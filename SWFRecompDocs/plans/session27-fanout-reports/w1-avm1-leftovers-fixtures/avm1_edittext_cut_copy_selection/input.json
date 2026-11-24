@@ -1,0 +1,12 @@
+[
+  { "type": "TextControl", "code": "Copy" },
+  { "type": "Wait" },
+  { "type": "TextControl", "code": "Paste" },
+  { "type": "Wait" },
+  { "type": "TextControl", "code": "Cut" },
+  { "type": "Wait" },
+  { "type": "TextControl", "code": "Cut" },
+  { "type": "TextControl", "code": "Copy" },
+  { "type": "Wait" },
+  { "type": "TextControl", "code": "Paste" }
+]

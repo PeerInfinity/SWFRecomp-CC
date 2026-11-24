@@ -1,0 +1,10 @@
+s.mc.foo=F
+s.mc:foo=F
+s[mc:foo]=undefined
+s.mc.bar=B
+s.mc.baz=Z
+_root.mc=undefined
+_root.pv=P
+s.pv=undefined
+s.late.q=undefined
+s.t5.text=X

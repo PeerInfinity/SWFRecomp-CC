@@ -1,0 +1,931 @@
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index 0d6137872..8b75016be 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -125,31 +125,6 @@ void tagSetCacheAsBitmap(SWFAppContext* app_context, size_t depth, u8 on);
+ void tagSetVisible(SWFAppContext* app_context, size_t depth, u8 visible);
+ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+     double r, double g, double b, double a);
+-void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20);
+-void tagSetFilterConvolution(SWFAppContext* app_context, size_t depth,
+-    u8 matrixX, u8 matrixY, const float* matrix, float divisor, float bias,
+-    u8 preserve_alpha, u8 clamp, u8 def_r, u8 def_g, u8 def_b, u8 def_a);
+-void tagSetFilterGradient(SWFAppContext* app_context, size_t depth,
+-    u8 type, u8 count, const u32* colors, const float* alphas, const u8* ratios,
+-    float blur_x, float blur_y, float angle, float distance, float strength,
+-    u8 quality, u8 flags);
+-// Extended filter data accessor (returns pointer to static data or NULL)
+-typedef struct ExtFilterData {
+-    u8 type;          // 5=convolution, 6=colormatrix, 7=gradientglow, 8=gradientbevel
+-    float cm_matrix[20];
+-    u8 conv_mx, conv_my;
+-    float conv_matrix[25];
+-    float conv_divisor, conv_bias;
+-    u8 conv_preserve_alpha, conv_clamp;
+-    u8 conv_color_r, conv_color_g, conv_color_b, conv_color_a;
+-    u8 grad_count;
+-    u32 grad_colors[16];
+-    float grad_alphas[16];
+-    u8 grad_ratios[16];
+-    float blur_x, blur_y, angle, distance, strength;
+-    u8 quality, flags;
+-} ExtFilterData;
+-const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth);
+ 
+ // Multi-filter list: stores ALL SWF-authored filters per display entry
+ typedef struct FilterListEntry {
+@@ -259,6 +234,11 @@ void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const
+ // Run a DoInitAction script, guarded by once-per-character-id.
+ // Used for DoInitAction tags inside DefineSprite definitions.
+ void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_func action);
++void tagDoInitActionFrame(SWFAppContext* app_context, size_t char_id, frame_func action);
++void tagDoInitActionFrameLate(SWFAppContext* app_context, size_t char_id, frame_func action, size_t def_frame);
++void tagDrainGotoInitActions(SWFAppContext* app_context, int force);
++void tagGotoInitCapture(int enter);
++void tagGotoInitTimerPass(int enter);
+ 
+ // Forward declaration (defined in actionmodern/action.h)
+ typedef struct MovieClip MovieClip;
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index aea7864be..1ccb129c8 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -1049,8 +1049,25 @@ typedef struct {
+ 	ASFunction* watcher_func;
+ 	ActionVar user_data;    // userData (3rd arg passed to watch())
+ } WatchEntry;
+-static WatchEntry g_watch_table[MAX_WATCH_ENTRIES];
++// s27 w1-timers-robustness PROTOTYPE: growable (was a fixed 64: the 65th
++// live watch() returned false and its handler never ran). Starts on a static
++// block; past that it doubles on the heap. Watch handlers are invoked with
++// &g_watch_table[i].user_data and may call watch() themselves, so a replaced
++// block is never freed (bounded: the abandoned blocks sum to < the live one).
++static WatchEntry g_watch_table_static[MAX_WATCH_ENTRIES];
++static WatchEntry* g_watch_table = g_watch_table_static;
++static int g_watch_cap = MAX_WATCH_ENTRIES;
+ static int g_watch_count = 0;
++static int watch_table_room(void)
++{
++	if (g_watch_count < g_watch_cap) return 1;
++	WatchEntry* nt = (WatchEntry*) calloc((size_t) g_watch_cap * 2, sizeof(WatchEntry));
++	if (nt == NULL) return 0;
++	memcpy(nt, g_watch_table, (size_t) g_watch_cap * sizeof(WatchEntry));
++	g_watch_table = nt;   // old block deliberately kept (see above)
++	g_watch_cap *= 2;
++	return 1;
++}
+ 
+ // Re-entrancy guard for watch handlers. Setting a watched property from inside
+ // its own watch handler re-fires the handler a Flash-version-specific number of
+@@ -5288,7 +5305,7 @@ static ActionVar builtin_object_watch(SWFAppContext* app_context, ActionVar* arg
+ 		}
+ 	}
+ 	// Add new entry
+-	if (g_watch_count < MAX_WATCH_ENTRIES) {
++	if (watch_table_room()) {
+ 		g_watch_table[g_watch_count].obj = obj;
+ 		g_watch_table[g_watch_count].mc = mc;
+ 		strncpy(g_watch_table[g_watch_count].prop_name, prop_name, sizeof(g_watch_table[0].prop_name) - 1);
+@@ -62429,105 +62446,6 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 				float fhr=0, fhg=0, fhb=0, fha=0;
+ 				u8 fquality=0, fflags=0;
+ 
+-				// Check extended filter data first (ColorMatrix, Convolution, Gradient*)
+-				const ExtFilterData* efd = (entry_depth != (size_t)-1) ? ng_getExtFilterDataByDepth(entry_depth) : NULL;
+-				if (efd && efd->type >= 5 && efd->type <= 8) {
+-					ASObject* proto = g_filter_protos_by_type[efd->type];
+-					if (proto) {
+-						ASObject* fobj = allocObject(app_context, 16);
+-						fobj->native_type = NATIVE_FILTER;
+-						ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+-						pv.data.numeric_value = (u64)proto;
+-						setPropertyWithFlags(app_context, fobj, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+-						ActionVar v;
+-						if (efd->type == 6) {
+-							// ColorMatrixFilter: matrix (ASArray of 20 floats)
+-							ASArray* marr = allocArray(app_context, 20);
+-							marr->length = 20; initArrayProto(app_context, marr);
+-							for (int i = 0; i < 20; i++) {
+-								marr->elements[i] = makeF64((double)efd->cm_matrix[i]);
+-							}
+-							v.type = ACTION_STACK_VALUE_ARRAY;
+-							v.data.numeric_value = (u64)marr;
+-							setProperty(app_context, fobj, "matrix", 6, &v);
+-						} else if (efd->type == 5) {
+-							// ConvolutionFilter: matrixX, matrixY, matrix, divisor, bias,
+-							//   preserveAlpha, clamp, color, alpha
+-							v = makeF64((double)efd->conv_mx); setProperty(app_context, fobj, "matrixX", 7, &v);
+-							v = makeF64((double)efd->conv_my); setProperty(app_context, fobj, "matrixY", 7, &v);
+-							int n = efd->conv_mx * efd->conv_my;
+-							if (n > 25) n = 25;
+-							ASArray* marr = allocArray(app_context, n);
+-							marr->length = n; initArrayProto(app_context, marr);
+-							for (int i = 0; i < n; i++) {
+-								marr->elements[i] = makeF64((double)efd->conv_matrix[i]);
+-							}
+-							v.type = ACTION_STACK_VALUE_ARRAY;
+-							v.data.numeric_value = (u64)marr;
+-							setProperty(app_context, fobj, "matrix", 6, &v);
+-							v = makeF64((double)efd->conv_divisor); setProperty(app_context, fobj, "divisor", 7, &v);
+-							v = makeF64((double)efd->conv_bias); setProperty(app_context, fobj, "bias", 4, &v);
+-							v.type = ACTION_STACK_VALUE_BOOLEAN;
+-							v.data.numeric_value = efd->conv_preserve_alpha;
+-							setProperty(app_context, fobj, "preserveAlpha", 13, &v);
+-							v.type = ACTION_STACK_VALUE_BOOLEAN;
+-							v.data.numeric_value = efd->conv_clamp;
+-							setProperty(app_context, fobj, "clamp", 5, &v);
+-							uint32_t cc = ((uint32_t)efd->conv_color_r << 16) | ((uint32_t)efd->conv_color_g << 8) | efd->conv_color_b;
+-							v = makeF64((double)cc); setProperty(app_context, fobj, "color", 5, &v);
+-							v = makeF64(efd->conv_color_a / 255.0); setProperty(app_context, fobj, "alpha", 5, &v);
+-						} else {
+-							// GradientGlow (7) / GradientBevel (8): distance, angle, colors, alphas,
+-							//   ratios, blurX, blurY, quality, strength, knockout, type
+-							double angle_deg = (double)efd->angle * 180.0 / 3.14159265358979323846;
+-							v = makeF64((double)efd->distance); setProperty(app_context, fobj, "distance", 8, &v);
+-							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
+-							// colors array
+-							ASArray* carr = allocArray(app_context, efd->grad_count);
+-							carr->length = efd->grad_count; initArrayProto(app_context, carr);
+-							for (int i = 0; i < efd->grad_count; i++)
+-								carr->elements[i] = makeF64((double)efd->grad_colors[i]);
+-							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)carr;
+-							setProperty(app_context, fobj, "colors", 6, &v);
+-							// alphas array
+-							ASArray* aarr = allocArray(app_context, efd->grad_count);
+-							aarr->length = efd->grad_count; initArrayProto(app_context, aarr);
+-							for (int i = 0; i < efd->grad_count; i++)
+-								aarr->elements[i] = makeF64((double)efd->grad_alphas[i]);
+-							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)aarr;
+-							setProperty(app_context, fobj, "alphas", 6, &v);
+-							// ratios array
+-							ASArray* rarr = allocArray(app_context, efd->grad_count);
+-							rarr->length = efd->grad_count; initArrayProto(app_context, rarr);
+-							for (int i = 0; i < efd->grad_count; i++)
+-								rarr->elements[i] = makeF64((double)efd->grad_ratios[i]);
+-							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)rarr;
+-							setProperty(app_context, fobj, "ratios", 6, &v);
+-							v = makeF64((double)efd->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+-							v = makeF64((double)efd->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+-							v = makeF64((double)efd->quality); setProperty(app_context, fobj, "quality", 7, &v);
+-							v = makeF64((double)efd->strength); setProperty(app_context, fobj, "strength", 8, &v);
+-							int inner_f = (efd->flags >> 2) & 1;
+-							int knockout_f = (efd->flags >> 1) & 1;
+-							int on_top_f = efd->flags & 1;
+-							v.type = ACTION_STACK_VALUE_BOOLEAN;
+-							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+-							// Ruffle type logic: ON_TOP → Full, else INNER → Inner, else Outer
+-							const char* type_str = on_top_f ? "full" : (inner_f ? "inner" : "outer");
+-							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
+-							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
+-							v.data.string_data.heap_ptr = u16p;
+-							setProperty(app_context, fobj, "type", 4, &v);
+-						}
+-						// Wrap in array
+-						ASArray* farr = allocArray(app_context, 1);
+-						farr->length = 1; initArrayProto(app_context, farr);
+-						farr->elements[0].type = ACTION_STACK_VALUE_OBJECT;
+-						farr->elements[0].data.numeric_value = (u64)fobj;
+-						PUSH(ACTION_STACK_VALUE_ARRAY, (u64)farr);
+-						return;
+-					}
+-				}
+ 
+ 				if (entry != NULL &&
+ 				    ng_getObjFilterData(entry, &ftype, &fblur_x, &fblur_y,
+@@ -80609,7 +80527,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 						break;
+ 					}
+ 				}
+-				if (!_w_found && g_watch_count < MAX_WATCH_ENTRIES) {
++				if (!_w_found && watch_table_room()) {
+ 					g_watch_table[g_watch_count].obj = NULL;
+ 					g_watch_table[g_watch_count].mc = mc;
+ 					strncpy(g_watch_table[g_watch_count].prop_name, _w_prop, sizeof(g_watch_table[0].prop_name) - 1);
+diff --git a/SWFModernRuntime/src/actionmodern/timer.c b/SWFModernRuntime/src/actionmodern/timer.c
+index ae5fa7802..e123ce771 100644
+--- a/SWFModernRuntime/src/actionmodern/timer.c
++++ b/SWFModernRuntime/src/actionmodern/timer.c
+@@ -7,6 +7,7 @@
+ // non-graphics modes.
+ 
+ #include <limits.h>
++#include <stdlib.h>
+ #include <math.h>
+ #include <stdint.h>
+ #include <string.h>
+@@ -16,6 +17,9 @@
+ #include <actionmodern/action.h>            // processTimers/hasActiveTimers ABI, actionFlushPendingOnLoads, g_execution_halted
+ #include <actionmodern/action_internal.h>
+ #include <actionmodern/actiontimer.h>
++// tag.c (s27 w1-timers-robustness prototype): goto-skipped DoInitAction queue.
++extern void tagGotoInitTimerPass(int enter);
++extern void tagDrainGotoInitActions(SWFAppContext* app_context, int force);
+ 
+ // ==================================================================
+ // Timer state
+@@ -44,7 +48,30 @@ typedef struct {
+ 	int extra_arg_count;
+ } TimerEntry;
+ 
+-static TimerEntry g_timers[MAX_TIMERS];
++// s27 w1-timers-robustness PROTOTYPE: growable (was a fixed 64: the 65th
++// live setInterval/setTimeout returned undefined and never fired). Starts on
++// a static block of MAX_TIMERS; past that it doubles on the heap. A callback
++// can create timers while processTimers / fireTimerCallback hold a pointer
++// into the table (and pass t->extra_args to the callee), so a replaced block
++// is never freed (bounded: the abandoned blocks sum to < the live one), and
++// processTimers re-derives its entry by index after each callback.
++static TimerEntry g_timers_static[MAX_TIMERS];
++static TimerEntry* g_timers = g_timers_static;
++static int g_timers_cap = MAX_TIMERS;
++
++static int timerFreeSlot(void)
++{
++	for (int i = 0; i < g_timers_cap; i++)
++		if (!g_timers[i].active) return i;
++	int ncap = g_timers_cap * 2;
++	TimerEntry* nt = (TimerEntry*) calloc((size_t) ncap, sizeof(TimerEntry));
++	if (nt == NULL) return -1;
++	memcpy(nt, g_timers, (size_t) g_timers_cap * sizeof(TimerEntry));
++	int slot = g_timers_cap;
++	g_timers = nt;            // old block deliberately kept (see above)
++	g_timers_cap = ncap;
++	return slot;
++}
+ static int g_next_timer_id = 1;
+ 
+ // Timer clock (s26 w2-timer-semantics). A port of Ruffle's Timers
+@@ -139,8 +166,11 @@ static int timerIsCallable(ActionVar* v)
+ 
+ static int timerIsObject(ActionVar* v)
+ {
++	// Ruffle create_timer: any non-function Object takes the method form —
++	// an Array included (s27 w1-timers-robustness prototype).
+ 	return v->type == ACTION_STACK_VALUE_OBJECT ||
+-	       v->type == ACTION_STACK_VALUE_MOVIECLIP;
++	       v->type == ACTION_STACK_VALUE_MOVIECLIP ||
++	       v->type == ACTION_STACK_VALUE_ARRAY;
+ }
+ 
+ // ==================================================================
+@@ -230,11 +260,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
+ 		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[2]));
+ 
+ 		// Find empty slot
+-		int slot = -1;
+-		for (int i = 0; i < MAX_TIMERS; i++)
+-		{
+-			if (!g_timers[i].active) { slot = i; break; }
+-		}
++		int slot = timerFreeSlot();
+ 		if (slot == -1)
+ 		{
+ 			if (args != NULL) FREE(args);
+@@ -289,11 +315,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
+ 		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[1]));
+ 
+ 		// Find empty slot
+-		int slot = -1;
+-		for (int i = 0; i < MAX_TIMERS; i++)
+-		{
+-			if (!g_timers[i].active) { slot = i; break; }
+-		}
++		int slot = timerFreeSlot();
+ 		if (slot == -1)
+ 		{
+ 			if (args != NULL) FREE(args);
+@@ -336,11 +358,15 @@ void actionTimerClearInterval(SWFAppContext* app_context, ActionVar* args, u32 n
+ 	}
+ 
+ 	// Get timer ID from first arg
+-	double id_d = timerCoerceToNumber(app_context, &args[0]);
++	// Ruffle clear_interval: coerce_to_i32 (ECMA ToInt32). `(int)double`
++	// was UB for NaN / out-of-range ids (x86: INT_MIN), so
++	// clearInterval(id + 4294967296) did not clear timer `id`
++	// (s27 w1-timers-robustness prototype).
++	double id_d = timerDelayToInt32(timerCoerceToNumber(app_context, &args[0]));
+ 	int id = (int)id_d;
+ 
+ 	// Find and deactivate the timer
+-	for (int i = 0; i < MAX_TIMERS; i++)
++	for (int i = 0; i < g_timers_cap; i++)
+ 	{
+ 		if (g_timers[i].active && g_timers[i].id == id)
+ 		{
+@@ -392,7 +418,35 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
+ 			}
+ 		}
+ 
+-		if (method_func == NULL) return; // method not found, skip silently
++		if (method_func == NULL)
++		{
++			// s27 w1-timers-robustness PROTOTYPE: Ruffle's Avm1Method arm is
++			// `this.call_method(name, params)` — a full member lookup, so a
++			// native method (setInterval(mc, "nextFrame", ms), `play`, ...)
++			// and a non-ASObject receiver (an Array) are called too. The
++			// dynamic-property lookup above only sees user-assigned
++			// functions; fall back to the CallMethod opcode path for the
++			// rest (AVM1 stack layout: args last..first, count, obj, name).
++			if (t->object.type != ACTION_STACK_VALUE_OBJECT &&
++			    t->object.type != ACTION_STACK_VALUE_MOVIECLIP &&
++			    t->object.type != ACTION_STACK_VALUE_ARRAY) return;
++			if (t->object.data.numeric_value == 0) return;
++			for (int i = t->extra_arg_count - 1; i >= 0; i--)
++				pushVar(app_context, &t->extra_args[i]);
++			ActionVar n_var = {0};
++			n_var.type = ACTION_STACK_VALUE_F64;
++			VAL(double, &n_var.data.numeric_value) = (double) t->extra_arg_count;
++			pushVar(app_context, &n_var);
++			pushVar(app_context, &t->object);
++			PUSH_STR(t->method_name, strlen(t->method_name));
++			char _tm_sb[17];
++			g_call_depth++;
++			actionCallMethod(app_context, _tm_sb);
++			g_call_depth--;
++			ActionVar _tm_r;
++			popVar(app_context, &_tm_r);
++			return;
++		}
+ 
+ 		// INV_VERSION_SWITCH: run the callback under its defining movie's SWF
+ 		// version (and the matching version-group _global) — timers fire from
+@@ -510,7 +564,7 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ 	// again (Ruffle cancels them when they come due, below); drop them now
+ 	// as before so they do not keep hasActiveTimers() — the headless exit
+ 	// condition — true until their due time.
+-	for (int i = 0; i < MAX_TIMERS; i++)
++	for (int i = 0; i < g_timers_cap; i++)
+ 	{
+ 		if (!g_timers[i].active || !g_timers[i].is_method ||
+ 		    g_timers[i].object.type != ACTION_STACK_VALUE_MOVIECLIP) continue;
+@@ -519,11 +573,17 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ 	}
+ 
+ 	int tick_count = 0;
++	// s27 w1-timers-robustness PROTOTYPE: init actions queued by a goto in a
++	// callback run after the batch of timers due at the same instant
++	// (tagDrainGotoInitActions; gnash gotoFrameFromInterval `x0xx1x234`).
++	tagGotoInitTimerPass(1);
++	int have_batch = 0;
++	uint64_t batch_tick = 0;
+ 	for (;;)
+ 	{
+ 		// Earliest due active timer (ties: lowest id = creation order).
+ 		int best = -1;
+-		for (int i = 0; i < MAX_TIMERS; i++)
++		for (int i = 0; i < g_timers_cap; i++)
+ 		{
+ 			if (!g_timers[i].active) continue;
+ 			if (best < 0 || g_timers[i].tick_us < g_timers[best].tick_us ||
+@@ -533,6 +593,12 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ 		if (best < 0 || !(g_timers[best].tick_us < g_timer_cur_us)) break;
+ 
+ 		TimerEntry* t = &g_timers[best];
++		if (have_batch && t->tick_us != batch_tick)
++		{
++			tagDrainGotoInitActions(app_context, 1);
++			have_batch = 0;
++			continue; // the init actions may have cleared / created timers
++		}
+ 		if (++tick_count > TIMER_MAX_TICKS)
+ 		{
+ 			g_timer_cur_us = t->tick_us - 100;
+@@ -549,6 +615,7 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ 		}
+ 
+ 		int expected_id = t->id;
++		if (!have_batch) { have_batch = 1; batch_tick = t->tick_us; }
+ 		if (!cancel)
+ 		{
+ 			fireTimerCallback(app_context, t);
+@@ -561,7 +628,9 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ 		}
+ 
+ 		// The callback may have cleared this timer (or cleared it and a new
+-		// one reused the slot): only reschedule the entry it fired.
++		// one reused the slot): only reschedule the entry it fired. Re-derive
++		// the pointer: the callback may have grown (moved) the table.
++		t = &g_timers[best];
+ 		if (t->active && t->id == expected_id)
+ 		{
+ 			if (!t->is_interval || cancel)
+@@ -571,12 +640,14 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ 		}
+ 		if (g_execution_halted) break;
+ 	}
++	tagGotoInitTimerPass(0);
++	tagDrainGotoInitActions(app_context, 1);
+ }
+ 
+ // Check if any timers are active
+ int hasActiveTimers(void)
+ {
+-	for (int i = 0; i < MAX_TIMERS; i++)
++	for (int i = 0; i < g_timers_cap; i++)
+ 	{
+ 		if (g_timers[i].active) return 1;
+ 	}
+@@ -650,7 +721,7 @@ ASFunction* actionTimerGetClearTimeout(void)  { initTimerFunctions(); return &g_
+ // static but not necessarily in function_registry).
+ void timerGcMarkRoots(void)
+ {
+-	for (int i = 0; i < MAX_TIMERS; i++) {
++	for (int i = 0; i < g_timers_cap; i++) {
+ 		if (!g_timers[i].active) continue;
+ 		swfGcMarkVar(&g_timers[i].func);
+ 		swfGcMarkVar(&g_timers[i].object);
+@@ -670,7 +741,7 @@ void timerGcMarkRoots(void)
+ // time before; firing with UNDEFINED is a deterministic no-op instead.
+ void timerGcScrubStashes(const void* p)
+ {
+-	for (int i = 0; i < MAX_TIMERS; i++) {
++	for (int i = 0; i < g_timers_cap; i++) {
+ 		if (!g_timers[i].active) continue;
+ 		ActionVar* vars[10];
+ 		int n = 0;
+diff --git a/SWFModernRuntime/src/libswf/swf.c b/SWFModernRuntime/src/libswf/swf.c
+index b1828f9ef..8871efd48 100644
+--- a/SWFModernRuntime/src/libswf/swf.c
++++ b/SWFModernRuntime/src/libswf/swf.c
+@@ -274,6 +274,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
+ 	g_defer_sprite_init = 1;
+ 	catch_up_mode = 1;
+ 	actionGotoCatchupEnter();
++	tagGotoInitCapture(1);
+ 	if (target <= original_frame)
+ 	{
+ 		actionRewindCleanup(app_context);
+@@ -296,8 +297,10 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
+ 		}
+ 	}
+ 	actionGotoCatchupLeave();
++	tagGotoInitCapture(0);
+ 	catch_up_mode = 0;
+ 	g_tag_skip_mode = saved_tag_skip;
++	tagDrainGotoInitActions(app_context, 0);
+ 	(void)saved_defer_sprite;
+ 	current_frame = target;
+ 
+@@ -346,6 +349,7 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
+ 	g_tag_skip_mode = 0;
+ 	g_defer_sprite_init = 1;
+ 	catch_up_mode = 1;
++	tagGotoInitCapture(1);
+ 	if (target <= original_frame)
+ 	{
+ 		actionRewindCleanup(app_context);
+@@ -368,7 +372,9 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
+ 		}
+ 	}
+ 	catch_up_mode = 0;
++	tagGotoInitCapture(0);
+ 	g_tag_skip_mode = saved_tag_skip;
++	tagDrainGotoInitActions(app_context, 0);
+ 	g_defer_sprite_init = saved_defer_sprite;
+ 
+ 	current_frame = original_frame;
+@@ -1269,6 +1275,7 @@ void tagMain(SWFAppContext* app_context)
+ 				ng_display_clear_after(app_context, target);
+ 
+ 				catch_up_mode = 1;
++				tagGotoInitCapture(1);
+ 				if (target <= original_frame)
+ 				{
+ 					actionRewindCleanup(app_context);
+@@ -1280,6 +1287,8 @@ void tagMain(SWFAppContext* app_context)
+ 						if (frame_funcs[f]) frame_funcs[f](app_context);
+ 					}
+ 					catch_up_mode = 0;
++					tagGotoInitCapture(0);
++					tagDrainGotoInitActions(app_context, 0);
+ 					if (target < g_frame_count)
+ 					{
+ 						current_frame = target;
+@@ -1296,6 +1305,8 @@ void tagMain(SWFAppContext* app_context)
+ 						if (frame_funcs[f]) frame_funcs[f](app_context);
+ 					}
+ 					catch_up_mode = 0;
++					tagGotoInitCapture(0);
++					tagDrainGotoInitActions(app_context, 0);
+ 					if (target < g_frame_count)
+ 					{
+ 						current_frame = target;
+diff --git a/SWFModernRuntime/src/libswf/swf_core.c b/SWFModernRuntime/src/libswf/swf_core.c
+index 97e277ce4..3a05bba44 100644
+--- a/SWFModernRuntime/src/libswf/swf_core.c
++++ b/SWFModernRuntime/src/libswf/swf_core.c
+@@ -192,6 +192,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
+ 	// sprite scripts fire synchronously inside ng_run_deferred_sprite_init_impl
+ 	// after the target frame's root script drains.
+ 	actionGotoCatchupEnter();
++	tagGotoInitCapture(1);
+ 	if (target <= original_frame)
+ 	{
+ #ifdef NO_GRAPHICS
+@@ -227,8 +228,10 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
+ 		}
+ 	}
+ 	actionGotoCatchupLeave();
++	tagGotoInitCapture(0);
+ 	catch_up_mode = 0;
+ 	g_tag_skip_mode = saved_tag_skip;
++	tagDrainGotoInitActions(app_context, 0);
+ 	// Do NOT restore g_defer_sprite_init here — keep it set so that the
+ 	// calling frame's tagShowFrame (which runs after this returns) also defers
+ 	// sprite init. g_defer_sprite_init is cleared in the deferred-script loop
+@@ -336,6 +339,7 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
+ 	g_tag_skip_mode = 0;
+ 	g_defer_sprite_init = 1;
+ 	catch_up_mode = 1;
++	tagGotoInitCapture(1);
+ 	if (target <= original_frame)
+ 	{
+ #ifdef NO_GRAPHICS
+@@ -366,7 +370,9 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
+ 		}
+ 	}
+ 	catch_up_mode = 0;
++	tagGotoInitCapture(0);
+ 	g_tag_skip_mode = saved_tag_skip;
++	tagDrainGotoInitActions(app_context, 0);
+ 	g_defer_sprite_init = saved_defer_sprite;
+ 
+ 	// Restore current_frame — the main loop manages frame advancement.
+@@ -1404,6 +1410,7 @@ void swfStart(SWFAppContext* app_context)
+ 			ng_display_clear_after(app_context, target);
+ 
+ 			catch_up_mode = 1;
++			tagGotoInitCapture(1);
+ 			if (target <= original_frame)
+ 			{
+ 				// Backward goto: replay tags from frame 0 to target.
+@@ -1426,6 +1433,8 @@ void swfStart(SWFAppContext* app_context)
+ 					if (funcs[f]) funcs[f](app_context);
+ 				}
+ 				catch_up_mode = 0;
++				tagGotoInitCapture(0);
++				tagDrainGotoInitActions(app_context, 0);
+ 				// Execute target frame with scripts enabled but
+ 				// backward protection still active
+ 				if (target < g_frame_count)
+@@ -1449,6 +1458,8 @@ void swfStart(SWFAppContext* app_context)
+ 					if (funcs[f]) funcs[f](app_context);
+ 				}
+ 				catch_up_mode = 0;
++				tagGotoInitCapture(0);
++				tagDrainGotoInitActions(app_context, 0);
+ 				// Execute target frame with scripts enabled
+ 				if (target < g_frame_count)
+ 				{
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 3bbbe9a85..9100d323a 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -9300,8 +9300,14 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
+ 	}
+ }
+ 
++size_t g_s27_root_frames_shown = 0; // s27 w1-timers-robustness prototype (tagDoInitActionFrameLate)
+ void tagShowFrame(SWFAppContext* app_context)
+ {
++	{
++		extern size_t current_frame;
++		if (g_current_movie_id == 0 && current_frame + 1 > g_s27_root_frames_shown)
++			g_s27_root_frames_shown = current_frame + 1;
++	}
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+ 	if (g_tag_skip_mode) return;
+ 	if (g_in_action_call) return;
+@@ -14203,6 +14209,126 @@ void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_fu
+ 	action(app_context);
+ }
+ 
++// s27 w1-timers-robustness PROTOTYPE: DoInitAction blocks on frames a root
++// goto passes over. The recompiler used to gate every root-frame init call on
++// `!catch_up_mode || g_tag_skip_mode`, so a forward goto that skipped a frame
++// never ran its init actions (from a frame script AND from a timer). Flash
++// runs them (gnash misc-ming InitActionTest2 `mc6`, misc-swfc
++// movieclip_destruction_test1 `initaction mc3 in root frame4`,
++// gotoFrameFromInterval `x0xx1x234`). While a root goto catch-up is active
++// the call is queued (in frame order) and drained when the catch-up ends,
++// before the target frame's own scripts; inside a timer pass the drain waits
++// for the end of the batch of timers due at the same instant (Flash order in
++// gotoFrameFromInterval: both callbacks, then the init actions).
++// Other catch-up passes (loaded-movie / clone first passes) keep skipping.
++typedef struct { u8 movie; u16 id; frame_func fn; } PendingGotoInit;
++static PendingGotoInit* g_pending_goto_inits = NULL;
++static size_t g_pending_goto_inits_n = 0, g_pending_goto_inits_cap = 0;
++static int g_goto_init_capture = 0;
++static int g_goto_init_timer_pass = 0;
++
++void tagGotoInitCapture(int enter) { g_goto_init_capture += enter ? 1 : -1; }
++void tagGotoInitTimerPass(int enter) { g_goto_init_timer_pass += enter ? 1 : -1; }
++
++void tagDoInitActionFrame(SWFAppContext* app_context, size_t char_id, frame_func action)
++{
++	if (!catch_up_mode || g_tag_skip_mode) {
++		tagDoInitActionGuarded(app_context, char_id, action);
++		return;
++	}
++	if (g_goto_init_capture <= 0) return;
++	u8 movie = g_current_movie_id;
++	size_t id = char_id & 0xFFFF;
++	u8* row = g_init_action_done[movie];
++	if (row != NULL && (row[id >> 3] & (1u << (id & 7)))) return;
++	for (size_t i = 0; i < g_pending_goto_inits_n; i++)
++		if (g_pending_goto_inits[i].movie == movie && g_pending_goto_inits[i].id == id) return;
++	if (g_pending_goto_inits_n >= g_pending_goto_inits_cap
++	    && !ng_table_grow((void**)&g_pending_goto_inits, &g_pending_goto_inits_cap,
++	                      sizeof(*g_pending_goto_inits), 16)) return;
++	g_pending_goto_inits[g_pending_goto_inits_n].movie = movie;
++	g_pending_goto_inits[g_pending_goto_inits_n].id = (u16) id;
++	g_pending_goto_inits[g_pending_goto_inits_n].fn = action;
++	g_pending_goto_inits_n++;
++}
++
++// The init's sprite is defined later in the tag stream, in root frame
++// def_frame ((size_t)-1: never): run only once the playhead has shown that
++// frame (Flash ignores an init action whose character is not defined yet).
++void tagDoInitActionFrameLate(SWFAppContext* app_context, size_t char_id, frame_func action, size_t def_frame)
++{
++	extern size_t g_s27_root_frames_shown;
++	if (def_frame == (size_t) -1 || g_s27_root_frames_shown <= def_frame) return;
++	tagDoInitActionFrame(app_context, char_id, action);
++}
++
++// force=0: the end of a goto (deferred while a timer pass is running);
++// force=1: the timer pass's batch boundary / end.
++static int g_goto_init_aq_scheduled = 0;
++static void tagDrainGotoInitActionsAQ(SWFAppContext* app_context, void* user)
++{
++	(void) user;
++	g_goto_init_aq_scheduled = 0;
++	tagDrainGotoInitActions(app_context, 1);
++}
++
++void tagDrainGotoInitActions(SWFAppContext* app_context, int force)
++{
++	if (!force) {
++		// End of a goto: Flash runs the init actions after the script that
++		// issued the goto, before the target frame's scripts (gnash
++		// action_execution_order_test12 `0+1+2+3+4+`): one SCRIPT-kind queue
++		// entry at the highest priority. Inside a timer pass processTimers
++		// drains them itself.
++		if (g_goto_init_timer_pass > 0 || g_pending_goto_inits_n == 0
++		    || g_goto_init_aq_scheduled) return;
++		g_goto_init_aq_scheduled = 1;
++		actionQueueCallbackEx(app_context, tagDrainGotoInitActionsAQ, NULL,
++		                      AQ_PRIORITY_INITIALIZE, NULL, 0, AQ_KIND_SCRIPT);
++		return;
++	}
++	size_t i = 0;
++	while (i < g_pending_goto_inits_n) {
++		PendingGotoInit p = g_pending_goto_inits[i++];
++		// Init actions run in the root timeline's context, never in the
++		// (possibly just-removed) clip whose script issued the goto.
++		// Same context save/clear/restore as action_queue.c's sprite-script
++		// dispatch (SetTarget state must not leak in from the caller).
++		extern MovieClip root_movieclip;
++		extern void actionSetCurrentContext(MovieClip* mc);
++		extern void actionSetBaseClip(MovieClip* mc);
++		extern MovieClip* actionGetBaseClip(void);
++		extern int g_settarget_explicit_root, g_settarget_invalid, g_settarget_none,
++		           g_settarget_context_changed;
++		extern MovieClip* g_settarget_saved_context;
++		u8 saved_movie = g_current_movie_id;
++		MovieClip* saved_ctx = g_current_context;
++		MovieClip* saved_base = actionGetBaseClip();
++		DisplayObject* saved_obj = g_current_sprite_obj;
++		int s_er = g_settarget_explicit_root, s_inv = g_settarget_invalid,
++		    s_none = g_settarget_none, s_cc = g_settarget_context_changed;
++		MovieClip* s_sc = g_settarget_saved_context;
++		g_settarget_explicit_root = g_settarget_invalid = g_settarget_none =
++			g_settarget_context_changed = 0;
++		g_settarget_saved_context = NULL;
++		g_current_movie_id = p.movie;
++		if (p.movie == 0) {
++			actionSetCurrentContext(&root_movieclip);
++			actionSetBaseClip(&root_movieclip);
++			g_current_sprite_obj = NULL;
++		}
++		tagDoInitActionGuarded(app_context, p.id, p.fn);
++		actionSetCurrentContext(saved_ctx);
++		actionSetBaseClip(saved_base);
++		g_current_sprite_obj = saved_obj;
++		g_settarget_explicit_root = s_er; g_settarget_invalid = s_inv;
++		g_settarget_none = s_none; g_settarget_context_changed = s_cc;
++		g_settarget_saved_context = s_sc;
++		g_current_movie_id = saved_movie;
++	}
++	g_pending_goto_inits_n = 0;
++}
++
+ // Per-sprite frame label storage (separate from Character union)
+ // Growable (was a fixed 256: gotoAndStop("label") on the 257th labelled
+ // sprite found no label and stayed on frame 1).
+@@ -14611,107 +14737,6 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+ 	}
+ }
+ 
+-// Extended filter data side table (for ColorMatrix, Convolution, Gradient
+-// filters), keyed by root depth. Growable (s26 w2-robustness-land): it was a
+-// fixed 32-entry table, so the 33rd+ filtered root depth silently lost its
+-// filter. Entries are individually allocated (pointer-stable): callers hold
+-// the ExtFilterData* that getOrCreateExtFilter / ng_getExtFilterDataByDepth
+-// hand out, so the backing table may move but an entry never does.
+-static ExtFilterData** g_ext_filters;
+-static size_t g_ext_filter_cap;
+-static int g_ext_filter_count = 0;
+-
+-// Parallel depth array for the ext filter side table
+-static size_t* g_ext_filter_depths;
+-static size_t g_ext_filter_depths_cap;
+-
+-static ExtFilterData* getOrCreateExtFilter(size_t depth)
+-{
+-	for (int i = 0; i < g_ext_filter_count; i++) {
+-		if (g_ext_filter_depths[i] == depth) return g_ext_filters[i];
+-	}
+-	if ((size_t) g_ext_filter_count >= g_ext_filter_cap
+-		&& !ng_table_grow((void**) &g_ext_filters, &g_ext_filter_cap, sizeof(*g_ext_filters), 32))
+-		return NULL;
+-	if ((size_t) g_ext_filter_count >= g_ext_filter_depths_cap
+-		&& !ng_table_grow((void**) &g_ext_filter_depths, &g_ext_filter_depths_cap, sizeof(*g_ext_filter_depths), 32))
+-		return NULL;
+-	ExtFilterData* ef = (ExtFilterData*) calloc(1, sizeof(ExtFilterData));
+-	if (ef == NULL) return NULL;
+-	int idx = g_ext_filter_count++;
+-	g_ext_filters[idx] = ef;
+-	g_ext_filter_depths[idx] = depth;
+-	return ef;
+-}
+-
+-void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20)
+-{
+-	(void)app_context;
+-	if (depth > max_depth) return;
+-	ExtFilterData* ef = getOrCreateExtFilter(depth);
+-	if (!ef) return;
+-	ef->type = 6; // colormatrix
+-	memcpy(ef->cm_matrix, matrix20, 20 * sizeof(float));
+-}
+-
+-void tagSetFilterConvolution(SWFAppContext* app_context, size_t depth,
+-    u8 matrixX, u8 matrixY, const float* matrix, float divisor, float bias,
+-    u8 preserve_alpha, u8 clamp, u8 def_r, u8 def_g, u8 def_b, u8 def_a)
+-{
+-	(void)app_context;
+-	if (depth > max_depth) return;
+-	ExtFilterData* ef = getOrCreateExtFilter(depth);
+-	if (!ef) return;
+-	ef->type = 5; // convolution
+-	ef->conv_mx = matrixX;
+-	ef->conv_my = matrixY;
+-	int n = matrixX * matrixY;
+-	if (n > 25) n = 25;
+-	memcpy(ef->conv_matrix, matrix, n * sizeof(float));
+-	ef->conv_divisor = divisor;
+-	ef->conv_bias = bias;
+-	ef->conv_preserve_alpha = preserve_alpha;
+-	ef->conv_clamp = clamp;
+-	ef->conv_color_r = def_r;
+-	ef->conv_color_g = def_g;
+-	ef->conv_color_b = def_b;
+-	ef->conv_color_a = def_a;
+-}
+-
+-void tagSetFilterGradient(SWFAppContext* app_context, size_t depth,
+-    u8 type, u8 count, const u32* colors, const float* alphas, const u8* ratios,
+-    float blur_x, float blur_y, float angle, float distance, float strength,
+-    u8 quality, u8 flags)
+-{
+-	(void)app_context;
+-	if (depth > max_depth) return;
+-	ExtFilterData* ef = getOrCreateExtFilter(depth);
+-	if (!ef) return;
+-	ef->type = type; // 7=gradientglow, 8=gradientbevel
+-	if (count > 16) count = 16;
+-	ef->grad_count = count;
+-	memcpy(ef->grad_colors, colors, count * sizeof(u32));
+-	memcpy(ef->grad_alphas, alphas, count * sizeof(float));
+-	memcpy(ef->grad_ratios, ratios, count);
+-	ef->blur_x = blur_x;
+-	ef->blur_y = blur_y;
+-	ef->angle = angle;
+-	ef->distance = distance;
+-	ef->strength = strength;
+-	ef->quality = quality;
+-	ef->flags = flags;
+-}
+-
+-const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth)
+-{
+-	if (depth == (size_t)-1) return NULL;
+-	for (int i = 0; i < g_ext_filter_count; i++) {
+-		if (g_ext_filter_depths[i] == depth) return g_ext_filters[i];
+-	}
+-	return NULL;
+-}
+-
+-
+ // Multi-filter list storage, keyed by root depth. Growable (s26
+ // w2-robustness-land; was a fixed 32, so the 33rd+ filtered root depth lost its
+ // filter list). Pointer-stable: display_list[depth].filter_chain and
+diff --git a/SWFModernRuntime/src/libswf/tag_stubs.c b/SWFModernRuntime/src/libswf/tag_stubs.c
+index 38e5e3f6a..6ae56bc78 100644
+--- a/SWFModernRuntime/src/libswf/tag_stubs.c
++++ b/SWFModernRuntime/src/libswf/tag_stubs.c
+@@ -61,7 +61,13 @@ extern const char* ng_lookupExportName(size_t char_id);
+ // ---------------------------------------------------------------------------
+ #define MAX_CLONE_DEPTH_ENTRIES 128
+ typedef struct { int swf_depth; char name[64]; } CloneDepthEntry;
+-static CloneDepthEntry g_clone_depth_table[MAX_CLONE_DEPTH_ENTRIES];
++// s27 w1-timers-robustness PROTOTYPE: growable (was a fixed 128 that is
++// only ever emptied by same-depth eviction, so the 129th duplicateMovieClip /
++// CloneSprite at a fresh depth was never registered: a later clone at that
++// depth did not evict the old name, and backward-goto survival lost it).
++// Indexed only (no long-lived entry pointers), so realloc is safe.
++static CloneDepthEntry* g_clone_depth_table = NULL;
++static size_t g_clone_depth_cap = 0;
+ static size_t g_clone_depth_count = 0;
+ 
+ extern MovieClip root_movieclip;
+@@ -140,7 +146,9 @@ static void clone_depth_evict(SWFAppContext* app_context, int swf_depth, MovieCl
+ static void clone_depth_register(SWFAppContext* app_context, int swf_depth, const char* name, MovieClip* keep)
+ {
+ 	clone_depth_evict(app_context, swf_depth, keep);
+-	if (g_clone_depth_count < MAX_CLONE_DEPTH_ENTRIES)
++	if (g_clone_depth_count < g_clone_depth_cap
++	    || ng_table_grow((void**)&g_clone_depth_table, &g_clone_depth_cap,
++	                     sizeof(*g_clone_depth_table), MAX_CLONE_DEPTH_ENTRIES))
+ 	{
+ 		g_clone_depth_table[g_clone_depth_count].swf_depth = swf_depth;
+ 		strncpy(g_clone_depth_table[g_clone_depth_count].name, name, 63);
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index c0b989e05..5d2ad19d3 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -30,6 +30,15 @@
+ #include <abc/abc_parser.hpp>
+ #include <abc/abc_verifier.hpp>
+ 
++// s27 w1-timers-robustness PROTOTYPE: a DoInitAction whose sprite is not yet
++// defined (its DefineSprite comes later in the tag stream) is ignored by
++// Flash until the playhead has passed the definition (gnash misc-ming
++// InitActionTest2: val4/init7/init8). Top-level sprite id -> 0-based root
++// frame of its DefineSprite, and the ids whose init call was emitted "late".
++#include <map>
++static std::map<unsigned, size_t> s27_sprite_def_frame;
++static std::set<unsigned> s27_late_init_ids;
++
+ #define MIN(x, y) ((x < y) ? x : y)
+ #define MAX(x, y) ((x > y) ? x : y)
+ 
+@@ -1566,6 +1575,12 @@ namespace SWFRecomp
+ 		context.out_script_header << endl << endl
+ 								  << "#define FRAME_RATE " << to_string(header.framerate >> 8);
+ 
++		for (unsigned id : s27_late_init_ids)
++		{
++			auto it = s27_sprite_def_frame.find(id);
++			context.out_script_header << endl << "#define SWFRECOMP_INITDEF_" << id << " "
++				<< (it == s27_sprite_def_frame.end() ? std::string("((size_t)-1)") : to_string(it->second));
++		}
+ 		context.out_script_header.close();
+ 		context.out_script_defs.close();
+ 		context.out_script_decls.close();
+@@ -4134,11 +4149,20 @@ namespace SWFRecomp
+ 				// Gated on (!catch_up_mode || g_tag_skip_mode) and dispatched
+ 				// via tagDoInitActionGuarded so the per-character once-only
+ 				// guard short-circuits during script-only target replay.
+-				current_frame_init_actions
+-					<< "\tif (!catch_up_mode || g_tag_skip_mode) "
+-					<< "tagDoInitActionGuarded(app_context, "
+-					<< charId(init_sprite_id) << ", " << func_name << ");"
+-					<< endl;
++				if (defined_chars.count(init_sprite_id))
++					current_frame_init_actions
++						<< "\ttagDoInitActionFrame(app_context, "
++						<< charId(init_sprite_id) << ", " << func_name << ");"
++						<< endl;
++				else
++				{
++					s27_late_init_ids.insert(init_sprite_id);
++					current_frame_init_actions
++						<< "\ttagDoInitActionFrameLate(app_context, "
++						<< charId(init_sprite_id) << ", " << func_name
++						<< ", SWFRECOMP_INITDEF_" << init_sprite_id << ");"
++						<< endl;
++				}
+ 
+ 
+ 
+@@ -5932,6 +5956,8 @@ namespace SWFRecomp
+ 				// referencing it succeeds. PlaceObject* tags that came earlier in
+ 				// the tag stream were already degraded to no-op modifies above.
+ 				defined_chars.insert(sprite_id);
++				if (!s27_sprite_def_frame.count(sprite_id))
++					s27_sprite_def_frame[sprite_id] = next_frame_i > 0 ? next_frame_i - 1 : 0;
+ 
+ 				std::string sp = "sprite_" + to_string(sprite_id);
+ 
