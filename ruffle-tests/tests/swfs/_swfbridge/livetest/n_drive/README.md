@@ -120,6 +120,11 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
 - `RANDCOUNT=true`: wraps `Math.random` (after `ASSetPropFlags`) and appends
   `rc=<calls so far>` to every NF line, to tell "different number of draws"
   from "different values".
+- `OBJDUMP=true` now also traces `ND door <i> t= k=v,…` whenever a door object's
+  own number/boolean fields change (key pickup flips `isOpen`).
+- `author.py` alone does NOT set `START_LEVEL`; pass it in the env (or use
+  `search.py`, which does), or you author on level 0.
+- `routes_ep0.txt` now has level 1 (key t=492, switch t=857, exit t=1255).
 - **Browser vs exporter is only comparable on RNG-dependent values with a seeded
   build**: build the browser N_drive with
   `EMCC_CFLAGS=-DMOCK_DATE_TIME=981152406000 build_test.sh flasharchive/N_drive wasm --graphics`

@@ -138,6 +138,7 @@ class NDrive {
 			+ (OBJHASH ? " h=" + NDrive.clipPosHash() + " o=" + NDrive.worldHash() : "")
 			+ (RANDCOUNT ? " rc=" + NDrive.rc : ""));
 		if (OBJDUMP && t == 0) NDrive.dumpObjects();
+		if (OBJDUMP) NDrive.doorDiff(t);
 		if (TRACKOBJ >= 0) { var tob:Object = r.objects.objArray[TRACKOBJ]; trace("NT t=" + t + " ob=" + tob.pos.x + "," + tob.pos.y); }
 	}
 	static function goldTrace():Void {
@@ -160,6 +161,24 @@ class NDrive {
 			hv = (hv * 31 + Math.round(o.pos.x * 1000) * 7 + Math.round(o.pos.y * 1000) + Number(o.OBJ_TYPE)) % 1000000007;
 		}
 		return n + ":" + hv;
+	}
+	// OBJDUMP (s26 n-browser-pfx): trace "ND door <i> t= k=v,..." whenever a door
+	// object's own primitive fields change (key pickup, switch, open/close).
+	static var doorState:Array;
+	static function doorDiff(t:Number):Void {
+		var arr:Array = r.objects.objArray;
+		if (t == 0 || doorState == undefined) doorState = new Array();
+		for (var i:Number = 0; i < arr.length; i++) {
+			var o:Object = arr[i];
+			if (o == undefined || o.doorpos == undefined) continue;
+			var s:String = "";
+			for (var k in o) {
+				var v = o[k];
+				var ty:String = typeof(v);
+				if (ty == "number" || ty == "boolean") s += k + "=" + v + ",";
+			}
+			if (doorState[i] != s) { if (t > 0) trace("ND door " + i + " t=" + t + " " + s); doorState[i] = s; }
+		}
 	}
 	static function dumpObjects():Void {
 		var arr:Array = r.objects.objArray;

@@ -12,3 +12,12 @@
 #   switch t=762, chimney bounce back onto the roof, run left onto the central box, jump the U's right wall: exit t=966;
 #   a1 = level 4 loads. Exporter = native graphics (1096 NF/ND lines incl. h=/o=) = browser (player + o= on all 966 a0 ticks).
 3 60:L|20:-|54:R|90:L|30:L|16:R|20:RJ|165:R|4:LJ|24:-|12:R|20:-|45:J|30:-|20:J|25:LJ|3:-|10:R|20:-|6:L|8:J|18:RJ|1:R|1:J|20:RJ|42:R|30:L|30:LJ|60:L|8:L|45:LJ|5:-|20:R|40:-/60:R
+# level 1 "cloud city" (s26 n-browser-pfx; no enemies): wall-jump off spring block (180,492)'s face onto it, wait 20 ticks,
+#   jump left onto the left cloud's face + wall-jump onto its top (58,350); bump (34,303); wall-jump between the stage
+#   wall and the upper cloud's lobe onto its top (115,198); climb right to (261,99); drop onto the lower-right arm and
+#   run left through the slot into the hollow: key t=492 (locked door (48,348) opens); back out right, over the middle
+#   cloud, jump onto the bump, step through the open door into the pocket: switch t=857; out, rest on the left cloud,
+#   short step off (16 ticks R; a bigger fall is a fall death), run right through the low tunnel to the chimney
+#   (x=758), jump 35 ticks + LJ into the cave: exit t=1255; a1 = level 2 loads.
+#   Exporter = native graphics (1322 NF/ND lines incl. h=/o=, 0 diffs). The (60,60) switch is never touched.
+1 8:R|20:RJ|5:R|10:RJ|14:R|20:-|33:LJ|1:L|20:LJ|30:L|28:LJ|6:-|40:LJ|1:L|25:RJ|30:R|45:RJ|60:R|15:R|15:-|70:L|10:R|45:RJ|40:R|18:R|82:L|45:LJ|50:L|8:R|20:-|40:L|30:-|40:LJ|1:L|20:RJ|10:-|50:-|16:R|30:-|135:R|35:RJ|10:LJ|40:L/60:R
