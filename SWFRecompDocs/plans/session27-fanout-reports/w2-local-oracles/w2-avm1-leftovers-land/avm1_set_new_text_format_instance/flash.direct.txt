@@ -1,0 +1,5 @@
+before size0=12 font0=Times nsize=12
+after setNewTextFormat size0=12 font0=Times nsize=40
+unchanged w=true h=true
+after text= size0=40 font0=_serif nsize=40
+grew h=true

@@ -1,0 +1,5 @@
+1 draw(h>setRGB c)=65280
+2 draw(h>setTransform c)=65280
+3 draw(h>_alpha50 c)=8323200
+4 draw(h>setRGB c,m,ct)=65535
+5 draw(tinted c itself)=16711680

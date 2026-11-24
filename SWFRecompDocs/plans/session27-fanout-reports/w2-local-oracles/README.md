@@ -14,3 +14,18 @@
 - `w2-applyfilter-cm/avm1_applyfilter_*`: Flash PNG + trace per kind. Only `convolution` matches the cloud `ours`;
   blur/glow/dropshadow/bevel/gradient* differ heavily (renders and traces) — follow-up.
 - `w2-flash-filter-kernels/avm2_applyfilter_gradient_opaque_probe`: Flash trace (30 lines differ from the provisional).
+
+## Batch 3 (direct mode; `--wrapped` loads AVM1 as an AS3 child, so `_root`/depth differ: use DIRECT for AVM1)
+
+- `w2-avm1-leftovers-land/avm1_set_new_text_format_instance`: Flash == expected except the Linux default font name
+  (`Times` vs `Times New Roman`): **a `new TextFormat()` argument DOES resize immediately in Flash** (`nsize=40`,
+  `size0=40` after `text=`). The w1 `tf_snf_*` deferral hunks are Flash-right for TextFormat instances.
+- `.../avm1_bare_depth_methods_v7_gate{,_swf7}`: Flash == expected (land both).
+- `.../avm1_edittext_maxchars_clips_insertion` (typing XYZ): Flash prints `changed #2: AXBCD caret=2` and `changed #3:`
+  too: onChanged fires for each typed key even when maxChars drops the character. The expected file was wrong.
+- `w2-draw-cx-text/avm2_bitmapdata_draw_text_glyph_cx` (mxmlc-built test.swf archived): **DEVICE** field: glyphs read
+  neither red nor green in every draw() variant, and the box stays ff0000 (untinted). **EMBEDDED** field: glyphs ARE tinted
+  (draw ct, descendant cx, holder+ct all → green), and the box IS tinted (ff00) under every tint. So "draw() never tints
+  the TextField box" is device-only.
+- `w2-draw-cx-text/avm1_bitmapdata_draw_text_glyph_cx`: device glyphs read neither colour in all 4 (as AVM2 device).
+- `w2-draw-cx-text/avm1_bitmapdata_draw_child_color`: `65280 / 65280 / 8323200 / 65535 / 16711680`.
