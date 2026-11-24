@@ -60894,6 +60894,23 @@ void actionDelete(SWFAppContext* app_context)
 
 // Separate noinline function to prevent GCC -O2 from misoptimizing the
 // textWidth/textHeight computation when inlined into the large actionGetMember.
+// s27 n-levels-5plus: the field's explicit TextFormat.tabStops, in twips, for
+// the EditText painter (tag.c). Returns the count (0 = default stops).
+int actionTextFieldTabStopsTwips(void* mc_ptr, int* out, int max)
+{
+	MovieClip* mc = (MovieClip*)mc_ptr;
+	if (mc == NULL || mc->dynamic_props == NULL || out == NULL) return 0;
+	ActionVar* ts_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_tabStops", 12);
+	if (ts_prop == NULL || ts_prop->type != ACTION_STACK_VALUE_ARRAY || ts_prop->data.numeric_value == 0) return 0;
+	ASArray* ts_array = (ASArray*)ts_prop->data.numeric_value;
+	int n = 0;
+	for (u32 ti = 0; ti < ts_array->length && n < max; ti++) {
+		double v = varToDouble(&ts_array->elements[ti]);
+		if (!isnan(v) && !isinf(v)) out[n++] = (int)(v * 20.0);
+	}
+	return n;
+}
+
 static __attribute__((noinline)) int computeTextFieldDimension(
 	SWFAppContext* app_context, MovieClip* mc,
 	const char* prop_name, u32 prop_name_len, double* out_result)
@@ -61001,9 +61018,13 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 		if (ww_prop != NULL && ww_prop->type == ACTION_STACK_VALUE_BOOLEAN && ww_prop->data.numeric_value)
 			word_wrap = 1;
 	}
-	if (word_wrap) {
+	// s27 n-levels-5plus: margins/indent are read for unwrapped fields too —
+	// they move the origin default TAB stops count from (Flash oracle
+	// regression/avm1_edittext_tabstops_metric); the unwrapped
+	// ng_computeTextWidth path uses them for nothing else.
+	if (word_wrap || mc->dynamic_props) {
 		// field_width_twips = textfield width in twips minus 2*GUTTER (40 twips each side)
-		field_width_twips = (int)(mc->width * 20.0f) - 80;
+		if (word_wrap) field_width_twips = (int)(mc->width * 20.0f) - 80;
 		if (field_width_twips < 0) field_width_twips = 0;
 
 		// Get margins and indent from TextFormat (stored as pixels on dynamic_props via _tf_ prefix or defaults)

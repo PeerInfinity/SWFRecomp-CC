@@ -1,0 +1,9 @@
+d textWidth=45
+b textWidth=93
+c textWidth=24
+s textWidth=45
+e textWidth=45
+m textWidth=35
+w textWidth=88
+n textWidth=35
+q textWidth=45

@@ -10,6 +10,8 @@ W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
 sed -e "s#static var SCRIPT:String = \"\";#static var SCRIPT:String = \"$1\";#" \
     -e "s|static var AUTOKILL:Boolean = false;|static var AUTOKILL:Boolean = ${AUTOKILL:-false};|" \
     -e "s|static var START_LEVEL:Number = 0;|static var START_LEVEL:Number = ${START_LEVEL:-0};|" \
+    -e "s|static var AUTOEXIT:Boolean = false;|static var AUTOEXIT:Boolean = ${AUTOEXIT:-false};|" \
+    -e "s|static var START_EPISODE:Number = 0;|static var START_EPISODE:Number = ${START_EPISODE:-0};|" \
     -e "s|static var OBJHASH:Boolean = false;|static var OBJHASH:Boolean = ${OBJHASH:-false};|" \
     -e "s|static var CLIPDIFF:Boolean = false;|static var CLIPDIFF:Boolean = ${CLIPDIFF:-false};|" \
     -e "s|static var RANDCOUNT:Boolean = false;|static var RANDCOUNT:Boolean = ${RANDCOUNT:-false};|" \

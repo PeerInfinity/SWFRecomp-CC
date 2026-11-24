@@ -23,6 +23,18 @@ class NDrive {
 	// shows up even when they never touch the player. (N is SWF6 = case-
 	// insensitive: the hash method must not be named objHash, which IS OBJHASH.)
 	static var START_LEVEL:Number = 0;
+	// START_EPISODE (s27 n-levels-5plus): episode to load. Episode 0 has only
+	// levels 0-4; START_LEVEL=5 wraps back to level id 0.
+	static var START_EPISODE:Number = 0;
+	// AUTOEXIT (s27 n-levels-5plus, coverage runs): when an attempt's script ends,
+	// call the level's exit object's own PlayerHitTrigger + PlayerHitExit (N's
+	// level-passed flow), so one run walks every level of an episode. Takes
+	// precedence over AUTOKILL.
+	static var AUTOEXIT:Boolean = false;
+	static var exitFired:Boolean = false;
+	// A retry of the same level (the scripted attempt died) exits at tick 10.
+	static var exitRetry:Boolean = false;
+	static var exitLevel:String = "";
 	static var OBJHASH:Boolean = false;
 	// CLIPDIFF: with OBJHASH, also trace "ND clip+ path" / "ND clip- path" for
 	// clips appearing/disappearing two levels under _root (+ their _currentframe).
@@ -303,8 +315,8 @@ class NDrive {
 					started = true;
 					trace("ND startgame frame=" + frame);
 					installHooks();
-					r.gamedata.LoadEpisodeNum(0);
-					if (START_LEVEL > 0) {
+					r.gamedata.LoadEpisodeNum(START_EPISODE);
+					if (START_LEVEL > 0 || START_EPISODE > 0) {
 						// App_StartNewGame hard-codes App_LoadLevel(0, ...): bumping
 						// curLevel alone only renamed level 0 (s26 n-levels). Same
 						// body, loading the current level's map instead.
@@ -315,6 +327,7 @@ class NDrive {
 						r.game.InitNewGame();
 						r.App_PlayerDeathEvent = r.App_PlayerDeathEvent_Normal;
 						r.App_LevelPassedEvent = r.App_LevelPassedEvent_Normal;
+						trace("ND level id=" + r.gamedata.GetCurrentLevelID() + " ep=" + r.gamedata.curEpisode + " lv=" + r.gamedata.curLevel);
 						r.App_LoadLevel(r.gamedata.GetCurrentLevelID(), r.App_StartPreLevelPause);
 					} else r.App_StartNewGame();
 				}
@@ -330,13 +343,24 @@ class NDrive {
 		if (ph != phase) {
 			trace("ND phase " + phase + "->" + ph + " frame=" + frame + " tick=" + r.game.tickCounter
 				+ " lvl=" + r.gamedata.GetCurrentLevelName() + " x=" + r.player.pos.x + " y=" + r.player.pos.y);
-			if (ph == "run" && phase == "prelevel") { attempt++; lastTick = -1; parseAttempt(attempt); trace("ND attempt " + attempt + " segs=" + segs.length); }
+			if (ph == "run" && phase == "prelevel") { exitFired = false; var ln:String = r.gamedata.GetCurrentLevelName(); exitRetry = (ln == exitLevel); exitLevel = ln; attempt++; lastTick = -1; parseAttempt(attempt); trace("ND attempt " + attempt + " segs=" + segs.length); }
 			phase = ph; phaseFrames = 0;
 		}
 		phaseFrames++;
 		if (phaseFrames == 20 && (phase == "prelevel" || phase == "postlevel" || phase == "retrywait"))
 			trace("ND shot " + phase + "_" + attempt + " frame=" + frame);
-		if (AUTOKILL && phase == "run" && segs.length > 0 && r.game.tickCounter >= segs[segs.length - 1].end) {
+		if (AUTOEXIT && phase == "run" && segs.length > 0 && r.game.tickCounter >= (exitRetry ? 10 : segs[segs.length - 1].end) && !exitFired) {
+			exitFired = true;
+			var oa:Array = r.objects.objArray;
+			for (var oi:Number = 0; oi < oa.length; oi++) {
+				if (oa[oi].OBJ_TYPE == 11) {
+					trace("ND autoexit a=" + attempt + " t=" + r.game.tickCounter + " i=" + oi);
+					oa[oi].PlayerHitTrigger();
+					oa[oi].PlayerHitExit();
+					break;
+				}
+			}
+		} else if (AUTOKILL && phase == "run" && segs.length > 0 && r.game.tickCounter >= segs[segs.length - 1].end) {
 			trace("ND autokill a=" + attempt + " t=" + r.game.tickCounter);
 			r.game.KillPlayer(4, 0, 0, r.player.pos.x, r.player.pos.y, r.player);
 		}

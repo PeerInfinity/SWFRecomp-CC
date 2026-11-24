@@ -646,6 +646,7 @@ int ng_font_is_builtin(int font_idx);
 int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square);
 s32 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx);
 void ng_setTabStops(const int* stops_twips, int count, u16 font_height);
+int actionTextFieldTabStopsTwips(void* mc, int* out, int max);
 void ng_clearTabStops(void);
 // `scroll_lines` is the field's AVM1 `scroll` property minus one — the number
 // of whole lines scrolled off the top of the view. 0 for an unscrolled field.

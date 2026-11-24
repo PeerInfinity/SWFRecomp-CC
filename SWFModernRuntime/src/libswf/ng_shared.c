@@ -1621,6 +1621,8 @@ static int ng_round_ls_to_pixel(int ls_twips) {
 static int g_tab_stops_twips[64];
 static int g_tab_stop_count = 0;
 static u16 g_tab_font_height = 0;
+static int g_tab_default_T = 0;   // Flash default stop pitch, twips
+static int g_tab_origin_twips = 40;  // text origin from the field edge: gutter + margin + indent
 
 void ng_setTabStops(const int* stops_twips, int count, u16 font_height)
 {
@@ -1640,9 +1642,38 @@ static int ng_next_tab_stop(int cursor_twips)
 		}
 		return cursor_twips;
 	}
-	int modulo = (int)(g_tab_font_height * 2.7f);
-	if (modulo <= 0) return cursor_twips;
-	return ((cursor_twips / modulo) + 1) * modulo;
+	// s27 n-levels-5plus: Flash Player 32's default stops (the painter's
+	// tag.c tf_default_tab_stop rule): multiples of T = 2 * (ascent + descent),
+	// each truncated to whole twips at the run size, counted from the field's
+	// left EDGE (text origin + the 2 px gutter). Ruffle's 2.7 * size from the
+	// text origin is NOT Flash (regression/avm1_edittext_tab_render: Flash
+	// textWidth d=45 b=93 c=24, Ruffle 59/64/39).
+	int t = g_tab_default_T;
+	if (t <= 0) {
+		// No font metrics: keep the old size-based fallback.
+		int modulo = (int)(g_tab_font_height * 2.7f);
+		if (modulo <= 0) return cursor_twips;
+		return ((cursor_twips / modulo) + 1) * modulo;
+	}
+	int fx = cursor_twips + g_tab_origin_twips;
+	return ((fx / t) + 1) * t - g_tab_origin_twips;
+}
+
+// T for the measured run's font (0 = unknown -> 2.7 * size fallback), and the
+// text origin's distance from the field edge. Flash oracle
+// (regression/avm1_edittext_tabstops_metric): leftMargin and indent both move
+// the origin the default stops are counted from (textWidth excludes them).
+static void ng_set_tab_font(int font_idx, int em, u16 font_height, int left_margin_twips, int indent_twips)
+{
+	int lo = left_margin_twips + indent_twips;
+	g_tab_origin_twips = 40 + (lo > 0 ? lo : 0);
+	g_tab_default_T = 0;
+	if (font_idx < 0 || em <= 0) return;
+	int a = (int)((double)ng_fonts[font_idx].ascent * (double)font_height / (double)em);
+	int d = (int)((double)ng_fonts[font_idx].descent * (double)font_height / (double)em);
+	if (a < 0) a = 0;
+	if (d < 0) d = 0;
+	g_tab_default_T = 2 * (a + d);
 }
 
 static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
@@ -1683,6 +1714,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
     int left_margin_twips, int right_margin_twips, int indent_twips,
     int* max_width_out, int* max_width_full_out, int letter_spacing_twips)
 {
+	ng_set_tab_font(font_idx, em, font_height, left_margin_twips, indent_twips);
 	if (text_len == 0) {
 		*max_width_out = 0;
 		if (max_width_full_out) *max_width_full_out = 0;
@@ -1894,6 +1926,7 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
+	ng_set_tab_font(fi, em, font_height, left_margin_twips, indent_twips);
 
 	if (!word_wrap || field_width_twips <= 0) {
 		int trim_trailing = (swf_version >= 8 && align != 0);

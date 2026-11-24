@@ -7601,8 +7601,15 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	TextFieldRenderInfo tf_snapped;
 	if (info->has_matrix && !info->device_font
 	    && info->m_b == 0.0f && info->m_c == 0.0f
-	    && info->m_a > 0.0f && info->m_d > 0.0f
-	    && !(info->m_a == 1.0f && info->m_d == 1.0f)) {
+	    && info->m_a > 0.0f && info->m_d > 0.0f) {
+		// s27 n-levels-5plus: UNIT scale too. Flash Player 32 oracle
+		// (regression/avm1_edittext_border_subpixel): an unscaled box
+		// 0/5/10/15 twips past a pixel draws on that pixel, 19 twips on the
+		// next = the same trunc(t + 2 twips). Ruffle snaps only non-unit
+		// scales, so its box straddles two rows at half coverage (N's
+		// "loading level..." console box at 43.5, 239.5 px). The size is
+		// left alone at unit scale (not oracle-pinned for fractional sizes).
+		int unit = (info->m_a == 1.0f && info->m_d == 1.0f);
 		float stx = info->m_tx + rintf(info->m_a * info->x * 20.0f);
 		float sty = info->m_ty + rintf(info->m_d * info->y * 20.0f);
 		stx = truncf((stx + 2.0f) / 20.0f) * 20.0f;
@@ -7610,8 +7617,10 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 		tf_snapped = *info;
 		tf_snapped.x = stx / 20.0f;
 		tf_snapped.y = sty / 20.0f;
-		tf_snapped.w = rintf(info->m_a * info->w - 0.35f);
-		tf_snapped.h = rintf(info->m_d * info->h - 0.35f);
+		if (!unit) {
+			tf_snapped.w = rintf(info->m_a * info->w - 0.35f);
+			tf_snapped.h = rintf(info->m_d * info->h - 0.35f);
+		}
 		tf_snapped.m_a = 1.0f; tf_snapped.m_d = 1.0f;
 		tf_snapped.m_tx = 0.0f; tf_snapped.m_ty = 0.0f;
 		info = &tf_snapped;
@@ -8169,7 +8178,7 @@ static u32 tf_glyph_xform_slot(const float m[6])
 // layout x + the 2 px gutter); the line is then aligned as a whole. Ruffle's
 // layout.rs tab() uses 2.7 * size from the text origin instead; Flash wins.
 // `line_x` is the pen offset from the line's layout start, in twips. Explicit
-// tabStops are not handled by this painter (the textWidth metric honours them).
+// tabStops: tf_tab_stop below.
 static float tf_default_tab_stop(float line_x, s16 ascent, s16 descent, int em, u16 fh, float gutter)
 {
 	if (em <= 0) return line_x;
@@ -8178,6 +8187,18 @@ static float tf_default_tab_stop(float line_x, s16 ascent, s16 descent, int em, 
 	if (!(t > 0.0f)) return line_x;
 	float fx = line_x + gutter;
 	return (floorf(fx / t) + 1.0f) * t - gutter;
+}
+
+// s27 n-levels-5plus: TAB with explicit TextFormat.tabStops (twips). Flash:
+// stops count from the TEXT origin (not the field edge) and a tab past the last
+// stop does not advance the pen. No stops -> the default rule above.
+static float tf_tab_stop(float line_x, s16 ascent, s16 descent, int em, u16 fh, float gutter,
+                         const int* stops, int n_stops)
+{
+	if (n_stops <= 0) return tf_default_tab_stop(line_x, ascent, descent, em, fh, gutter);
+	for (int i = 0; i < n_stops; i++)
+		if ((float)stops[i] > line_x) return (float)stops[i];
+	return line_x;
 }
 
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
@@ -8229,6 +8250,13 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 	// 2px gutter on each side (Flash text field internal padding)
 	float gutter_twips = 40.0f;
+	int tab_stops[64];
+	int tab_stop_count = info->mc ? actionTextFieldTabStopsTwips(info->mc, tab_stops, 64) : 0;
+	// Default stops count from the field edge: gutter + the line's left offset
+	// (leftMargin/blockIndent, + indent on a paragraph's first line, + bullet).
+	// Flash oracle regression/avm1_edittext_tabstops_metric (margin/indent rows).
+#define TF_TAB_REF(par) (gutter_twips + (float)({ s32 _lo = (par).cont ? info->left_margin_twips \
+		: info->left_margin_twips + info->indent_twips; _lo > 0 ? _lo : 0; }) + ((par).bullet ? 720.0f : 0.0f))
 
 	// Field clipping mask (stencil): gutter-inset horizontally, full height
 	// vertically. Matches Ruffle EditText::render_self mask.
@@ -8445,8 +8473,9 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			}
 			if (cp == '\t') {
 				if (MAX_TF_PARAGRAPHS_ROOM(cur_par))
-					pars[cur_par].width = tf_default_tab_stop(pars[cur_par].width, ascent, descent,
-					                                          em_square, cur_fh, gutter_twips);
+					pars[cur_par].width = tf_tab_stop(pars[cur_par].width, ascent, descent,
+					                                  em_square, cur_fh, TF_TAB_REF(pars[cur_par]),
+					                                  tab_stops, tab_stop_count);
 				trail = 0.0f;
 				continue;
 			}
@@ -8807,8 +8836,10 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		}
 		if (cp == '\t') {
 			float line_start = base_x + (par_idx < par_count ? par_x_offset[par_idx] : 0.0f);
-			x_pos = line_start + tf_default_tab_stop(x_pos - line_start, ascent, descent,
-			                                         em_square, cur_fh, gutter_twips);
+			x_pos = line_start + tf_tab_stop(x_pos - line_start, ascent, descent,
+			                                 em_square, cur_fh,
+			                                 par_idx < par_count ? TF_TAB_REF(pars[par_idx]) : gutter_twips,
+			                                 tab_stops, tab_stop_count);
 			continue;
 		}
 
@@ -8900,6 +8931,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	}
 	#undef MAX_TF_PARAGRAPHS_ROOM
 #undef TF_RESOLVE_RUN_FONT
+#undef TF_TAB_REF
 
 	// Caret at (or past) the end of the text — pen is at its final position.
 	// (Empty field: the draw loop never ran, so x_pos is still the synthesised

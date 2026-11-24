@@ -1,0 +1,10 @@
+# s27 n-levels-5plus. textWidth with TABs (ng_shared.c ng_next_tab_stop) and the
+# painter with explicit TextFormat.tabStops / margins / indent (tag.c tf_tab_stop).
+# Goldens = FLASH PLAYER 32 oracle (tools/flash-oracle run_trace.py /
+# run_image.py tick 1). The Ruffle exporter is NOT a golden (2.7 x size stops).
+[image_comparisons.output]
+tolerance = 64
+max_outliers = 0
+
+[player_options]
+with_renderer = { optional = false }

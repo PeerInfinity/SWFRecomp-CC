@@ -1,0 +1,12 @@
+# s27 n-levels-5plus. Bordered EditText at fractional-pixel positions, unscaled.
+# Golden = FLASH PLAYER 32 oracle (run_image.py tick 1): box translation snapped
+# trunc((t + 2 twips) / 1 px). The Ruffle exporter straddles (not a golden).
+# Before the fix 4956 outliers (borders at half coverage on two rows/cols);
+# after 48 = one AA'd box corner per field + sub-pixel glyph-edge AA, which
+# Flash rasterises analytically (the AA floor).
+[image_comparisons.output]
+tolerance = 64
+max_outliers = 60
+
+[player_options]
+with_renderer = { optional = false }

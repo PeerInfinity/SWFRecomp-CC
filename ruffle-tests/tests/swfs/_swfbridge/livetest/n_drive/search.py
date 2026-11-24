@@ -5,7 +5,8 @@ import os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 lvl, prefix, cands = sys.argv[1], sys.argv[2], sys.argv[3:]
 atts = [(prefix + "|" + c) if prefix else c for c in cands]
-env = dict(os.environ, START_LEVEL=lvl, FREEZE="")
+ep, _, lv = lvl.rpartition(".")  # "E.L" or "L"
+env = dict(os.environ, START_LEVEL=lv, START_EPISODE=ep or "0", FREEZE="")
 subprocess.run(["python3", os.path.join(HERE, "author.py")] + atts, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 lines = open(os.path.join(HERE, "last_trace.txt")).read().splitlines()
 cur = -1; info = {}

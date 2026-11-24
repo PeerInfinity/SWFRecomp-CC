@@ -147,3 +147,17 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
 - Record: `SWFRecompDocs/plans/n-ragdoll-strokes-report.md`. The "ragdoll
   thin strokes" at shot 1560 were the ninja's own limb bones drawn by a
   runtime bug, not the ragdoll and not a stroke-width rule.
+
+## s27 n-levels-5plus additions
+
+- **Episode 0 has only levels 0–4.** `START_LEVEL=5` wraps to level id 0. The probe
+  now prints `ND level id= ep= lv=` at start.
+- `START_EPISODE=e`: load episode e (then `START_LEVEL` as before). `search.py`
+  takes `E.L` (e.g. `1.3`) or a bare `L` (episode 0).
+- `AUTOEXIT=true` (coverage runs): when an attempt's script ends, call the level's
+  exit object's own `PlayerHitTrigger()` + `PlayerHitExit()`, i.e. N's real
+  level-passed flow. A retry of the same level (the scripted attempt died) exits at
+  tick 10. One run walks a whole episode (~2.5k frames):
+  `START_EPISODE=1 AUTOEXIT=true OBJHASH=true FREEZE="" build.sh "<10 attempts>"`.
+- Episodes 1 and 2: exporter = native byte-identical telemetry. Record:
+  `SWFRecompDocs/plans/n-levels-5plus-report.md`.
