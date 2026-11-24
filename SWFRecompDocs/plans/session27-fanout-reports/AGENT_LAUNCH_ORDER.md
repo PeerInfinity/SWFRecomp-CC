@@ -28,7 +28,8 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
-| w2-layer-alpha-group | Flash capture n3_layer_alpha | fixtures (Flash golden); priced Ruffle-golden losses | session_018CoDi4H4DqA4qwhbCgk45g |
+| w2-layer-alpha-group | Flash capture n3_layer_alpha | fixtures (Flash golden); priced Ruffle-golden losses | session_018CoDi4H4DqA4qwhbCgk45g — DELIVERED, LANDED `fb6fe4ba4` (0 corpus; 2 Flash-golden fixtures; Flash probes: filters/blend/aoffset group, cAB does not) |
+| w2b-group-alpha-triggers | w2-layer-alpha-group + Flash probes | corpus filter/blend rows will move | session_018CoDi5TpfA7P8yRuUGbTVQ |
 | w2-flash-filter-kernels | Flash captures glow_kernels/draw_filtered | 2 fixtures (Flash trace) | session_018CoDi5rf6MrkHLk3QibWyX |
 | w2-jpeg-flash-decode | w1-drift lead 1 | headroom on 2 Flash-golden rows | session_018CoDi66FA1hXSXXAwLB8kW — DELIVERED, HELD: IJG v7+ model bit-exact on clone, 27 on dithering, +1 getpixel; but Flash 32 BitmapDataDraw = 82944 (stb flat) contradicts → w2b-jpeg-refine |
 | w2b-jpeg-refine | w2-jpeg-flash-decode + Flash oracles | refined decoder or NO-GO | session_018CoDi3cn6pb1EqGj5vDUvC |
