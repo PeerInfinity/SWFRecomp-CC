@@ -31,7 +31,7 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 | w2-layer-alpha-group | Flash capture n3_layer_alpha | fixtures (Flash golden); priced Ruffle-golden losses | session_018CoDi4H4DqA4qwhbCgk45g |
 | w2-flash-filter-kernels | Flash captures glow_kernels/draw_filtered | 2 fixtures (Flash trace) | session_018CoDi5rf6MrkHLk3QibWyX |
 | w2-jpeg-flash-decode | w1-drift lead 1 | headroom on 2 Flash-golden rows | session_018CoDi66FA1hXSXXAwLB8kW |
-| w2-allow-networking-subtests | w1-drift §3 | NEW subtest rows | session_018CoDi4rozCuYyCVd6iWznD |
+| w2-allow-networking-subtests | w1-drift §3 | NEW subtest rows | session_018CoDi4rozCuYyCVd6iWznD — DELIVERED, LANDED `d37ca69b5` (+8 NEW trace rows, all pass both modes) |
 | w2-draw-cx-text | w1-text-glyph-fidelity §4 | 2 fixtures (Flash trace) | session_018CoDi5MC3ifTEYbRy5fxSf |
 | w2-applyfilter-cm | w1-applyfilter-tail items 3, 5 | 3 CM fixtures (Flash PNG) | session_018CoDi4dFuVDgVxQdWMdvo7 |
 | w2-holder-drawing-full | w1-render-bitmap-leads §1/1b | fixture (hand == Flash) | session_018CoDi6o54ceV3pKjPBKyS1 |
@@ -41,7 +41,7 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 | w2-timers-land | w1-timers-robustness | trace `InitActionTest2` +1; timer fixtures (Flash only) | session_018CoDi6CHnwMMMavVzvAyco |
 | w2-exec-order-land | w1-exec-order | 2 fixtures (Flash); nested-frame order | session_018CoDi4AMuRxHCCPT8zNJJ7 |
 | w2-loaded-shell-land | w1-per-movie-dl-phase3 | 3–6 fixtures (Flash prefix) | session_018CoDi7GWpU4jrHWENpzHVk |
-| local `browser-arms-land` | w1-browser-avm1-gaps + real-browser probe | browser-only (0 CI) | launched ~03:25 UTC, cwd verified, handshake sent |
+| local `browser-arms-land` | w1-browser-avm1-gaps + real-browser probe | browser-only (0 CI) | launched ~02:47 UTC, cwd verified, handshake sent |
 
 ## N ladder (local one-task sessions)
 
@@ -49,6 +49,8 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
   tessellation-cache artifact (Flash rule kept); exit-door = strokes in line-style-id order (fixed); fixtures pass in CI.
 - `n-ragdoll-strokes` launched 2026-11-24 ~01:45 UTC (run.S7bGuoXf, cwd verified, handshake sent): ragdoll Drawing-API
   thin strokes under scale, then the native residual (fps counter, edge px). CI folded into the coordinator's runs.
+- `n-ragdoll-strokes` DONE (`438121c22`; REPORT BACK verified): shot-1560 class = attachMovie'd clip's timeline children parented to _root (not ragdoll/strokes); fixture `avm1_attached_clip_timeline_child_parent`.
+- `n-l2l4-pixel-pass` launched ~03:05 UTC (cwd verified, handshake sent): L2/L4 native pixel pass, goto-rebuild _root fallback.
 - `flash-oracle` (launched by s26-coordinator at Robert's request): real Flash Player 32 oracle; captures come to s27.
 
 ## Grading runs
@@ -56,3 +58,4 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 | run | mode / categories / images | code | result |
 |---|---|---|---|
 | 45300086369 | graphics / full / images (wave 0, dispatched by n-trap-stroke) | d70f2c0aa | **exact**: trace 4684 eff on the 4722 intersection, 0 moves; +2 new fixture rows pass (4686 / 4724); pixels 0 moves, 0 band moves (595 / 639 summed incl. the 2 fixtures). Results `da51f878f` |
+| 45312833576 | graphics / full / images (interim #1) | b8d3b736a (drift, glyph-fidelity, applyfilter-tail, render-bitmap-leads, html_typed_runs fixture; Pages dry run 45312837356 success) | **exact**: trace 0 moves on the 4724 intersection, +5 new fixture rows pass (4691 / 4729 eff); pixels +3 by name (`pixelbender_dithering`, `acid-color-0`, `shader_as_mask`), +3 new fixture images pass, 0 regressions, 0 band moves. Results `a0e485e5f` |
