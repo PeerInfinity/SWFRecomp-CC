@@ -22468,10 +22468,13 @@ DisplayObject* actionHolderShellList(MovieClip* mc, size_t* out_max);
 		if (_shl != NULL) { cur_sprite_dl = _shl; cur_sprite_max = _shm; } \
 	} while (0)
 static MovieClip* resolveSlashPathToMCImpl(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Declared for EVERY build (s27 browser-advance-order): actionGetVariable's
+// root-scoped lookup (_GV_RDL_LEAVE) calls these in browser-WASM too. Gated
+// NO_GRAPHICS || OFFSCREEN_RENDER, the browser compiled an implicit `int`
+// ng_rootDLLeave, wasm-ld linked a signature-mismatch stub, and the first
+// root-scoped variable read trapped (every browser build since 78fee9e13).
 extern int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap);
 extern void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap);
-#endif
 // s27 phase 3: a path walked from the ROOT reads the root movie's list even
 // while a loaded movie's list is the active one.
 static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
