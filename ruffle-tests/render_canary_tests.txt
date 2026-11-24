@@ -764,3 +764,43 @@ avm2/bitmapdata_applyfilter_blur                       # Flash growth rule (vs R
 regression/avm1_po3_cm_live_under_cxform               # cx-after pass on a live CM chain       1 cmp
 regression/avm1_po3_cm_alpha_bias_edge                 # keep-empty bias, unsnapped AA rim      1 cmp
 regression/avm1_po3_cm_folded_clear                    # tagSetColorMatrixFolded restore        1 cmp
+
+# s27 w2-loaded-shell-land: LOADED-MOVIE render members. The set had no row
+# whose stage holds a loadMovie'd child, so a change to the loader's delivery
+# tick or to per-movie display lists was invisible to it. Each renders a child
+# SWF's content (shape / bitmap fill / morph / text) inside a holder.
+regression/avm1_parent_child_render
+regression/avm1_parent_child_bitmap_fill
+regression/avm1_parent_child_morph
+regression/avm1_parent_child_text
+# s27 w2-exec-order-land: nested timeline sprites run their frame BEFORE their root-level parent and _root
+# (exec_order_nested_early in swf.c/swf_core.c); image rows whose nested sprite scripts drive the drawn state.
+# tier=2
+from_shumway/timeline/timeline_as2_5                   # nested sprite timeline, AS2
+from_shumway/timeline/timeline_loop                    # nested sprite loop
+from_shumway/acid/acid-child                           # nested child clips
+regression/avm1_nested_po3_filters                     # nested PO3 filters
+
+# s27 w2b-group-alpha-triggers: the other Flash transparency-group triggers (Flash Player 32
+# goldens). Cover the group alpha ROW at the composite for a folded-CM filter list, a complex
+# blend (MULTIPLY), an alpha OFFSET on LAYER, an ancestor alpha above a LAYER, and the
+# cacheAsBitmap control that must stay per child.
+regression/group_alpha_filter_cm                   # AVM1, folded identity CM + 50%   1 cmp
+regression/avm2_group_alpha_filter_cm              # AVM2 twin (impotent filter list)  1 cmp
+regression/group_alpha_multiply                    # AVM1, complex blend group alpha   1 cmp
+regression/avm2_group_alpha_multiply               # AVM2 twin                         1 cmp
+regression/group_alpha_layer_aadd                  # AVM1, LAYER alpha offset row      1 cmp
+regression/avm2_group_alpha_layer_aadd             # AVM2 twin                         1 cmp
+regression/group_alpha_layer_inner                 # AVM1, ancestor alpha above LAYER  1 cmp
+regression/avm2_group_alpha_layer_inner            # AVM2 twin                         1 cmp
+regression/group_alpha_cab                         # AVM1, cacheAsBitmap stays per child (tol 2)
+regression/avm2_group_alpha_cab                    # AVM2 twin (tol 2)                 1 cmp
+regression/avm1_po3_color_matrix_live                  # per-pass clamp + alpha-from-colour (FLASH golden, s27 w2b)  1 cmp
+# s27 w2b-avm1-applyfilter-flash: AVM1 applyFilter graded against FLASH PLAYER 32
+# (blur into an opaque target keeps its alpha word but displays opaque -- the
+# attached-bitmap alpha-forced upload; glow/bevel onto opaque = -6 untouched).
+# tier=1
+regression/avm1_applyfilter_blur                       # opaque-target blur, alpha-forced display  1 cmp
+regression/avm1_applyfilter_glow                       # glow kernel + opaque -6                    1 cmp
+regression/avm1_applyfilter_bevel                      # bevel kernel + opaque -6                   1 cmp
+regression/avm1_applyfilter_convolution                # convolution into both targets              1 cmp

@@ -5622,6 +5622,8 @@ static int g_bitmapdata_init_done = 0;
 #define MAX_BITMAP_NATIVES 8192
 static struct { ASObject* obj; BitmapDataNative* native; } g_bitmap_natives[MAX_BITMAP_NATIVES];
 static int g_bitmap_native_count = 0;
+// s27 w2b-avm1-applyfilter-flash: see bmpOpaqueAlphaForcedCopy.
+static int g_bmp_opaque_raw_alpha = 0;
 
 static void setBitmapNative(ASObject* obj, BitmapDataNative* native)
 {
@@ -14630,6 +14632,19 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
         // blur + glow model, Flash convolution; the gradient kinds are the
         // kernels' copy pass-through), as Ruffle runs one apply_filter for
         // both VMs. Same sourceRect / destPoint reads as the CM arm below.
+        // s27 w2b-avm1-applyfilter-flash (Flash Player 32 captures of the
+        // w2-applyfilter-cm fixtures): an OPAQUE target refuses every
+        // glow-family kind -- DropShadow, Glow, Bevel, GradientGlow,
+        // GradientBevel -- with -6 and is left untouched (white stays white),
+        // while Blur, Convolution and ColorMatrix still apply. Ruffle has no
+        // such rule (it applies all of them; RUFFLE_VS_FLASH_DIFFERENCES.md).
+        if (!dest_bmp->transparent
+            && (filter_type == 2 || filter_type == 3 || filter_type == 4
+                || filter_type == 7 || filter_type == 8))
+        {
+            r = makeF64(-6);
+            return r;
+        }
         static float conv_buf[256 * 4];
         Avm1FilterKernelParams kp;
         if (avm1FilterKernelParams(filter_obj, filter_type, &kp, conv_buf,
@@ -14641,6 +14656,7 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
                 src_bmp->pixels, (uint32_t) src_bmp->width, (uint32_t) src_bmp->height,
                 src_bmp->transparent,
                 rx, ry, rw, rh, dx, dy, &kp);
+            if (!dest_bmp->transparent && filter_type == 1) g_bmp_opaque_raw_alpha = 1;
         }
         r = makeF64(0);
         return r;
@@ -17090,6 +17106,13 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 	g_this_depth = saved_this_depth;
 	if (flags & INV_DEPTH_GUARD) g_call_depth--;
 	if (flags & INV_SPECIAL_GUARD) g_special_depth--;
+	// s27 w2b-timers-tail: a user-function return is Flash's flush point for
+	// init actions a root goto queued (tag.c tagFlushGotoInitsAtCallReturn;
+	// natives have swf_version 0, so the goto's own call never flushes).
+	if (func->swf_version != 0) {
+		extern void tagFlushGotoInitsAtCallReturn(SWFAppContext* app_context);
+		tagFlushGotoInitsAtCallReturn(app_context);
+	}
 	return result;
 }
 
@@ -22444,7 +22467,27 @@ DisplayObject* actionHolderShellList(MovieClip* mc, size_t* out_max);
 		size_t _shm = 0; DisplayObject* _shl = actionHolderShellList((m), &_shm); \
 		if (_shl != NULL) { cur_sprite_dl = _shl; cur_sprite_max = _shm; } \
 	} while (0)
+static MovieClip* resolveSlashPathToMCImpl(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc);
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+extern int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap);
+extern void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap);
+#endif
+// s27 phase 3: a path walked from the ROOT reads the root movie's list even
+// while a loaded movie's list is the active one.
 static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	extern MovieClip root_movieclip;
+	if (start_mc == &root_movieclip) {
+		DisplayObject* _sdl = NULL; size_t _smax = 0, _scap = 0;
+		int _sw = ng_rootDLEnter(&_sdl, &_smax, &_scap);
+		MovieClip* r = resolveSlashPathToMCImpl(app_context, path, path_len, start_mc);
+		ng_rootDLLeave(_sw, _sdl, _smax, _scap);
+		return r;
+	}
+#endif
+	return resolveSlashPathToMCImpl(app_context, path, path_len, start_mc);
+}
+static MovieClip* resolveSlashPathToMCImpl(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
 	g_shape_alias_resolution = 0;
 	if (path_len == 0 || start_mc == NULL) return NULL;
 
@@ -25961,8 +26004,18 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, i
 // When unloadMovie is called, the MC's frame/bytes properties should not change until
 // the next frame. We queue MCs here and set their unloaded flag at the start of the next frame.
 #define MAX_DEFERRED_UNLOADS 32
-static MovieClip* g_deferred_unload_mcs[MAX_DEFERRED_UNLOADS];
+// s27 w2b-timers-tail: growable (was a fixed MAX_DEFERRED_UNLOADS = 32: the
+// 33rd unloadMovie of a frame never reset its clip's frame/bytes state).
+// Nothing runs script while the queue is drained, so realloc is safe.
+static MovieClip** g_deferred_unload_mcs = NULL;
+static size_t g_deferred_unload_mcs_cap = 0;
 static int g_deferred_unload_mc_count = 0;
+static int deferred_unload_room(void)
+{
+	return (size_t)g_deferred_unload_mc_count < g_deferred_unload_mcs_cap
+		|| ng_table_grow((void**)&g_deferred_unload_mcs, &g_deferred_unload_mcs_cap,
+		                 sizeof(MovieClip*), MAX_DEFERRED_UNLOADS);
+}
 
 void actionProcessDeferredUnloads(void)
 {
@@ -25995,8 +26048,18 @@ typedef struct {
 	char url[512];
 } DeferredFailedLoad;
 #define MAX_DEFERRED_FAILED_LOADS 16
-static DeferredFailedLoad g_deferred_failed_loads[MAX_DEFERRED_FAILED_LOADS];
+// s27 w2b-timers-tail: growable (was a fixed MAX_DEFERRED_FAILED_LOADS = 16:
+// the 17th failed loadMovie of a frame kept its clip's old state forever).
+// The drain runs no script, so realloc by an enqueue is never mid-drain.
+static DeferredFailedLoad* g_deferred_failed_loads = NULL;
+static size_t g_deferred_failed_loads_cap = 0;
 static int g_deferred_failed_load_count = 0;
+static int deferred_failed_load_room(void)
+{
+	return (size_t)g_deferred_failed_load_count < g_deferred_failed_loads_cap
+		|| ng_table_grow((void**)&g_deferred_failed_loads, &g_deferred_failed_loads_cap,
+		                 sizeof(DeferredFailedLoad), MAX_DEFERRED_FAILED_LOADS);
+}
 
 // Construct a child URL relative to root_movieclip's base directory.
 // E.g., root url "file:///test_name/test.swf" + child "target.swf" -> "file:///test_name/target.swf"
@@ -26015,8 +26078,14 @@ static void constructChildURL(char* dest, size_t dest_size, const char* child_fi
 	}
 }
 
+static void actionDrainDeferredShellClears(void);
+static unsigned g_direct_load_epoch = 1;
 void actionProcessDeferredFailedLoads(void)
 {
+	// s27 w2-loaded-shell-land: one end-of-tick pass per tick (both tick
+	// loops call this once, just before the direct-load drain).
+	g_direct_load_epoch++;
+	actionDrainDeferredShellClears();
 	for (int i = 0; i < g_deferred_failed_load_count; i++) {
 		DeferredFailedLoad* dfl = &g_deferred_failed_loads[i];
 		if (dfl->mc != NULL) {
@@ -26040,6 +26109,7 @@ typedef struct {
 	MovieClip* target;
 	MovieEntry* entry;
 	int is_level;  // 1 if target is a _levelN MC (needs display_list swap)
+	unsigned born; // s27 w2-loaded-shell-land: drain epoch that first saw the entry (stamped lazily)
 } PendingDirectLoad;
 #define MAX_PENDING_DIRECT_LOADS 16
 // s27 w2-timers-land: growable (was a fixed MAX_PENDING_DIRECT_LOADS = 16:
@@ -26054,6 +26124,29 @@ static int direct_load_room(void)
 	return (size_t)g_pending_direct_load_count < g_pending_direct_loads_cap
 		|| ng_table_grow((void**)&g_pending_direct_loads, &g_pending_direct_loads_cap,
 		                 sizeof(PendingDirectLoad), MAX_PENDING_DIRECT_LOADS);
+}
+// s27 w2-loaded-shell-land: FLASH delivery tick. A direct loadMovie issued in
+// tick N delivers (the movie's frame 1 runs) in tick N+1's end-of-tick drain,
+// AFTER the root's tick-N+1 frame script -- not in tick N's own drain. Flash
+// Player 32 captures (regression/avm1_loaded_timeline_holder,
+// _shell_consumers_seq; s26 avm1_loaded_bare_goto: `p2 h0 g0 k0` before any
+// child frame). Entries are stamped lazily (the queue sites stay untouched):
+// each entry's `born` field is the epoch of the drain that first saw entry i,
+// and an entry fires only at a LATER epoch. Parallel to the queue; entries at
+// index >= g_pending_direct_stamped are unstamped.
+static int g_pending_direct_stamped = 0;
+// Holders whose direct load was delivered in the current tick's drain: their
+// movie's clip enterFrame starts on the NEXT tick (Flash: no `cx` on the
+// delivery tick). Read by ng_dispatch_loaded_shell_enterframe (tag.c).
+#define MAX_DELIVERED_THIS_TICK 16
+static MovieClip* g_delivered_mc[MAX_DELIVERED_THIS_TICK];
+static unsigned g_delivered_epoch[MAX_DELIVERED_THIS_TICK];
+static int g_delivered_next = 0;
+int actionLoadedMovieDeliveredThisTick(MovieClip* mc)
+{
+	for (int i = 0; i < MAX_DELIVERED_THIS_TICK; i++)
+		if (g_delivered_mc[i] == mc && g_delivered_epoch[i] == g_direct_load_epoch) return 1;
+	return 0;
 }
 
 // --- Deferred loadVariables `onData` queue ---------------------------------
@@ -26443,7 +26536,19 @@ typedef struct {
 	DisplayObject* dl;
 	size_t max, cap;
 	int on;
+	int rootdl_tok;
 } ChildDLSwap;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+extern int ng_rootDLStashPush(void);
+extern void ng_rootDLStashPop(int token);
+extern int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap);
+extern void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap);
+#define ROOTDL_PUSH() ng_rootDLStashPush()
+#define ROOTDL_POP(t) ng_rootDLStashPop(t)
+#else
+#define ROOTDL_PUSH() 0
+#define ROOTDL_POP(t) ((void)(t))
+#endif
 
 static void childDLSwapIn(DisplayObject* owner, ChildDLSwap* s)
 {
@@ -26451,9 +26556,11 @@ static void childDLSwapIn(DisplayObject* owner, ChildDLSwap* s)
 	extern size_t max_depth;
 	extern size_t display_list_capacity;
 	s->on = 0;
+	s->rootdl_tok = 0;
 	s->owner = owner;
 	if (owner == NULL || owner->sprite_display_list == NULL) return;
 	if (display_list == owner->sprite_display_list) return;  // already active (re-entrant goto)
+	s->rootdl_tok = ROOTDL_PUSH();
 	s->dl = display_list; s->max = max_depth; s->cap = display_list_capacity;
 	display_list = owner->sprite_display_list;
 	max_depth = owner->sprite_max_depth;
@@ -26471,6 +26578,7 @@ static void childDLSwapOut(ChildDLSwap* s)
 	s->owner->sprite_max_depth = max_depth;
 	s->owner->sprite_dl_capacity = display_list_capacity;
 	display_list = s->dl; max_depth = s->max; display_list_capacity = s->cap;
+	ROOTDL_POP(s->rootdl_tok);
 	s->on = 0;
 }
 
@@ -26480,7 +26588,48 @@ static void childDLSwapOut(ChildDLSwap* s)
 // non-root clip, so the movie's children are gone (and stop rendering) at once.
 // Removal goes through tagRemoveObject2 on the swapped-in shell, the same loop
 // the reload path uses, so onUnload fires and cached MovieClips invalidate.
+// s27 w1-per-movie-dl-phase3: the unload is DEFERRED to the end of the tick.
+// Ruffle's loader makes a loaded movie a ROOT clip (loader.rs movie_loader_data:
+// replace_with_movie(.., is_root=true, ..)), so avm1_unload_movie takes its
+// is_root() arm and runs avm1_unload + transform_to_unloaded_state in a spawned
+// future, i.e. at the next update; its own comment records that Flash applies
+// the unloaded state one frame later even for a non-root clip. So `h.a` read
+// in the same script right after h.unloadMovie() is still the movie's child.
+// The playhead unregister stays synchronous (the movie runs no further frame).
+#define MAX_DEFERRED_SHELL_CLEARS 64
+static MovieClip* g_deferred_shell_clear[MAX_DEFERRED_SHELL_CLEARS];
+static int g_deferred_shell_clear_count = 0;
+static SWFAppContext* g_deferred_shell_clear_app = NULL;
+static void actionClearChildMovieShellNow(SWFAppContext* app_context, MovieClip* mc);
 void actionClearChildMovieShell(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || mc->loaded_dl_shell == NULL) return;
+	for (int i = 0; i < g_deferred_shell_clear_count; i++)
+		if (g_deferred_shell_clear[i] == mc) return;
+	if (g_deferred_shell_clear_count >= MAX_DEFERRED_SHELL_CLEARS) {
+		actionClearChildMovieShellNow(app_context, mc);
+		return;
+	}
+	g_deferred_shell_clear_app = app_context;
+	g_deferred_shell_clear[g_deferred_shell_clear_count++] = mc;
+}
+// Drained from actionProcessDeferredFailedLoads (end of tick, before the
+// pending direct loads fire, so an unload+reload in one script clears first).
+static void actionDrainDeferredShellClears(void)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	int n = g_deferred_shell_clear_count;
+	g_deferred_shell_clear_count = 0;
+	for (int i = 0; i < n; i++) {
+		MovieClip* mc = g_deferred_shell_clear[i];
+		int live = 0;
+		for (int c = 0; c < child_mc_count; c++)
+			if (child_mc_cache[c] == mc) { live = 1; break; }
+		if (live) actionClearChildMovieShellNow(g_deferred_shell_clear_app, mc);
+	}
+}
+static void actionClearChildMovieShellNow(SWFAppContext* app_context, MovieClip* mc)
 {
 	if (mc == NULL || mc->loaded_dl_shell == NULL) return;
 	DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
@@ -26633,8 +26782,14 @@ int actionChildMovieBareGoto(SWFAppContext* app_context, long frame0, int rel, i
 	return 1;
 }
 
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+extern void ng_dispatch_loaded_shell_enterframe(SWFAppContext* app_context);
+#endif
 void actionAdvancePlayingLevels(SWFAppContext* app_context)
 {
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	ng_dispatch_loaded_shell_enterframe(app_context);
+#endif
 	if (g_level_advance_count == 0) return;
 	int write = 0;
 	for (int read = 0; read < g_level_advance_count; read++) {
@@ -26702,9 +26857,11 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 			DisplayObject* _saved_dl = NULL;
 			size_t _saved_max = 0, _saved_cap = 0;
 			int _did_swap = 0;
+			int _rootdl_tok = 0;
 			DisplayObject* dobj = e.mc->display_obj ? (DisplayObject*)e.mc->display_obj
 			                                        : actionChildMovieShell(app_context, e.mc, 1);
 			if (dobj != NULL && dobj->sprite_display_list != NULL) {
+				if (!isLevelRootMC(e.mc)) _rootdl_tok = ROOTDL_PUSH();
 				_saved_dl = display_list;
 				_saved_max = max_depth;
 				_saved_cap = display_list_capacity;
@@ -26858,6 +27015,7 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 				max_depth = _saved_max;
 				display_list_capacity = _saved_cap;
 			}
+			ROOTDL_POP(_rootdl_tok);
 			if (_saved_td != NULL) {
 				extern float (*g_active_transform_data)[16];
 				g_active_transform_data = _saved_td;
@@ -26895,6 +27053,7 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 // AVM2 tick advances. Both live here; the AVM2 side calls in through the two
 // entry points at the bottom.
 void actionFirePendingDirectLoads(SWFAppContext* app_context);
+static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all);
 
 static int g_avm1_under_avm2_ready = 0;
 
@@ -27202,7 +27361,8 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
 	extern int quit_swf;
 	int saved_quit = quit_swf;
 	quit_swf = 0;
-	actionFirePendingDirectLoads(app_context);
+	// No end-of-tick epoch pass on this path: keep its same-drain delivery.
+	actionFirePendingDirectLoadsImpl(app_context, 1);
 	// The MCL Phase-3 slot, same as swf_core.c / swf.c: the previous AVM2
 	// tick's drain parked onLoadInit, and it fires here, just before the
 	// loaded movie's own advance.
@@ -27546,15 +27706,35 @@ int actionAvm1LocalConnectionDeliver(SWFAppContext* app_context, const char* key
 }
 #endif  // SWF_AVM2
 
+static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all);
 void actionFirePendingDirectLoads(SWFAppContext* app_context)
 {
+	actionFirePendingDirectLoadsImpl(app_context, 0);
+}
+static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all)
+{
 	int count = g_pending_direct_load_count;
-	if (count == 0) return;
-	// Copy and reset (child scripts may queue more loads)
+	if (count == 0) { g_pending_direct_stamped = 0; return; }
+	if (g_pending_direct_stamped > count) g_pending_direct_stamped = count;
+	for (int i = g_pending_direct_stamped; i < count; i++)
+		g_pending_direct_loads[i].born = g_direct_load_epoch;
+	g_pending_direct_stamped = count;
+	// Copy the due entries out (child scripts may queue more loads and grow the
+	// queue); entries born this epoch stay queued, in order.
 	PendingDirectLoad* loads = (PendingDirectLoad*) malloc((size_t)count * sizeof(PendingDirectLoad));
 	if (loads == NULL) return;
-	for (int i = 0; i < count; i++) loads[i] = g_pending_direct_loads[i];
-	g_pending_direct_load_count = 0;
+	int n_due = 0, n_keep = 0;
+	for (int i = 0; i < count; i++) {
+		if (fire_all || g_pending_direct_loads[i].born < g_direct_load_epoch) {
+			loads[n_due++] = g_pending_direct_loads[i];
+		} else {
+			g_pending_direct_loads[n_keep++] = g_pending_direct_loads[i];
+		}
+	}
+	g_pending_direct_load_count = n_keep;
+	g_pending_direct_stamped = n_keep;
+	count = n_due;
+	if (count == 0) { free(loads); return; }
 
 	// Stable sort level loads by level number (mc->depth) ascending so lower
 	// levels run their init scripts first — matches Flash/Ruffle ordering when
@@ -27657,7 +27837,9 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		// on top of that additionally breaks avm1/swf{5_to_6,6_to_5}_cross_call.
 		// Both measured. See SWFRecompDocs/status/child-timeline-advance.md.
 		DisplayObject* _shell = NULL;
+		int _rootdl_tok = 0;
 		if (!loads[i].is_level && (_shell = actionChildMovieShell(app_context, mc, 1)) != NULL) {
+			_rootdl_tok = ROOTDL_PUSH();
 			_saved_dl = display_list;
 			_saved_max = max_depth;
 			_saved_cap = display_list_capacity;
@@ -27701,6 +27883,21 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 				_did_swap = 1;
 			}
 		}
+		// s27 phase 3: a TIMELINE-placed holder (it already has a display_obj
+		// with a sprite list) gets its movie's frame 1 in that list too, the
+		// same list actionAdvancePlayingLevels runs frames 2..N in.
+		if (!_did_swap && !loads[i].is_level && mc->display_obj != NULL
+		    && ((DisplayObject*)mc->display_obj)->sprite_display_list != NULL) {
+			DisplayObject* _hd = (DisplayObject*)mc->display_obj;
+			_rootdl_tok = ROOTDL_PUSH();
+			_saved_dl = display_list;
+			_saved_max = max_depth;
+			_saved_cap = display_list_capacity;
+			display_list = _hd->sprite_display_list;
+			max_depth = _hd->sprite_max_depth;
+			display_list_capacity = _hd->sprite_dl_capacity;
+			_did_swap = 1;
+		}
 		// Swap transform_data to child's array (for correct ng_cache_transform)
 		{
 			extern float (*g_active_transform_data)[16];
@@ -27740,6 +27937,9 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		int _saved_is_playing = is_playing;
 
 		entry->init_func(app_context);
+		g_delivered_mc[g_delivered_next] = mc;
+		g_delivered_epoch[g_delivered_next] = g_direct_load_epoch;
+		g_delivered_next = (g_delivered_next + 1) % MAX_DELIVERED_THIS_TICK;
 		// Register the loaded movie's playhead BEFORE its frame 1 runs. This used
 		// to be gated on `is_level`, which is why a movie loadMovie'd into a
 		// HOLDER CLIP never advanced past its first frame: nothing called
@@ -27791,6 +27991,7 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			max_depth = _saved_max;
 			display_list_capacity = _saved_cap;
 		}
+		ROOTDL_POP(_rootdl_tok);
 		if (_saved_td != NULL) {
 			extern float (*g_active_transform_data)[16];
 			g_active_transform_data = _saved_td;
@@ -35022,6 +35223,33 @@ int actionIterateDynamicSubtreeBitmaps(void* root_mc, AttachedBitmapCallback cb,
 	return count;
 }
 
+// s27 w2b-avm1-applyfilter-flash: set once an AVM1 BlurFilter applyFilter
+// leaves non-0xFF alpha words in an OPAQUE BitmapData (Flash's stored form,
+// see avm1_filter_kernels.c). Flash displays an opaque bitmap ignoring that
+// alpha, so the attached-bitmap draw then uploads an alpha-forced copy.
+// Zero (the only state any corpus row reaches) skips the lookup entirely.
+// (Defined next to g_bitmap_native_count.)
+
+static uint32_t* bmpOpaqueAlphaForcedCopy(const uint32_t* px, int w, int h)
+{
+    if (!g_bmp_opaque_raw_alpha || px == NULL || w <= 0 || h <= 0) return NULL;
+    int opaque = 0;
+    for (int i = 0; i < g_bitmap_native_count; i++)
+    {
+        BitmapDataNative* n = g_bitmap_natives[i].native;
+        if (n != NULL && n->pixels == px) { opaque = !n->transparent && !n->disposed; break; }
+    }
+    if (!opaque) return NULL;
+    size_t cnt = (size_t) w * (size_t) h, k;
+    for (k = 0; k < cnt; k++)
+        if ((px[k] >> 24) != 0xFF) break;
+    if (k == cnt) return NULL;
+    uint32_t* out = (uint32_t*) malloc(cnt * sizeof(uint32_t));
+    if (out == NULL) return NULL;
+    for (k = 0; k < cnt; k++) out[k] = px[k] | 0xFF000000u;
+    return out;
+}
+
 int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
 {
 	int count = 0;
@@ -35049,7 +35277,10 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
 		info.alpha = (float)mc->alpha;
 		info.cxform_slot = mc->dynamic_cxform_slot;
 		info.cxform = mc->dynamic_cxform_slot != 0 ? mc->dyn_cx : NULL;
+		uint32_t* forced = bmpOpaqueAlphaForcedCopy(info.pixels, info.width, info.height);
+		if (forced != NULL) info.pixels = forced;
 		cb(&info, user_data);
+		free(forced);
 		count++;
 	}
 	return count;
@@ -40480,7 +40711,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			}
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
-			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+			if (deferred_failed_load_room()) {
 				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
 				dfl->mc = mc;
 				constructChildURL(dfl->url, sizeof(dfl->url), url_mut);
@@ -40558,7 +40789,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			}
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
-			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+			if (deferred_failed_load_room()) {
 				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
 				dfl->mc = mc;
 				constructChildURL(dfl->url, sizeof(dfl->url), url_mut2);
@@ -41879,7 +42110,11 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             DisplayObject* _p2_shell = actionChildMovieShell(app_context, loads[i].target, 1);
             ChildDLSwap _p2_sw;
             _p2_sw.on = 0;
-            if (_p2_shell != NULL) {
+            if (_p2_shell == NULL && loads[i].target != NULL && !isLevelRootMC(loads[i].target)
+                && loads[i].target->display_obj != NULL) {
+                // s27 phase 3: timeline-placed holder -> its own sprite list.
+                childDLSwapIn((DisplayObject*)loads[i].target->display_obj, &_p2_sw);
+            } else if (_p2_shell != NULL) {
                 childDLSwapIn(_p2_shell, &_p2_sw);
                 if (_p2_sw.on) {
                     for (size_t _cd = max_depth; _cd >= 1; _cd--) {
@@ -42365,6 +42600,15 @@ int g_inside_enterframe_dispatch = 0;
 
 static void dispatch_root_dprops_enterframe(SWFAppContext* app_context)
 {
+	// s27 w1-exec-order: _root's onEnterFrame at most once per tick (see
+	// actionDispatchEnterFrameHandlers; Ruffle Avm1::run_frame walks each
+	// clip, root included, exactly once per frame).
+	{
+		extern MovieClip root_movieclip;
+		extern size_t g_tick_count;
+		if (root_movieclip.ef_fired_tick == g_tick_count) return;
+		root_movieclip.ef_fired_tick = g_tick_count;
+	}
 	{
 		extern MovieClip root_movieclip;
 		ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
@@ -42462,6 +42706,16 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 
 		ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
 		if (func == NULL) continue;
+		// s27 w1-exec-order: one onEnterFrame per clip per tick. The goto
+		// catch-up's Phase F (ng_executeGotoCatchUp) re-runs this dispatcher
+		// twice through ng_run_deferred_sprite_init_impl; display-list
+		// sprites are protected by the consumed enterframe_eligible, but
+		// dynamic MCs (and _root, below) fired again on every inline goto.
+		{
+			extern size_t g_tick_count;
+			if (mc->ef_fired_tick == g_tick_count) continue;
+			mc->ef_fired_tick = g_tick_count;
+		}
 
 		MovieClip* saved_ctx = g_current_context;
 		actionSetCurrentContext(mc);
@@ -46109,8 +46363,23 @@ typedef struct PendingLoadVarsLoad {
 	int success;            // 0 = failure (file missing), 1 = success
 	int is_stylesheet;      // StyleSheet.load: parse() + onLoad(result), no onData
 } PendingLoadVarsLoad;
-static PendingLoadVarsLoad g_pending_lv_loads[MAX_PENDING_LV_LOADS];
+// s27 w2b-timers-tail: growable (was a fixed MAX_PENDING_LV_LOADS = 32: the
+// 33rd LoadVars.load / XML-less form load of a tick was dropped, its onData /
+// onLoad never fired). processLoadVarsLoads drains a heap snapshot
+// (g_lv_inflight, a GC root: the not-yet-fired entries' instances were only
+// marked while they sat in the live queue) so onData calling load() again
+// may grow the live queue.
+static PendingLoadVarsLoad* g_pending_lv_loads = NULL;
+static size_t g_pending_lv_loads_cap = 0;
 static int g_pending_lv_load_count = 0;
+static PendingLoadVarsLoad* g_lv_inflight = NULL;
+static int g_lv_inflight_n = 0;
+static int lv_load_room(void)
+{
+	return (size_t)g_pending_lv_load_count < g_pending_lv_loads_cap
+		|| ng_table_grow((void**)&g_pending_lv_loads, &g_pending_lv_loads_cap,
+		                 sizeof(PendingLoadVarsLoad), MAX_PENDING_LV_LOADS);
+}
 
 int actionHasPendingLoadVarsLoads(void) { return g_pending_lv_load_count > 0; }
 
@@ -46205,10 +46474,15 @@ void processLoadVarsLoads(SWFAppContext* app_context)
 	while (g_pending_lv_load_count > 0 && guard++ < 16) {
 		// Copy locally so onData handlers that call load() again don't
 		// clobber our array.
-		PendingLoadVarsLoad local[MAX_PENDING_LV_LOADS];
 		int count = g_pending_lv_load_count;
+		PendingLoadVarsLoad* local = (PendingLoadVarsLoad*) malloc((size_t)count * sizeof(PendingLoadVarsLoad));
+		if (local == NULL) break;
 		for (int i = 0; i < count; i++) local[i] = g_pending_lv_loads[i];
 		g_pending_lv_load_count = 0;
+		PendingLoadVarsLoad* saved_inflight = g_lv_inflight;
+		int saved_inflight_n = g_lv_inflight_n;
+		g_lv_inflight = local;
+		g_lv_inflight_n = count;
 
 		for (int i = 0; i < count; i++) {
 			PendingLoadVarsLoad* p = &local[i];
@@ -46228,6 +46502,7 @@ void processLoadVarsLoads(SWFAppContext* app_context)
 				}
 				fireLoadVarsCallback(app_context, lv, "onLoad", 6, &ok, 1);
 				releaseObject(app_context, lv);
+			p->lv = NULL;  // fired: no longer a GC root
 				continue;
 			}
 
@@ -46252,7 +46527,11 @@ void processLoadVarsLoads(SWFAppContext* app_context)
 			fireLoadVarsCallback(app_context, lv, "onData", 6, &cb, 1);
 
 			releaseObject(app_context, lv);
+			p->lv = NULL;  // fired: no longer a GC root
 		}
+		g_lv_inflight = saved_inflight;
+		g_lv_inflight_n = saved_inflight_n;
+		free(local);
 	}
 }
 
@@ -46330,7 +46609,7 @@ static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* ar
 	DataFileEntry* data = findDataFile(url_utf8);
 
 	// Enqueue deferred dispatch.
-	if (g_pending_lv_load_count < MAX_PENDING_LV_LOADS) {
+	if (lv_load_room()) {
 		PendingLoadVarsLoad* p = &g_pending_lv_loads[g_pending_lv_load_count++];
 		p->lv = lv;
 		p->is_stylesheet = g_lv_enqueue_ss;
@@ -51518,11 +51797,21 @@ check_special_vars:
 			}
 
 			{
+			// s27 phase 3: a lookup scoped to the ROOT timeline reads the root
+			// movie's list even while a loaded movie's list is active (a
+			// synchronous child-frame -> _root.f() call). Every return below
+			// goes through _GV_RDL_LEAVE.
+			DisplayObject* _gvr_dl = NULL; size_t _gvr_max = 0, _gvr_cap = 0;
+			int _gvr_sw = (g_current_context == NULL || g_current_context == &root_movieclip)
+				? ng_rootDLEnter(&_gvr_dl, &_gvr_max, &_gvr_cap) : 0;
+#define _GV_RDL_LEAVE() ng_rootDLLeave(_gvr_sw, _gvr_dl, _gvr_max, _gvr_cap)
 			size_t child_depth = ng_findDisplayEntryByName(name_buf);
+			if (child_depth == SIZE_MAX) _GV_RDL_LEAVE();
 			if (child_depth != SIZE_MAX)
 			{
 				extern MovieClip root_movieclip;
 				if (!ng_isScriptableAtDepth(child_depth)) {
+					_GV_RDL_LEAVE();
 					// Flash quirk: sh.var = 10 actually sets var on the parent,
 					// so a shape/morph/static-text name resolves to the parent
 					// MC. Flag so actionCallMethod emulates
@@ -51538,6 +51827,7 @@ check_special_vars:
 					extern Character* dictionary;
 					size_t _cid = display_list[child_depth].char_id;
 					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+						_GV_RDL_LEAVE();
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 						return;
 					}
@@ -51551,10 +51841,13 @@ check_special_vars:
 					size_t _cid = display_list[child_depth].char_id;
 					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON)
 						child_mc->is_button_mc = 1;
+					_GV_RDL_LEAVE();
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
 					return;
 				}
+				_GV_RDL_LEAVE();
 			}
+#undef _GV_RDL_LEAVE
 			}
 
 			// AS-created clips (createEmptyMovieClip / attachMovie /
@@ -56392,7 +56685,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 					actionClearChildMovieShell(app_context, _gu2_mc);  // s26 w2 phase 5
 				}
 				// Defer marking MC as unloaded until next frame (Flash defers unload state)
-				if (g_deferred_unload_mc_count < MAX_DEFERRED_UNLOADS) {
+				if (deferred_unload_room()) {
 					g_deferred_unload_mcs[g_deferred_unload_mc_count++] = _gu2_mc;
 				}
 			}
@@ -56494,7 +56787,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			}
 		} else if (_gu2_mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
-			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+			if (deferred_failed_load_room()) {
 				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
 				dfl->mc = _gu2_mc;
 				constructChildURL(dfl->url, sizeof(dfl->url), url_utf8);
@@ -61135,6 +61428,19 @@ static void actionGetMemberImpl(SWFAppContext* app_context);
 
 void actionGetMember(SWFAppContext* app_context)
 {
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// s27 phase 3: `_root.x` from a loaded movie's frame reads the ROOT list.
+	extern MovieClip root_movieclip;
+	if (STACK_SECOND_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP
+	    && (MovieClip*)STACK_SECOND_TOP_VALUE == &root_movieclip) {
+		DisplayObject* _sdl = NULL; size_t _smax = 0, _scap = 0;
+		int _sw = ng_rootDLEnter(&_sdl, &_smax, &_scap);
+		actionGetMemberImpl(app_context);
+		ng_rootDLLeave(_sw, _sdl, _smax, _scap);
+		swf5TextFieldRefToClip(app_context);
+		return;
+	}
+#endif
 	actionGetMemberImpl(app_context);
 	swf5TextFieldRefToClip(app_context);
 }
@@ -62606,7 +62912,14 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 			if (mc->display_obj != NULL) {
 				DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
 				if (parent_dobj->sprite_display_list != NULL) {
-					for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
+					// s27 phase 3: while this list is the ACTIVE one (a movie loaded
+					// into a timeline holder is running its frame) the stored max is
+					// only written back at swap-out; read the live one.
+					extern DisplayObject* display_list;
+					extern size_t max_depth;
+					size_t _pd_max = (parent_dobj->sprite_display_list == display_list)
+						? max_depth : parent_dobj->sprite_max_depth;
+					for (size_t _cd = 1; _cd <= _pd_max; _cd++) {
 						DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
 						if (_ch->char_id == 0) continue;
 						if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, child_name_buf)) {
@@ -81021,7 +81334,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					} else if (mc != NULL) {
 						// Failed load: defer state change to next frame
-						if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
+						if (deferred_failed_load_room()) {
 							DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
 							dfl->mc = mc;
 							constructChildURL(dfl->url, sizeof(dfl->url), _lm_url);
@@ -86312,8 +86625,16 @@ void actionGcMarkRoots(void)
 		swfGcMarkObject(g_pending_mcl_loads_next_tick[i].mcl);
 	// Deferred LoadVars loads (queue holds a retain, but retained-by-C-queue
 	// is still invisible to the trace — must be an explicit root).
-	for (int i = 0; i < g_pending_lv_load_count && i < MAX_PENDING_LV_LOADS; i++)
+	for (int i = 0; i < g_pending_lv_load_count; i++)
 		swfGcMarkObject(g_pending_lv_loads[i].lv);
+	for (int i = 0; i < g_lv_inflight_n; i++)
+		swfGcMarkObject(g_lv_inflight[i].lv);
+	// s27 w2b-timers-tail: MCL Phase-3 queue (onLoadInit waiting for the
+	// child's first frame) -- the loader's broadcaster must stay alive until
+	// it fires (Ruffle roots it in the load manager); it was only marked
+	// while in the two earlier queues.
+	for (int i = 0; i < g_pending_load_init_count; i++)
+		swfGcMarkObject(g_pending_load_inits[i].mcl);
 	// Deferred XML loads ride the ActionQueue as heap payloads — walk the
 	// queue and mark the doc of every aq_dispatch_xml_load entry.
 	actionQueueGcForEach(gcMarkXmlLoadPayload);
@@ -86405,7 +86726,13 @@ void actionGcScrubStashes(const void* p)
 	for (int i = 0; i < g_pending_mcl_load_count_next_tick; i++)
 		if ((const void*)g_pending_mcl_loads_next_tick[i].mcl == p)
 			g_pending_mcl_loads_next_tick[i].mcl = NULL;
-	for (int i = 0; i < g_pending_lv_load_count && i < MAX_PENDING_LV_LOADS; i++)
+	for (int i = 0; i < g_pending_lv_load_count; i++)
 		if ((const void*)g_pending_lv_loads[i].lv == p)
 			g_pending_lv_loads[i].lv = NULL;
+	for (int i = 0; i < g_lv_inflight_n; i++)
+		if ((const void*)g_lv_inflight[i].lv == p)
+			g_lv_inflight[i].lv = NULL;
+	for (int i = 0; i < g_pending_load_init_count; i++)
+		if ((const void*)g_pending_load_inits[i].mcl == p)
+			g_pending_load_inits[i].mcl = NULL;
 }

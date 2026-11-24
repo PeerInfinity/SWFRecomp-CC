@@ -1,1 +1,7 @@
 num_frames = 20
+
+# s27 w2-loaded-shell-land: output.txt re-derived for the FLASH direct-loadMovie
+# delivery tick (a load issued in tick N delivers after the root's tick-N+1
+# scripts; Flash Player 32 captures of avm1_loaded_timeline_holder /
+# _shell_consumers / _bare_goto / _unload_shell). The previous golden followed
+# Ruffle's one-tick-earlier delivery. PREDICTED pending a Flash capture.

@@ -1,0 +1,474 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index be73f4a60..ea5e77715 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -184,6 +184,9 @@ struct MovieClip {
+ 	// corpus regression (child-timeline-advance.md section 2.2). Allocated by
+ 	// actionChildMovieShell, swapped in around every frame call of the movie.
+ 	void* loaded_dl_shell;
++	// s27 w1-exec-order: g_tick_count of this clip's last onEnterFrame
++	// dispatch (Flash/Ruffle run exactly one per clip per frame).
++	size_t ef_fired_tick;
+ };
+ 
+ // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index c8ee21284..1abe5c779 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -41895,6 +41895,15 @@ int g_inside_enterframe_dispatch = 0;
+ 
+ static void dispatch_root_dprops_enterframe(SWFAppContext* app_context)
+ {
++	// s27 w1-exec-order: _root's onEnterFrame at most once per tick (see
++	// actionDispatchEnterFrameHandlers; Ruffle Avm1::run_frame walks each
++	// clip, root included, exactly once per frame).
++	{
++		extern MovieClip root_movieclip;
++		extern size_t g_tick_count;
++		if (root_movieclip.ef_fired_tick == g_tick_count) return;
++		root_movieclip.ef_fired_tick = g_tick_count;
++	}
+ 	{
+ 		extern MovieClip root_movieclip;
+ 		ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
+@@ -41992,6 +42001,16 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
+ 
+ 		ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
+ 		if (func == NULL) continue;
++		// s27 w1-exec-order: one onEnterFrame per clip per tick. The goto
++		// catch-up's Phase F (ng_executeGotoCatchUp) re-runs this dispatcher
++		// twice through ng_run_deferred_sprite_init_impl; display-list
++		// sprites are protected by the consumed enterframe_eligible, but
++		// dynamic MCs (and _root, below) fired again on every inline goto.
++		{
++			extern size_t g_tick_count;
++			if (mc->ef_fired_tick == g_tick_count) continue;
++			mc->ef_fired_tick = g_tick_count;
++		}
+ 
+ 		MovieClip* saved_ctx = g_current_context;
+ 		actionSetCurrentContext(mc);
+diff --git a/SWFModernRuntime/src/libswf/swf.c b/SWFModernRuntime/src/libswf/swf.c
+index b1828f9ef..c65581c67 100644
+--- a/SWFModernRuntime/src/libswf/swf.c
++++ b/SWFModernRuntime/src/libswf/swf.c
+@@ -391,6 +391,23 @@ DisplayObject* g_current_sprite_obj = NULL;
+ 
+ RenderContext* context;
+ 
++#ifdef OFFSCREEN_RENDER
++// s27 w2-exec-order-land: nested-sprite frame order (Phase 3 early). Same rule
++// and kill switch (SWF_EXEC_ORDER_NESTED_EARLY=0) as swf_core.c
++// exec_order_nested_early: a sprite nested in a root-level sprite is newer than
++// its parent and _root in the Flash/Ruffle exec list, so its frame script runs
++// before theirs and before _root.onEnterFrame. Browser-WASM keeps its order.
++static int exec_order_nested_early(void)
++{
++	static int s_v = -1;
++	if (s_v < 0) {
++		const char* ev = getenv("SWF_EXEC_ORDER_NESTED_EARLY");
++		s_v = (ev != NULL && ev[0] == '0') ? 0 : 1;
++	}
++	return s_v;
++}
++#endif
++
+ void tagMain(SWFAppContext* app_context)
+ {
+ 	frame_func* frame_funcs = app_context->frame_funcs;
+@@ -936,6 +953,14 @@ void tagMain(SWFAppContext* app_context)
+ 		// actionDrainAllInPriorityOrder at the top of root frame_funcs[current_frame]
+ 		// drains those scripts before the root's own DoAction. Without this
+ 		// call, sprite frame_funcs (frame > 0) never run.
++		// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
++		// nested sprites first, then their root-level parents (Phase 1).
++		const int nested_early = exec_order_nested_early();
++		if (nested_early)
++		{
++			extern void advance_nested_sprite_frames(SWFAppContext* app_context);
++			advance_nested_sprite_frames(app_context);
++		}
+ 		{
+ 			extern void advance_sprite_frames(SWFAppContext* app_context);
+ 			extern int g_advance_defer_nested;
+@@ -957,6 +982,8 @@ void tagMain(SWFAppContext* app_context)
+ 		// flush reads their post-advance value, matching Ruffle's
+ 		// instantiation-ordered exec list (#10a). Writes only mc->currentframe;
+ 		// the playhead + frame scripts stay in Phase 3 (advance_nested_sprite_frames).
++		// Skipped when Phase 3 already ran early.
++		if (!nested_early)
+ 		{
+ 			extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
+ 			presync_nested_sprite_currentframe(app_context);
+@@ -1112,16 +1139,31 @@ void tagMain(SWFAppContext* app_context)
+ 		// came one frame after the root's, a constant off-by-one (N's
+ 		// injected probe reached "startgame" at frame 27 vs native/Ruffle 28).
+ 		// Probe: SWFRecomp/tests/wasm_probes/enterframe_count_injected_clip.
++		//
++		// s27 w1-exec-order: browser-WASM only HERE. OFFSCREEN marks at the END
++		// of its post-frame-func block below (after the Phase-3 advance, the
++		// SCRIPT drain that fires a stopped root's deferred onEnterFrame, the
++		// attach-init drain and the promote), the same slot as swf_core.c. Marked
++		// here, a clip created by any of those scripts missed the mark and first
++		// fired onEnterFrame one tick late in graphics only (Ruffle: the tick
++		// after creation, since createEmptyMovieClip runs its load frame at once
++		// -- construct_as_avm1_object(run_frame=true)). Fixture:
++		// regression/avm1_exec_order_dynamic_eligible.
++#ifndef OFFSCREEN_RENDER
+ 		{
+ 			extern void actionMarkDynamicMCsEnterFrameEligible(void);
+ 			actionMarkDynamicMCsEnterFrameEligible();
+ 		}
++#endif
+ #ifdef OFFSCREEN_RENDER
+ 
+ 		// (Attached-clip promotion moved below the SCRIPT drain, s26 n-levels.)
+ 
+ 		// Phase 3: advance nested sprite children (deferred from Phase 1
+-		// via g_advance_defer_nested above).
++		// via g_advance_defer_nested above), unless it ran early (OFFSCREEN).
++#ifdef OFFSCREEN_RENDER
++		if (!nested_early)
++#endif
+ 		{
+ 			extern void advance_nested_sprite_frames(SWFAppContext* app_context);
+ 			advance_nested_sprite_frames(app_context);
+@@ -1170,6 +1212,12 @@ void tagMain(SWFAppContext* app_context)
+ 			extern void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);
+ 			ng_apply_pending_sprite_self_gotos(app_context);
+ 		}
++		// Dynamic-MC enterFrame eligibility, OFFSCREEN slot (see the browser
++		// mark above): last of the post-frame-func steps, like swf_core.c.
++		{
++			extern void actionMarkDynamicMCsEnterFrameEligible(void);
++			actionMarkDynamicMCsEnterFrameEligible();
++		}
+ #endif
+ 
+ 		// Flush deferred rollOver/rollOut events from Selection.setFocus()
+diff --git a/SWFModernRuntime/src/libswf/swf_core.c b/SWFModernRuntime/src/libswf/swf_core.c
+index 97e277ce4..288a1dd22 100644
+--- a/SWFModernRuntime/src/libswf/swf_core.c
++++ b/SWFModernRuntime/src/libswf/swf_core.c
+@@ -817,6 +817,32 @@ static void input_events_pump_tick(SWFAppContext* app_context)
+     }
+ }
+ 
++// s27 w2-exec-order-land: nested-sprite frame order. Flash/Ruffle walk the
++// AVM1 exec list newest-first with _root LAST (avm1/runtime.rs run_frame), so a
++// timeline sprite nested inside a root-level sprite (always instantiated after
++// _root) queues its frame script BEFORE _root's onEnterFrame and frame script.
++// We used to defer that nested advance (Phase 3) until after the root frame
++// func, so a nested child's frame script ran after the root's DoAction on the
++// tick it advanced (Flash oracle: regression/avm1_exec_order_dynamic_eligible,
++// `inner f2` before `root ef`). The nested pass now runs FIRST, before Phase 1
++// and the enterFrame flush: a nested child is newer than its root-level parent,
++// so it runs its frame before the parent's (Flash IDE golden avm1/execution_order4:
++// `clip1.child: frame 2` precedes `clip2`/`clip1: frame 3` on the next tick; run
++// after Phase 1 the child advanced on its own placement tick). Its scripts drain
++// ahead of the root DoAction (aq FIFO), root-last fires _root.onEnterFrame after
++// them, and a child its parent removes this tick has its queued script dropped
++// (aq_sprite_ctx_removed; Ruffle run_actions skips removed clips the same way).
++// Kill switch for A/B work: SWF_EXEC_ORDER_NESTED_EARLY=0.
++static int exec_order_nested_early(void)
++{
++	static int s_v = -1;
++	if (s_v < 0) {
++		const char* ev = getenv("SWF_EXEC_ORDER_NESTED_EARLY");
++		s_v = (ev != NULL && ev[0] == '0') ? 0 : 1;
++	}
++	return s_v;
++}
++
+ // Console-only swfStart implementation
+ void swfStart(SWFAppContext* app_context)
+ {
+@@ -1078,6 +1104,11 @@ void swfStart(SWFAppContext* app_context)
+ 			// Phase 1: Advance root-level sprites (defer nested child recursion)
+ 			// Phase 2: Run root frame script (EnterFrame flushes between RemoveObject & DoAction)
+ 			// Phase 3: Advance nested children of sprites
++			// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
++			// nested sprites first, then their root-level parents (Phase 1).
++			const int nested_early = exec_order_nested_early();
++			if (nested_early)
++				advance_nested_sprite_frames(app_context);
+ 			extern int g_advance_defer_nested;
+ 			g_advance_defer_nested = 1;
+ 			advance_sprite_frames(app_context);
+@@ -1097,6 +1128,8 @@ void swfStart(SWFAppContext* app_context)
+ 			// onEnterFrame fires in the Phase-2 flush reads their post-advance
+ 			// value, matching Ruffle's instantiation-ordered exec list (#10a).
+ 			// Writes only mc->currentframe — playhead + scripts stay in Phase 3.
++			// Not needed (and would read one frame ahead) when Phase 3 ran early.
++			if (!nested_early)
+ 			{
+ 				extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
+ 				presync_nested_sprite_currentframe(app_context);
+@@ -1162,8 +1195,10 @@ void swfStart(SWFAppContext* app_context)
+ 				if (g_enterframe_flush_pending)
+ 					tagFlushPendingEnterFrame(app_context);
+ 			}
+-			// Phase 3: advance nested sprite children (deferred from Phase 1)
+-			advance_nested_sprite_frames(app_context);
++			// Phase 3: advance nested sprite children (deferred from Phase 1),
++			// unless it already ran early (exec_order_nested_early).
++			if (!nested_early)
++				advance_nested_sprite_frames(app_context);
+ 
+ 			// Phase 7b: drain any AQ_KIND_SCRIPT entries queued during
+ 			// advance_sprite_frames (Phase 1 + Phase 3) that weren't covered
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 8a13378ea..9fc228e33 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -736,3 +736,10 @@ regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased
+ # s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
+ # tier=1
+ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp
++# s27 w2-exec-order-land: nested timeline sprites run their frame BEFORE their root-level parent and _root
++# (exec_order_nested_early in swf.c/swf_core.c); image rows whose nested sprite scripts drive the drawn state.
++# tier=2
++from_shumway/timeline/timeline_as2_5                   # nested sprite timeline, AS2
++from_shumway/timeline/timeline_loop                    # nested sprite loop
++from_shumway/acid/acid-child                           # nested child clips
++regression/avm1_nested_po3_filters                     # nested PO3 filters
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/create_test_swf.py
+new file mode 100644
+index 000000000..9cfc9fed3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/create_test_swf.py
+@@ -0,0 +1,64 @@
++#!/usr/bin/env python3
++"""avm1_exec_order_dynamic_eligible_mode: when does a clip created by a
++script that runs AFTER the frame function (Phase-3 nested-sprite script /
++stopped-root deferred _root.onEnterFrame / attach-init) first fire onEnterFrame?
++swf.c (graphics) marked dynamic MCs eligible BEFORE that drain; swf_core.c after."""
++import struct, sys
++def tag(code, data):
++    if len(data) < 63: return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++def s(x): return x.encode() + b'\0'
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str): b += b'\x00' + s(it)
++        elif isinstance(it, int): b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++GETVAR=b'\x1c'; SETVAR=b'\x1d'; SETMEM=b'\x4f'; GETMEM=b'\x4e'; ADD2=b'\x47'; TRACE=b'\x26'
++STOP=b'\x07'; POP=b'\x17'; CALLM=b'\x52'; INC=b'\x50'; EQ2=b'\x49'; NOT=b'\x12'
++def jif(off): return b'\x9d' + struct.pack('<Hh', 2, off)
++def deffunc(body):
++    d = s('') + struct.pack('<H', 0) + struct.pack('<H', len(body))
++    return b'\x9b' + struct.pack('<H', len(d)) + d + body
++def doaction(a): return tag(12, a + b'\0')
++def place(depth, cid, name): return tag(26, bytes([0x02 | 0x20]) + struct.pack('<HH', depth, cid) + s(name))
++SHOW = tag(1, b'')
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++def tr_t(prefix):  # trace(prefix + _root.t)
++    return push(prefix) + push('_root') + GETVAR + push('t') + GETMEM + ADD2 + TRACE
++def create_with_ef(name, depth):
++    # _root.createEmptyMovieClip(name, depth); _root[name].onEnterFrame = function(){trace(name+" ef t="+_root.t)}
++    return (push(depth, name, 2, '_root') + GETVAR + push('createEmptyMovieClip') + CALLM + POP
++            + push('_root') + GETVAR + push(name) + GETMEM + push('onEnterFrame')
++            + deffunc(tr_t(name + ' ef t=')) + SETMEM)
++def attach(lib, name, depth):
++    return push(depth, name, lib, 3, '_root') + GETVAR + push('attachMovie') + CALLM + POP
++# inner (nested in outer): frame 2 script creates `e` (Phase-3 script)
++inner = sprite(3, [doaction(tr_t('inner f1 t=')),
++                   doaction(tr_t('inner f2 creates e t=') + create_with_ef('e', 6)),
++                   doaction(tr_t('inner f3 t=')), doaction(tr_t('inner f4 t=') + STOP)])
++outer = sprite(4, [place(1, 3, 'inner')])
++# library clip `ai`: frame-1 (attach-init) script creates `g`
++ai = sprite(5, [doaction(tr_t('ai f1 creates g t=') + create_with_ef('g', 9) + STOP)])
++exp = tag(56, struct.pack('<H', 1) + struct.pack('<H', 5) + s('ai'))
++# _root.onEnterFrame: t++; trace; if t==4 create d; if t==5 attach ai
++def ifeq(n, body):
++    cond = push('_root') + GETVAR + push('t') + GETMEM + push(n) + EQ2 + NOT
++    return cond + jif(len(body)) + body
++root_ef = (push('_root') + GETVAR + push('t') + push('_root') + GETVAR + push('t') + GETMEM + INC + SETMEM
++           + tr_t('root ef t=') + ifeq(4, tr_t('root ef creates d t=') + create_with_ef('d', 7))
++           + ifeq(6, tr_t('root ef attaches ai t=') + attach('ai', 'aiclip', 8)))
++f1 = (place(1, 4, 'outer') + doaction(push('_root') + GETVAR + push('t', 0) + SETMEM + tr_t('root f1 t=')
++      + push('_root') + GETVAR + push('onEnterFrame') + deffunc(root_ef) + SETMEM))
++frames = [f1, doaction(tr_t('root f2 t=')), doaction(tr_t('root f3 stop t=') + STOP)]
++body = (tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + inner + outer + ai + exp
++        + b''.join(f + SHOW for f in frames) + tag(0, b''))
++nb = 13
++bits = '{:05b}'.format(nb) + ''.join('{:013b}'.format(v) for v in (0, 4000, 0, 3000))
++bits += '0' * ((8 - len(bits) % 8) % 8)
++rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++hdr_rest = rect + struct.pack('<HH', 30 << 8, len(frames))
++total = 8 + len(hdr_rest) + len(body)
++open(sys.argv[1], 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/output.txt b/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/output.txt
+new file mode 100644
+index 000000000..51296c444
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/output.txt
+@@ -0,0 +1,35 @@
++inner f1 t=undefined
++root f1 t=0
++inner f2 creates e t=0
++root ef t=1
++root f2 t=1
++e ef t=1
++inner f3 t=1
++root ef t=2
++root f3 stop t=2
++e ef t=2
++inner f4 t=2
++root ef t=3
++e ef t=3
++root ef t=4
++root ef creates d t=4
++d ef t=4
++e ef t=4
++root ef t=5
++d ef t=5
++e ef t=5
++root ef t=6
++root ef attaches ai t=6
++ai f1 creates g t=6
++g ef t=6
++d ef t=6
++e ef t=6
++root ef t=7
++g ef t=7
++d ef t=7
++e ef t=7
++root ef t=8
++g ef t=8
++d ef t=8
++e ef t=8
++root ef t=9
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/test.swf b/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..8de8fe62ce584c5bf041c3b10ed9a532208f0677
+GIT binary patch
+literal 1186
+zcmbVMJx{_w7=B7ArHPVgj5zqw7-eu199#?}2*yD$Iyjn24`?Ekl+(oD;C?YNF3!Xs
+z;Qw&*hq&Q;ZICJ)Cfw4d_rCAl^VRCrW%@M<w6Rr!@d<3|I9>v+a$-o!I@ACiN$l!k
+z5%9WQ7TC>wn;$`#z;)pJ9P2^{IBF+3lu*>)s9R)zit~0OU=C+}o2lBw3e1!|l)+5M
+z=V<OK5H(jiJ^pa!-+Qcl>-BJv{c}1)O=JMSTj_EZR0F5O@NCFYHiSikZPrwsUZ-3C
+zf>%&gQeiI6!-1;Mq)On!N<zb9YFi@;L+ZlML+hP34caQ|19~I$a6HNCh^Urot|W@k
+z0Ihk6YW+i0YZg%vEHk6g?Hw;dmV|#tloOUOvPxW*v@`{o1gMJzKw4#nb>f}Vm3-3T
+zHKFAuKGe>~XQ>sRY!e1diUCfSUlJHVknzI%(u|QP?krJ4nC`ryxc`Xa&Jtxh7#XJ!
+z%niia7>vWY(`Zu`$#9Aciw&40o%CcwW=$$>65Hcc(vKjT69$sPC=;}!k44U_W>ejs
+TF6jRfnW13!x!+S2M{fHDJMR-X
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/test.toml b/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/test.toml
+new file mode 100644
+index 000000000..b79f9a570
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_exec_order_dynamic_eligible/test.toml
+@@ -0,0 +1 @@
++num_frames = 10
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/create_test_swf.py
+new file mode 100644
+index 000000000..2217b9468
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/create_test_swf.py
+@@ -0,0 +1,49 @@
++import struct, sys
++sys.path.insert(0, sys.argv[0].rsplit('/',1)[0])
++def tag(code, data):
++    if len(data) < 63: return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++def s(x): return x.encode() + b'\0'
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str): b += b'\x00' + s(it)
++        elif isinstance(it, int): b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++GETVAR=b'\x1c'; SETMEM=b'\x4f'; GETMEM=b'\x4e'; ADD2=b'\x47'; TRACE=b'\x26'; INC=b'\x50'; LESS2=b'\x48'; NOT=b'\x12'
++def jif(off): return b'\x9d' + struct.pack('<Hh', 2, off)
++def deffunc(body):
++    d = s('') + struct.pack('<H', 0) + struct.pack('<H', len(body))
++    return b'\x9b' + struct.pack('<H', len(d)) + d + body
++def doaction(a): return tag(12, a + b'\0')
++def initaction(cid, a): return tag(59, struct.pack('<H', cid) + a + b'\0')
++def place(depth, cid, name): return tag(26, bytes([0x02 | 0x20]) + struct.pack('<HH', depth, cid) + s(name))
++SHOW = tag(1, b'')
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++def gotoplay(fr): return b'\x81' + struct.pack('<HH', 2, fr) + b'\x06'   # GotoFrame(idx) + Play
++V = sys.argv[2]
++ef = push('_root') + GETVAR + push('onEnterFrame') + deffunc(push('onEnterFrame') + TRACE) + SETMEM
++f1 = doaction(push('_root') + GETVAR + push('loops', 0) + SETMEM + ef)
++f2 = b''
++defs = b''
++if 'sprite' in V:
++    defs += sprite(3, [doaction(push('inner f1') + TRACE), doaction(push('inner f2') + TRACE)])
++    f2 += place(1, 3, 'mc')
++if 'init' in V:
++    defs += sprite(4, [])
++    f2 += initaction(4, push('init action') + TRACE)
++f2 += doaction(push('Frame 2') + TRACE)
++loop = push('_root') + GETVAR + push('loops') + GETMEM + push(3) + LESS2 + NOT
++body_ = push('_root') + GETVAR + push('loops') + push('_root') + GETVAR + push('loops') + GETMEM + INC + SETMEM + gotoplay(1)
++f3 = doaction(push('Frame 3') + TRACE + (gotoplay(1) if 'uncond' in V else loop + jif(len(body_)) + body_))
++frames = [f1, f2, f3, doaction(push('Frame 4') + TRACE + b'\x07')]
++body = (tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + defs + b''.join(f + SHOW for f in frames) + tag(0, b''))
++nb = 13
++bits = '{:05b}'.format(nb) + ''.join('{:013b}'.format(v) for v in (0, 4000, 0, 3000))
++bits += '0' * ((8 - len(bits) % 8) % 8)
++rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++hdr_rest = rect + struct.pack('<HH', 12 << 8, len(frames))
++total = 8 + len(hdr_rest) + len(body)
++open(sys.argv[1], 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/output.txt b/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/output.txt
+new file mode 100644
+index 000000000..f2176bb08
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/output.txt
+@@ -0,0 +1,22 @@
++onEnterFrame
++Frame 2
++onEnterFrame
++Frame 3
++Frame 2
++onEnterFrame
++Frame 3
++Frame 2
++onEnterFrame
++Frame 3
++Frame 2
++onEnterFrame
++Frame 3
++onEnterFrame
++Frame 4
++onEnterFrame
++onEnterFrame
++onEnterFrame
++onEnterFrame
++onEnterFrame
++onEnterFrame
++onEnterFrame
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/test.swf b/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..a4b60a231a86d48a291c09f21270200deed0df03
+GIT binary patch
+literal 271
+zcmZvWK@P!C5Qe|DswC1z*AiCm0BT<e8Y`7_VJQ~G0#B+JaEZ4OH*=R7B$Sxd<ezWm
+zn`DtS0t>cuhqyOr)fl&t8rfx8#!e=!@nD&2UC=Qt*lB${AsM9Akq`PXITY(W$yfU|
+z7x#gLnBRd)8R9#p2~V=uM@bSp8{t1`gsPqw;mbTTE}kRkG`!kGU+=x4|C{slY-3Ru
+MTTt;2P@Y6^2i)vCC;$Ke
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/test.toml b/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/test.toml
+new file mode 100644
+index 000000000..c5f8797f7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_goto_backward_enterframe_once/test.toml
+@@ -0,0 +1 @@
++num_frames = 14

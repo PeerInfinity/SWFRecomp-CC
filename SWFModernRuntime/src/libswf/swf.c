@@ -471,6 +471,23 @@ size_t max_depth = 0;
 
 RenderContext* context;
 
+#ifdef OFFSCREEN_RENDER
+// s27 w2-exec-order-land: nested-sprite frame order (Phase 3 early). Same rule
+// and kill switch (SWF_EXEC_ORDER_NESTED_EARLY=0) as swf_core.c
+// exec_order_nested_early: a sprite nested in a root-level sprite is newer than
+// its parent and _root in the Flash/Ruffle exec list, so its frame script runs
+// before theirs and before _root.onEnterFrame. Browser-WASM keeps its order.
+static int exec_order_nested_early(void)
+{
+	static int s_v = -1;
+	if (s_v < 0) {
+		const char* ev = getenv("SWF_EXEC_ORDER_NESTED_EARLY");
+		s_v = (ev != NULL && ev[0] == '0') ? 0 : 1;
+	}
+	return s_v;
+}
+#endif
+
 void tagMain(SWFAppContext* app_context)
 {
 	frame_func* frame_funcs = app_context->frame_funcs;
@@ -1016,6 +1033,14 @@ void tagMain(SWFAppContext* app_context)
 		// actionDrainAllInPriorityOrder at the top of root frame_funcs[current_frame]
 		// drains those scripts before the root's own DoAction. Without this
 		// call, sprite frame_funcs (frame > 0) never run.
+		// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
+		// nested sprites first, then their root-level parents (Phase 1).
+		const int nested_early = exec_order_nested_early();
+		if (nested_early)
+		{
+			extern void advance_nested_sprite_frames(SWFAppContext* app_context);
+			advance_nested_sprite_frames(app_context);
+		}
 		{
 			extern void advance_sprite_frames(SWFAppContext* app_context);
 			extern int g_advance_defer_nested;
@@ -1037,6 +1062,8 @@ void tagMain(SWFAppContext* app_context)
 		// flush reads their post-advance value, matching Ruffle's
 		// instantiation-ordered exec list (#10a). Writes only mc->currentframe;
 		// the playhead + frame scripts stay in Phase 3 (advance_nested_sprite_frames).
+		// Skipped when Phase 3 already ran early.
+		if (!nested_early)
 		{
 			extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
 			presync_nested_sprite_currentframe(app_context);
@@ -1192,16 +1219,31 @@ void tagMain(SWFAppContext* app_context)
 		// came one frame after the root's, a constant off-by-one (N's
 		// injected probe reached "startgame" at frame 27 vs native/Ruffle 28).
 		// Probe: SWFRecomp/tests/wasm_probes/enterframe_count_injected_clip.
+		//
+		// s27 w1-exec-order: browser-WASM only HERE. OFFSCREEN marks at the END
+		// of its post-frame-func block below (after the Phase-3 advance, the
+		// SCRIPT drain that fires a stopped root's deferred onEnterFrame, the
+		// attach-init drain and the promote), the same slot as swf_core.c. Marked
+		// here, a clip created by any of those scripts missed the mark and first
+		// fired onEnterFrame one tick late in graphics only (Ruffle: the tick
+		// after creation, since createEmptyMovieClip runs its load frame at once
+		// -- construct_as_avm1_object(run_frame=true)). Fixture:
+		// regression/avm1_exec_order_dynamic_eligible.
+#ifndef OFFSCREEN_RENDER
 		{
 			extern void actionMarkDynamicMCsEnterFrameEligible(void);
 			actionMarkDynamicMCsEnterFrameEligible();
 		}
+#endif
 #ifdef OFFSCREEN_RENDER
 
 		// (Attached-clip promotion moved below the SCRIPT drain, s26 n-levels.)
 
 		// Phase 3: advance nested sprite children (deferred from Phase 1
-		// via g_advance_defer_nested above).
+		// via g_advance_defer_nested above), unless it ran early (OFFSCREEN).
+#ifdef OFFSCREEN_RENDER
+		if (!nested_early)
+#endif
 		{
 			extern void advance_nested_sprite_frames(SWFAppContext* app_context);
 			advance_nested_sprite_frames(app_context);
@@ -1249,6 +1291,12 @@ void tagMain(SWFAppContext* app_context)
 		{
 			extern void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);
 			ng_apply_pending_sprite_self_gotos(app_context);
+		}
+		// Dynamic-MC enterFrame eligibility, OFFSCREEN slot (see the browser
+		// mark above): last of the post-frame-func steps, like swf_core.c.
+		{
+			extern void actionMarkDynamicMCsEnterFrameEligible(void);
+			actionMarkDynamicMCsEnterFrameEligible();
 		}
 #endif
 

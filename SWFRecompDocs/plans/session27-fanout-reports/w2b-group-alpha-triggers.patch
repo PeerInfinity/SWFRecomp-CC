@@ -1,0 +1,2818 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index e4a995b9f..ea8ef5071 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -561,6 +561,14 @@ void render_webgpu_end_child_layer(WebGPURenderContext* context, u8 blend_mode);
+ // render_webgpu_end_child_layer(.., 2) (Flash's transparency group). The value
+ // is consumed (reset to 1) by that call, whatever its mode.
+ void render_webgpu_set_group_alpha(WebGPURenderContext* context, float group_alpha);
++// s27 w2b-group-alpha-triggers: the general group ALPHA ROW a' = a*m + o
++// (o in 0..1 units, m in (0,1]; o == 0 is exactly set_group_alpha(m)). Also
++// consumed by every blend composite (trivial and complex modes, not only
++// LAYER) and by render_webgpu_composite_filtered_group.
++void render_webgpu_set_group_alpha_row(WebGPURenderContext* context, float m, float o);
++// The filter layer blitted (premultiplied over) with the pending group alpha
++// row applied once (a filtered clip is a transparency group in Flash).
++void render_webgpu_composite_filtered_group(WebGPURenderContext* context);
+ int  render_webgpu_begin_nested_filter(WebGPURenderContext* context);   // s26 N1
+ void render_webgpu_end_nested_filter(WebGPURenderContext* context);
+ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index ff29870e0..73183ebe0 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -80,6 +80,8 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_begin_child_layer(ctx)                render_webgpu_begin_child_layer(ctx)
+ #define renderer_end_child_layer(ctx, m)               render_webgpu_end_child_layer(ctx, m)
+ #define renderer_set_group_alpha(ctx, ga)              render_webgpu_set_group_alpha(ctx, ga)
++#define renderer_set_group_alpha_row(ctx, m, o)        render_webgpu_set_group_alpha_row(ctx, m, o)
++#define renderer_composite_filtered_group(ctx)         render_webgpu_composite_filtered_group(ctx)
+ #define renderer_begin_nested_filter(ctx)              render_webgpu_begin_nested_filter(ctx)
+ #define renderer_end_nested_filter(ctx)                render_webgpu_end_nested_filter(ctx)
+ 
+@@ -152,6 +154,8 @@ typedef FlashbangContext RenderContext;
+ #define renderer_begin_child_layer(ctx)                (0)
+ #define renderer_end_child_layer(ctx, m)               ((void)0)
+ #define renderer_set_group_alpha(ctx, ga)              ((void)0)
++#define renderer_set_group_alpha_row(ctx, m, o)        ((void)0)
++#define renderer_composite_filtered_group(ctx)         ((void)0)
+ #define renderer_begin_nested_filter(ctx)              (0)
+ #define renderer_end_nested_filter(ctx)                ((void)0)
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 1813878a5..a698e5e92 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -20531,6 +20531,10 @@ static void avm2_filter_layer_in_place(Avm2Context* ctx,
+ 	}
+ }
+ 
++// s27 w2b: the transparency-group split (defined with the LAYER arm below).
++static Avm2Object* g_avm2_lga_strip;
++static int avm2_lga_split(const Avm2Cx* parent_cx, const Avm2DisplayObjectExt* ext,
++                          Avm2Cx* stripped_parent, float* ga, float* go);
+ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+                                  Avm2DisplayObjectExt* ext,
+                                  const Mat* parent_world, double parent_alpha,
+@@ -20577,11 +20581,60 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	if (n == 0)
+ 	{
+ 		// Every filter is impotent or unsupported: render normally.
++		// s27 w2b: but Flash still bitmap-caches a node with ANY filter, so
++		// it is a transparency group (n3g_filter_cm: an identity ColorMatrix
++		// + 50% shows only the top child, (128,128,255)). With an alpha row
++		// to split, render it into a LAYER-shaped group (premultiplied over,
++		// the row applied once at the composite); else as before.
++		Avm2Cx fsp;
++		float fm = 1.0f, fo = 0.0f;
++		if (avm2_lga_split(parent_cx, ext, &fsp, &fm, &fo))
++		{
++			int root_layer = renderer_blend_mode_is_layered(context, 2);
++			int child_layer = !root_layer && renderer_begin_child_layer(context);
++			if (root_layer || child_layer)
++			{
++				if (root_layer)
++				{
++					renderer_suspend_pass(context);
++					renderer_begin_offscreen_pass(context);
++				}
++				Avm2Object* saved_strip = g_avm2_lga_strip;
++				g_avm2_lga_strip = obj;
++				avm2_render_node(ctx, obj, parent_world, 1.0, &fsp);
++				g_avm2_lga_strip = saved_strip;
++				if (root_layer)
++				{
++					renderer_end_offscreen_pass(context);
++					renderer_resume_pass(context);
++				}
++				renderer_set_group_alpha_row(context, fm, fo);
++				if (root_layer)
++					renderer_composite_blend(context, 2,
++						renderer_clip_ref(context) > 0 ? 1 : 0);
++				else
++					renderer_end_child_layer(context, 2);
++				g_avm2_filter_active = saved_active;
++				return;
++			}
++		}
+ 		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+ 		g_avm2_filter_active = saved_active;
+ 		return;
+ 	}
+ 
++	// s27 w2b-group-alpha-triggers: a filtered node is a TRANSPARENCY GROUP
++	// in Flash (Flash Player 32, n3g_filter_cm: identity ColorMatrix + 50%
++	// shows only the top child at the overlap). Its concatenated alpha row is
++	// stripped from the source render, every filter composes INTO the layer
++	// (avm2_filter_one_in_place, the tag.c render_filtered_core group arm) and
++	// the row is applied once at the composite.
++	Avm2Cx lga_sp;
++	float lga_m = 1.0f, lga_o = 0.0f;
++	int group = avm2_lga_split(parent_cx, ext, &lga_sp, &lga_m, &lga_o);
++	Avm2Object* lga_saved = g_avm2_lga_strip;
++	if (group) { parent_cx = &lga_sp; parent_alpha = 1.0; }
++
+ 	// Only the LAST filter's composition flags reach the framebuffer; the
+ 	// earlier ones fold into the ping-pong (see the chaining note below).
+ 	const Avm2FilterVal* last = list[n - 1];
+@@ -20652,7 +20705,9 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 		if (pad) renderer_set_filter_pad(context, avm2_filter_reach_px(list, n, vs, 1));
+ 	}
+ 	renderer_begin_offscreen_pass(context);
++	if (group) g_avm2_lga_strip = obj;   // the node's OWN alpha too
+ 	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++	if (group) g_avm2_lga_strip = lga_saved;
+ 	renderer_end_offscreen_pass(context);
+ 	if (needs_source_tex && !chained)
+ 		renderer_snapshot_filter_source(context);
+@@ -20662,7 +20717,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	// blur tail past the stage edge, so reading the BLUR at +offset cut a
+ 	// shadow thrown back onto the stage; shifting the blur's INPUT read is exact.
+ 	int shadow_pre_shifted = 0;
+-	if (is_shadow && n == 1)
++	if (is_shadow && n == 1 && !group)
+ 	{
+ 		float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
+ 		float a_ = avm2_filter_fixed16(last->angle);
+@@ -20700,12 +20755,12 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 			continue;
+ 		}
+ 		int f_is_blur = (f->kind == AVM2_FILTER_BLUR);
+-		if (chained && !f_last && !f_is_blur)
++		if ((group || (chained && !f_last)) && !f_is_blur)
+ 		{
+ 			avm2_filter_one_in_place(ctx, f);
+ 			continue;
+ 		}
+-		if (chained && f_last)
++		if (chained && f_last && !group)
+ 			renderer_snapshot_filter_source(context);
+ 		// AS3 BlurFilter has no `strength` property, so Avm2FilterVal.strength
+ 		// stays 0 for it - passing that through would multiply the layer by
+@@ -20726,6 +20781,14 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 
+ 	renderer_resume_pass(context);
+ 
++	if (group)
++	{
++		renderer_set_group_alpha_row(context, lga_m, lga_o);
++		renderer_composite_filtered_group(context);
++		if (nested_filter) renderer_end_nested_filter(context);
++		g_avm2_filter_active = saved_active;
++		return;
++	}
+ 	if (legacy)
+ 	{
+ 		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+@@ -21223,31 +21286,39 @@ static int avm2_render_blend_shader(Avm2Context* ctx, Avm2Object* obj,
+ // Only a pure multiplier in (0,1): no alpha offset on either side.
+ static Avm2Object* g_avm2_lga_strip;   // the node whose OWN alpha is stripped
+ 
++// s27 w2b-group-alpha-triggers: the whole concatenated alpha ROW
++// a' = a*m + o (parent_cx then the node's own alpha / cx_aa), not only a
++// multiplier: Flash Player 32 groups an alpha OFFSET too (n3g_layer_aadd).
+ static int avm2_lga_split(const Avm2Cx* parent_cx, const Avm2DisplayObjectExt* ext,
+-                          Avm2Cx* stripped_parent, float* ga)
++                          Avm2Cx* stripped_parent, float* ga, float* go)
+ {
+-	if (parent_cx->add[3] != 0.0f || ext->cx_aa != 0) return 0;
+-	float m = parent_cx->mult[3] * ((float) ext->alpha_fixed8 / 256.0f);
+-	if (!(m > 0.0f && m < 1.0f)) return 0;
++	float om = (float) ext->alpha_fixed8 / 256.0f;
++	float oa = (float) ext->cx_aa / 255.0f;
++	float m = parent_cx->mult[3] * om;
++	float o = parent_cx->mult[3] * oa + parent_cx->add[3];
++	if (!(m > 0.0f && m <= 1.0f) || (m == 1.0f && o == 0.0f)) return 0;
+ 	*stripped_parent = *parent_cx;
+ 	stripped_parent->mult[3] = 1.0f;
++	stripped_parent->add[3] = 0.0f;
+ 	*ga = m;
++	*go = o;
+ 	return 1;
+ }
+ 
+-// Render `obj` (blend-wrapped) into the open LAYER group, stripped when it
+-// splits; returns the group alpha for renderer_set_group_alpha (1 = none).
++// Render `obj` (blend-wrapped) into the open group, stripped when it splits;
++// returns the group alpha row for renderer_set_group_alpha_row (1, 0 = none).
+ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+                              const Mat* parent_world, double parent_alpha,
+                              const Avm2Cx* parent_cx);
+ static float avm2_render_layer_group(Avm2Context* ctx, Avm2Object* obj,
+                                      const Avm2DisplayObjectExt* ext,
+                                      const Mat* parent_world, double parent_alpha,
+-                                     const Avm2Cx* parent_cx)
++                                     const Avm2Cx* parent_cx, float* go)
+ {
+ 	Avm2Cx sp;
+ 	float ga = 1.0f;
+-	if (avm2_lga_split(parent_cx, ext, &sp, &ga))
++	*go = 0.0f;
++	if (avm2_lga_split(parent_cx, ext, &sp, &ga, go))
+ 	{
+ 		Avm2Object* saved = g_avm2_lga_strip;
+ 		g_avm2_lga_strip = obj;
+@@ -21329,17 +21400,16 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 			renderer_suspend_pass(context);
+ 			renderer_capture_backdrop(context, bm);
+ 			renderer_begin_offscreen_pass(context);
+-			float lga = 1.0f;
++			// s27 transparency group; w2b: every blend mode's layer is a
++			// group in Flash (n3g_multiply), and the row may carry an offset.
++			float lga_o = 0.0f;
+ 			if (bm == 2) g_avm2_layer_group_depth++;
+-			if (bm == 2)   // s27 transparency group
+-				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
+-					parent_alpha, parent_cx);
+-			else
+-				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++			float lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
++				parent_alpha, parent_cx, &lga_o);
+ 			if (bm == 2) g_avm2_layer_group_depth--;
+ 			renderer_end_offscreen_pass(context);
+ 			renderer_resume_pass(context);
+-			renderer_set_group_alpha(context, lga);
++			renderer_set_group_alpha_row(context, lga, lga_o);
+ 			// The stencil reference is read from the context inside
+ 			// composite_blend; the argument is the legacy boolean.
+ 			renderer_composite_blend(context, bm,
+@@ -21352,17 +21422,17 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 			// ALPHA / ERASE node inside a group, or a LAYER nested in a
+ 			// filter/blend offscreen, renders into its own child layer and
+ 			// composites once (alpha/erase.wgsl, or premultiplied over).
+-			float lga = 1.0f;
++			float lga = 1.0f, lga_o = 0.0f;
+ 			if (bm == 2)
+ 			{
+ 				g_avm2_layer_group_depth++;
+ 				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
+-					parent_alpha, parent_cx);   // s27 transparency group
++					parent_alpha, parent_cx, &lga_o);   // s27 transparency group
+ 				g_avm2_layer_group_depth--;
+ 			}
+ 			else
+ 				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+-			renderer_set_group_alpha(context, lga);
++			renderer_set_group_alpha_row(context, lga, lga_o);
+ 			renderer_end_child_layer(context, bm);
+ 		}
+ 		else
+@@ -21438,7 +21508,7 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 	// and every child re-publishes on entry, so a single global is enough.
+ 	Avm2Cx own_cx, node_cx;
+ 	avm2_cx_of_ext(&own_cx, ext);
+-	if (lga_own) own_cx.mult[3] = 1.0f;
++	if (lga_own) { own_cx.mult[3] = 1.0f; own_cx.add[3] = 0.0f; }   // s27 / w2b row
+ 	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
+ 	g_avm2_cur_cx = node_cx;
+ 
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 2aeedfe7d..da1b0aa77 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3887,19 +3887,83 @@ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
+ // padded filter capture refuses child layers), and at most two blend-group
+ // ancestors deep (the child-layer stack is CHILD_LAYER_MAX = 4).
+ // ---------------------------------------------------------------------------
++//
++// s27 w2b-group-alpha-triggers: Flash Player 32 groups for MORE triggers than
++// LAYER (w2-local-oracles/w2-layer-alpha-group, pixel (80,50)):
++//   * a FILTERED clip (n3g_filter_cm, identity ColorMatrix + 50%): its filter
++//     layer is the group; the row is applied by render_filtered_core at the
++//     filter composite (renderer_composite_filtered_group);
++//   * every non-NORMAL blend mode (n3g_multiply, MULTIPLY + 50% on white):
++//     the blend layer is the group, the row is applied to the layer inside
++//     the blend composite (trivial and complex shaders alike);
++//   * an alpha OFFSET on a grouping clip (n3g_layer_aadd, LAYER, mult 1,
++//     offset -128 -> (128,128,254)): the row a' = a*m + o is applied to the
++//     unpremultiplied group at the composite.
++//   * cacheAsBitmap alone does NOT group (n3g_cab stays per child).
++// A non-LAYER blend group only opens on the main pass (is_layered refuses
++// inside any offscreen), so it splits only with no blend / filter ancestor.
+ #define LGA_MAX 128
+-static struct { const DisplayObject* obj; float ga; } g_lga[LGA_MAX];
++static struct { const DisplayObject* obj; float ga; float go; u32 orig_cx; } g_lga[LGA_MAX];
+ static int g_lga_n;
+ static int g_lga_block;       // > 0 while composing under a filtered ancestor
+ static int g_lga_blend_anc;   // blend-mode (> 1) ancestors of the subtree
+ 
+ static void lga_reset(void) { g_lga_n = 0; }
+ 
+-static float lga_for_entry(const DisplayObject* obj)
++static int lga_index(const DisplayObject* obj)
+ {
+ 	for (int i = g_lga_n - 1; i >= 0; --i)
+-		if (g_lga[i].obj == obj) return g_lga[i].ga;
+-	return 1.0f;
++		if (g_lga[i].obj == obj) return i;
++	return -1;
++}
++
++// Hand obj's recorded group alpha row (if any) to the NEXT group composite.
++static void lga_set_for_entry(const DisplayObject* obj)
++{
++	int i = lga_index(obj);
++	if (i >= 0) renderer_set_group_alpha_row(context, g_lga[i].ga, g_lga[i].go);
++	else renderer_set_group_alpha(context, 1.0f);
++}
++
++// Blend modes whose composite is a group (Flash: every mode but NORMAL;
++// ALPHA / ERASE only act on an enclosing LAYER, never composite on their own).
++static inline int lga_blend_groups(u8 m)
++{
++	return m >= 3 && m <= 14 && m != 11 && m != 12;
++}
++
++// A NORMAL entry whose PlaceObject3 filter list the recompiler folded whole
++// into its cxform (ColorMatrix-only, swf.cpp PlaceCmCompose, not ::live): no
++// filter layer opens, but Flash still bitmap-caches a clip with ANY filter,
++// so it is a group (n3g_filter_cm is exactly this: an identity CM + 50%).
++// When its alpha row splits, the render arms give it a LAYER-shaped group
++// (premultiplied over: the same composite as a group with no blend mode).
++static inline int obj_cm_folded(const DisplayObject* obj)
++{
++	return obj->blend_mode <= 1 && !obj_filter_routed(obj)
++	    && obj->filter_chain != NULL
++	    && ((const FilterListData*) obj->filter_chain)->count > 0;
++}
++static inline int lga_fold_group(const DisplayObject* obj)
++{
++	return obj_cm_folded(obj) && lga_index(obj) >= 0;
++}
++// The blend mode a render arm composites obj's group with.
++static inline u8 lga_group_mode(const DisplayObject* obj)
++{
++	return lga_fold_group(obj) ? 2 : obj->blend_mode;
++}
++
++// Whether the render arms are certain to open a group for obj.
++static int lga_entry_groups(const DisplayObject* obj)
++{
++	if (g_lga_block > 0) return 0;
++	if (obj_filter_routed(obj)) return 1;            // the filter layer
++	if (obj->blend_mode == 2 || obj_cm_folded(obj)) return g_lga_blend_anc < 2;
++	if (lga_blend_groups(obj->blend_mode))
++		return g_lga_blend_anc == 0
++		    && renderer_blend_mode_is_layered(context, obj->blend_mode);
++	return 0;
+ }
+ 
+ // `cx` is the entry's concatenated cxform (NULL = identity) and `slot` the GPU
+@@ -3910,13 +3974,14 @@ static float lga_for_entry(const DisplayObject* obj)
+ static int lga_split_entry(DisplayObject* obj, const float* cx,
+ 	float stripped[20], const float** sub_cx, u32* sub_slot)
+ {
+-	if (cx == NULL || obj->blend_mode != 2 || obj_filter_routed(obj)) return 0;
+-	if (g_lga_block > 0 || g_lga_blend_anc >= 2 || g_lga_n >= LGA_MAX) return 0;
+-	if (cx[3] != 0.0f || cx[7] != 0.0f || cx[11] != 0.0f || cx[19] != 0.0f) return 0;
+-	float m = cx[15];
+-	if (!(m > 0.0f && m < 1.0f)) return 0;
++	if (cx == NULL || g_lga_n >= LGA_MAX || !lga_entry_groups(obj)) return 0;
++	if (cx[3] != 0.0f || cx[7] != 0.0f || cx[11] != 0.0f) return 0;
++	float m = cx[15], o = cx[19];   // s27 w2b: the whole alpha row
++	if (!(m > 0.0f && m <= 1.0f) || (m == 1.0f && o == 0.0f)) return 0;
+ 	memcpy(stripped, cx, 20 * sizeof(float));
+ 	stripped[15] = 1.0f;
++	stripped[19] = 0.0f;
++	u32 orig_cx = obj->cxform_id;
+ 	u32 slot = 0;
+ 	int ident = cx_is_identity(stripped);
+ 	if (!ident) {
+@@ -3930,6 +3995,8 @@ static int lga_split_entry(DisplayObject* obj, const float* cx,
+ 	}
+ 	g_lga[g_lga_n].obj = obj;
+ 	g_lga[g_lga_n].ga = m;
++	g_lga[g_lga_n].go = o;
++	g_lga[g_lga_n].orig_cx = orig_cx;
+ 	g_lga_n++;
+ 	*sub_cx = ident ? NULL : stripped;
+ 	*sub_slot = slot;
+@@ -3940,12 +4007,12 @@ static int lga_split_entry(DisplayObject* obj, const float* cx,
+ static inline void lga_enter(const DisplayObject* obj)
+ {
+ 	if (obj_filter_routed(obj)) g_lga_block++;
+-	if (obj->blend_mode > 1) g_lga_blend_anc++;
++	if (obj->blend_mode > 1 || lga_fold_group(obj)) g_lga_blend_anc++;
+ }
+ static inline void lga_leave(const DisplayObject* obj)
+ {
+ 	if (obj_filter_routed(obj)) g_lga_block--;
+-	if (obj->blend_mode > 1) g_lga_blend_anc--;
++	if (obj->blend_mode > 1 || lga_fold_group(obj)) g_lga_blend_anc--;
+ }
+ 
+ #ifndef NO_GRAPHICS
+@@ -4224,6 +4291,15 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 		const float* child_cx = (eff_cx_valid && !cx_is_identity(eff_cx))
+ 			? eff_cx : NULL;
+ 
++		// s27 w2b: a FILTERED leaf shape's alpha moves to its filter composite
++		// (the glow / shadow must not show through the crisp source).
++		if ((ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
++		    && obj_filter_routed(obj))
++		{
++			const float* lsub; u32 lslot; float lcx[20];
++			lga_split_entry(obj, child_cx, lcx, &lsub, &lslot);
++		}
++
+ 		switch (ch->type)
+ 		{
+ 			case CHAR_TYPE_TEXT:
+@@ -5084,6 +5160,20 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+ 	// Group alpha: every filter (the last included) composes INTO the layer,
+ 	// which is then blitted once at that alpha.
+ 	int group = (src != NULL && src->group_alpha < 1.0f);
++	// s27 w2b: a TIMELINE filtered entry whose alpha row compose split off
++	// (lga_split_entry) is a group too. The filter's own colour (A3) takes the
++	// entry's ORIGINAL colour transform minus that row: the row now applies
++	// once, at the composite, to the source and filter output alike.
++	int lga_i = (src == NULL) ? lga_index(obj) : -1;
++	if (lga_i >= 0)
++	{
++		group = 1;
++		u32 cur_cx = obj->cxform_id;
++		obj->cxform_id = g_lga[lga_i].orig_cx;
++		have_obj_cx = filtered_object_cxform(app_context, obj, obj_cx);
++		obj->cxform_id = cur_cx;
++		if (have_obj_cx) { obj_cx[15] = 1.0f; obj_cx[19] = 0.0f; }
++	}
+ 	// Only the LAST filter's composition flags reach the framebuffer; the
+ 	// earlier ones fold into the blur ping-pong. Same rule (and the same
+ 	// caveats) as avm2_display.c::avm2_render_filtered, whose `.filters` array
+@@ -5252,7 +5342,13 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+ 
+ 	if (group)
+ 	{
+-		renderer_composite_filtered_alpha(context, src->group_alpha);
++		if (src != NULL)
++			renderer_composite_filtered_alpha(context, src->group_alpha);
++		else
++		{
++			renderer_set_group_alpha_row(context, g_lga[lga_i].ga, g_lga[lga_i].go);
++			renderer_composite_filtered_group(context);
++		}
+ 		if (nested) renderer_end_nested_filter(context);
+ 		g_filter_capture_depth--;
+ 		return;
+@@ -5445,8 +5541,9 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 				renderer_set_blend_mode(context, 0);
+ 				continue;
+ 			}
++			// s27 w2b: lga_group_mode = 2 for a folded-CM group (obj_cm_folded).
+ 			if (!obj_filter_routed(obj)
+-			    && renderer_blend_mode_is_layered(context, obj->blend_mode))
++			    && renderer_blend_mode_is_layered(context, lga_group_mode(obj)))
+ 			{
+ 				renderer_suspend_pass(context);
+ 				renderer_capture_backdrop(context, obj->blend_mode);
+@@ -5456,22 +5553,22 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 				if (obj->blend_mode == 2) g_layer_group_depth--;
+ 				renderer_end_offscreen_pass(context);
+ 				renderer_resume_pass(context);
+-				if (obj->blend_mode == 2)   // s27 transparency group
+-					renderer_set_group_alpha(context, lga_for_entry(obj));
+-				renderer_composite_blend(context, obj->blend_mode,
++				lga_set_for_entry(obj);   // s27 transparency group (w2b: every mode)
++				renderer_composite_blend(context, lga_group_mode(obj),
+ 					active_clip_depth > 0 ? 1 : 0);
+ 				continue;
+ 			}
+ 			// s25 w2: a LAYER nested in a filter/blend offscreen (where
+ 			// is_layered refuses) still isolates its subtree: one child layer
+ 			// in that offscreen, composited premultiplied-over.
+-			if (obj->blend_mode == 2 && !obj_filter_routed(obj)
++			if ((obj->blend_mode == 2 || lga_fold_group(obj)) && !obj_filter_routed(obj)
+ 			    && renderer_begin_child_layer(context))
+ 			{
+-				g_layer_group_depth++;
++				int real_layer = (obj->blend_mode == 2);
++				if (real_layer) g_layer_group_depth++;
+ 				render_single_object(app_context, obj);
+-				g_layer_group_depth--;
+-				renderer_set_group_alpha(context, lga_for_entry(obj));   // s27
++				if (real_layer) g_layer_group_depth--;
++				lga_set_for_entry(obj);   // s27 (w2b: alpha row)
+ 				renderer_end_child_layer(context, 2);
+ 				continue;
+ 			}
+@@ -8874,6 +8971,16 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 		{
+ 			compose_root_text_instance(app_context, obj, ch);
+ 		}
++		else if ((ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
++		         && obj_filter_routed(obj))
++		{
++			// s27 w2b: a root FILTERED shape's alpha row moves to its filter
++			// composite (lga_split_entry; the render arm reads the side table).
++			float seed_cx[20], lcx[20];
++			const float* lsub; u32 lslot;
++			if (root_seed_cxform(app_context, obj, seed_cx))
++				lga_split_entry(obj, seed_cx, lcx, &lsub, &lslot);
++		}
+ 	}
+ 	}
+ 
+@@ -8985,7 +9092,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 		// and composite it once. Filter+blend on the same object both want
+ 		// filter_tex_a, so blend keeps the legacy per-draw pipeline there.
+ 		int blend_layered = !blend_skip && !obj_filter_routed(obj)
+-			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
++			&& renderer_blend_mode_is_layered(context, lga_group_mode(obj));   // s27 w2b
+ 		// setMask maskee: the masker's geometry becomes the stencil for this
+ 		// entry's paint, restored (not ended) afterwards.
+ 		// opaqueBackground: painted under this entry and OUTSIDE its own
+@@ -9007,9 +9114,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			if (obj->blend_mode == 2) g_layer_group_depth--;
+ 			renderer_end_offscreen_pass(context);
+ 			renderer_resume_pass(context);
+-			if (obj->blend_mode == 2)   // s27 transparency group
+-				renderer_set_group_alpha(context, lga_for_entry(obj));
+-			renderer_composite_blend(context, obj->blend_mode,
++			lga_set_for_entry(obj);   // s27 transparency group (w2b: every mode)
++			renderer_composite_blend(context, lga_group_mode(obj),
+ 				active_clip_depth > 0 ? 1 : 0);
+ 		} else if (obj_filter_routed(obj)) {
+ 			render_filtered_root_entry(app_context, obj, (int) i, (int) max_depth);
+@@ -9958,6 +10064,16 @@ void tagShowFrame(SWFAppContext* app_context)
+ 		{
+ 			compose_root_text_instance(app_context, obj, ch);
+ 		}
++		else if ((ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
++		         && obj_filter_routed(obj))
++		{
++			// s27 w2b: a root FILTERED shape's alpha row moves to its filter
++			// composite (lga_split_entry; the render arm reads the side table).
++			float seed_cx[20], lcx[20];
++			const float* lsub; u32 lslot;
++			if (root_seed_cxform(app_context, obj, seed_cx))
++				lga_split_entry(obj, seed_cx, lcx, &lsub, &lslot);
++		}
+ 		// CHAR_TYPE_MORPH_SHAPE: lerped per instance at draw time
+ 		// (draw_morph_instance), not into the shared vertex region here.
+ 	}
+@@ -10079,7 +10195,7 @@ void tagShowFrame(SWFAppContext* app_context)
+ 			&& g_layer_group_depth == 0;
+ 		// Non-trivial blend modes render into their own layer and composite once.
+ 		int blend_layered = !blend_skip && !obj_filter_routed(obj)
+-			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
++			&& renderer_blend_mode_is_layered(context, lga_group_mode(obj));   // s27 w2b
+ 
+ 		// setMask maskee: push the masker's geometry as this entry's stencil.
+ 		// opaqueBackground: painted under this entry and OUTSIDE its own
+@@ -10107,9 +10223,8 @@ void tagShowFrame(SWFAppContext* app_context)
+ 			if (obj->blend_mode == 2) g_layer_group_depth--;
+ 			renderer_end_offscreen_pass(context);
+ 			renderer_resume_pass(context);
+-			if (obj->blend_mode == 2)   // s27 transparency group
+-				renderer_set_group_alpha(context, lga_for_entry(obj));
+-			renderer_composite_blend(context, obj->blend_mode,
++			lga_set_for_entry(obj);   // s27 transparency group (w2b: every mode)
++			renderer_composite_blend(context, lga_group_mode(obj),
+ 				active_clip_depth > 0 ? 1 : 0);
+ 		}
+ 		// Check if this object has a visual filter
+diff --git a/SWFModernRuntime/src/rendering/render_stub.c b/SWFModernRuntime/src/rendering/render_stub.c
+index 9b0522af3..f648d0756 100644
+--- a/SWFModernRuntime/src/rendering/render_stub.c
++++ b/SWFModernRuntime/src/rendering/render_stub.c
+@@ -83,6 +83,8 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* c) { (void)c; }
+ int  render_webgpu_begin_child_layer(WebGPURenderContext* c) { (void)c; return 0; }
+ void render_webgpu_end_child_layer(WebGPURenderContext* c, u8 m) { (void)c; (void)m; }
+ void render_webgpu_set_group_alpha(WebGPURenderContext* c, float ga) { (void)c; (void)ga; }
++void render_webgpu_set_group_alpha_row(WebGPURenderContext* c, float m, float o) { (void)c; (void)m; (void)o; }
++void render_webgpu_composite_filtered_group(WebGPURenderContext* c) { (void)c; }
+ int  render_webgpu_begin_nested_filter(WebGPURenderContext* c) { (void)c; return 0; }
+ void render_webgpu_end_nested_filter(WebGPURenderContext* c) { (void)c; }
+ void render_webgpu_end_offscreen_pass(WebGPURenderContext* c) { (void)c; }
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 90411aa9e..d610d0470 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -4690,10 +4690,16 @@ static const char* composite_wgsl =
+ 	"\n"
+ 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+ 	"  let ga = select(1.0, params.offset_and_mode.w, params.offset_and_mode.w > 0.0);\n"
+-	"  let c = textureSample(in_tex, in_samp, uv) * ga;\n"
++	"  let raw = textureSample(in_tex, in_samp, uv);\n"
++	"  let c = raw * ga;\n"
+ 	"  let a_tinted = c.a * params.tint.a;\n"
+ 	"  let tinted = vec4f(params.tint.rgb * a_tinted, a_tinted);\n"
+-	"  return select(c, tinted, params.offset_and_mode.z > 0.5);\n"
++	// s27 w2b: z > 1.5 = group ALPHA ROW, a' = clamp(a*ga + tint.a) on the
++	// unpremultiplied group (an empty texel stays empty).
++	"  let a_row = clamp(raw.a * ga + params.tint.a, 0.0, 1.0);\n"
++	"  let rowed = select(vec4f(0.0), raw * (a_row / max(raw.a, 1e-6)), raw.a > 0.0);\n"
++	"  return select(select(c, tinted, params.offset_and_mode.z > 0.5), rowed,\n"
++	"                params.offset_and_mode.z > 1.5);\n"
+ 	"}\n";
+ 
+ // Flash's glow/drop-shadow/bevel filters do not simply draw a blurred copy
+@@ -5233,6 +5239,16 @@ static const char* blend_shader_wgsl_head =
+ 	"@group(0) @binding(0) var parent_tex: texture_2d<f32>;\n"
+ 	"@group(0) @binding(1) var current_tex: texture_2d<f32>;\n"
+ 	"@group(0) @binding(2) var tex_samp: sampler;\n"
++	// s27 w2b: the group alpha row (composite_wgsl's layout: offset_and_mode.w =
++	// m (0 = 1), .z > 1.5 = with offset tint.a). All zero = untouched.
++	"struct GroupParams { offset_and_mode: vec4f, tint: vec4f }\n"
++	"@group(0) @binding(3) var<uniform> gparams: GroupParams;\n"
++	"fn group_row(raw: vec4f) -> vec4f {\n"
++	"  let ga = select(1.0, gparams.offset_and_mode.w, gparams.offset_and_mode.w > 0.0);\n"
++	"  let a_row = clamp(raw.a * ga + gparams.tint.a, 0.0, 1.0);\n"
++	"  let rowed = select(vec4f(0.0), raw * (a_row / max(raw.a, 1e-6)), raw.a > 0.0);\n"
++	"  return select(raw * ga, rowed, gparams.offset_and_mode.z > 1.5);\n"
++	"}\n"
+ 	"\n"
+ 	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+ 	"\n"
+@@ -5263,7 +5279,7 @@ static const char* blend_shader_wgsl_head =
+ static const char* blend_shader_wgsl_frag =
+ 	"@fragment fn %s(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+ 	"  let dst = textureSample(parent_tex, tex_samp, uv);\n"
+-	"  let src = textureSample(current_tex, tex_samp, uv);\n"
++	"  let src = group_row(textureSample(current_tex, tex_samp, uv));\n"
+ 	"  if (src.a > 0.0) {\n"
+ 	"    if (dst.a > 0.0) {\n"
+ 	"      let s = src.rgb / src.a;\n"
+@@ -5395,7 +5411,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
+ 
+ 	// --- Complex blends: one pipeline per mode, no hardware blending. ---
+ 	{
+-		WGPUBindGroupLayoutEntry entries[3] = {0};
++		WGPUBindGroupLayoutEntry entries[4] = {0};
+ 		entries[0].binding = 0;
+ 		entries[0].visibility = WGPUShaderStage_Fragment;
+ 		entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+@@ -5407,10 +5423,15 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
+ 		entries[2].binding = 2;
+ 		entries[2].visibility = WGPUShaderStage_Fragment;
+ 		entries[2].sampler.type = WGPUSamplerBindingType_Filtering;
++		// s27 w2b: group alpha row (blend_params_buf zeros = none).
++		entries[3].binding = 3;
++		entries[3].visibility = WGPUShaderStage_Fragment;
++		entries[3].buffer.type = WGPUBufferBindingType_Uniform;
++		entries[3].buffer.minBindingSize = 32;
+ 
+ 		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+ 		bgl_desc.label = WGPU_LABEL("blend_shader_bgl");
+-		bgl_desc.entryCount = 3;
++		bgl_desc.entryCount = 4;
+ 		bgl_desc.entries = entries;
+ 		ctx->blend_shader_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
+ 
+@@ -5511,28 +5532,54 @@ void render_webgpu_capture_backdrop(WebGPURenderContext* ctx, u8 blend_mode)
+ // subtree's colour transforms and hand it here just before the composite.
+ // composite_wgsl's params.w is the group alpha (premultiplied: rgb AND a
+ // scale), so the LAYER pipelines' over blend gives dst*(1 - a*ga) + c*ga.
++//
++// s27 w2b-group-alpha-triggers: the pending value is a general alpha ROW
++// a' = a*m + o (Flash Player 32: an alpha OFFSET on a LAYER also groups,
++// n3g_layer_aadd), and every blend group (not only LAYER) and the filter
++// layer consume it (n3g_multiply, n3g_filter_cm group in Flash).
+ static float g_group_alpha_pending = 1.0f;
++static float g_group_alpha_offset_pending = 0.0f;
+ 
+ void render_webgpu_set_group_alpha(WebGPURenderContext* ctx, float group_alpha)
+ {
+ 	(void) ctx;
+ 	g_group_alpha_pending = group_alpha;
++	g_group_alpha_offset_pending = 0.0f;
++}
++
++void render_webgpu_set_group_alpha_row(WebGPURenderContext* ctx, float m, float o)
++{
++	(void) ctx;
++	g_group_alpha_pending = m;
++	g_group_alpha_offset_pending = o;
+ }
+ 
+ // Consume the pending group alpha; returns a value in (0, 1) or 1 (= none).
+-static float take_group_alpha(void)
++// *o_out (may be NULL) receives the pending offset (0 = none); an offset
++// forces the row path even at m == 1.
++static float take_group_alpha_row(float* o_out)
+ {
+ 	float ga = g_group_alpha_pending;
++	float o = g_group_alpha_offset_pending;
+ 	g_group_alpha_pending = 1.0f;
+-	return (ga > 0.0f && ga < 1.0f) ? ga : 1.0f;
++	g_group_alpha_offset_pending = 0.0f;
++	if (!(ga > 0.0f)) { o = 0.0f; ga = 1.0f; }
++	if (ga > 1.0f) ga = 1.0f;
++	if (o_out != NULL) *o_out = o;
++	return ga;
+ }
+ 
+-// The params binding for a LAYER composite with group alpha `ga` < 1: its
+-// own filter-ring slot (a queue write to the shared, permanently zero
+-// blend_params_buf would land on EVERY composite of the frame).
+-static void group_alpha_params(WebGPURenderContext* ctx, float ga, WGPUBindGroupEntry* e)
++// Whether a taken (ga, o) is a real group alpha.
++static inline int group_row_active(float ga, float o) { return ga < 1.0f || o != 0.0f; }
++
++// The params binding for a composite with group alpha row (ga, o): its own
++// filter-ring slot (a queue write to the shared, permanently zero
++// blend_params_buf would land on EVERY composite of the frame). o == 0 keeps
++// the s27 multiplier-only encoding byte-for-byte.
++static void group_alpha_row_params(WebGPURenderContext* ctx, float ga, float o,
++                                   WGPUBindGroupEntry* e)
+ {
+-	float params[8] = { 0.0f, 0.0f, 0.0f, ga, 0.0f, 0.0f, 0.0f, 0.0f };
++	float params[8] = { 0.0f, 0.0f, o != 0.0f ? 2.0f : 0.0f, ga, 0.0f, 0.0f, 0.0f, o };
+ 	e->buffer = ctx->filter_uniform_ring;
+ 	e->offset = filter_uniform_push(ctx, params, 32);
+ 	e->size = 32;
+@@ -5541,7 +5588,9 @@ static void group_alpha_params(WebGPURenderContext* ctx, float ga, WGPUBindGroup
+ // Composite the layer in filter_tex_a onto the resumed main pass.
+ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 stencil_ref)
+ {
+-	float group_alpha = take_group_alpha();
++	float group_off = 0.0f;
++	float group_alpha = take_group_alpha_row(&group_off);
++	int group_row = group_row_active(group_alpha, group_off);
+ 	if (!ctx->renderer_ok) return;
+ 	render_webgpu_ensure_blend_resources(ctx);
+ 
+@@ -5551,16 +5600,21 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32
+ 	if (blend_mode_is_complex(blend_mode))
+ 	{
+ 		pipeline = ctx->blend_shader_pipeline[blend_mode];
+-		WGPUBindGroupEntry e[3] = {0};
++		WGPUBindGroupEntry e[4] = {0};
+ 		e[0].binding = 0;
+ 		e[0].textureView = ctx->filter_view_b;   // backdrop ("parent")
+ 		e[1].binding = 1;
+ 		e[1].textureView = ctx->filter_view_a;   // this object's layer ("current")
+ 		e[2].binding = 2;
+ 		e[2].sampler = ctx->filter_sampler;
++		e[3].binding = 3;
++		e[3].buffer = ctx->blend_params_buf;
++		e[3].size = 32;
++		if (group_row)   // s27 w2b: a complex blend group's alpha
++			group_alpha_row_params(ctx, group_alpha, group_off, &e[3]);
+ 		WGPUBindGroupDescriptor bd = {0};
+ 		bd.layout = ctx->blend_shader_bgl;
+-		bd.entryCount = 3;
++		bd.entryCount = 4;
+ 		bd.entries = e;
+ 		bg = wgpuDeviceCreateBindGroup(ctx->device, &bd);
+ 	}
+@@ -5575,8 +5629,8 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32
+ 		e[2].binding = 2;
+ 		e[2].buffer = ctx->blend_params_buf;
+ 		e[2].size = 32;
+-		if (blend_mode == 2 && group_alpha < 1.0f)
+-			group_alpha_params(ctx, group_alpha, &e[2]);
++		if (group_row)   // s27: LAYER; w2b: every trivial blend group too
++			group_alpha_row_params(ctx, group_alpha, group_off, &e[2]);
+ 		WGPUBindGroupDescriptor bd = {0};
+ 		bd.layout = ctx->composite_bgl;
+ 		bd.entryCount = 3;
+@@ -5774,7 +5828,8 @@ int render_webgpu_begin_child_layer(WebGPURenderContext* ctx)
+ 
+ void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
+ {
+-	float group_alpha = take_group_alpha();
++	float group_off = 0.0f;
++	float group_alpha = take_group_alpha_row(&group_off);
+ 	if (!ctx->renderer_ok || ctx->child_layer_open <= 0) return;
+ 	int level = --ctx->child_layer_open;
+ 	render_webgpu_end_offscreen_pass(ctx);      // offscreen_depth -> parent; un-parks clip
+@@ -5820,9 +5875,10 @@ void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
+ 	// blend_layer_pipeline[2] (composite_wgsl, which reads params.w): the
+ 	// same premultiplied-over blend, layout and stencil as child_layer_over.
+ 	WGPURenderPipeline pl = ctx->child_layer_pipeline[k];
+-	if (k == 2 && group_alpha < 1.0f && ctx->blend_layer_pipeline[2] != NULL)
++	if (k == 2 && group_row_active(group_alpha, group_off)
++	    && ctx->blend_layer_pipeline[2] != NULL)
+ 	{
+-		group_alpha_params(ctx, group_alpha, &e[2]);
++		group_alpha_row_params(ctx, group_alpha, group_off, &e[2]);
+ 		pl = ctx->blend_layer_pipeline[2];
+ 	}
+ 	WGPUBindGroupDescriptor bd = {0};
+@@ -6506,6 +6562,22 @@ void render_webgpu_composite_filtered_alpha(WebGPURenderContext* ctx, float grou
+ 	composite_filtered_impl(ctx, 0.0f, 0.0f, 0, 0, 0, 0, group_alpha);
+ }
+ 
++// s27 w2b-group-alpha-triggers: a TIMELINE filtered clip is a transparency
++// group in Flash (Flash Player 32, n3g_filter_cm: an identity ColorMatrix +
++// 50% alpha shows only the top child at the overlap, (128,128,255)): the
++// pending group alpha row is applied once to the filter layer. Row-free
++// (m == 1, o == 0): byte-identical to composite_filtered(0, 0, no tint).
++static void composite_filtered_params(WebGPURenderContext* ctx, const float params[8]);
++void render_webgpu_composite_filtered_group(WebGPURenderContext* ctx)
++{
++	float o = 0.0f;
++	float ga = take_group_alpha_row(&o);
++	if (!ctx->renderer_ok) return;
++	if (o == 0.0f) { composite_filtered_impl(ctx, 0.0f, 0.0f, 0, 0, 0, 0, ga < 1.0f ? ga : 0.0f); return; }
++	float params[8] = { 0.0f, 0.0f, 2.0f, ga, 0.0f, 0.0f, 0.0f, o };
++	composite_filtered_params(ctx, params);
++}
++
+ static void composite_filtered_impl(WebGPURenderContext* ctx,
+ 	float offset_x, float offset_y,
+ 	float tint_r, float tint_g, float tint_b, float tint_a, float group_alpha)
+@@ -6514,6 +6586,11 @@ static void composite_filtered_impl(WebGPURenderContext* ctx,
+ 	// offset_x/y are in NDC space; tint rgba = 0 means passthrough
+ 	float has_tint = (tint_r != 0 || tint_g != 0 || tint_b != 0 || tint_a != 0) ? 1.0f : 0.0f;
+ 	float params[8] = {offset_x, offset_y, has_tint, group_alpha, tint_r, tint_g, tint_b, tint_a};
++	composite_filtered_params(ctx, params);
++}
++
++static void composite_filtered_params(WebGPURenderContext* ctx, const float params[8])
++{
+ 	u32 params_offset = filter_uniform_push(ctx, params, 32);
+ 
+ 	// Create bind group for composite: read filter_tex_a
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 57543c8c3..c845f7805 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -742,3 +742,18 @@ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch
+ # group alpha in render_webgpu.c (root composite_blend + nested end_child_layer).
+ regression/layer_group_alpha_transparency          # AVM1, Flash golden (tol 1)        1 cmp
+ regression/avm2_layer_group_alpha_transparency     # AVM2 twin, Flash golden (tol 1)   1 cmp
++
++# s27 w2b-group-alpha-triggers: the other Flash transparency-group triggers (Flash Player 32
++# goldens). Cover the group alpha ROW at the composite for a folded-CM filter list, a complex
++# blend (MULTIPLY), an alpha OFFSET on LAYER, an ancestor alpha above a LAYER, and the
++# cacheAsBitmap control that must stay per child.
++regression/group_alpha_filter_cm                   # AVM1, folded identity CM + 50%   1 cmp
++regression/avm2_group_alpha_filter_cm              # AVM2 twin (impotent filter list)  1 cmp
++regression/group_alpha_multiply                    # AVM1, complex blend group alpha   1 cmp
++regression/avm2_group_alpha_multiply               # AVM2 twin                         1 cmp
++regression/group_alpha_layer_aadd                  # AVM1, LAYER alpha offset row      1 cmp
++regression/avm2_group_alpha_layer_aadd             # AVM2 twin                         1 cmp
++regression/group_alpha_layer_inner                 # AVM1, ancestor alpha above LAYER  1 cmp
++regression/avm2_group_alpha_layer_inner            # AVM2 twin                         1 cmp
++regression/group_alpha_cab                         # AVM1, cacheAsBitmap stays per child (tol 2)
++regression/avm2_group_alpha_cab                    # AVM2 twin (tol 2)                 1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/output.expected.png b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..36c4e0c1914acfcad337c77681931377abd40469
+GIT binary patch
+literal 519
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnZPZ!6KiaBrZZscS(6ku@N
+zUzqsr&Cg3QGv`<tNOP+En8|cR^|WhypW(3zhI-p@eg<n{4wgm-0V0VC-};Zcmf2To
+zKi^r!RChx`fQ8ACc;eapCHe1u?FsL{U}pbv|Lv1|cuCPsl2uT}iT~_h?yg_5_ow}n
+zH%HkT6$Ch#C?^Vf43E81Ob9n4GSG+(Tnu$B`itiAuVjzRSOtt=22WQ%mvv4FO#nvo
+Bb5Z~R
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/output.txt b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/test.swf b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..2d989412ea8fbd95e109d004a8304027ceaab510
+GIT binary patch
+literal 192
+zcmZ<@59T_+z`&5fAn(AydWV5Qj*-DdkOL^<%=G{N|79YKKqi9#gC2+i0Wcp-F)}a$
+z5%UEDcLoLp4n~HA6Lt+JjDQOMGXRkQuTQh$ixj>o8(z%en;pQQ#KFXnsU!Nph{XqN
+z#($8K&V&@XHiwtteVqqhu4rJm!^s7d>kwoEl8g*YU=|aQW@2yv+T1V5$HK_K1>|Ki
+LI0!H?FoFaD3lSuG
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/test.toml b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/test.toml
+new file mode 100644
+index 000000000..91a14de8b
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_cab/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 2
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/output.expected.png b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0fb136b679752ff996805ad26c830769f4fcdb73
+GIT binary patch
+literal 515
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnJPZ!6KiaBrZ8gd<W;9)pu
+z@#Ow7{qS2NiL06AE1og7&vKo*BRTCE>z}Xtsu^y~bWq@6X(Ez1l>W2(`qn=u-7U}W
+zR)5gW%jBpaz(O>U_}BN>vvt>>ncts1|BL<GlzVKA3IZHVG$c0soB!pm{iS<<<cq!~
+wH9H7!uryLmSfr)BlVd7NrIvX(UG;;>dn>>C>q}?4fsxDL>FVdQ&MBb@0P$>p6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/output.txt b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/test.swf b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..365298115ddff6a4d22906812790bf6ce1b28f0a
+GIT binary patch
+literal 277
+zcmZ<@59ShOWMIf(kau8Uy~DsD$H?F!$icwC;LP;@|NmtoKsg2m0R}w~1p;6`m||pL
+z1R~}O2JQ?D3LK0K2`B6tP8b0d{AU0n0bZYG#TO}jQ#QPq!#6vCL5YKjAyY^6ff0)j
+z*o^-mC7lT=a%~PT!}~f9yj;=1aEFr%DAys#1|%67n7}M1AkD<!0JM3(U;>cj16s-j
+b6v<?85MW|pWMg1xum=ib0py8008Ih_9#JP>
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/test.toml b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_filter_cm/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/output.expected.png b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c94f5628c1cace4ddac2291568c25191c93ee912
+GIT binary patch
+literal 516
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|Vn}PZ!6KiaBrZ8gd;r5MXe$
+zesb5aZs(<C9MPOAAI>lzF+CmHe$MciMZ^BM)$9#(Ia!(<6gY?^_AK9DasTrCnklcN
+zY#Hry1UQ%)6^JK3=U*}}m!E%CdCOV<U-Qe1@|zt5I9M8KNX+=}|LdK6X8u2Z%j%7e
+vM0*o|aLh^W*;vJKV=6C`qk;en4T*=`Ut;*xChWF-!~g`Iu6{1-oD!M<2Y+`B
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/output.txt b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/test.swf b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..1830ab7753a1a5e219ae5c40250cdaf66d34c624
+GIT binary patch
+literal 197
+zcmZ<@59T_`z`&5fAn(AydWV5Qj*-DdkOL^<%=G{N|79YKKqi9#gC2+i0Wcp-F)}a$
+z5%UEDcLoLp4n~HA6Lt+JjDQOMGXRkQuTQh$ixj>o8(z%en;pQQ#KFXnsU!Nph{XqN
+z#($8K&V&@XHiwtteVqqhu4rJm!^s7d>kwoEl8g*YU=|aQW@2yv+B`*&kBO0i3&?xP
+Q;2^*Patt2>lLL?f0L;cE6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/test.toml b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_aadd/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/output.expected.png b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0fb136b679752ff996805ad26c830769f4fcdb73
+GIT binary patch
+literal 515
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnJPZ!6KiaBrZ8gd<W;9)pu
+z@#Ow7{qS2NiL06AE1og7&vKo*BRTCE>z}Xtsu^y~bWq@6X(Ez1l>W2(`qn=u-7U}W
+zR)5gW%jBpaz(O>U_}BN>vvt>>ncts1|BL<GlzVKA3IZHVG$c0soB!pm{iS<<<cq!~
+wH9H7!uryLmSfr)BlVd7NrIvX(UG;;>dn>>C>q}?4fsxDL>FVdQ&MBb@0P$>p6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/output.txt b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/test.swf b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..e96fff33846058bad36e2122109769ed6a11f065
+GIT binary patch
+literal 212
+zcmZ<@59YeUz`&5fAn(AydWV5Qj*-DdkOL^<%=G{N|79YKKqi9#gC2+i0Wcp-F)}a$
+z5%UEDcLoLp4n~HA6Lt+JjDQOMGXRkQuTQh$ixj>o8(z%en;pQQ#KFXnsU!Nph{XqN
+z#($8K&V&@XHiwtteVqqhu4rJm!^s7d>kwoEl8g*YU=|aQW@2yv+I*Rl8z|Z-$i~FT
+Xzy%To3HAx{0R_2%+)M@s0f<5X6H+E(
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/test.toml b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_layer_inner/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/output.expected.png b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0fb136b679752ff996805ad26c830769f4fcdb73
+GIT binary patch
+literal 515
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnJPZ!6KiaBrZ8gd<W;9)pu
+z@#Ow7{qS2NiL06AE1og7&vKo*BRTCE>z}Xtsu^y~bWq@6X(Ez1l>W2(`qn=u-7U}W
+zR)5gW%jBpaz(O>U_}BN>vvt>>ncts1|BL<GlzVKA3IZHVG$c0soB!pm{iS<<<cq!~
+wH9H7!uryLmSfr)BlVd7NrIvX(UG;;>dn>>C>q}?4fsxDL>FVdQ&MBb@0P$>p6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/output.txt b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/test.swf b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc3e6f0cdccfb676644fcc790ea27db610de51d6
+GIT binary patch
+literal 192
+zcmZ<@59T_+z`&5fAn(AydWV5Qj*-DdkOL^<%=G{N|79YKKqi9#gC2+i0Wcp-F)}a$
+z5%UEDcLoLp4n~HA6Lt+JjDQOMGXRkQuTQh$ixj>o8(z%en;pQQ#KFXnsU!Nph{XqN
+z#($8K&V&@XHiwtteVqqhu4rJm!^s7d>kwoEl8g*YU=|aQW@2yv+T1V5$Hd6M1>|Ki
+LI0!H?FoOgE3il*>
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/test.toml b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_group_alpha_multiply/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_cab/create_test_swf.py b/ruffle-tests/tests/swfs/regression/group_alpha_cab/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_cab/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_cab/output.expected.png b/ruffle-tests/tests/swfs/regression/group_alpha_cab/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..36c4e0c1914acfcad337c77681931377abd40469
+GIT binary patch
+literal 519
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnZPZ!6KiaBrZZscS(6ku@N
+zUzqsr&Cg3QGv`<tNOP+En8|cR^|WhypW(3zhI-p@eg<n{4wgm-0V0VC-};Zcmf2To
+zKi^r!RChx`fQ8ACc;eapCHe1u?FsL{U}pbv|Lv1|cuCPsl2uT}iT~_h?yg_5_ow}n
+zH%HkT6$Ch#C?^Vf43E81Ob9n4GSG+(Tnu$B`itiAuVjzRSOtt=22WQ%mvv4FO#nvo
+Bb5Z~R
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_cab/output.txt b/ruffle-tests/tests/swfs/regression/group_alpha_cab/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_cab/test.swf b/ruffle-tests/tests/swfs/regression/group_alpha_cab/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..f5e01a04af293ee75eeb7bbe7af8c9294803dc16
+GIT binary patch
+literal 152
+zcmZ<@59XS|z`&5fAn(AydWV5Qj*-Dd5GcUl%=G{Ne+3RkhJ+J#4JV8k7#aRE0FeN%
+zPqX5S6uv1NUd-W}9l)T(!NicMBl^II#RsSar~;&<Ga*H;&EaKuU+00BD;gN?aB>0V
+nIt1B(BqIY8n8gI7nHU^^I{F3qSQr_&fV@lw2LUDqMvx!?lSLu{
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_cab/test.toml b/ruffle-tests/tests/swfs/regression/group_alpha_cab/test.toml
+new file mode 100644
+index 000000000..91a14de8b
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_cab/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 2
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/create_test_swf.py b/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/output.expected.png b/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0fb136b679752ff996805ad26c830769f4fcdb73
+GIT binary patch
+literal 515
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnJPZ!6KiaBrZ8gd<W;9)pu
+z@#Ow7{qS2NiL06AE1og7&vKo*BRTCE>z}Xtsu^y~bWq@6X(Ez1l>W2(`qn=u-7U}W
+zR)5gW%jBpaz(O>U_}BN>vvt>>ncts1|BL<GlzVKA3IZHVG$c0soB!pm{iS<<<cq!~
+wH9H7!uryLmSfr)BlVd7NrIvX(UG;;>dn>>C>q}?4fsxDL>FVdQ&MBb@0P$>p6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/output.txt b/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/test.swf b/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..6bc17097a8b01a8a615a5223f0f17e17605bfd12
+GIT binary patch
+literal 237
+zcmZ<@59WHyz`&5fAn(AydWV5Qj*-Dd5GcUl%=G{Ne+3RkhJ+J#4JV8k7#aRE0FeN%
+zPqX5S6uv1NUd-W}9l)T(!NicMBl^II#RsSar~;&<Ga*H;&EaKuU+00BD;gN?aB>0V
+zIt1B(BqIY8n8gI7nHU^^I`#`D07*VZMg}gRNG5}W022cv8v{dwJx~}6AWz%@Xc7R|
+C043!B
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/test.toml b/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_filter_cm/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/create_test_swf.py b/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/output.expected.png b/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c94f5628c1cace4ddac2291568c25191c93ee912
+GIT binary patch
+literal 516
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|Vn}PZ!6KiaBrZ8gd;r5MXe$
+zesb5aZs(<C9MPOAAI>lzF+CmHe$MciMZ^BM)$9#(Ia!(<6gY?^_AK9DasTrCnklcN
+zY#Hry1UQ%)6^JK3=U*}}m!E%CdCOV<U-Qe1@|zt5I9M8KNX+=}|LdK6X8u2Z%j%7e
+vM0*o|aLh^W*;vJKV=6C`qk;en4T*=`Ut;*xChWF-!~g`Iu6{1-oD!M<2Y+`B
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/output.txt b/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/test.swf b/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d3079a4e88c41d23d2f8e4a3fd22e2c9557f04a0
+GIT binary patch
+literal 157
+zcmZ<@59XT7z`&5fAn(AydWV5Qj*-Dd5GcUl%=G{Ne+3RkhJ+J#4JV8k7#aRE0FeN%
+zPqX5S6uv1NUd-W}9l)T(!NicMBl^II#RsSar~;&<Ga*H;&EaKuU+00BD;gN?aB>0V
+sIt1B(BqIY8n8gI7nHU^^I;IHnF)=c50eLSO90XW^A`E;COb$Q_07v8^ng9R*
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/test.toml b/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_layer_aadd/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/create_test_swf.py b/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/output.expected.png b/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0fb136b679752ff996805ad26c830769f4fcdb73
+GIT binary patch
+literal 515
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnJPZ!6KiaBrZ8gd<W;9)pu
+z@#Ow7{qS2NiL06AE1og7&vKo*BRTCE>z}Xtsu^y~bWq@6X(Ez1l>W2(`qn=u-7U}W
+zR)5gW%jBpaz(O>U_}BN>vvt>>ncts1|BL<GlzVKA3IZHVG$c0soB!pm{iS<<<cq!~
+wH9H7!uryLmSfr)BlVd7NrIvX(UG;;>dn>>C>q}?4fsxDL>FVdQ&MBb@0P$>p6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/output.txt b/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/test.swf b/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..541c0bab3b8aa3e278e1cb75aee5379bafefa7fe
+GIT binary patch
+literal 172
+zcmZ<@59V6Kz`&5fAn(AydWV5Qj*-Dd5GcUl%=G{Ne+3RkhJ+J#4JV8k7#aRE0FeN%
+zPqX5S6uv1NUd-W}9l)T(!NicMBl^II#RsSar~;&<Ga*H;&EaKuU+00BD;gN?aB>0V
+zIt1B(BqIY8n8gI7nHU^^Ixcf^14TOp*_ap^xIm&H!9GDgpddGpo5|oH08t14X7VHH
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/test.toml b/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_layer_inner/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_multiply/create_test_swf.py b/ruffle-tests/tests/swfs/regression/group_alpha_multiply/create_test_swf.py
+new file mode 100755
+index 000000000..e6783e0de
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_multiply/create_test_swf.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for one of the s27 w2b-group-alpha-triggers fixtures
++(AVM1 `group_alpha_<probe>` and AVM2 twin `avm2_group_alpha_<probe>`); the
++variant is taken from the directory name.
++
++Each is the s27 w2-layer-alpha-group probe scene
++(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
++mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
++opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
++placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
++  filter_cm    identity ColorMatrixFilter + alpha 128/256   -> GROUPED
++  multiply     blendMode MULTIPLY + alpha 128/256           -> GROUPED
++  layer_aadd   blendMode LAYER, alpha mult 1, offset -128   -> GROUPED
++  layer_inner  LAYER sprite (alpha 1) inside a 50% parent   -> GROUPED
++  cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
++At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
++(128,128,254)), per child = (128,65,192) for cab.
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
++1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
++w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
++The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
++avm2_layer_group_alpha recipe) use the same golden: a script-free timeline
++renders the same under both VMs.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0) | (0x04 if cab else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20))
++    if cx: body += cx
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    if cab: body += bytes([1])
++    return tag(70, body)
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++IDENT_CM = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
++A50 = cxform_alpha(mult=(256, 256, 256, 128))
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def scene():
++    return [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)])]
++PROBES = {
++    'filter_cm':   lambda: scene() + [place3(1, 10, cx=A50, filters=[colormatrix(IDENT_CM)])],
++    'cab':         lambda: scene() + [place3(1, 10, cx=A50, cab=True)],
++    'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
++    'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
++    'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
++}
++
++def build(name):
++    avm2 = name.startswith("avm2_")
++    probe = name[len("avm2_"):] if avm2 else name
++    probe = probe[len("group_alpha_"):]
++    tags = PROBES[probe]()
++    fa = 0x08 if avm2 else 0
++    t = [tag(69, bytes([fa, 0, 0, 0])), tag(9, bytes((255, 255, 255)))]
++    if avm2: t.append(DOABC)
++    t += tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++if __name__ == "__main__":
++    name = sys.argv[1] if len(sys.argv) > 1 else HERE.name
++    (HERE / "test.swf").write_bytes(build(name))
++    print("wrote", HERE / "test.swf", name)
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_multiply/output.expected.png b/ruffle-tests/tests/swfs/regression/group_alpha_multiply/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0fb136b679752ff996805ad26c830769f4fcdb73
+GIT binary patch
+literal 515
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnJPZ!6KiaBrZ8gd<W;9)pu
+z@#Ow7{qS2NiL06AE1og7&vKo*BRTCE>z}Xtsu^y~bWq@6X(Ez1l>W2(`qn=u-7U}W
+zR)5gW%jBpaz(O>U_}BN>vvt>>ncts1|BL<GlzVKA3IZHVG$c0soB!pm{iS<<<cq!~
+wH9H7!uryLmSfr)BlVd7NrIvX(UG;;>dn>>C>q}?4fsxDL>FVdQ&MBb@0P$>p6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_multiply/output.txt b/ruffle-tests/tests/swfs/regression/group_alpha_multiply/output.txt
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_multiply/test.swf b/ruffle-tests/tests/swfs/regression/group_alpha_multiply/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..f091e5cea2ab87fce5e78ddf5260b31fbba900a6
+GIT binary patch
+literal 152
+zcmZ<@59XS|z`&5fAn(AydWV5Qj*-Dd5GcUl%=G{Ne+3RkhJ+J#4JV8k7#aRE0FeN%
+zPqX5S6uv1NUd-W}9l)T(!NicMBl^II#RsSar~;&<Ga*H;&EaKuU+00BD;gN?aB>0V
+nIt1B(BqIY8n8gI7nHU^^I{F3qm>3zjfV@lw2LUDqW{@BNlPe+t
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/group_alpha_multiply/test.toml b/ruffle-tests/tests/swfs/regression/group_alpha_multiply/test.toml
+new file mode 100644
+index 000000000..f3c9a68a4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/group_alpha_multiply/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }

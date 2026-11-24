@@ -89,16 +89,24 @@ static int g_next_timer_id = 1;
 // * a timer fires while its due time is STRICTLY before the clock, earliest
 //   due time first; a repeating timer then moves its due time forward by one
 //   interval (catch-up: several fires in one update are possible);
-// * at most TIMER_MAX_TICKS (10) fires per update in total; on the 11th the
-//   clock is pulled back to just before that timer (tick - 100 us) and the
-//   update ends (MAX_TICKS);
+// * NO per-update fire cap (s27 w2b-timers-tail). Ruffle stops after
+//   MAX_TICKS = 10 fires per update ("for sanity", timer.rs) and pulls the
+//   clock back; Flash Player 32 does not: 70 one-shot setTimeout(fn, 10)
+//   created in frame 1 had ALL fired before frame 2 at 10 fps
+//   (session27-fanout-reports/w1-local-oracles/w1-timers-robustness/
+//   caps_timers, regression/avm1_timer_overflow). Every timer due before the
+//   clock fires, and a repeating one catches up (a 10 ms interval fires ~10x
+//   per 100 ms frame, as Flash's real-time interval does). The loop is
+//   finite without a cap (a timer created in a callback is due after the
+//   advanced clock, and each interval is >= 10 ms); TIMER_SANITY_TICKS is a
+//   hang guard only, with Ruffle's clock pull-back if it is ever reached;
 // * a timer created inside a callback is due >= 10 ms after the CURRENT
 //   clock, so it never fires in the update that created it.
 // Ties on the due time fire in id (creation) order; Ruffle's BinaryHeap
 // order for ties is a heap-layout accident (it alternates 1,2,2,1,... for
 // two equal intervals), so creation order is the deliberate choice here.
 #define TIMER_MIN_INTERVAL_MS 10
-#define TIMER_MAX_TICKS 10
+#define TIMER_SANITY_TICKS 1000000
 static uint64_t g_timer_cur_us = 0;
 
 static uint64_t timerIntervalUs(double delay_int32)
@@ -603,7 +611,7 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 			have_batch = 0;
 			continue; // the init actions / target frame may have cleared or created timers
 		}
-		if (++tick_count > TIMER_MAX_TICKS)
+		if (++tick_count > TIMER_SANITY_TICKS)
 		{
 			g_timer_cur_us = t->tick_us - 100;
 			break;

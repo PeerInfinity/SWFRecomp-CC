@@ -355,6 +355,54 @@ void ng_unbumpSpriteInitDepth(void) {
 	}
 }
 
+// s27 w1-per-movie-dl-phase3: the ROOT movie's list while a loaded movie's
+// list (a clip-target shell or a timeline holder's sprite list) is swapped in
+// as the active display_list. Root-arm name lookups ("the root timeline's
+// child named X") must read this, never the active list: a synchronous
+// cross-movie call (child frame -> _root.f() -> clip.f()) runs root code while
+// the holder's list is active. Engaged only by the clip-target loader/driver
+// swaps (ng_rootDLStashPush), outermost swap wins.
+DisplayObject* g_rootdl_stash = NULL;
+size_t g_rootdl_stash_max = 0;
+size_t g_rootdl_stash_cap = 0;
+int g_rootdl_stash_on = 0;
+int ng_rootDLStashPush(void) {
+	if (g_rootdl_stash_on) return 0;
+	if (g_sprite_init_depth > 0 && g_root_dl_backup != NULL) {
+		g_rootdl_stash = g_root_dl_backup;
+		g_rootdl_stash_max = g_root_dl_max_backup;
+		g_rootdl_stash_cap = g_root_dl_cap_backup;
+	} else {
+		g_rootdl_stash = display_list;
+		g_rootdl_stash_max = max_depth;
+		g_rootdl_stash_cap = display_list_capacity;
+	}
+	g_rootdl_stash_on = 1;
+	return 1;
+}
+void ng_rootDLStashPop(int token) { if (token) g_rootdl_stash_on = 0; }
+// The root movie's list and max depth, whatever list is active.
+DisplayObject* ng_rootDisplayList(size_t* out_max) {
+	if (g_rootdl_stash_on && g_rootdl_stash != NULL) {
+		if (out_max) *out_max = g_rootdl_stash_max;
+		return g_rootdl_stash;
+	}
+	if (out_max) *out_max = max_depth;
+	return display_list;
+}
+// Scoped switch to the root list for a root-arm lookup. Returns 1 if swapped.
+int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap) {
+	if (!g_rootdl_stash_on || g_rootdl_stash == NULL || display_list == g_rootdl_stash) return 0;
+	*sdl = display_list; *smax = max_depth; *scap = display_list_capacity;
+	display_list = g_rootdl_stash; max_depth = g_rootdl_stash_max; display_list_capacity = g_rootdl_stash_cap;
+	return 1;
+}
+void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap) {
+	if (!swapped) return;
+	g_rootdl_stash = display_list; g_rootdl_stash_max = max_depth; g_rootdl_stash_cap = display_list_capacity;
+	display_list = sdl; max_depth = smax; display_list_capacity = scap;
+}
+
 int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap) {
 	if (g_sprite_init_depth <= 0) return 0;
 	// Save current (sprite) DL
@@ -3708,31 +3756,46 @@ static inline int obj_filter_routed(const DisplayObject* obj)
 }
 
 // s27 w2-applyfilter-cm: a LIVE ColorMatrix-only entry (no type 1-4 filter,
-// no cacheAsBitmap) whose chain carries an alpha bias > 0. FP32 does NOT snap
-// it: regression/avm1_po3_cm_alpha_bias_edge's rect at x 110.5 reads
-// half-coverage (255,127,127) at x = 110 and y = 80 (A' = 0.5 * 0.5 + 64/255),
-// where Ruffle snaps to whole pixels 111..169. Scoped to the alpha-bias case,
-// the only CM-only row with a Flash golden; the other live CMs
-// (avm1_po3_color_matrix_live, Ruffle-exporter golden) keep Ruffle's snap
-// until a Flash capture decides them.
-static int obj_live_cm_abias_only(const DisplayObject* obj)
+// no cacheAsBitmap). FP32 does NOT snap it. First measured on the alpha-bias
+// case (regression/avm1_po3_cm_alpha_bias_edge: half-coverage (255,127,127)
+// at x = 110 / y = 80 of a rect at 110.5, where Ruffle snaps to whole pixels
+// 111..169); s27 w2b-avm1-applyfilter-flash widened it to EVERY live CM-only
+// entry on the FP32 capture of regression/avm1_po3_color_matrix_live, whose
+// quadrant 4 (A' = 0.5 R, no bias, rect at 110.5) covers 110..169 x 80..119
+// in Flash (the half-covered rim reads the full (255,127,127): the alpha is
+// computed from unpremultiplied red) where Ruffle's snap gives 111..169.
+static int obj_live_cm_only(const DisplayObject* obj)
 {
 	if (!obj->cm_live || obj->filter_type != 0 || obj->cache_as_bitmap) return 0;
 	const FilterListData* fl = (const FilterListData*) obj->filter_chain;
-	if (fl == NULL) return 0;
-	int abias = 0;
+	if (fl == NULL || fl->count == 0) return 0;
 	for (u8 i = 0; i < fl->count; i++)
-	{
 		if (fl->entries[i].type != 6) return 0;
-		if (fl->entries[i].cm_matrix[19] > 0.0f) abias = 1;
-	}
-	return abias;
+	return 1;
+}
+
+// The composed world of a live CM-only entry, noted where compose_children
+// writes its slot (the renderer's xform mirror is not always allocated). One
+// row per entry (latest wins); a row is used only while its slot is current.
+#define CM_WORLD_NOTES 32
+static struct { const DisplayObject* obj; u32 slot; float m[16]; } g_cm_world[CM_WORLD_NOTES];
+static int g_cm_world_next = 0;
+static void cm_world_note(const DisplayObject* obj, const float composed[16])
+{
+	if (!obj_live_cm_only(obj)) return;
+	int k;
+	for (k = 0; k < CM_WORLD_NOTES; k++)
+		if (g_cm_world[k].obj == obj) break;
+	if (k == CM_WORLD_NOTES) { k = g_cm_world_next; g_cm_world_next = (k + 1) % CM_WORLD_NOTES; }
+	g_cm_world[k].obj = obj;
+	g_cm_world[k].slot = obj->transform_id;
+	memcpy(g_cm_world[k].m, composed, sizeof(g_cm_world[k].m));
 }
 
 // Entries Ruffle bitmap-caches: explicit cacheAsBitmap, or any filter list.
 static inline int cab_snaps(const DisplayObject* obj)
 {
-	if (obj_live_cm_abias_only(obj)) return 0;
+	if (obj_live_cm_only(obj)) return 0;
 	return obj->cache_as_bitmap || obj_filter_routed(obj);
 }
 
@@ -3933,19 +3996,83 @@ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
 // padded filter capture refuses child layers), and at most two blend-group
 // ancestors deep (the child-layer stack is CHILD_LAYER_MAX = 4).
 // ---------------------------------------------------------------------------
+//
+// s27 w2b-group-alpha-triggers: Flash Player 32 groups for MORE triggers than
+// LAYER (w2-local-oracles/w2-layer-alpha-group, pixel (80,50)):
+//   * a FILTERED clip (n3g_filter_cm, identity ColorMatrix + 50%): its filter
+//     layer is the group; the row is applied by render_filtered_core at the
+//     filter composite (renderer_composite_filtered_group);
+//   * every non-NORMAL blend mode (n3g_multiply, MULTIPLY + 50% on white):
+//     the blend layer is the group, the row is applied to the layer inside
+//     the blend composite (trivial and complex shaders alike);
+//   * an alpha OFFSET on a grouping clip (n3g_layer_aadd, LAYER, mult 1,
+//     offset -128 -> (128,128,254)): the row a' = a*m + o is applied to the
+//     unpremultiplied group at the composite.
+//   * cacheAsBitmap alone does NOT group (n3g_cab stays per child).
+// A non-LAYER blend group only opens on the main pass (is_layered refuses
+// inside any offscreen), so it splits only with no blend / filter ancestor.
 #define LGA_MAX 128
-static struct { const DisplayObject* obj; float ga; } g_lga[LGA_MAX];
+static struct { const DisplayObject* obj; float ga; float go; u32 orig_cx; } g_lga[LGA_MAX];
 static int g_lga_n;
 static int g_lga_block;       // > 0 while composing under a filtered ancestor
 static int g_lga_blend_anc;   // blend-mode (> 1) ancestors of the subtree
 
 static void lga_reset(void) { g_lga_n = 0; }
 
-static float lga_for_entry(const DisplayObject* obj)
+static int lga_index(const DisplayObject* obj)
 {
 	for (int i = g_lga_n - 1; i >= 0; --i)
-		if (g_lga[i].obj == obj) return g_lga[i].ga;
-	return 1.0f;
+		if (g_lga[i].obj == obj) return i;
+	return -1;
+}
+
+// Hand obj's recorded group alpha row (if any) to the NEXT group composite.
+static void lga_set_for_entry(const DisplayObject* obj)
+{
+	int i = lga_index(obj);
+	if (i >= 0) renderer_set_group_alpha_row(context, g_lga[i].ga, g_lga[i].go);
+	else renderer_set_group_alpha(context, 1.0f);
+}
+
+// Blend modes whose composite is a group (Flash: every mode but NORMAL;
+// ALPHA / ERASE only act on an enclosing LAYER, never composite on their own).
+static inline int lga_blend_groups(u8 m)
+{
+	return m >= 3 && m <= 14 && m != 11 && m != 12;
+}
+
+// A NORMAL entry whose PlaceObject3 filter list the recompiler folded whole
+// into its cxform (ColorMatrix-only, swf.cpp PlaceCmCompose, not ::live): no
+// filter layer opens, but Flash still bitmap-caches a clip with ANY filter,
+// so it is a group (n3g_filter_cm is exactly this: an identity CM + 50%).
+// When its alpha row splits, the render arms give it a LAYER-shaped group
+// (premultiplied over: the same composite as a group with no blend mode).
+static inline int obj_cm_folded(const DisplayObject* obj)
+{
+	return obj->blend_mode <= 1 && !obj_filter_routed(obj)
+	    && obj->filter_chain != NULL
+	    && ((const FilterListData*) obj->filter_chain)->count > 0;
+}
+static inline int lga_fold_group(const DisplayObject* obj)
+{
+	return obj_cm_folded(obj) && lga_index(obj) >= 0;
+}
+// The blend mode a render arm composites obj's group with.
+static inline u8 lga_group_mode(const DisplayObject* obj)
+{
+	return lga_fold_group(obj) ? 2 : obj->blend_mode;
+}
+
+// Whether the render arms are certain to open a group for obj.
+static int lga_entry_groups(const DisplayObject* obj)
+{
+	if (g_lga_block > 0) return 0;
+	if (obj_filter_routed(obj)) return 1;            // the filter layer
+	if (obj->blend_mode == 2 || obj_cm_folded(obj)) return g_lga_blend_anc < 2;
+	if (lga_blend_groups(obj->blend_mode))
+		return g_lga_blend_anc == 0
+		    && renderer_blend_mode_is_layered(context, obj->blend_mode);
+	return 0;
 }
 
 // `cx` is the entry's concatenated cxform (NULL = identity) and `slot` the GPU
@@ -3956,13 +4083,14 @@ static float lga_for_entry(const DisplayObject* obj)
 static int lga_split_entry(DisplayObject* obj, const float* cx,
 	float stripped[20], const float** sub_cx, u32* sub_slot)
 {
-	if (cx == NULL || obj->blend_mode != 2 || obj_filter_routed(obj)) return 0;
-	if (g_lga_block > 0 || g_lga_blend_anc >= 2 || g_lga_n >= LGA_MAX) return 0;
-	if (cx[3] != 0.0f || cx[7] != 0.0f || cx[11] != 0.0f || cx[19] != 0.0f) return 0;
-	float m = cx[15];
-	if (!(m > 0.0f && m < 1.0f)) return 0;
+	if (cx == NULL || g_lga_n >= LGA_MAX || !lga_entry_groups(obj)) return 0;
+	if (cx[3] != 0.0f || cx[7] != 0.0f || cx[11] != 0.0f) return 0;
+	float m = cx[15], o = cx[19];   // s27 w2b: the whole alpha row
+	if (!(m > 0.0f && m <= 1.0f) || (m == 1.0f && o == 0.0f)) return 0;
 	memcpy(stripped, cx, 20 * sizeof(float));
 	stripped[15] = 1.0f;
+	stripped[19] = 0.0f;
+	u32 orig_cx = obj->cxform_id;
 	u32 slot = 0;
 	int ident = cx_is_identity(stripped);
 	if (!ident) {
@@ -3976,6 +4104,8 @@ static int lga_split_entry(DisplayObject* obj, const float* cx,
 	}
 	g_lga[g_lga_n].obj = obj;
 	g_lga[g_lga_n].ga = m;
+	g_lga[g_lga_n].go = o;
+	g_lga[g_lga_n].orig_cx = orig_cx;
 	g_lga_n++;
 	*sub_cx = ident ? NULL : stripped;
 	*sub_slot = slot;
@@ -3986,12 +4116,12 @@ static int lga_split_entry(DisplayObject* obj, const float* cx,
 static inline void lga_enter(const DisplayObject* obj)
 {
 	if (obj_filter_routed(obj)) g_lga_block++;
-	if (obj->blend_mode > 1) g_lga_blend_anc++;
+	if (obj->blend_mode > 1 || lga_fold_group(obj)) g_lga_blend_anc++;
 }
 static inline void lga_leave(const DisplayObject* obj)
 {
 	if (obj_filter_routed(obj)) g_lga_block--;
-	if (obj->blend_mode > 1) g_lga_blend_anc--;
+	if (obj->blend_mode > 1 || lga_fold_group(obj)) g_lga_blend_anc--;
 }
 
 #ifndef NO_GRAPHICS
@@ -4173,6 +4303,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			// Fallback: overwrite in-place (may cause visual artifacts)
 			renderer_write_transform(context, obj->transform_id, composed);
 		}
+		cm_world_note(obj, composed);
 
 		// Color transform for this child and its subtree — TRUE composition
 		// (out = parent(child)), not inheritance. The old code had exactly two
@@ -4269,6 +4400,15 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		}
 		const float* child_cx = (eff_cx_valid && !cx_is_identity(eff_cx))
 			? eff_cx : NULL;
+
+		// s27 w2b: a FILTERED leaf shape's alpha moves to its filter composite
+		// (the glow / shadow must not show through the crisp source).
+		if ((ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
+		    && obj_filter_routed(obj))
+		{
+			const float* lsub; u32 lslot; float lcx[20];
+			lga_split_entry(obj, child_cx, lcx, &lsub, &lslot);
+		}
 
 		switch (ch->type)
 		{
@@ -5105,6 +5245,59 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	render_filtered_core(app_context, obj, NULL);
 }
 
+// s27 w2b-avm1-applyfilter-flash: the DEVICE-pixel rect of Flash's filter
+// cache for `obj` (inclusive): floor() of its world AABB on both ends, so a
+// 60 x 40 px shape at whole pixel 110,10 spans 110..170 x 10..50 (FP32,
+// regression/avm1_po3_color_matrix_live quadrant 2) and one at 110.5 spans
+// 110..169 (regression/avm1_po3_cm_alpha_bias_edge: column 170 stays white).
+// Reads the entry's world matrix back from the renderer's CPU slot mirror.
+// A baked root slot reads transform_data (as cab_snap_root_leaf does); a
+// composed slot the note above (or the renderer's CPU mirror, when present).
+static int cm_cache_rect_px(SWFAppContext* app_context, DisplayObject* obj, int r[4])
+{
+#if !defined(NO_GRAPHICS)
+	if (context == NULL) return 0;
+	u32 t = obj->transform_id;
+	u32 baked = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
+	const float* w;
+	w = NULL;
+	for (int k = 0; k < CM_WORLD_NOTES; k++)
+		if (g_cm_world[k].obj == obj && g_cm_world[k].slot == t) { w = g_cm_world[k].m; break; }
+	if (w != NULL)
+		;
+	else if (t < baked && app_context->transform_data != NULL)
+		w = (const float*) app_context->transform_data + (size_t) t * 16;
+	else if (context->xform_mirror != NULL && context->xform_mirror_valid != NULL
+	         && t < context->xform_slot_count && context->xform_mirror_valid[t])
+		w = &context->xform_mirror[(size_t) t * 16];
+	else
+		return 0;
+	float b[4];
+	if (!opaque_bg_local_bounds(obj, b)) return 0;
+	const float xs[4] = { b[0], b[1], b[0], b[1] };
+	const float ys[4] = { b[2], b[2], b[3], b[3] };
+	double xmin = 1e30, ymin = 1e30, xmax = -1e30, ymax = -1e30;
+	for (int k = 0; k < 4; k++)
+	{
+		double X = (double) w[0] * xs[k] + (double) w[4] * ys[k] + (double) w[12];
+		double Y = (double) w[1] * xs[k] + (double) w[5] * ys[k] + (double) w[13];
+		if (X < xmin) xmin = X;
+		if (X > xmax) xmax = X;
+		if (Y < ymin) ymin = Y;
+		if (Y > ymax) ymax = Y;
+	}
+	double vs = context->stage_scale > 0.0f ? (double) context->stage_scale : 1.0;
+	r[0] = (int) floor(xmin / 20.0 * vs + 1e-6);
+	r[1] = (int) floor(ymin / 20.0 * vs + 1e-6);
+	r[2] = (int) floor(xmax / 20.0 * vs + 1e-6);
+	r[3] = (int) floor(ymax / 20.0 * vs + 1e-6);
+	return r[2] >= r[0] && r[3] >= r[1];
+#else
+	(void) app_context; (void) obj; (void) r;
+	return 0;
+#endif
+}
+
 static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
                                  const FilteredSource* src)
 {
@@ -5130,6 +5323,20 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 	// Group alpha: every filter (the last included) composes INTO the layer,
 	// which is then blitted once at that alpha.
 	int group = (src != NULL && src->group_alpha < 1.0f);
+	// s27 w2b: a TIMELINE filtered entry whose alpha row compose split off
+	// (lga_split_entry) is a group too. The filter's own colour (A3) takes the
+	// entry's ORIGINAL colour transform minus that row: the row now applies
+	// once, at the composite, to the source and filter output alike.
+	int lga_i = (src == NULL) ? lga_index(obj) : -1;
+	if (lga_i >= 0)
+	{
+		group = 1;
+		u32 cur_cx = obj->cxform_id;
+		obj->cxform_id = g_lga[lga_i].orig_cx;
+		have_obj_cx = filtered_object_cxform(app_context, obj, obj_cx);
+		obj->cxform_id = cur_cx;
+		if (have_obj_cx) { obj_cx[15] = 1.0f; obj_cx[19] = 0.0f; }
+	}
 	// Only the LAST filter's composition flags reach the framebuffer; the
 	// earlier ones fold into the blur ping-pong. Same rule (and the same
 	// caveats) as avm2_display.c::avm2_render_filtered, whose `.filters` array
@@ -5232,6 +5439,11 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		for (int i = 0; i < chain_n; i++)
 			if (chain[i]->type != 6) { cm_cx_after = 0; break; }
 	}
+	// s27 w2b-avm1-applyfilter-flash: the cache rect an alpha-bias CM tints
+	// (see cm_cache_rect_px). A live CM-only entry is unsnapped, so its slot
+	// matrix is exactly where it is drawn.
+	int cm_rect[4] = { 0, 0, 0, 0 };
+	int have_cm_rect = (src == NULL && obj_live_cm_only(obj) && cm_cache_rect_px(app_context, obj, cm_rect));
 	renderer_begin_offscreen_pass(context);
 	if (cm_cx_after)
 	{
@@ -5292,7 +5504,15 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 			// s27 w2-applyfilter-cm: an alpha bias leaves a = 0 texels of the
 			// stage-sized layer empty (the object's cache in Flash/Ruffle
 			// holds only its bounds); see render_webgpu_set_cm_keep_empty.
-			if (f->cm_matrix[19] > 0.0f) renderer_set_cm_keep_empty(context, 1);
+			if (f->cm_matrix[19] > 0.0f)
+			{
+				renderer_set_cm_keep_empty(context, 1);
+				// s27 w2b-avm1-applyfilter-flash: ... except inside the
+				// object's cache rect, where Flash tints empty texels too.
+				if (have_cm_rect)
+					renderer_set_cm_bias_rect(context, cm_rect[0], cm_rect[1],
+					                          cm_rect[2], cm_rect[3]);
+			}
 			renderer_run_color_matrix(context, f->cm_matrix);
 			continue;
 		}
@@ -5337,7 +5557,13 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 			for (int c = 0; c < 4; c++) m20[r * 5 + c] = obj_cx[c * 4 + r];
 			m20[r * 5 + 4] = obj_cx[16 + r] * 255.0f;
 		}
-		if (m20[19] > 0.0f) renderer_set_cm_keep_empty(context, 1);
+		if (m20[19] > 0.0f)
+		{
+			renderer_set_cm_keep_empty(context, 1);
+			if (have_cm_rect)
+				renderer_set_cm_bias_rect(context, cm_rect[0], cm_rect[1],
+				                          cm_rect[2], cm_rect[3]);
+		}
 		renderer_run_color_matrix(context, m20);
 	}
 
@@ -5345,7 +5571,13 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 
 	if (group)
 	{
-		renderer_composite_filtered_alpha(context, src->group_alpha);
+		if (src != NULL)
+			renderer_composite_filtered_alpha(context, src->group_alpha);
+		else
+		{
+			renderer_set_group_alpha_row(context, g_lga[lga_i].ga, g_lga[lga_i].go);
+			renderer_composite_filtered_group(context);
+		}
 		if (nested) renderer_end_nested_filter(context);
 		g_filter_capture_depth--;
 		return;
@@ -5538,8 +5770,9 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				renderer_set_blend_mode(context, 0);
 				continue;
 			}
+			// s27 w2b: lga_group_mode = 2 for a folded-CM group (obj_cm_folded).
 			if (!obj_filter_routed(obj)
-			    && renderer_blend_mode_is_layered(context, obj->blend_mode))
+			    && renderer_blend_mode_is_layered(context, lga_group_mode(obj)))
 			{
 				renderer_suspend_pass(context);
 				renderer_capture_backdrop(context, obj->blend_mode);
@@ -5549,22 +5782,22 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				if (obj->blend_mode == 2) g_layer_group_depth--;
 				renderer_end_offscreen_pass(context);
 				renderer_resume_pass(context);
-				if (obj->blend_mode == 2)   // s27 transparency group
-					renderer_set_group_alpha(context, lga_for_entry(obj));
-				renderer_composite_blend(context, obj->blend_mode,
+				lga_set_for_entry(obj);   // s27 transparency group (w2b: every mode)
+				renderer_composite_blend(context, lga_group_mode(obj),
 					active_clip_depth > 0 ? 1 : 0);
 				continue;
 			}
 			// s25 w2: a LAYER nested in a filter/blend offscreen (where
 			// is_layered refuses) still isolates its subtree: one child layer
 			// in that offscreen, composited premultiplied-over.
-			if (obj->blend_mode == 2 && !obj_filter_routed(obj)
+			if ((obj->blend_mode == 2 || lga_fold_group(obj)) && !obj_filter_routed(obj)
 			    && renderer_begin_child_layer(context))
 			{
-				g_layer_group_depth++;
+				int real_layer = (obj->blend_mode == 2);
+				if (real_layer) g_layer_group_depth++;
 				render_single_object(app_context, obj);
-				g_layer_group_depth--;
-				renderer_set_group_alpha(context, lga_for_entry(obj));   // s27
+				if (real_layer) g_layer_group_depth--;
+				lga_set_for_entry(obj);   // s27 (w2b: alpha row)
 				renderer_end_child_layer(context, 2);
 				continue;
 			}
@@ -6960,10 +7193,17 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 	size_t att_n = 0;
 	if (include_attached) {
 		att_n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
-		for (size_t k = 0; k < att_n && gathered; k++)
+		for (size_t k = 0; k < att_n && gathered; k++) {
+			// s27 w2-loaded-shell-land: a movie loaded into a dynamic holder's
+			// shell gets its clip enterFrame in its own slot, AFTER the root's
+			// frame script (ng_dispatch_loaded_shell_enterframe; Flash Player
+			// 32, s26 avm1_loaded_shell_consumers: `t3 ... cx` every tick).
+			if (g_att_sa_mc[k]->display_obj == NULL
+			    && g_att_sa_mc[k]->loaded_dl_shell == (void*)g_att_sa_d[k]) continue;
 			gathered = gather_clip_ef_entries(app_context,
 				g_att_sa_d[k]->sprite_display_list, g_att_sa_d[k]->sprite_max_depth,
 				g_att_sa_mc[k], entries, &n, CLIP_EF_FLAT_CAP);
+		}
 	}
 #else
 	(void)include_attached;
@@ -7073,6 +7313,36 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 {
 	dispatch_enterframe_clip_actions_impl(app_context, dl, dl_max, parent_mc, 0);
 }
+
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// s27 w2-loaded-shell-land: clip-event enterFrame for every movie loaded into a
+// dynamic holder's shell (MovieClip.loaded_dl_shell), dispatched from the
+// loaded-movie driver (actionAdvancePlayingLevels) after the root's frame
+// script, instead of inside the root broadcast. Newest holder first (Flash
+// runs the loaded movies e1 d1 c1, highest/newest first).
+extern int actionLoadedMovieDeliveredThisTick(MovieClip* mc);
+void ng_dispatch_loaded_shell_enterframe(SWFAppContext* app_context)
+{
+	if (!g_any_clip_ef_placed) return;
+	size_t n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
+	DisplayObject* sd[ATTACHED_STANDALONE_CAP];
+	MovieClip* sm[ATTACHED_STANDALONE_CAP];
+	size_t ns = 0;
+	for (size_t k = 0; k < n; k++) {
+		if (g_att_sa_mc[k]->display_obj != NULL
+		    || g_att_sa_mc[k]->loaded_dl_shell != (void*)g_att_sa_d[k]) continue;
+		sd[ns] = g_att_sa_d[k]; sm[ns] = g_att_sa_mc[k]; ns++;
+	}
+	for (size_t k = ns; k-- > 0;) {
+		MovieClip* mc = sm[k];
+		if (mc->depth == INT_MIN || mc->unloaded || mc->avm1_removed) continue;
+		if (actionLoadedMovieDeliveredThisTick(mc)) continue;
+		if (mc->loaded_dl_shell != (void*)sd[k] || sd[k]->sprite_display_list == NULL) continue;
+		dispatch_enterframe_clip_actions_impl(app_context, sd[k]->sprite_display_list,
+			sd[k]->sprite_max_depth, mc, 0);
+	}
+}
+#endif
 
 // Per-tick ROOT dispatch: the root display_list plus (CI modes) every
 // attachMovie'd clip's standalone child list. Browser-WASM keeps its own
@@ -9429,6 +9699,16 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		{
 			compose_root_text_instance(app_context, obj, ch);
 		}
+		else if ((ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
+		         && obj_filter_routed(obj))
+		{
+			// s27 w2b: a root FILTERED shape's alpha row moves to its filter
+			// composite (lga_split_entry; the render arm reads the side table).
+			float seed_cx[20], lcx[20];
+			const float* lsub; u32 lslot;
+			if (root_seed_cxform(app_context, obj, seed_cx))
+				lga_split_entry(obj, seed_cx, lcx, &lsub, &lslot);
+		}
 	}
 	}
 
@@ -9540,7 +9820,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		// and composite it once. Filter+blend on the same object both want
 		// filter_tex_a, so blend keeps the legacy per-draw pipeline there.
 		int blend_layered = !blend_skip && !obj_filter_routed(obj)
-			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
+			&& renderer_blend_mode_is_layered(context, lga_group_mode(obj));   // s27 w2b
 		// setMask maskee: the masker's geometry becomes the stencil for this
 		// entry's paint, restored (not ended) afterwards.
 		// opaqueBackground: painted under this entry and OUTSIDE its own
@@ -9562,9 +9842,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (obj->blend_mode == 2) g_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
-			if (obj->blend_mode == 2)   // s27 transparency group
-				renderer_set_group_alpha(context, lga_for_entry(obj));
-			renderer_composite_blend(context, obj->blend_mode,
+			lga_set_for_entry(obj);   // s27 transparency group (w2b: every mode)
+			renderer_composite_blend(context, lga_group_mode(obj),
 				active_clip_depth > 0 ? 1 : 0);
 		} else if (obj_filter_routed(obj)) {
 			render_filtered_root_entry(app_context, obj, (int) i, (int) max_depth);
@@ -10557,6 +10836,16 @@ void tagShowFrame(SWFAppContext* app_context)
 		{
 			compose_root_text_instance(app_context, obj, ch);
 		}
+		else if ((ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
+		         && obj_filter_routed(obj))
+		{
+			// s27 w2b: a root FILTERED shape's alpha row moves to its filter
+			// composite (lga_split_entry; the render arm reads the side table).
+			float seed_cx[20], lcx[20];
+			const float* lsub; u32 lslot;
+			if (root_seed_cxform(app_context, obj, seed_cx))
+				lga_split_entry(obj, seed_cx, lcx, &lsub, &lslot);
+		}
 		// CHAR_TYPE_MORPH_SHAPE: lerped per instance at draw time
 		// (draw_morph_instance), not into the shared vertex region here.
 	}
@@ -10678,7 +10967,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			&& g_layer_group_depth == 0;
 		// Non-trivial blend modes render into their own layer and composite once.
 		int blend_layered = !blend_skip && !obj_filter_routed(obj)
-			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
+			&& renderer_blend_mode_is_layered(context, lga_group_mode(obj));   // s27 w2b
 
 		// setMask maskee: push the masker's geometry as this entry's stencil.
 		// opaqueBackground: painted under this entry and OUTSIDE its own
@@ -10706,9 +10995,8 @@ void tagShowFrame(SWFAppContext* app_context)
 			if (obj->blend_mode == 2) g_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
-			if (obj->blend_mode == 2)   // s27 transparency group
-				renderer_set_group_alpha(context, lga_for_entry(obj));
-			renderer_composite_blend(context, obj->blend_mode,
+			lga_set_for_entry(obj);   // s27 transparency group (w2b: every mode)
+			renderer_composite_blend(context, lga_group_mode(obj),
 				active_clip_depth > 0 ? 1 : 0);
 		}
 		// Check if this object has a visual filter
@@ -13950,6 +14238,10 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
 		g_root_dl_backup = new_base;
 		g_root_dl_cap_backup = new_cap;
 	}
+	if (g_rootdl_stash == old_base) {
+		g_rootdl_stash = new_base;
+		g_rootdl_stash_cap = new_cap;
+	}
 #endif
 	for (size_t j = 0; j < BTN_STATE_SNAP_MAX; j++) {
 		if (g_btn_state_old_sprite_dl[j] == old_base) {
@@ -14956,9 +15248,21 @@ static void tagDrainGotoInitActionsAQ(SWFAppContext* app_context, void* user)
 	tagDrainGotoInitActions(app_context, 1);
 }
 
+static int g_goto_init_draining = 0;
+static void tagDrainGotoInitActionsNow(SWFAppContext* app_context);
+
 void tagDrainGotoInitActions(SWFAppContext* app_context, int force)
 {
-	if (!force) {
+	if (force) {
+		// Not re-entrant: an init action's own function returns
+		// (tagFlushGotoInitsAtCallReturn) must not restart the drain.
+		if (g_goto_init_draining) return;
+		g_goto_init_draining = 1;
+		tagDrainGotoInitActionsNow(app_context);
+		g_goto_init_draining = 0;
+		return;
+	}
+	{
 		// End of a goto: Flash runs the init actions after the script that
 		// issued the goto, before the target frame's scripts (gnash
 		// action_execution_order_test12 `0+1+2+3+4+`): one SCRIPT-kind queue
@@ -14971,6 +15275,28 @@ void tagDrainGotoInitActions(SWFAppContext* app_context, int force)
 		                      AQ_PRIORITY_INITIALIZE, NULL, 0, AQ_KIND_SCRIPT);
 		return;
 	}
+}
+
+// s27 w2b-timers-tail: Flash's flush point for goto-queued init actions is
+// the RETURN of the next user-function call inside the issuing script
+// (Flash Player 32, regression/avm1_goto_skipped_init_call:
+// `f1 / g f3 / init2 f3 / init3 f3 / f1 after g / f3`): the callee's body
+// runs first, the inits run when it returns, before the rest of the caller.
+// Without such a call they still run after the issuing script (the
+// AQ_PRIORITY_INITIALIZE entry above). Called from action.c
+// invokeFunctionValue for user-defined (DefineFunction/DefineFunction2)
+// callees only, so the native goto call itself never flushes. Inside a root
+// goto catch-up (capture) and inside a timer pass (processTimers drains at
+// its batch boundaries: gnash gotoFrameFromInterval `x0xx1x234`) it waits.
+void tagFlushGotoInitsAtCallReturn(SWFAppContext* app_context)
+{
+	if (g_pending_goto_inits_n == 0 || g_goto_init_capture > 0
+	    || g_goto_init_timer_pass > 0 || g_goto_init_draining) return;
+	tagDrainGotoInitActions(app_context, 1);
+}
+
+static void tagDrainGotoInitActionsNow(SWFAppContext* app_context)
+{
 	size_t i = 0;
 	while (i < g_pending_goto_inits_n) {
 		PendingGotoInit p = g_pending_goto_inits[i++];

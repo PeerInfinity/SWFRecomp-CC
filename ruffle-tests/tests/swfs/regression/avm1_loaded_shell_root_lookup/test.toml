@@ -1,0 +1,4 @@
+num_frames = 6
+
+# GOLDEN: Flash Player 32 (LNX 32,0,0,465) direct-mode trace, prefix to num_frames
+# (SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-per-movie-dl-phase3/avm1_loaded_shell_root_lookup/flash.direct.txt).

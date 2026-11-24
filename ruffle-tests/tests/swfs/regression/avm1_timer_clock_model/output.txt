@@ -12,8 +12,8 @@ e f3
 n f3
 a4 f3
 F4
-F5 cnt=10
-F6 cnt=10
-F7 cnt=10
+F5 cnt=16
+F6 cnt=18
+F7 cnt=18
 F8 cnt=0
 F9 end

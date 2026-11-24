@@ -91,6 +91,14 @@ int avm1_filter_kernels_apply(SWFAppContext* app,
 
 	Avm2BitmapDataExt dst = { 0 }, src = { 0 };
 	dst.width = dst_w; dst.height = dst_h; dst.transparency = dst_transparent ? 1 : 0;
+	// s27 w2b-avm1-applyfilter-flash: Flash's AVM1 Blur into an OPAQUE target
+	// stores the blurred PREMULTIPLIED word with its alpha (FP32 capture of
+	// avm1_applyfilter_blur: getPixel32 reads 0x6B640005 where the transparent
+	// twin reads 0x6BEE000C, and 0 on the empty grown rim), and the display
+	// ignores that alpha (the rim draws black). AVM1 getPixel32 already
+	// returns an opaque bitmap's raw word, so write the kernel's premultiplied
+	// result unforced (the AVM2 path keeps with_alpha(c, 0xFF)).
+	if (!dst_transparent && p->kind == AVM2_FILTER_BLUR) dst.transparency = 1;
 	dst.pixels = dst_px;
 	src.width = src_w; src.height = src_h; src.transparency = src_transparent ? 1 : 0;
 	// applyFilter(bmp, ...) onto itself: every kernel reads the whole source

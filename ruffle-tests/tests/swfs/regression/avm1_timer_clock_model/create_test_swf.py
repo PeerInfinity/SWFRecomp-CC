@@ -13,13 +13,21 @@
                                     fb's setTimeout(fn, 0) is created against
                                     the current clock, so it fires next update
   F4  setInterval(fc, 10), setInterval(fc, 13)
-                                    16 fires are due per update; at most 10
-                                    run (Ruffle MAX_TICKS) -> cnt=10 each frame
+                                    every due fire runs, catching up (no
+                                    per-update cap: s27 w2b-timers-tail; Flash
+                                    fired 70 due one-shots in one update,
+                                    regression/avm1_timer_overflow): F5 sees
+                                    9+7 = 16 (10..90 / 13..91), F6 and F7 see
+                                    10+8 = 18. Ruffle's MAX_TICKS = 10 ("for
+                                    sanity") gave cnt=10 each frame.
   F7  clears both; F8 sees cnt=0.
 
-s26 w2-timer-semantics. GOLDEN IS ANALYTIC (Ruffle-source-derived; the Ruffle
-exporter never fires timers): core/src/timer.rs Timers::update_timers /
-add_timer (MIN_INTERVAL 10, MAX_TICKS 10, TIMER_SCALE 1000, `tick_time <
+s26 w2-timer-semantics; F5-F7 re-derived s27 w2b-timers-tail without the
+MAX_TICKS cap. GOLDEN IS ANALYTIC (Ruffle-source-derived; the Ruffle
+exporter never fires timers; a Flash capture of this SWF is requested in
+session27-fanout-reports/w2b-timers-tail-report.md -- Flash's real-time clock
+may jitter F5-F7 by a fire): core/src/timer.rs Timers::update_timers /
+add_timer (MIN_INTERVAL 10, MAX_TICKS 10 [dropped], TIMER_SCALE 1000, `tick_time <
 cur_time`), avm1/globals.rs create_timer (coerce_to_i32), tests/framework
 runner.rs (run_frame then update_timers(frame_time) per tick). Computed by a
 line-for-line simulation of that model INCLUDING std BinaryHeap tie order

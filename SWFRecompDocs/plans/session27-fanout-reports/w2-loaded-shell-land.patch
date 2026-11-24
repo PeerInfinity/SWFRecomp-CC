@@ -1,0 +1,1281 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index c8ee21284..151b0e652 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -22325,7 +22325,27 @@ DisplayObject* actionHolderShellList(MovieClip* mc, size_t* out_max);
+ 		size_t _shm = 0; DisplayObject* _shl = actionHolderShellList((m), &_shm); \
+ 		if (_shl != NULL) { cur_sprite_dl = _shl; cur_sprite_max = _shm; } \
+ 	} while (0)
++static MovieClip* resolveSlashPathToMCImpl(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc);
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++extern int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap);
++extern void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap);
++#endif
++// s27 phase 3: a path walked from the ROOT reads the root movie's list even
++// while a loaded movie's list is the active one.
+ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	extern MovieClip root_movieclip;
++	if (start_mc == &root_movieclip) {
++		DisplayObject* _sdl = NULL; size_t _smax = 0, _scap = 0;
++		int _sw = ng_rootDLEnter(&_sdl, &_smax, &_scap);
++		MovieClip* r = resolveSlashPathToMCImpl(app_context, path, path_len, start_mc);
++		ng_rootDLLeave(_sw, _sdl, _smax, _scap);
++		return r;
++	}
++#endif
++	return resolveSlashPathToMCImpl(app_context, path, path_len, start_mc);
++}
++static MovieClip* resolveSlashPathToMCImpl(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
+ 	g_shape_alias_resolution = 0;
+ 	if (path_len == 0 || start_mc == NULL) return NULL;
+ 
+@@ -25814,8 +25834,14 @@ static void constructChildURL(char* dest, size_t dest_size, const char* child_fi
+ 	}
+ }
+ 
++static void actionDrainDeferredShellClears(void);
++static unsigned g_direct_load_epoch = 1;
+ void actionProcessDeferredFailedLoads(void)
+ {
++	// s27 w2-loaded-shell-land: one end-of-tick pass per tick (both tick
++	// loops call this once, just before the direct-load drain).
++	g_direct_load_epoch++;
++	actionDrainDeferredShellClears();
+ 	for (int i = 0; i < g_deferred_failed_load_count; i++) {
+ 		DeferredFailedLoad* dfl = &g_deferred_failed_loads[i];
+ 		if (dfl->mc != NULL) {
+@@ -25843,6 +25869,30 @@ typedef struct {
+ #define MAX_PENDING_DIRECT_LOADS 16
+ static PendingDirectLoad g_pending_direct_loads[MAX_PENDING_DIRECT_LOADS];
+ int g_pending_direct_load_count = 0;
++// s27 w2-loaded-shell-land: FLASH delivery tick. A direct loadMovie issued in
++// tick N delivers (the movie's frame 1 runs) in tick N+1's end-of-tick drain,
++// AFTER the root's tick-N+1 frame script -- not in tick N's own drain. Flash
++// Player 32 captures (regression/avm1_loaded_timeline_holder,
++// _shell_consumers_seq; s26 avm1_loaded_bare_goto: `p2 h0 g0 k0` before any
++// child frame). Entries are stamped lazily (the queue sites stay untouched):
++// g_pending_direct_born[i] is the epoch of the drain that first saw entry i,
++// and an entry fires only at a LATER epoch. Parallel to the queue; entries at
++// index >= g_pending_direct_stamped are unstamped.
++static unsigned g_pending_direct_born[MAX_PENDING_DIRECT_LOADS];
++static int g_pending_direct_stamped = 0;
++// Holders whose direct load was delivered in the current tick's drain: their
++// movie's clip enterFrame starts on the NEXT tick (Flash: no `cx` on the
++// delivery tick). Read by ng_dispatch_loaded_shell_enterframe (tag.c).
++#define MAX_DELIVERED_THIS_TICK 16
++static MovieClip* g_delivered_mc[MAX_DELIVERED_THIS_TICK];
++static unsigned g_delivered_epoch[MAX_DELIVERED_THIS_TICK];
++static int g_delivered_next = 0;
++int actionLoadedMovieDeliveredThisTick(MovieClip* mc)
++{
++	for (int i = 0; i < MAX_DELIVERED_THIS_TICK; i++)
++		if (g_delivered_mc[i] == mc && g_delivered_epoch[i] == g_direct_load_epoch) return 1;
++	return 0;
++}
+ 
+ // --- Deferred loadVariables `onData` queue ---------------------------------
+ // Ruffle's load_form_into_object (core/src/loader.rs:1028-1042) parses the form
+@@ -26231,7 +26281,19 @@ typedef struct {
+ 	DisplayObject* dl;
+ 	size_t max, cap;
+ 	int on;
++	int rootdl_tok;
+ } ChildDLSwap;
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++extern int ng_rootDLStashPush(void);
++extern void ng_rootDLStashPop(int token);
++extern int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap);
++extern void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap);
++#define ROOTDL_PUSH() ng_rootDLStashPush()
++#define ROOTDL_POP(t) ng_rootDLStashPop(t)
++#else
++#define ROOTDL_PUSH() 0
++#define ROOTDL_POP(t) ((void)(t))
++#endif
+ 
+ static void childDLSwapIn(DisplayObject* owner, ChildDLSwap* s)
+ {
+@@ -26239,9 +26301,11 @@ static void childDLSwapIn(DisplayObject* owner, ChildDLSwap* s)
+ 	extern size_t max_depth;
+ 	extern size_t display_list_capacity;
+ 	s->on = 0;
++	s->rootdl_tok = 0;
+ 	s->owner = owner;
+ 	if (owner == NULL || owner->sprite_display_list == NULL) return;
+ 	if (display_list == owner->sprite_display_list) return;  // already active (re-entrant goto)
++	s->rootdl_tok = ROOTDL_PUSH();
+ 	s->dl = display_list; s->max = max_depth; s->cap = display_list_capacity;
+ 	display_list = owner->sprite_display_list;
+ 	max_depth = owner->sprite_max_depth;
+@@ -26259,6 +26323,7 @@ static void childDLSwapOut(ChildDLSwap* s)
+ 	s->owner->sprite_max_depth = max_depth;
+ 	s->owner->sprite_dl_capacity = display_list_capacity;
+ 	display_list = s->dl; max_depth = s->max; display_list_capacity = s->cap;
++	ROOTDL_POP(s->rootdl_tok);
+ 	s->on = 0;
+ }
+ 
+@@ -26268,7 +26333,48 @@ static void childDLSwapOut(ChildDLSwap* s)
+ // non-root clip, so the movie's children are gone (and stop rendering) at once.
+ // Removal goes through tagRemoveObject2 on the swapped-in shell, the same loop
+ // the reload path uses, so onUnload fires and cached MovieClips invalidate.
++// s27 w1-per-movie-dl-phase3: the unload is DEFERRED to the end of the tick.
++// Ruffle's loader makes a loaded movie a ROOT clip (loader.rs movie_loader_data:
++// replace_with_movie(.., is_root=true, ..)), so avm1_unload_movie takes its
++// is_root() arm and runs avm1_unload + transform_to_unloaded_state in a spawned
++// future, i.e. at the next update; its own comment records that Flash applies
++// the unloaded state one frame later even for a non-root clip. So `h.a` read
++// in the same script right after h.unloadMovie() is still the movie's child.
++// The playhead unregister stays synchronous (the movie runs no further frame).
++#define MAX_DEFERRED_SHELL_CLEARS 64
++static MovieClip* g_deferred_shell_clear[MAX_DEFERRED_SHELL_CLEARS];
++static int g_deferred_shell_clear_count = 0;
++static SWFAppContext* g_deferred_shell_clear_app = NULL;
++static void actionClearChildMovieShellNow(SWFAppContext* app_context, MovieClip* mc);
+ void actionClearChildMovieShell(SWFAppContext* app_context, MovieClip* mc)
++{
++	if (mc == NULL || mc->loaded_dl_shell == NULL) return;
++	for (int i = 0; i < g_deferred_shell_clear_count; i++)
++		if (g_deferred_shell_clear[i] == mc) return;
++	if (g_deferred_shell_clear_count >= MAX_DEFERRED_SHELL_CLEARS) {
++		actionClearChildMovieShellNow(app_context, mc);
++		return;
++	}
++	g_deferred_shell_clear_app = app_context;
++	g_deferred_shell_clear[g_deferred_shell_clear_count++] = mc;
++}
++// Drained from actionProcessDeferredFailedLoads (end of tick, before the
++// pending direct loads fire, so an unload+reload in one script clears first).
++static void actionDrainDeferredShellClears(void)
++{
++	extern MovieClip* child_mc_cache[];
++	extern int child_mc_count;
++	int n = g_deferred_shell_clear_count;
++	g_deferred_shell_clear_count = 0;
++	for (int i = 0; i < n; i++) {
++		MovieClip* mc = g_deferred_shell_clear[i];
++		int live = 0;
++		for (int c = 0; c < child_mc_count; c++)
++			if (child_mc_cache[c] == mc) { live = 1; break; }
++		if (live) actionClearChildMovieShellNow(g_deferred_shell_clear_app, mc);
++	}
++}
++static void actionClearChildMovieShellNow(SWFAppContext* app_context, MovieClip* mc)
+ {
+ 	if (mc == NULL || mc->loaded_dl_shell == NULL) return;
+ 	DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
+@@ -26421,8 +26527,14 @@ int actionChildMovieBareGoto(SWFAppContext* app_context, long frame0, int rel, i
+ 	return 1;
+ }
+ 
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++extern void ng_dispatch_loaded_shell_enterframe(SWFAppContext* app_context);
++#endif
+ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ {
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	ng_dispatch_loaded_shell_enterframe(app_context);
++#endif
+ 	if (g_level_advance_count == 0) return;
+ 	int write = 0;
+ 	for (int read = 0; read < g_level_advance_count; read++) {
+@@ -26490,9 +26602,11 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ 			DisplayObject* _saved_dl = NULL;
+ 			size_t _saved_max = 0, _saved_cap = 0;
+ 			int _did_swap = 0;
++			int _rootdl_tok = 0;
+ 			DisplayObject* dobj = e.mc->display_obj ? (DisplayObject*)e.mc->display_obj
+ 			                                        : actionChildMovieShell(app_context, e.mc, 1);
+ 			if (dobj != NULL && dobj->sprite_display_list != NULL) {
++				if (!isLevelRootMC(e.mc)) _rootdl_tok = ROOTDL_PUSH();
+ 				_saved_dl = display_list;
+ 				_saved_max = max_depth;
+ 				_saved_cap = display_list_capacity;
+@@ -26646,6 +26760,7 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ 				max_depth = _saved_max;
+ 				display_list_capacity = _saved_cap;
+ 			}
++			ROOTDL_POP(_rootdl_tok);
+ 			if (_saved_td != NULL) {
+ 				extern float (*g_active_transform_data)[16];
+ 				g_active_transform_data = _saved_td;
+@@ -26683,6 +26798,7 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ // AVM2 tick advances. Both live here; the AVM2 side calls in through the two
+ // entry points at the bottom.
+ void actionFirePendingDirectLoads(SWFAppContext* app_context);
++static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all);
+ 
+ static int g_avm1_under_avm2_ready = 0;
+ 
+@@ -26990,7 +27106,8 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
+ 	extern int quit_swf;
+ 	int saved_quit = quit_swf;
+ 	quit_swf = 0;
+-	actionFirePendingDirectLoads(app_context);
++	// No end-of-tick epoch pass on this path: keep its same-drain delivery.
++	actionFirePendingDirectLoadsImpl(app_context, 1);
+ 	// The MCL Phase-3 slot, same as swf_core.c / swf.c: the previous AVM2
+ 	// tick's drain parked onLoadInit, and it fires here, just before the
+ 	// loaded movie's own advance.
+@@ -27334,14 +27451,35 @@ int actionAvm1LocalConnectionDeliver(SWFAppContext* app_context, const char* key
+ }
+ #endif  // SWF_AVM2
+ 
++static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all);
+ void actionFirePendingDirectLoads(SWFAppContext* app_context)
++{
++	actionFirePendingDirectLoadsImpl(app_context, 0);
++}
++static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all)
+ {
+ 	int count = g_pending_direct_load_count;
+-	if (count == 0) return;
+-	// Copy and reset (child scripts may queue more loads)
++	if (count == 0) { g_pending_direct_stamped = 0; return; }
++	if (g_pending_direct_stamped > count) g_pending_direct_stamped = count;
++	for (int i = g_pending_direct_stamped; i < count; i++)
++		g_pending_direct_born[i] = g_direct_load_epoch;
++	g_pending_direct_stamped = count;
++	// Copy the due entries; entries born this epoch stay queued (in order).
+ 	PendingDirectLoad loads[MAX_PENDING_DIRECT_LOADS];
+-	for (int i = 0; i < count; i++) loads[i] = g_pending_direct_loads[i];
+-	g_pending_direct_load_count = 0;
++	int n_due = 0, n_keep = 0;
++	for (int i = 0; i < count; i++) {
++		if (fire_all || g_pending_direct_born[i] < g_direct_load_epoch) {
++			loads[n_due++] = g_pending_direct_loads[i];
++		} else {
++			g_pending_direct_loads[n_keep] = g_pending_direct_loads[i];
++			g_pending_direct_born[n_keep] = g_pending_direct_born[i];
++			n_keep++;
++		}
++	}
++	g_pending_direct_load_count = n_keep;
++	g_pending_direct_stamped = n_keep;
++	count = n_due;
++	if (count == 0) return;
+ 
+ 	// Stable sort level loads by level number (mc->depth) ascending so lower
+ 	// levels run their init scripts first — matches Flash/Ruffle ordering when
+@@ -27444,7 +27582,9 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 		// on top of that additionally breaks avm1/swf{5_to_6,6_to_5}_cross_call.
+ 		// Both measured. See SWFRecompDocs/status/child-timeline-advance.md.
+ 		DisplayObject* _shell = NULL;
++		int _rootdl_tok = 0;
+ 		if (!loads[i].is_level && (_shell = actionChildMovieShell(app_context, mc, 1)) != NULL) {
++			_rootdl_tok = ROOTDL_PUSH();
+ 			_saved_dl = display_list;
+ 			_saved_max = max_depth;
+ 			_saved_cap = display_list_capacity;
+@@ -27488,6 +27628,21 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 				_did_swap = 1;
+ 			}
+ 		}
++		// s27 phase 3: a TIMELINE-placed holder (it already has a display_obj
++		// with a sprite list) gets its movie's frame 1 in that list too, the
++		// same list actionAdvancePlayingLevels runs frames 2..N in.
++		if (!_did_swap && !loads[i].is_level && mc->display_obj != NULL
++		    && ((DisplayObject*)mc->display_obj)->sprite_display_list != NULL) {
++			DisplayObject* _hd = (DisplayObject*)mc->display_obj;
++			_rootdl_tok = ROOTDL_PUSH();
++			_saved_dl = display_list;
++			_saved_max = max_depth;
++			_saved_cap = display_list_capacity;
++			display_list = _hd->sprite_display_list;
++			max_depth = _hd->sprite_max_depth;
++			display_list_capacity = _hd->sprite_dl_capacity;
++			_did_swap = 1;
++		}
+ 		// Swap transform_data to child's array (for correct ng_cache_transform)
+ 		{
+ 			extern float (*g_active_transform_data)[16];
+@@ -27527,6 +27682,9 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 		int _saved_is_playing = is_playing;
+ 
+ 		entry->init_func(app_context);
++		g_delivered_mc[g_delivered_next] = mc;
++		g_delivered_epoch[g_delivered_next] = g_direct_load_epoch;
++		g_delivered_next = (g_delivered_next + 1) % MAX_DELIVERED_THIS_TICK;
+ 		// Register the loaded movie's playhead BEFORE its frame 1 runs. This used
+ 		// to be gated on `is_level`, which is why a movie loadMovie'd into a
+ 		// HOLDER CLIP never advanced past its first frame: nothing called
+@@ -27578,6 +27736,7 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 			max_depth = _saved_max;
+ 			display_list_capacity = _saved_cap;
+ 		}
++		ROOTDL_POP(_rootdl_tok);
+ 		if (_saved_td != NULL) {
+ 			extern float (*g_active_transform_data)[16];
+ 			g_active_transform_data = _saved_td;
+@@ -41412,7 +41571,11 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
+             DisplayObject* _p2_shell = actionChildMovieShell(app_context, loads[i].target, 1);
+             ChildDLSwap _p2_sw;
+             _p2_sw.on = 0;
+-            if (_p2_shell != NULL) {
++            if (_p2_shell == NULL && loads[i].target != NULL && !isLevelRootMC(loads[i].target)
++                && loads[i].target->display_obj != NULL) {
++                // s27 phase 3: timeline-placed holder -> its own sprite list.
++                childDLSwapIn((DisplayObject*)loads[i].target->display_obj, &_p2_sw);
++            } else if (_p2_shell != NULL) {
+                 childDLSwapIn(_p2_shell, &_p2_sw);
+                 if (_p2_sw.on) {
+                     for (size_t _cd = max_depth; _cd >= 1; _cd--) {
+@@ -50908,11 +51071,21 @@ check_special_vars:
+ 			}
+ 
+ 			{
++			// s27 phase 3: a lookup scoped to the ROOT timeline reads the root
++			// movie's list even while a loaded movie's list is active (a
++			// synchronous child-frame -> _root.f() call). Every return below
++			// goes through _GV_RDL_LEAVE.
++			DisplayObject* _gvr_dl = NULL; size_t _gvr_max = 0, _gvr_cap = 0;
++			int _gvr_sw = (g_current_context == NULL || g_current_context == &root_movieclip)
++				? ng_rootDLEnter(&_gvr_dl, &_gvr_max, &_gvr_cap) : 0;
++#define _GV_RDL_LEAVE() ng_rootDLLeave(_gvr_sw, _gvr_dl, _gvr_max, _gvr_cap)
+ 			size_t child_depth = ng_findDisplayEntryByName(name_buf);
++			if (child_depth == SIZE_MAX) _GV_RDL_LEAVE();
+ 			if (child_depth != SIZE_MAX)
+ 			{
+ 				extern MovieClip root_movieclip;
+ 				if (!ng_isScriptableAtDepth(child_depth)) {
++					_GV_RDL_LEAVE();
+ 					// Flash quirk: sh.var = 10 actually sets var on the parent,
+ 					// so a shape/morph/static-text name resolves to the parent
+ 					// MC. Flag so actionCallMethod emulates
+@@ -50928,6 +51101,7 @@ check_special_vars:
+ 					extern Character* dictionary;
+ 					size_t _cid = display_list[child_depth].char_id;
+ 					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
++						_GV_RDL_LEAVE();
+ 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+ 						return;
+ 					}
+@@ -50941,10 +51115,13 @@ check_special_vars:
+ 					size_t _cid = display_list[child_depth].char_id;
+ 					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON)
+ 						child_mc->is_button_mc = 1;
++					_GV_RDL_LEAVE();
+ 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+ 					return;
+ 				}
++				_GV_RDL_LEAVE();
+ 			}
++#undef _GV_RDL_LEAVE
+ 			}
+ #endif
+ 
+@@ -60515,6 +60692,19 @@ static void actionGetMemberImpl(SWFAppContext* app_context);
+ 
+ void actionGetMember(SWFAppContext* app_context)
+ {
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	// s27 phase 3: `_root.x` from a loaded movie's frame reads the ROOT list.
++	extern MovieClip root_movieclip;
++	if (STACK_SECOND_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP
++	    && (MovieClip*)STACK_SECOND_TOP_VALUE == &root_movieclip) {
++		DisplayObject* _sdl = NULL; size_t _smax = 0, _scap = 0;
++		int _sw = ng_rootDLEnter(&_sdl, &_smax, &_scap);
++		actionGetMemberImpl(app_context);
++		ng_rootDLLeave(_sw, _sdl, _smax, _scap);
++		swf5TextFieldRefToClip(app_context);
++		return;
++	}
++#endif
+ 	actionGetMemberImpl(app_context);
+ 	swf5TextFieldRefToClip(app_context);
+ }
+@@ -61986,7 +62176,14 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 			if (mc->display_obj != NULL) {
+ 				DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+ 				if (parent_dobj->sprite_display_list != NULL) {
+-					for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
++					// s27 phase 3: while this list is the ACTIVE one (a movie loaded
++					// into a timeline holder is running its frame) the stored max is
++					// only written back at swap-out; read the live one.
++					extern DisplayObject* display_list;
++					extern size_t max_depth;
++					size_t _pd_max = (parent_dobj->sprite_display_list == display_list)
++						? max_depth : parent_dobj->sprite_max_depth;
++					for (size_t _cd = 1; _cd <= _pd_max; _cd++) {
+ 						DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
+ 						if (_ch->char_id == 0) continue;
+ 						if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, child_name_buf)) {
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index e742e9d0e..7699f0d78 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -357,6 +357,54 @@ void ng_unbumpSpriteInitDepth(void) {
+ 	}
+ }
+ 
++// s27 w1-per-movie-dl-phase3: the ROOT movie's list while a loaded movie's
++// list (a clip-target shell or a timeline holder's sprite list) is swapped in
++// as the active display_list. Root-arm name lookups ("the root timeline's
++// child named X") must read this, never the active list: a synchronous
++// cross-movie call (child frame -> _root.f() -> clip.f()) runs root code while
++// the holder's list is active. Engaged only by the clip-target loader/driver
++// swaps (ng_rootDLStashPush), outermost swap wins.
++DisplayObject* g_rootdl_stash = NULL;
++size_t g_rootdl_stash_max = 0;
++size_t g_rootdl_stash_cap = 0;
++int g_rootdl_stash_on = 0;
++int ng_rootDLStashPush(void) {
++	if (g_rootdl_stash_on) return 0;
++	if (g_sprite_init_depth > 0 && g_root_dl_backup != NULL) {
++		g_rootdl_stash = g_root_dl_backup;
++		g_rootdl_stash_max = g_root_dl_max_backup;
++		g_rootdl_stash_cap = g_root_dl_cap_backup;
++	} else {
++		g_rootdl_stash = display_list;
++		g_rootdl_stash_max = max_depth;
++		g_rootdl_stash_cap = display_list_capacity;
++	}
++	g_rootdl_stash_on = 1;
++	return 1;
++}
++void ng_rootDLStashPop(int token) { if (token) g_rootdl_stash_on = 0; }
++// The root movie's list and max depth, whatever list is active.
++DisplayObject* ng_rootDisplayList(size_t* out_max) {
++	if (g_rootdl_stash_on && g_rootdl_stash != NULL) {
++		if (out_max) *out_max = g_rootdl_stash_max;
++		return g_rootdl_stash;
++	}
++	if (out_max) *out_max = max_depth;
++	return display_list;
++}
++// Scoped switch to the root list for a root-arm lookup. Returns 1 if swapped.
++int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap) {
++	if (!g_rootdl_stash_on || g_rootdl_stash == NULL || display_list == g_rootdl_stash) return 0;
++	*sdl = display_list; *smax = max_depth; *scap = display_list_capacity;
++	display_list = g_rootdl_stash; max_depth = g_rootdl_stash_max; display_list_capacity = g_rootdl_stash_cap;
++	return 1;
++}
++void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap) {
++	if (!swapped) return;
++	g_rootdl_stash = display_list; g_rootdl_stash_max = max_depth; g_rootdl_stash_cap = display_list_capacity;
++	display_list = sdl; max_depth = smax; display_list_capacity = scap;
++}
++
+ int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap) {
+ 	if (g_sprite_init_depth <= 0) return 0;
+ 	// Save current (sprite) DL
+@@ -6717,10 +6765,17 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
+ 	size_t att_n = 0;
+ 	if (include_attached) {
+ 		att_n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
+-		for (size_t k = 0; k < att_n && gathered; k++)
++		for (size_t k = 0; k < att_n && gathered; k++) {
++			// s27 w2-loaded-shell-land: a movie loaded into a dynamic holder's
++			// shell gets its clip enterFrame in its own slot, AFTER the root's
++			// frame script (ng_dispatch_loaded_shell_enterframe; Flash Player
++			// 32, s26 avm1_loaded_shell_consumers: `t3 ... cx` every tick).
++			if (g_att_sa_mc[k]->display_obj == NULL
++			    && g_att_sa_mc[k]->loaded_dl_shell == (void*)g_att_sa_d[k]) continue;
+ 			gathered = gather_clip_ef_entries(app_context,
+ 				g_att_sa_d[k]->sprite_display_list, g_att_sa_d[k]->sprite_max_depth,
+ 				g_att_sa_mc[k], entries, &n, CLIP_EF_FLAT_CAP);
++		}
+ 	}
+ #else
+ 	(void)include_attached;
+@@ -6831,6 +6886,36 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+ 	dispatch_enterframe_clip_actions_impl(app_context, dl, dl_max, parent_mc, 0);
+ }
+ 
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++// s27 w2-loaded-shell-land: clip-event enterFrame for every movie loaded into a
++// dynamic holder's shell (MovieClip.loaded_dl_shell), dispatched from the
++// loaded-movie driver (actionAdvancePlayingLevels) after the root's frame
++// script, instead of inside the root broadcast. Newest holder first (Flash
++// runs the loaded movies e1 d1 c1, highest/newest first).
++extern int actionLoadedMovieDeliveredThisTick(MovieClip* mc);
++void ng_dispatch_loaded_shell_enterframe(SWFAppContext* app_context)
++{
++	if (!g_any_clip_ef_placed) return;
++	size_t n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
++	DisplayObject* sd[ATTACHED_STANDALONE_CAP];
++	MovieClip* sm[ATTACHED_STANDALONE_CAP];
++	size_t ns = 0;
++	for (size_t k = 0; k < n; k++) {
++		if (g_att_sa_mc[k]->display_obj != NULL
++		    || g_att_sa_mc[k]->loaded_dl_shell != (void*)g_att_sa_d[k]) continue;
++		sd[ns] = g_att_sa_d[k]; sm[ns] = g_att_sa_mc[k]; ns++;
++	}
++	for (size_t k = ns; k-- > 0;) {
++		MovieClip* mc = sm[k];
++		if (mc->depth == INT_MIN || mc->unloaded || mc->avm1_removed) continue;
++		if (actionLoadedMovieDeliveredThisTick(mc)) continue;
++		if (mc->loaded_dl_shell != (void*)sd[k] || sd[k]->sprite_display_list == NULL) continue;
++		dispatch_enterframe_clip_actions_impl(app_context, sd[k]->sprite_display_list,
++			sd[k]->sprite_max_depth, mc, 0);
++	}
++}
++#endif
++
+ // Per-tick ROOT dispatch: the root display_list plus (CI modes) every
+ // attachMovie'd clip's standalone child list. Browser-WASM keeps its own
+ // dispatch_attached_clip_enterframe pass, so there this is the plain root walk.
+@@ -13271,6 +13356,10 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
+ 		g_root_dl_backup = new_base;
+ 		g_root_dl_cap_backup = new_cap;
+ 	}
++	if (g_rootdl_stash == old_base) {
++		g_rootdl_stash = new_base;
++		g_rootdl_stash_cap = new_cap;
++	}
+ #endif
+ 	for (size_t j = 0; j < BTN_STATE_SNAP_MAX; j++) {
+ 		if (g_btn_state_old_sprite_dl[j] == old_base) {
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 8a13378ea..cd651d051 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -736,3 +736,12 @@ regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased
+ # s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
+ # tier=1
+ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp
++
++# s27 w2-loaded-shell-land: LOADED-MOVIE render members. The set had no row
++# whose stage holds a loadMovie'd child, so a change to the loader's delivery
++# tick or to per-movie display lists was invisible to it. Each renders a child
++# SWF's content (shape / bitmap fill / morph / text) inside a holder.
++regression/avm1_parent_child_render
++regression/avm1_parent_child_bitmap_fill
++regression/avm1_parent_child_morph
++regression/avm1_parent_child_text
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/output.txt b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/output.txt
+index 71761e45d..de3f1c72f 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/output.txt
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/output.txt
+@@ -1,11 +1,11 @@
++t1 cf:0 tf:1 ax:undefined b:undefined z:undefined
+ c1
+-t1 cf:1 tf:5 ax:10 b:undefined z:undefined
++t2 cf:1 tf:5 ax:10 b:undefined z:undefined
+ c2
+-t2 cf:2 tf:5 ax:20 b:movieclip z:undefined
++t3 cf:2 tf:5 ax:20 b:movieclip z:undefined
+ c3
+-t3 cf:3 tf:5 ax:30 b:undefined z:undefined
++t4 cf:3 tf:5 ax:30 b:undefined z:undefined
+ c4
+-t4 cf:4 tf:5 ax:30 b:undefined z:undefined
+ t5 cf:4 tf:5 ax:30 b:undefined z:undefined
+ t6 cf:4 tf:5 ax:30 b:undefined z:undefined
+ t7 cf:4 tf:5 ax:30 b:undefined z:undefined
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/test.toml b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/test.toml
+index 071c36f74..ca920482f 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/test.toml
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_advance/test.toml
+@@ -1 +1,7 @@
+ num_frames = 20
++
++# s27 w2-loaded-shell-land: output.txt re-derived for the FLASH direct-loadMovie
++# delivery tick (a load issued in tick N delivers after the root's tick-N+1
++# scripts; Flash Player 32 captures of avm1_loaded_timeline_holder /
++# _shell_consumers / _bare_goto / _unload_shell). The previous golden followed
++# Ruffle's one-tick-earlier delivery. PREDICTED pending a Flash capture.
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/output.txt b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/output.txt
+index ba1d11167..6ed5423a9 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/output.txt
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/output.txt
+@@ -1,5 +1,5 @@
++t1 cf:0 ax:undefined b:undefined
+ S1
+-t1 cf:1 ax:10 b:undefined
+ t2 cf:1 ax:10 b:undefined
+ t3 cf:1 ax:10 b:undefined
+ t4 cf:1 ax:10 b:undefined
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/test.toml b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/test.toml
+index b79f9a570..95e2b123b 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/test.toml
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_frame1_stop/test.toml
+@@ -1 +1,7 @@
+ num_frames = 10
++
++# s27 w2-loaded-shell-land: output.txt re-derived for the FLASH direct-loadMovie
++# delivery tick (a load issued in tick N delivers after the root's tick-N+1
++# scripts; Flash Player 32 captures of avm1_loaded_timeline_holder /
++# _shell_consumers / _bare_goto / _unload_shell). The previous golden followed
++# Ruffle's one-tick-earlier delivery. PREDICTED pending a Flash capture.
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/output.txt b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/output.txt
+index 5c6fb078b..953b12b52 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/output.txt
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/output.txt
+@@ -1,25 +1,25 @@
++t1 cf:0 ax:undefined
+ L1
+-t1 cf:1 ax:10
++t2 cf:1 ax:10
+ L2
+-t2 cf:2 ax:20
+-L3
+-t3 cf:3 ax:30
++t3 cf:2 ax:20
+ stop
+-t4 cf:3 ax:30
+-t5 cf:3 ax:30
+-t6 cf:3 ax:30
++t4 cf:2 ax:20
++t5 cf:2 ax:20
++t6 cf:2 ax:20
+ play
++L3
++t7 cf:3 ax:30
+ L4
+-t7 cf:4 ax:40
++t8 cf:4 ax:40
+ L5
+-t8 cf:5 ax:50
++t9 cf:5 ax:50
+ L6
+-t9 cf:6 ax:60
++t10 cf:6 ax:60
+ L1
+-t10 cf:1 ax:10
+-L2
+-t11 cf:2 ax:20
++t11 cf:1 ax:10
+ done
++L2
+ L3
+ L4
+ L5
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/test.toml b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/test.toml
+index 3b88eb49b..80f0f422b 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/test.toml
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_holder_stop/test.toml
+@@ -1 +1,7 @@
+ num_frames = 16
++
++# s27 w2-loaded-shell-land: output.txt re-derived for the FLASH direct-loadMovie
++# delivery tick (a load issued in tick N delivers after the root's tick-N+1
++# scripts; Flash Player 32 captures of avm1_loaded_timeline_holder /
++# _shell_consumers / _bare_goto / _unload_shell). The previous golden followed
++# Ruffle's one-tick-earlier delivery. PREDICTED pending a Flash capture.
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/output.txt b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/output.txt
+index c82196066..034a3597c 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/output.txt
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/output.txt
+@@ -1,34 +1,32 @@
++t1 f1:0 a:undefined b:undefined c:undefined ax:undefined | f2:0 p:undefined q:undefined | rf:1
+ c1
+ d1
+-t1 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:1 p:movieclip q:undefined | rf:1
++t2 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:1 p:movieclip q:undefined | rf:1
+ c2
+ d2
+-t2 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:2 p:movieclip q:movieclip | rf:1
++t3 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:2 p:movieclip q:movieclip | rf:1
+ c3
+ d1
+-t3 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:1 p:movieclip q:undefined | rf:1
++t4 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:1 p:movieclip q:undefined | rf:1
+ c1
+ d2
+-t4 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:2 p:movieclip q:movieclip | rf:1
++t5 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:2 p:movieclip q:movieclip | rf:1
+ c2
+ d1
+-t5 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:1 p:movieclip q:undefined | rf:1
++t6 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:1 p:movieclip q:undefined | rf:1
+ c3
+ d2
+-t6 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:2 p:movieclip q:movieclip | rf:1
++t7 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:2 p:movieclip q:movieclip | rf:1
+ c1
+ d1
+-t7 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:1 p:movieclip q:undefined | rf:1
++t8 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:1 p:movieclip q:undefined | rf:1
+ c2
+ d2
+-t8 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:2 p:movieclip q:movieclip | rf:1
++t9 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:2 p:movieclip q:movieclip | rf:1
++done
+ c3
+ d1
+-t9 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:1 p:movieclip q:undefined | rf:1
+-done
+ c1
+ d2
+ c2
+ d1
+-c3
+-d2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/test.toml b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/test.toml
+index b0e417313..1ba2b32e2 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/test.toml
++++ b/ruffle-tests/tests/swfs/regression/avm1_child_timeline_loop/test.toml
+@@ -1 +1,7 @@
+ num_frames = 12
++
++# s27 w2-loaded-shell-land: output.txt re-derived for the FLASH direct-loadMovie
++# delivery tick (a load issued in tick N delivers after the root's tick-N+1
++# scripts; Flash Player 32 captures of avm1_loaded_timeline_holder /
++# _shell_consumers / _bare_goto / _unload_shell). The previous golden followed
++# Ruffle's one-tick-earlier delivery. PREDICTED pending a Flash capture.
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..fec11e129f1f563276a4e576f9b4b5ed1a25b97d
+GIT binary patch
+literal 189
+zcmZ<@59Zj*z`&5fAn(Ayeu05Oj+w!k>Hq)#2F%mg85rV=^7Bg=WTvq&F!*FJV2b!n
+nV`X4SHq>Eo_h)cmAVrT6RF4@6_85coG%_(TGOz<}V_*OP`mrco
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/child2.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/child2.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..9029ab6697685833215ee7defebe01551fe216e1
+GIT binary patch
+literal 184
+zcmZ<@59Zjxz`&5fAn(Ayeu05Oj+w!k>Hq)#hRoC085rV=^7Bg=WTvq&F!-c1V2b!n
+fV`X4SG1Osj_h(^nU@#y-lMzT0iF%BodKef06=EmJ
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/child3.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/child3.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..3ce86676f58b2adf73e0849e64064186c0ab7dcd
+GIT binary patch
+literal 85
+zcmZ<@59SDEU|`5#kau8UzresC$H?H!^#A{VGv;aR3=Hu_`S~RbGSgTX7<{rBFh%^P
+Wu`)2E8tO2(`!_NHjbUeS0FnSo;SuWq
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/create_test_swf.py
+new file mode 100644
+index 000000000..be3912273
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/create_test_swf.py
+@@ -0,0 +1,54 @@
++#!/usr/bin/env python3
++r"""s27 w1-per-movie-dl-phase3: delivery-tick-INSENSITIVE rewrite of the held
++s26 fixture avm1_loaded_bare_goto. Same three child movies and the same bare
++gotos, but no row depends on WHEN a load lands in the tick or on the order of
++sibling movies / root within a tick (the two things Ruffle and our runtime
++disagree on, and the Flash order is not pinned by any corpus row). Each child
++appends to its own log on _root; the parent appends its own frame numbers;
++everything is traced once on the parent's frame 10.
++
++  P: 1..10 once each  -> no child goto leaked to the root playhead
++  h: c1,c2,c3,c2, pinned at 2   (bare gotoAndStop(2) from frame 3 runs frame 2's DoAction)
++  g: d1,d2, pinned at 2         (bare nextFrame() from frame 1 moves AND stops; d3 never)
++  k: e1, at 1                   (bare goto to the current frame, and the parent's
++                                 k.gotoAndStop(1), are no-ops)
++"""
++import sys
++from pathlib import Path
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa
++
++def app(var, s):
++    return set_member(get_var('_root'), var, concat(get_path('_root', var), s))
++
++def parent():
++    f1 = b''
++    for v in ('Lh', 'Lg', 'Lk', 'P'):
++        f1 += set_var(v, push(''))
++    for name, depth, url in (('h', 1, 'child.swf'), ('g', 2, 'child2.swf'), ('k', 3, 'child3.swf')):
++        f1 += call_method(get_var('_root'), 'createEmptyMovieClip', name, depth)
++        f1 += call_method(get_var(name), 'loadMovie', url)
++    f1 += app('P', '1,')
++    frames = [do_action(f1)]
++    for n in range(2, 11):
++        code = set_member(get_var('_root'), 'P', concat(get_path('_root', 'P'), get_path('_root', '_currentframe'), ','))
++        if n == 5:
++            code += call_method(get_var('k'), 'gotoAndStop', 1)
++        if n == 10:
++            code += trace_expr('P:', get_var('P'))
++            for h, v in (('h', 'Lh'), ('g', 'Lg'), ('k', 'Lk')):
++                code += trace_expr(h + ':', get_var(v), ' cf:', get_path(h, '_currentframe'))
++            code += STOP
++        frames.append(do_action(code))
++    swf_file(HERE / 'test.swf', frames, version=8)
++
++def children():
++    swf_file(HERE / 'child.swf', [do_action(app('Lh', 'c1,')), do_action(app('Lh', 'c2,')),
++                                  do_action(app('Lh', 'c3,') + goto_frame(1) + STOP)], version=8)
++    swf_file(HERE / 'child2.swf', [do_action(app('Lg', 'd1,') + NEXT_FRAME), do_action(app('Lg', 'd2,')),
++                                   do_action(app('Lg', 'd3,'))], version=8)
++    swf_file(HERE / 'child3.swf', [do_action(app('Lk', 'e1,') + goto_frame(0) + STOP)], version=8)
++
++if __name__ == '__main__':
++    children(); parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/output.txt
+new file mode 100644
+index 000000000..bc270fbbd
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/output.txt
+@@ -0,0 +1,4 @@
++P:1,2,3,4,5,6,7,8,9,10,
++h:c1,c2,c3,c2, cf:2
++g:d1,d2, cf:2
++k:e1, cf:1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b110b5feb0c4c50d0743d3738306c65fddf5230
+GIT binary patch
+literal 1415
+zcmd^9yH3ME5FBEH5f9Ok#yl!2gamYH5)^?8AXucJM3&#OlZ(s|#24@f*X5u1BFx^!
+z7M9~k2!#Ss`S#AUbGI|QR}X{rw<ZwcpbPyS*xx{}k!4v&o2~$26}Sl@8UXfG5R`+s
+z2sFSd)=lVygrGe_QY67b2Od+#I1I51IH_lI?{YZiueWRxdA%eW<Gv*}=_rg6_vGot
+zSJ<yihCED|?J9u$xkyb!bgLrz9?@1#bT-En&<$&th(tY!p8PYW^EsxthN*P>Sxu`O
+zeW}9fG0Z!3(b29ewOs@%rP(1RoaZ$4M%+*Bp@+UHwfbWz`BEP)HC0wCzElt?&o)_$
+zadt6s2b@WV{_mpyg4;fpt0Ogs)mDva!7z_xvxF4S#+YG>HQ><k+fbGdN#UAqP^chB
+a(Kx7}<bYU&igOfsr-G7hszd4IDBu&_6GcD(
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/test.toml
+new file mode 100644
+index 000000000..145dfa073
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto_seq/test.toml
+@@ -0,0 +1,4 @@
++num_frames = 12
++
++# GOLDEN: Flash Player 32 (LNX 32,0,0,465) direct-mode trace, prefix to num_frames
++# (SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-per-movie-dl-phase3/avm1_loaded_bare_goto_seq/flash.direct.txt).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..f9135d9d8bb555b4ebaaff841f463dbb04b86fb3
+GIT binary patch
+literal 129
+zcmZ<@59VlOU|`5#kau8UzresC$H?H!^#A|=6P%0;j0_Gysr_u8Kyn#~%fgTdWHLdq
+w9*~~K&cF~~l%HS1ATy1bfgul5z;7BW13M#7sk=XrU|{HEQ)2=fl>{~&0MOPHga7~l
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/create_test_swf.py
+new file mode 100644
+index 000000000..902d36832
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/create_test_swf.py
+@@ -0,0 +1,44 @@
++#!/usr/bin/env python3
++r"""s27 w1-per-movie-dl-phase3: delivery-tick-insensitive rewrite of the held
++s26 fixture avm1_loaded_shell_consumers. The only Ruffle-runner disagreement
++there was ONE extra leading `cx` (our load lands a tick earlier). Here the
++child clip's enterFrame bumps _root.n instead of tracing, and the parent
++traces the per-tick DELTA from frame 3 on: one enterFrame per tick for a live
++shell child is all that row grades, whenever the load landed.
++"""
++import sys
++from pathlib import Path
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa
++SUBTRACT = bytes([0x0B])
++
++def parent():
++    defs = define_sprite(2, [b''])
++    f1 = place_object2(2, char_id=2, name='px', tx=0, ty=0)
++    f1 += do_action(set_var('n', push(0)) + set_var('m', push(0))
++                    + call_method(get_var('_root'), 'createEmptyMovieClip', 'h', 1)
++                    + call_method(get_var('h'), 'loadMovie', 'child.swf'))
++    frames = [f1, do_action(set_var('m', get_var('n')))]
++    for n in range(3, 7):
++        code = trace_expr('t', get_path('_root', '_currentframe'), ' d:', get_var('n') + get_var('m') + SUBTRACT)
++        code += set_var('m', get_var('n'))
++        code += for_in_concat(get_var('h'), 's') + trace_expr('in:', get_var('s'))
++        code += trace_expr('ev:', get_var('h.a') + TYPEOF,
++                           ' sl:', get_var('/h/b') + TYPEOF,
++                           ' sp:', get_var('/px') + TYPEOF,
++                           ' tp:', get_path('h', 'a') + TARGET_PATH)
++        if n == 6:
++            code += STOP
++        frames.append(do_action(code))
++    swf_file(HERE / 'test.swf', frames, version=8, prefix=defs)
++
++def child():
++    defs = define_sprite(1, [b''])
++    bump = set_member(get_var('_root'), 'n', concat(get_path('_root', 'n')) + push(1) + ADD2)
++    f1 = place_object2(1, char_id=1, name='a', tx=0, ty=0, clip_actions=[(EV_ENTER_FRAME, bump)])
++    f1 += place_object2(2, char_id=1, name='b', tx=0, ty=0)
++    swf_file(HERE / 'child.swf', [f1], version=8, prefix=defs)
++
++if __name__ == '__main__':
++    child(); parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/output.txt
+new file mode 100644
+index 000000000..defb3f39f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/output.txt
+@@ -0,0 +1,12 @@
++t3 d:0
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++t4 d:1
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++t5 d:1
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++t6 d:1
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..19c0a68375e8c3359e1089847556d70a0cdce8e8
+GIT binary patch
+literal 1245
+zcmeHGy-tHr7(HCDXgYM$<)WRKOxe4%Nv*`e4jSWVu+TulUjVB<fyM{8iG%OsXxx1f
+z9q_vsn%ZZu6P$C;{m%Ig;q>})_sal69F1Xq0EZn+SY6ledkh-J0A4ya1A~G50VDmH
+z7@-3x#12dXup~_WK;pGl6)KuZMB1Ao%PMfO56p|etAc5gSC8k}G72Vfl;h$+bm=IJ
+zVt-KHFVx-jBrXr*%=6U+5>vXK-kPgK+#+hEf4An<hG~!d=XXUBq}8JEk^nQ8HbCDW
+z!fh7f%`Dz^?aiqYl@M|bwQLA}^+dsh26pzw&{vI+Lg_dOjb`RCT<ewLvzAU#I$SBp
+zfQVp81U<un2Y%v;4y7q$8He7S(79c+xnxP|&^K5~D@Bqe#gWb)W>eSRHn43#HSqJF
+K{{oXL0Db{1-ueOn
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/test.toml
+new file mode 100644
+index 000000000..cac172187
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers_seq/test.toml
+@@ -0,0 +1,4 @@
++num_frames = 7
++
++# GOLDEN: Flash Player 32 (LNX 32,0,0,465) direct-mode trace, prefix to num_frames
++# (SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-per-movie-dl-phase3/avm1_loaded_shell_consumers_seq/flash.direct.txt).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..b1a6b9932ab9f48d2b5e9d89de8b9334921067b8
+GIT binary patch
+literal 259
+zcmZ<@59VNIWMIf(kau8UzresC$Hd^w^#A|=6P%0;j0_G83=ExYY9J;HLm`7bb0Sb+
+z8VdtMkrl%<b_Ry{qWt_41{sh@K?Q@Ki~BTI1_p&<D+Vw_A1EdR6)OaZF*5)S0g12y
+gRh58+fUJ^?%wnJ!U`e16YCv1<nUm;X5j)s_0L!m41^@s6
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/create_test_swf.py
+new file mode 100644
+index 000000000..02a31f3d2
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/create_test_swf.py
+@@ -0,0 +1,32 @@
++#!/usr/bin/env python3
++r"""s27 w1-per-movie-dl-phase3 probe: while a loaded movie's frame runs (its
++list swapped in as the active display list), does a ROOT-timeline child
++resolve through _root? Shell holder (createEmptyMovieClip) and timeline
++holder. Rows are traced from the CHILD's frame 1 and 2, so they run inside the
++swap. `px` is a root timeline sprite; the child also places its own `q`.
++"""
++import sys
++from pathlib import Path
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa
++
++def parent():
++    defs = define_sprite(2, [b''])
++    f1 = place_object2(1, char_id=2, name='px', tx=0, ty=0)
++    f1 += place_object2(2, char_id=2, name='th', tx=0, ty=0)
++    f1 += do_action(call_method(get_var('_root'), 'createEmptyMovieClip', 'h', 1)
++                    + call_method(get_var('h'), 'loadMovie', 'child.swf')
++                    + call_method(get_var('th'), 'loadMovie', 'child.swf'))
++    frames = [f1] + [do_action(b'')] * 3 + [do_action(STOP)]
++    swf_file(HERE / 'test.swf', frames, version=8, prefix=defs)
++
++def child():
++    defs = define_sprite(1, [b''])
++    row = trace_expr('r:', get_path('_root', 'px') + TYPEOF, ' s:', get_var('/px') + TYPEOF,
++                     ' q:', get_var('q') + TYPEOF, ' tq:', get_path('this', 'q') + TYPEOF)
++    f1 = place_object2(1, char_id=1, name='q', tx=0, ty=0) + do_action(row)
++    swf_file(HERE / 'child.swf', [f1, do_action(row + STOP)], version=8, prefix=defs)
++
++if __name__ == '__main__':
++    child(); parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/output.txt
+new file mode 100644
+index 000000000..2d29231eb
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/output.txt
+@@ -0,0 +1,4 @@
++r:movieclip s:movieclip q:movieclip tq:movieclip
++r:movieclip s:movieclip q:movieclip tq:movieclip
++r:movieclip s:movieclip q:movieclip tq:movieclip
++r:movieclip s:movieclip q:movieclip tq:movieclip
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..e637087438cae32faab44abc017de06c3cd81003
+GIT binary patch
+literal 242
+zcmZ<@59av9z`&5fAn(Ayeu05Oj+Mcg>Hq)#CpeiH7#SRZQeA9nj0{W+EDQw|AT|@2
+zU6R3I&pZPtJB^iroe@McgA4)jm_R&s28Q^e{QMFInQ3AS49P{Qi6yD7xdkPazWHUD
+zsm?i>1q?yr)3||B8JRgLdd1~wXeP;kBy;i;Q@|Q<D`sI}0J;T3HPGdZ%qRpCGdtKj
+E02+xgMgRZ+
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/test.toml
+new file mode 100644
+index 000000000..9706742df
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_root_lookup/test.toml
+@@ -0,0 +1,4 @@
++num_frames = 6
++
++# GOLDEN: Flash Player 32 (LNX 32,0,0,465) direct-mode trace, prefix to num_frames
++# (SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-per-movie-dl-phase3/avm1_loaded_shell_root_lookup/flash.direct.txt).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..7c502e5b2ae022382d43989286d146bc2967a8a5
+GIT binary patch
+literal 124
+zcmZ<@59X+0U|`5#kau8UzresC$IRf&^#A|=6P%0;j0_Gysctqk5L0X#149La6!SDz
+r28Luq1%_$NAim5r76yj+3I;!SHK1astPyruE@qJ8WMc+3cCf(!rA8GS
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/create_test_swf.py
+new file mode 100644
+index 000000000..ec83b4aea
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/create_test_swf.py
+@@ -0,0 +1,71 @@
++#!/usr/bin/env python3
++r"""Build test.swf + child.swf for regression/avm1_loaded_timeline_holder
++(s26 w2-loaded-shell-phase2, phase 3).
++
++WHAT THIS PINS DOWN
++-------------------
++**A movie loaded into a TIMELINE-placed clip (the holder HAS a display_obj)
++places its frame-1 children into that clip's own list, the same list its
++frames 2..N use.** Before, both loaders ran frame 1 against whatever list was
++active (the parent's), while actionAdvancePlayingLevels ran frames 2..N in the
++holder's sprite list -- so frame 1's PlaceObject2 at depth 1 collided with
++the PARENT's depth-1 clip (refused, "Failed to place object at depth 1."), and
++the loaded movie's `x` was never its own.
++
++THE SHAPE
++---------
++    parent test.swf (SWF8, 5 frames)
++      f1: sprite `x`@1 at (10,0) ; empty sprite `t`@2 ; t.loadMovie(child.swf)
++      f2..f5: trace t<N> tt:<typeof t.x> tf:<t._currentframe>
++    child.swf (SWF8, 3 frames)
++      f1: sprite `x`@1 at (30,0); trace c1 <x._x>
++      f2: trace c2 <x._x>        f3: trace c3; stop()
++
++  * `c1 30` / `c2 30`: the child's `x` is its own (not the parent's 10, and
++    not undefined on frame 2 -- frames 2..N already used the holder's list).
++  * no "Warning: Failed to place object at depth 1." line.
++  * NOT asserted: the parent-side reads `t.x._x` / `_root.x._x`. They still
++    alias (the `_x` getter and child-MC identity are keyed on the instance
++    NAME, and root's `x` and the loaded movie's `x` share it); reported as a
++    lead in the w2 report. Flash: 30 and 10.
++
++GOLDEN: output.txt is PREDICTED; see LOCAL ORACLE REQUESTS in
++SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
++"""
++import sys
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa: E402,F401,F403
++
++
++def parent():
++    defs = define_sprite(2, [b''])
++    f1 = place_object2(1, char_id=2, name='x', tx=200, ty=0)
++    f1 += place_object2(2, char_id=2, name='t', tx=0, ty=0)
++    f1 += do_action(call_method(get_var('t'), 'loadMovie', 'child.swf'))
++    frames = [f1]
++    for n in range(2, 6):
++        code = trace_expr('t', get_path('_root', '_currentframe'),
++                          ' tt:', get_path('t', 'x') + TYPEOF,
++                          ' tf:', get_path('t', '_currentframe'))
++        if n == 5:
++            code += STOP
++        frames.append(do_action(code))
++    swf_file(HERE / 'test.swf', frames, version=8, prefix=defs)
++
++
++def child():
++    defs = define_sprite(1, [b''])
++    swf_file(HERE / 'child.swf', [
++        place_object2(1, char_id=1, name='x', tx=600, ty=0)
++        + do_action(trace_expr('c1 ', get_path('x', '_x'))),
++        do_action(trace_expr('c2 ', get_path('x', '_x'))),
++        do_action(trace_str('c3') + STOP),
++    ], version=8, prefix=defs)
++
++
++if __name__ == '__main__':
++    child()
++    parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/output.txt
+new file mode 100644
+index 000000000..222dc8a53
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/output.txt
+@@ -0,0 +1,7 @@
++t2 tt:undefined tf:1
++c1 30
++t3 tt:movieclip tf:1
++c2 30
++t4 tt:movieclip tf:2
++c3
++t5 tt:movieclip tf:3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..a3dd1bbdfd4bf0ed1a56ed62ae961fb2e27e3fc8
+GIT binary patch
+literal 552
+zcmZ<@59ZKdVqnN%kau8UzresC$I9T$^#A|=6P!#8j0_G83=G|DYK#m_3_>Ru7%CV#
+z+0>YT92SNW20i9!+zbrK8JRgLdd1~w4AWQ{*cpN9r!g}CWo1B;Ir)hxzWHUDsSH8l
+zK(p+b)8O*c*clk&i}Le9D*1uT<kF&|)Vz|kqQu-(20!;{YzzzvB_&o2?l9wkrdBZc
+Yxj<#okYuoER~z=WrPC`U*};hb0G8u`eE<Le
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/test.toml
+new file mode 100644
+index 000000000..e13a7fb82
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_timeline_holder/test.toml
+@@ -0,0 +1,4 @@
++num_frames = 6
++
++# GOLDEN: Flash Player 32 (LNX 32,0,0,465) direct-mode trace, prefix to num_frames
++# (SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-per-movie-dl-phase3/avm1_loaded_timeline_holder/flash.direct.txt).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..086c419147c8de5906f4f6ad9c0497b8319d5815
+GIT binary patch
+literal 96
+zcmZ<@59UZ<U|`5#kau8UzresC$Hd^w^#A|=`3#H<5ez8|j1z#2|3DQ2yg+r8lI+?F
+qPv*#MZeX~`$pn;XXJcaoQY;J(KqcL5YK#m_3_>ST7!rX3ARz$G84?8m
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/create_test_swf.py
+new file mode 100644
+index 000000000..68c83ffd9
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/create_test_swf.py
+@@ -0,0 +1,48 @@
++#!/usr/bin/env python3
++r"""s27 w1-per-movie-dl-phase3: delivery-tick-insensitive rewrite of the held
++s26 fixture avm1_loaded_unload_shell. Only the parent traces, from frame 3 on,
++so no row depends on the load-delivery tick or the intra-tick order.
++
++Ruffle (current source, 1e604fa87 and the Feb-2026 build alike): a movie that a
++loader put into a clip is a ROOT clip (`replace_with_movie(.., is_root=true,
++..)` in loader.rs `movie_loader_data`), so `avm1_unload_movie` takes its
++`is_root()` arm and defers `avm1_unload` + `transform_to_unloaded_state` to a
++spawned future, i.e. to the next update. Ruffle's own comment there records
++that Flash applies the unloaded state ONE FRAME after unloadMovie even for a
++non-root clip (`movieclip_library_state_values`). So `b:` (read right after
++h.unloadMovie() in the same script) is still movieclip; t4 is undefined.
++"""
++import sys
++from pathlib import Path
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa
++
++def typeof_of(*path):
++    return get_path(*path) + TYPEOF
++
++def parent():
++    f1 = b''
++    for name, depth in (('h', 1), ('g', 2)):
++        f1 += call_method(get_var('_root'), 'createEmptyMovieClip', name, depth)
++        f1 += call_method(get_var(name), 'loadMovie', 'child.swf')
++    frames = [do_action(f1), do_action(b'')]
++    f3 = trace_expr('a:', typeof_of('h', 'a'))
++    f3 += call_method(get_var('h'), 'unloadMovie')
++    f3 += trace_expr('b:', typeof_of('h', 'a'), ' g:', typeof_of('g', 'a'))
++    frames.append(do_action(f3))
++    for n in (4, 5, 6):
++        code = trace_expr('t', get_path('_root', '_currentframe'),
++                          ' h:', typeof_of('h', 'a'), ' g:', typeof_of('g', 'a'))
++        if n == 6:
++            code += STOP
++        frames.append(do_action(code))
++    swf_file(HERE / 'test.swf', frames, version=8)
++
++def child():
++    defs = define_shape_rect(1, 40, 40, (255, 0, 0)) + define_sprite(2, [place_object2(1, char_id=1, tx=0, ty=0)])
++    swf_file(HERE / 'child.swf', [place_object2(1, char_id=2, name='a', tx=200, ty=200), b''],
++             version=8, prefix=defs)
++
++if __name__ == '__main__':
++    child(); parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/output.txt
+new file mode 100644
+index 000000000..35adafa22
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/output.txt
+@@ -0,0 +1,5 @@
++a:movieclip
++b:movieclip g:movieclip
++t4 h:undefined g:movieclip
++t5 h:undefined g:movieclip
++t6 h:undefined g:movieclip
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..021170c8edb43f86f11f853f3ee8dae1825914c7
+GIT binary patch
+literal 658
+zcmZ<@59XM}#K4fjAn(Ayeu05Oj*Y>Y>Hq)#_RN<V7#OCpGO#m(Xl9TS5D%!9VH!IF
+zLwr$wehGujG%*H-<f7EXl2q5+f|5$#{Ibkc=bX#}h9L22+(4;}%$yXx;_@^!lVm`W
+zIr)hxU=1L}Fr$GMrBltKbf5##EMjnAU}Odo_RQHJpRh16Bw9heCj;_jB7>icyBf$j
+zKxw!HF9Snq9*TQ`8j~<J0`)N{q+2n#gNy>%4mS~OWhB(d5|kk12Zm;HX;D#XUP)R}
+eVs0vfpF7x`45&F7NahT*1yMBg0Xr~^7#INF=8aqc
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/test.toml
+new file mode 100644
+index 000000000..fb29c1266
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_deferred/test.toml
+@@ -0,0 +1,4 @@
++num_frames = 7
++
++# GOLDEN: Flash Player 32 (LNX 32,0,0,465) direct-mode trace, prefix to num_frames
++# (SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-per-movie-dl-phase3/avm1_loaded_unload_deferred/flash.direct.txt).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/output.txt b/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/output.txt
+index fda5c5013..6bff24738 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/output.txt
++++ b/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/output.txt
+@@ -1,5 +1,5 @@
+ complete m cf:0 tf:4 fl:4 bt:35
+ init m cf:1 tf:4 fl:4 bt:35
+ m [tf:4 fl:4 bt:35]
+-d [tf:4 fl:4 bt:35]
++d [tf:1 fl:1 bt:0] [tf:4 fl:4 bt:35]
+ end m cf:4 d cf:4
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/test.toml b/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/test.toml
+index 071c36f74..ca920482f 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/test.toml
++++ b/ruffle-tests/tests/swfs/regression/avm1_mcl_holder_totalframes/test.toml
+@@ -1 +1,7 @@
+ num_frames = 20
++
++# s27 w2-loaded-shell-land: output.txt re-derived for the FLASH direct-loadMovie
++# delivery tick (a load issued in tick N delivers after the root's tick-N+1
++# scripts; Flash Player 32 captures of avm1_loaded_timeline_holder /
++# _shell_consumers / _bare_goto / _unload_shell). The previous golden followed
++# Ruffle's one-tick-earlier delivery. PREDICTED pending a Flash capture.

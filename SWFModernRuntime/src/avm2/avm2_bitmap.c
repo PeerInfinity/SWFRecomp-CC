@@ -2737,12 +2737,6 @@ static int bd_node_has_cm(const Avm2DisplayObjectExt* ext)
 	return 0;
 }
 
-// The ruffle-port kernels are no longer reached since s27 (draw() runs the
-// fb_* Flash model); kept as the documented ruffle reference.
-static uint32_t* bd_glowlike_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
-                                           const PixelRegion* region,
-                                           const Avm2FilterVal* f)
-	__attribute__((unused));
 static uint32_t* bd_convolve_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
                                            const PixelRegion* region,
                                            const Avm2FilterVal* f, int grow,
@@ -3501,205 +3495,6 @@ static uint32_t color_matrix_pixel(uint32_t straight, const float* m)
 	return CMK(out[0], out[1], out[2], out[3]);
 }
 
-// BlurFilter, on the CPU. Ruffle runs applyFilter through the RENDERER
-// (core/src/bitmap/operations.rs::apply_filter -> render/wgpu/src/filters/
-// blur.rs). We already own a bit-exact port of that kernel on the GPU side
-// (render_webgpu.c::blur_box_kernel + blur_wgsl), but it is wired only to the
-// stage-sized PlaceObject filter ping-pong (tag.c::renderer_run_blur) and so
-// cannot serve a BitmapData at the source's own size. This is the same
-// arithmetic on the CPU, which also keeps NO_GRAPHICS in lockstep with the
-// graphics build — applyFilter is observable through getPixel/getPixels, so
-// the two modes have to agree with or without a renderer.
-//
-// The kernel is a symmetric FRACTIONAL box: unit weights on taps -m..+m, the
-// quantized fraction `alpha` on the two outermost taps, divided by full_size,
-// floored to 1/255 after every pass to imitate FP's fixed-point accumulator.
-// blur.wgsl expresses that as three bilinear samples plus a loop; a sample
-// taken exactly between two texels returns their average, so the tap/weight
-// form below is algebraically identical (see blur_box_kernel's comments).
-typedef struct
-{
-	int m;             // unit-weight taps either side of the centre
-	int alpha255;      // the two outermost taps' weight, in 1/255 units
-	double full_size;  // window width; the weights sum to it
-} BlurKernel;
-
-// 0 when ruffle SKIPS this axis' pass entirely (a window of one texel or less
-// would only ever sample itself). NOT the same as an identity pass: if BOTH
-// axes skip, apply() returns None and the destination is never written.
-static int blur_kernel_for(double size, BlurKernel* k)
-{
-	float fs = (float) (size > 255.0 ? 255.0 : size);
-	if (!(fs > 1.0f)) return 0;
-	float radius = (fs - 1.0f) * 0.5f;
-	// ceil, not floor — with a whole-number radius this leaves alpha at 1 and
-	// fuses the outermost pair instead of wasting a tap (blur.rs' comment).
-	float mf = ceilf(radius) - 1.0f;
-	k->m = (int) mf;
-	k->alpha255 = (int) floorf((radius - mf) * 255.0f);
-	k->full_size = (double) fs;
-	return 1;
-}
-
-static int blur_clamp(int v, int n)
-{
-	return v < 0 ? 0 : (v >= n ? n - 1 : v);
-}
-
-// One axis. `in` is a grid of pitch `in_stride` and extent `in_w`x`in_h`; the
-// window read is `[start_x, start_x+out_w) x [start_y, start_y+out_h)` inside
-// it, with taps CLAMPED to that whole grid (ClampToEdge — the sampler ruffle
-// binds). `out` is the tightly packed out_w*out_h result. The two grids differ
-// only for the FIRST pass, which ruffle runs against the whole source TEXTURE
-// while rendering into a rect-sized target, so its taps reach the real pixels
-// around sourceRect rather than the rect's own edge colour.
-static void blur_axis_pass(const uint32_t* in, int in_stride, int in_w, int in_h,
-                           int start_x, int start_y, uint32_t* out,
-                           int out_w, int out_h, int horizontal,
-                           const BlurKernel* k)
-{
-	int m = k->m;
-	int alpha255 = k->alpha255;
-	// A LITERAL port of blur.wgsl's last line -- `floor(result * 255.0) / 255.0`
-	// with `result = total / filter_args.full_size` -- and of blur.rs:236-249's
-	// `alpha = ((radius - m) * 255.0).floor() / 255.0`.
-	//
-	// s15 deliberately departed on two counts (divide by the WEIGHT SUM, round
-	// to nearest) because those are energy-preserving: quantizing alpha down to
-	// 1/255 makes the weights sum to up to 2/255 LESS than full_size, so
-	// Ruffle's divide-by-full_size shrinks a uniform field every pass, and its
-	// floor costs another half level on top. That is a real bias -- but it is
-	// FLASH's bias, ruffle imitates it on purpose ("This rounding imitates the
-	// fixed-point computations of FP"), and it compounds over `quality` passes
-	// exactly as the goldens do. Modelling it over blur_quality's grid
-	// (BlurFilter(row, 1, col), so a horizontal-only blur) predicts a decay of
-	// 255 - 255*(wsum/full_size)^q that peaks at 9 levels on the EVEN blur
-	// sizes -- where radius is fractional and alpha255 == 127 -- and at 0 on the
-	// odd ones, where alpha255 == 255 and the weights sum to full_size exactly.
-	// blur_quality's board row was `excess 166 986, max_diff 9`: the model
-	// reproduces the maximum to the level.
-	//
-	// Measured on this tree (session 16, w2-gfx-filters), literal vs s15's form:
-	//
-	//   comparison                    s15 form            literal (this)   tol
-	//   visual/filters/blur_quality   fail 166 986 max 9  PASS 0 max 6      6
-	//   visual/filters/blur_pass_scaling  fail 18 582 max 6  PASS 0 max 3   3
-	//   visual/filters/blur_fractional    pass 0 max 5    pass 0 max 5      5
-	//
-	// i.e. +2 comparisons and no regression -- including on blur_fractional,
-	// which s15's own table predicted would break at 48 outliers / max 6. It
-	// does not move at all. Both of the surviving numbers sit exactly ON their
-	// budget (6 vs 6, 5 vs 5), so treat them as on-budget in any CI ledger.
-	//
-	// The GPU path (render_webgpu.c::blur_box_kernel) was always a faithful
-	// port and is untouched; the two are now the same arithmetic.
-	double denom = 255.0 * (double) k->full_size;
-	int axis_len = horizontal ? in_w : in_h;
-	int start_along = horizontal ? start_x : start_y;
-	int start_across = horizontal ? start_y : start_x;
-	int n_along = horizontal ? out_w : out_h;
-	int n_across = horizontal ? out_h : out_w;
-	size_t in_step_along = (size_t) (horizontal ? 1 : in_stride);
-	size_t in_step_across = (size_t) (horizontal ? in_stride : 1);
-	size_t out_step_along = (size_t) (horizontal ? 1 : out_w);
-	size_t out_step_across = (size_t) (horizontal ? out_w : 1);
-
-	for (int across = 0; across < n_across; across++)
-	{
-		const uint32_t* line = in + (size_t) (start_across + across) * in_step_across;
-		uint32_t* orow = out + (size_t) across * out_step_across;
-		// Running unit-weight window sum over taps [-m, +m]. Every pass ends
-		// in a floor(), so the inputs are always whole 0..255 channels and
-		// this stays exact integer arithmetic.
-		int32_t sum[4] = { 0, 0, 0, 0 };
-		for (int t = -m; t <= m; t++)
-		{
-			uint32_t c = line[(size_t) blur_clamp(start_along + t, axis_len) * in_step_along];
-			sum[0] += (int32_t) CA(c); sum[1] += (int32_t) CR(c);
-			sum[2] += (int32_t) CG(c); sum[3] += (int32_t) CB(c);
-		}
-		for (int i = 0; i < n_along; i++)
-		{
-			uint32_t lo = line[(size_t) blur_clamp(start_along + i - m - 1, axis_len) * in_step_along];
-			uint32_t hi = line[(size_t) blur_clamp(start_along + i + m + 1, axis_len) * in_step_along];
-			int32_t frac[4] = {
-				(int32_t) CA(lo) + (int32_t) CA(hi), (int32_t) CR(lo) + (int32_t) CR(hi),
-				(int32_t) CG(lo) + (int32_t) CG(hi), (int32_t) CB(lo) + (int32_t) CB(hi)
-			};
-			uint32_t ch[4];
-			for (int c = 0; c < 4; c++)
-			{
-				// Numerator in 1/255 units so it stays an exact integer:
-				// (unit_sum + alpha*(lo+hi)) / full_size, alpha = alpha255/255.
-				int32_t num = 255 * sum[c] + alpha255 * frac[c];
-				double v = floor((double) num / denom);
-				if (!(v > 0.0)) v = 0.0;
-				if (v > 255.0) v = 255.0;
-				ch[c] = (uint32_t) v;
-			}
-			orow[(size_t) i * out_step_along] = CMK(ch[1], ch[2], ch[3], ch[0]);
-			if (i + 1 < n_along)
-			{
-				uint32_t drop = line[(size_t) blur_clamp(start_along + i - m, axis_len) * in_step_along];
-				uint32_t add = line[(size_t) blur_clamp(start_along + i + 1 + m, axis_len) * in_step_along];
-				sum[0] += (int32_t) CA(add) - (int32_t) CA(drop);
-				sum[1] += (int32_t) CR(add) - (int32_t) CR(drop);
-				sum[2] += (int32_t) CG(add) - (int32_t) CG(drop);
-				sum[3] += (int32_t) CB(add) - (int32_t) CB(drop);
-			}
-		}
-	}
-}
-
-// Blur `region` of `src` into a freshly allocated region-sized buffer of
-// PREMULTIPLIED pixels (the form both our storage and ruffle's GPU textures
-// use, so no un/re-multiply round trip belongs here). The result is the source
-// rect's own size — blur.rs' ping-pong targets are exactly source.size, no
-// filter grows the rect.
-//
-// NULL when no pass runs at all (quality 0, or both axes <= 1 texel): ruffle's
-// apply() returns None there and apply_filter leaves the DESTINATION
-// UNTOUCHED, which is not the same as copying the source across.
-static uint32_t* bd_blur_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
-                                       const PixelRegion* region,
-                                       const Avm2FilterVal* f)
-{
-	int rw = (int) pr_w(region), rh = (int) pr_h(region);
-	if (rw <= 0 || rh <= 0) return NULL;
-	BlurKernel kx, ky;
-	int has_x = blur_kernel_for((double) f->blur_x / 65536.0, &kx);
-	int has_y = blur_kernel_for((double) f->blur_y / 65536.0, &ky);
-	if (f->quality == 0 || (!has_x && !has_y)) return NULL;
-
-	size_t n = (size_t) rw * (size_t) rh;
-	uint32_t* cur = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
-	uint32_t* other = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
-	int first = 1;
-	for (uint8_t q = 0; q < f->quality; q++)
-	{
-		for (int axis = 0; axis < 2; axis++)
-		{
-			int horizontal = (axis == 0);
-			if (!(horizontal ? has_x : has_y)) continue;
-			const BlurKernel* k = horizontal ? &kx : &ky;
-			if (first)
-			{
-				blur_axis_pass(src->pixels, (int) src->width, (int) src->width,
-				               (int) src->height, (int) region->x_min,
-				               (int) region->y_min, cur, rw, rh, horizontal, k);
-				first = 0;
-			}
-			else
-			{
-				blur_axis_pass(cur, rw, rw, rh, 0, 0, other, rw, rh, horizontal, k);
-				uint32_t* swap = cur; cur = other; other = swap;
-			}
-		}
-	}
-	heap_free(ctx->app, other);
-	return cur;
-}
-
 // DisplacementMapFilter, on the CPU — the same pass as ruffle's
 // render/wgpu/shaders/filter/displacement_map.wgsl at viewscale 1 (applyFilter
 // carries no stage scale; *_scales_with_screen is the render-time route, which
@@ -3828,164 +3623,17 @@ static uint32_t* bd_displace_source_region(Avm2Context* ctx, Avm2BitmapDataExt* 
 	return out;
 }
 
-// ---------------------------------------------------------------------------
-// Glow / DropShadow / Bevel on the CPU (s26 w2-avm2-applyfilter-kernels).
-//
-// A straight port of ruffle's wgpu passes: render/wgpu/src/filters/{glow,
-// drop_shadow,bevel}.rs plus shaders/filter/{glow,bevel}.wgsl. Ruffle is the
-// oracle for applyFilter here (its GPU path IS its applyFilter), and per cell
-// it lands on the same count against Flash as our blur cells already do.
-//
-// Conventions, straight from the passes:
-//   * the blur is the existing bd_blur_source_region (blur.rs: a source.size
-//     target), or, when no blur pass runs, the WHOLE source texture;
-//   * blur_uv = (source pixel centre + offset) / SOURCE TEXTURE size, sampled
-//     NEAREST + clamp, and an out-of-0..1 uv reads 0 (the shader's own test).
-//     Note the blurred texture is source.size, so a sub-rect source indexes it
-//     with whole-texture uv: that is ruffle's own quirk, kept verbatim;
-//   * colours and the source are premultiplied; the output is the shader's
-//     vec4 written to an Rgba8Unorm target (saturate, round to nearest);
-//   * DropShadow = Glow at (-cos(angle) * distance, -sin(angle) * distance),
-//     composite_source = !hideObject; AS3 GlowFilter always composites.
-//     Bevel samples the blur at +offset (highlight side) and -offset (shadow).
-// The output is a region-sized PREMULTIPLIED buffer, the same contract as the
-// blur and displacement arms, so bd_apply_filter copies it the same way.
-// ---------------------------------------------------------------------------
-
-static float fk_sat(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
-
-static uint32_t fk_unorm(float v)
-{
-	return (uint32_t) floorf(fk_sat(v) * 255.0f + 0.5f);
-}
-
-static uint32_t fk_store(const float c[4])
-{
-	return CMK(fk_unorm(c[0]), fk_unorm(c[1]), fk_unorm(c[2]), fk_unorm(c[3]));
-}
-
-typedef struct
-{
-	const uint32_t* px;
-	int w, h;
-} FkTex;
-
-// textureSample(blurred, nearest-clamp, uv).a with the shader's 0..1 test.
-static float fk_blur_alpha(const FkTex* t, float u, float v)
-{
-	if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) return 0.0f;
-	int x = (int) floorf(u * (float) t->w), y = (int) floorf(v * (float) t->h);
-	if (x < 0) x = 0; else if (x >= t->w) x = t->w - 1;
-	if (y < 0) y = 0; else if (y >= t->h) y = t->h - 1;
-	return (float) CA(t->px[(size_t) y * (size_t) t->w + (size_t) x]) / 255.0f;
-}
-
+// s27 w2b-filter-kernels-residual: the ruffle-port CPU kernels that lived
+// here (BlurKernel / blur_axis_pass / bd_blur_source_region, the fk_* shader
+// helpers and bd_glowlike_source_region; s26 w2-avm2-applyfilter-kernels)
+// went unreached once s27 moved applyFilter and draw() onto the fb_* FLASH
+// model below, and were deleted. Their ruffle sources of record are
+// render/wgpu/src/filters/{blur,glow,drop_shadow,bevel}.rs and
+// shaders/filter/{blur,glow,bevel}.wgsl; git history has the port.
 static int fk_is_glowlike(uint8_t kind)
 {
 	return kind == AVM2_FILTER_GLOW || kind == AVM2_FILTER_DROP_SHADOW
 	       || kind == AVM2_FILTER_BEVEL;
-}
-
-static uint32_t* bd_glowlike_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
-                                           const PixelRegion* region,
-                                           const Avm2FilterVal* f)
-{
-	int rw = (int) pr_w(region), rh = (int) pr_h(region);
-	if (rw <= 0 || rh <= 0 || src->width == 0 || src->height == 0) return NULL;
-	uint32_t* blurred = bd_blur_source_region(ctx, src, region, f);
-	FkTex bt;
-	if (blurred != NULL) { bt.px = blurred; bt.w = rw; bt.h = rh; }
-	else { bt.px = src->pixels; bt.w = (int) src->width; bt.h = (int) src->height; }
-
-	float sw = (float) src->width, sh = (float) src->height;
-	float dist = (float) ((double) f->distance / 65536.0);
-	float ang = (float) ((double) f->angle / 65536.0);
-	float offx = 0.0f, offy = 0.0f;
-	if (f->kind == AVM2_FILTER_DROP_SHADOW)
-	{
-		offx = -(cosf(ang) * dist);
-		offy = -(sinf(ang) * dist);
-	}
-	else if (f->kind == AVM2_FILTER_BEVEL)
-	{
-		offx = cosf(ang) * dist;
-		offy = sinf(ang) * dist;
-	}
-	float strength = (float) f->strength / 256.0f;
-	int knockout = f->knockout != 0;
-	// Glow colour: straight rgb, its alpha folded in by the shader.
-	float gc[4] = { (float) CR(f->color) / 255.0f, (float) CG(f->color) / 255.0f,
-	                (float) CB(f->color) / 255.0f, (float) f->alpha / 255.0f };
-	// Bevel colours: premultiplied on the host (bevel.rs).
-	float hi[4] = { (float) CR(f->color2) / 255.0f, (float) CG(f->color2) / 255.0f,
-	                (float) CB(f->color2) / 255.0f, (float) f->alpha2 / 255.0f };
-	float sh_c[4] = { gc[0], gc[1], gc[2], gc[3] };
-	for (int i = 0; i < 3; i++) { hi[i] *= hi[3]; sh_c[i] *= sh_c[3]; }
-	int composite = 1;
-	if (f->kind == AVM2_FILTER_DROP_SHADOW) composite = !f->hide_object;
-	int bevel_type = f->on_top ? 2 : (f->inner ? 1 : 0);
-
-	size_t n = (size_t) rw * (size_t) rh;
-	uint32_t* out = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
-	for (int y = 0; y < rh; y++)
-	{
-		float cy = (float) region->y_min + (float) y + 0.5f;
-		for (int x = 0; x < rw; x++)
-		{
-			float cx = (float) region->x_min + (float) x + 0.5f;
-			uint32_t dr = bd_get_raw(src, region->x_min + (uint32_t) x,
-			                         region->y_min + (uint32_t) y);
-			float d[4] = { (float) CR(dr) / 255.0f, (float) CG(dr) / 255.0f,
-			               (float) CB(dr) / 255.0f, (float) CA(dr) / 255.0f };
-			float c[4];
-			if (f->kind == AVM2_FILTER_BEVEL)
-			{
-				float bl = fk_blur_alpha(&bt, (cx + offx) / sw, (cy + offy) / sh);
-				float br = fk_blur_alpha(&bt, (cx - offx) / sw, (cy - offy) / sh);
-				float ha = fk_sat((bl - br) * strength);
-				float sa = fk_sat((br - bl) * strength);
-				float g[4];
-				for (int i = 0; i < 4; i++) g[i] = hi[i] * ha + sh_c[i] * sa;
-				int outer = (bevel_type == 0 || bevel_type == 2);
-				int inner = (bevel_type == 1 || bevel_type == 2);
-				for (int i = 0; i < 4; i++)
-				{
-					if (inner && outer)
-						c[i] = knockout ? g[i] : d[i] - d[i] * g[3] + g[i];
-					else if (inner)
-						c[i] = knockout ? g[i] * d[3] : g[i] * d[3] + d[i] * (1.0f - g[3]);
-					else
-						c[i] = knockout ? g[i] - g[i] * d[3] : d[i] + g[i] - g[i] * d[3];
-				}
-			}
-			else
-			{
-				float blur = fk_blur_alpha(&bt, (cx + offx) / sw, (cy + offy) / sh);
-				float col[4] = { gc[0], gc[1], gc[2], 1.0f };
-				if (f->inner)
-				{
-					float a = gc[3] * fk_sat((1.0f - blur) * strength);
-					for (int i = 0; i < 4; i++)
-						c[i] = (!knockout && composite)
-						       ? col[i] * a * d[3] + d[i] * (1.0f - a)
-						       : col[i] * a * d[3];
-				}
-				else
-				{
-					float a = gc[3] * fk_sat(blur * strength);
-					for (int i = 0; i < 4; i++)
-					{
-						if (knockout) c[i] = col[i] * a * (1.0f - d[3]);
-						else if (composite) c[i] = col[i] * a * (1.0f - d[3]) + d[i];
-						else c[i] = col[i] * a;
-					}
-				}
-			}
-			out[(size_t) y * (size_t) rw + (size_t) x] = fk_store(c);
-		}
-	}
-	if (blurred != NULL) heap_free(ctx->app, blurred);
-	return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -4127,9 +3775,8 @@ static void bd_apply_convolution(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 // does NOT match visual/filters/blur_quality at quality >= 7: that golden
 // disagrees with blur_fractional's on the IDENTICAL filter (BlurFilter(n,1,1)
 // on the same image; +1 on ~95% of channels, compounding per pass), so no
-// single model fits both. Where it departs from the ruffle port above
-// (bd_blur_source_region / bd_glowlike_source_region; since s27 draw()'s
-// filter layer runs this model too):
+// single model fits both. Where it departs from ruffle's blur.rs / glow.rs
+// passes (since s27 draw()'s filter layer runs this model too):
 //   * the blur runs over the WHOLE source bitmap, transparent only outside
 //     the bitmap itself (filter_sourcerect: real pixels beyond a sub-rect
 //     sourceRect bleed into the edge), and the OUTPUT is the sourceRect GROWN
@@ -4144,7 +3791,7 @@ static void bd_apply_convolution(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 //     rect is the source rect grown by the blur reach shifted by the
 //     TRUNCATED offset (DropShadow 4 @ 45deg, blur 4: +0 left/top, +4
 //     right/bottom; Bevel the same reach on every side). The colour maths
-//     after the sample is the ruffle shader's (bd_glowlike_source_region).
+//     after the sample is Flash's integer model (fb_glow_composite; s27).
 // Scratch buffers are calloc'd (a quality-15 blur of 255 grows the rect by
 // ~1.9k px per side), and a failed allocation leaves the target untouched.
 // ---------------------------------------------------------------------------
@@ -4382,60 +4029,85 @@ static int fb_alpha_level(const uint32_t* g, int w, int h, double px, double py)
 	return (int) v;
 }
 
-static float fb_alpha_at(const uint32_t* g, int w, int h, double px, double py)
-{
-	return (float) fb_alpha_level(g, w, h, px, py) / 255.0f;
-}
-
 // x * a / 255, rounded (the 8-bit multiply of the Flash glow composite).
 static uint32_t fb_mul8(uint32_t x, uint32_t a)
 {
 	return (x * a + 127u) / 255u;
 }
 
-// Glow / DropShadow pixel, FLASH integer model (s27 w2-flash-filter-kernels,
-// fitted to the glow_kernels Flash rows: 37 -> 10 channel-pixels off, every
-// outer-glow row exact). `level` is the floored blur sample (of the INVERTED
-// alpha for an inner glow); the glow amount is floor(min(255, level *
-// strength) * alpha) with the colour alpha UNquantised -- (a + 1) / 256
-// recovers 0.5 and 0.75 from their truncated bytes 127 / 191, which the
-// `glow quality3 alpha.5` row needs (24 * 1.5 * 0.5 = 12, not 11.95 -> 11).
-// The colour and the composite are 8-bit multiplies on the premultiplied
-// source `dr`; inner = source-atop, outer = under the source.
-static uint32_t fb_glow_pixel(const Avm2FilterVal* f, int level, uint32_t dr,
-                              int composite)
+// Premultiply a gradient-table colour: (c * (a + 1)) >> 8 (s27
+// w2b-filter-kernels-residual, fitted on the gradientglow `full knockout`
+// Flash rows, where the glow is written bare: every channel of 16 px exact).
+static uint32_t fb_mul_grad(uint32_t c, uint32_t a)
 {
-	double al = f->alpha == 0 ? 0.0 : ((double) f->alpha + 1.0) / 256.0;
-	double st = (double) f->strength / 256.0;
-	double raw = (double) level * st;
-	if (raw > 255.0) raw = 255.0;
-	if (raw < 0.0) raw = 0.0;
-	uint32_t ga = (uint32_t) floor(raw * al + 1e-9);
-	if (ga > 255u) ga = 255u;
-	uint32_t cc[3] = { CR(f->color), CG(f->color), CB(f->color) };
+	return (c * (a + 1u)) >> 8;
+}
+
+// The Flash filter COMPOSITE of a glow layer onto the source pixel `dr`
+// (premultiplied), shared by Glow / DropShadow / Bevel and the two gradient
+// filters (s27 w2b-filter-kernels-residual). The layer is the straight colour
+// cc[] at alpha `ga`, premultiplied by `pmul`. Fitted on the Flash rows of
+// regression/avm2_applyfilter_glow_kernels (23/23 lines but 4 bevel px) and
+// avm2_applyfilter_gradient_opaque_probe:
+//   * INNER (source-atop): a straight-space lerp -- the source is
+//     un-premultiplied with Flash's own factors (unmul), s = (glow_c * 256 +
+//     src_c * (256 - ga)) >> 8, then re-premultiplied by the source alpha,
+//     rounded. A per-channel 8-bit multiply of the stored premultiplied value
+//     (s27 w2-flash-filter-kernels) cannot reproduce Flash: every inner glow /
+//     inner DS px was off by one there (provably no linear rounding fits);
+//     this form fits all 40 inner px of the fixture.
+//   * OUTER (under the source): glow * (256 - da) >> 8, plus the source. The
+//     /255 multiply left `dropshadow default` (9,6) one alpha level high.
+//   * FULL (on top, bevel / gradient "full"): glow + (src * (256 - ga)) >> 8.
+//   * knockout drops the source term; inner knockout is glow * da.
+// `composite` = 0 (DropShadow hideObject) writes the glow alone (inner: the
+// glow clipped to the source alpha).
+static uint32_t fb_glow_composite(const Avm2FilterVal* f, const uint32_t cc[3],
+                                  uint32_t ga, uint32_t dr, int composite,
+                                  uint32_t (*pmul)(uint32_t, uint32_t))
+{
 	uint32_t d[4] = { CA(dr), CR(dr), CG(dr), CB(dr) };
 	uint32_t o[4];
-	if (f->inner)
+	if (f->on_top)
 	{
-		uint32_t gA = fb_mul8(ga, d[0]);
-		o[0] = gA;
-		for (int i = 0; i < 3; i++) o[i + 1] = fb_mul8(cc[i], gA);
+		o[0] = ga;
+		for (int i = 0; i < 3; i++) o[i + 1] = pmul(cc[i], ga);
 		if (!f->knockout && composite)
 		{
-			uint32_t inv = 255u - ga;
-			for (int i = 0; i < 4; i++) o[i] += fb_mul8(d[i], inv);
+			for (int i = 0; i < 4; i++) o[i] += (d[i] * (256u - ga)) >> 8;
+		}
+	}
+	else if (f->inner)
+	{
+		if (d[0] == 0) return 0;
+		if (f->knockout || !composite)
+		{
+			uint32_t gA = fb_mul8(ga, d[0]);
+			o[0] = gA;
+			for (int i = 0; i < 3; i++) o[i + 1] = pmul(cc[i], gA);
+		}
+		else
+		{
+			uint32_t s = unmul(dr);
+			uint32_t sc[3] = { CR(s), CG(s), CB(s) };
+			o[0] = d[0];
+			for (int i = 0; i < 3; i++)
+			{
+				uint32_t v = (pmul(cc[i], ga) * 256u + sc[i] * (256u - ga)) >> 8;
+				if (v > 255u) v = 255u;
+				o[i + 1] = fb_mul8(v, d[0]);
+			}
 		}
 	}
 	else
 	{
 		o[0] = ga;
-		for (int i = 0; i < 3; i++) o[i + 1] = fb_mul8(cc[i], ga);
+		for (int i = 0; i < 3; i++) o[i + 1] = pmul(cc[i], ga);
 		if (composite || f->knockout)
 		{
-			uint32_t inv = 255u - d[0];
 			for (int i = 0; i < 4; i++)
 			{
-				o[i] = fb_mul8(o[i], inv);
+				o[i] = (o[i] * (256u - d[0])) >> 8;
 				if (!f->knockout) o[i] += d[i];
 			}
 		}
@@ -4444,8 +4116,109 @@ static uint32_t fb_glow_pixel(const Avm2FilterVal* f, int level, uint32_t dr,
 	return CMK(o[1], o[2], o[3], o[0]);
 }
 
-// Glow / DropShadow / Bevel over `region`, Flash model. Returns a calloc'd
-// premultiplied grid of the region grown by g[0..3] = left, top, right, bottom.
+// The glow amount: floor(min(255, level * strength) * alpha), the colour
+// alpha UNquantised -- (a + 1) / 256 recovers 0.5 and 0.75 from their
+// truncated bytes 127 / 191, which the `glow quality3 alpha.5` row needs
+// (24 * 1.5 * 0.5 = 12, not 11.95 -> 11).
+static uint32_t fb_glow_amount(double amount, uint8_t alpha)
+{
+	double al = alpha == 0 ? 0.0 : ((double) alpha + 1.0) / 256.0;
+	if (amount > 255.0) amount = 255.0;
+	if (amount < 0.0) amount = 0.0;
+	uint32_t ga = (uint32_t) floor(amount * al + 1e-9);
+	return ga > 255u ? 255u : ga;
+}
+
+// Glow / DropShadow pixel, FLASH integer model (s27 w2-flash-filter-kernels;
+// composites refitted in w2b-filter-kernels-residual). `level` is the floored
+// blur sample (of the INVERTED alpha for an inner glow).
+static uint32_t fb_glow_pixel(const Avm2FilterVal* f, int level, uint32_t dr,
+                              int composite)
+{
+	uint32_t ga = fb_glow_amount((double) level * ((double) f->strength / 256.0), f->alpha);
+	uint32_t cc[3] = { CR(f->color), CG(f->color), CB(f->color) };
+	return fb_glow_composite(f, cc, ga, dr, composite, fb_mul8);
+}
+
+// Bevel pixel, FLASH integer model (s27 w2b-filter-kernels-residual; was the
+// ruffle shader's float maths). b_l / b_r = the floored blur samples at
+// +offset / -offset; their difference times the strength is the highlight
+// (>= 0, colour2 / alpha2) or shadow (< 0, colour / alpha) amount, then
+// fb_glow_amount and the shared composite. Glow_kernels bevel rows: 7 -> 4
+// px off; the 4 left are at fractional offsets where Flash's own sample
+// lands one level the other side of an integer (unresolved).
+static uint32_t fb_bevel_pixel(const Avm2FilterVal* f, int b_l, int b_r, uint32_t dr)
+{
+	int diff = b_l - b_r;
+	double st = (double) f->strength / 256.0;
+	uint32_t col = diff >= 0 ? f->color2 : f->color;
+	uint8_t al = diff >= 0 ? f->alpha2 : f->alpha;
+	uint32_t ga = fb_glow_amount((double) (diff >= 0 ? diff : -diff) * st, al);
+	uint32_t cc[3] = { CR(col), CG(col), CB(col) };
+	return fb_glow_composite(f, cc, ga, dr, 1, fb_mul8);
+}
+
+// GradientGlow / GradientBevel colour table (s27 w2b-filter-kernels-residual,
+// fitted on the avm2_applyfilter_gradient_opaque_probe Flash rows): 256
+// STRAIGHT entries, each channel (alpha included) the floored linear lerp
+// between the two stops whose ratios bracket the index; before the first /
+// after the last stop it is that stop. lut[i] = 0xAARRGGBB.
+static void fb_grad_lut(const Avm2FilterVal* f, uint32_t lut[256])
+{
+	int n = f->grad_count;
+	for (int i = 0; i < 256; i++)
+	{
+		if (n == 0) { lut[i] = 0; continue; }
+		int k = 0;
+		while (k < n && f->grad_ratios[k] < i) k++;
+		int j = k == 0 ? 0 : k - 1;
+		if (k >= n) k = j = n - 1;
+		int rj = f->grad_ratios[j], rk = f->grad_ratios[k];
+		uint32_t c0 = f->grad_colors[j], c1 = f->grad_colors[k];
+		uint32_t v0[4] = { f->grad_alphas[j], CR(c0), CG(c0), CB(c0) };
+		uint32_t v1[4] = { f->grad_alphas[k], CR(c1), CG(c1), CB(c1) };
+		uint32_t v[4];
+		for (int c = 0; c < 4; c++)
+		{
+			if (j == k || rk == rj) v[c] = v1[c];
+			else v[c] = (v0[c] * (uint32_t) (rk - i) + v1[c] * (uint32_t) (i - rj))
+			            / (uint32_t) (rk - rj);
+		}
+		lut[i] = CMK(v[1], v[2], v[3], v[0]);
+	}
+}
+
+// One gradient-filter pixel. GradientGlow indexes the table with
+// min(255, floor(level * strength)), `level` = the blur of the (NOT inverted,
+// also for "inner") alpha at -offset, like DropShadow. GradientBevel indexes
+// it with floor(128 + (b_l - b_r) * strength / 2), the bevel samples. The
+// entry's alpha is the glow amount; table colours premultiply as
+// fb_mul_grad. Probe: all 6 GradientGlow rows and the inner / outer
+// GradientBevel rows exact; `gradientbevel full knockout` 2 px off (the same
+// fractional-offset sample residual as Bevel).
+static uint32_t fb_grad_pixel(const Avm2FilterVal* f, const uint32_t lut[256],
+                              int level, int b_l, int b_r, uint32_t dr)
+{
+	double st = (double) f->strength / 256.0;
+	int idx;
+	if (f->kind == AVM2_FILTER_GRADIENT_GLOW)
+	{
+		double v = floor((double) level * st + 1e-9);
+		idx = v > 255.0 ? 255 : (int) v;
+	}
+	else
+	{
+		double v = floor(128.0 + (double) (b_l - b_r) * st / 2.0 + 1e-9);
+		idx = v < 0.0 ? 0 : (v > 255.0 ? 255 : (int) v);
+	}
+	uint32_t e = lut[idx];
+	uint32_t cc[3] = { CR(e), CG(e), CB(e) };
+	return fb_glow_composite(f, cc, CA(e), dr, 1, fb_mul_grad);
+}
+
+// Glow / DropShadow / Bevel / GradientGlow / GradientBevel over `region`,
+// Flash model. Returns a calloc'd premultiplied grid of the region grown by
+// g[0..3] = left, top, right, bottom.
 static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* region,
                                     const Avm2FilterVal* f, int g[4])
 {
@@ -4455,6 +4228,8 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 	FlashBlurK kx, ky;
 	int has_x, has_y, ex, ey;
 	fb_reach(f, &kx, &ky, &has_x, &has_y, &ex, &ey);
+	int is_bevel = f->kind == AVM2_FILTER_BEVEL || f->kind == AVM2_FILTER_GRADIENT_BEVEL;
+	int is_grad = f->kind == AVM2_FILTER_GRADIENT_GLOW || f->kind == AVM2_FILTER_GRADIENT_BEVEL;
 
 	float dist = (float) ((double) f->distance / 65536.0);
 	float ang = (float) ((double) f->angle / 65536.0);
@@ -4465,12 +4240,15 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 		cy_off = sinf(ang) * dist;
 	}
 	int iox = (int) cx_off, ioy = (int) cy_off;   // truncated
-	if (f->kind == AVM2_FILTER_DROP_SHADOW)
+	if (f->kind == AVM2_FILTER_DROP_SHADOW || f->kind == AVM2_FILTER_GRADIENT_GLOW)
 	{
+		// GradientGlow carries a distance / angle and is offset exactly like a
+		// DropShadow (probe `gradientglow outer`: nothing left of x=5, the
+		// glow runs to x=19 on the right).
 		g[0] = ex - iox > 0 ? ex - iox : 0; g[2] = ex + iox > 0 ? ex + iox : 0;
 		g[1] = ey - ioy > 0 ? ey - ioy : 0; g[3] = ey + ioy > 0 ? ey + ioy : 0;
 	}
-	else if (f->kind == AVM2_FILTER_BEVEL)
+	else if (is_bevel)
 	{
 		g[0] = g[2] = ex + (iox < 0 ? -iox : iox);
 		g[1] = g[3] = ey + (ioy < 0 ? -ioy : ioy);
@@ -4485,24 +4263,20 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 	// offset plus one texel.
 	int mx = (g[0] > g[2] ? g[0] : g[2]) + (int) ceilf(fabsf(cx_off)) + 1;
 	int my = (g[1] > g[3] ? g[1] : g[3]) + (int) ceilf(fabsf(cy_off)) + 1;
-	int inner_glow = f->kind != AVM2_FILTER_BEVEL && f->inner;
+	// Only Glow / DropShadow read the inverted blur for "inner"; GradientGlow
+	// inner reads the plain blur (probe `gradientglow inner`: the source is
+	// untouched where the offset sample falls outside the object).
+	int inner_glow = (f->kind == AVM2_FILTER_GLOW || f->kind == AVM2_FILTER_DROP_SHADOW)
+	                 && f->inner;
 	uint32_t* bl = fb_blur_window_ex(src, region, f, mx, my, inner_glow);
 	if (bl == NULL) return NULL;
 	int bw = rw + 2 * mx, bh = rh + 2 * my;
 	uint32_t* out = (uint32_t*) calloc((size_t) ow * (size_t) oh, sizeof(uint32_t));
 	if (out == NULL) { free(bl); return NULL; }
-
-	float strength = (float) f->strength / 256.0f;
-	int knockout = f->knockout != 0;
-	float gc[4] = { (float) CR(f->color) / 255.0f, (float) CG(f->color) / 255.0f,
-	                (float) CB(f->color) / 255.0f, (float) f->alpha / 255.0f };
-	float hi[4] = { (float) CR(f->color2) / 255.0f, (float) CG(f->color2) / 255.0f,
-	                (float) CB(f->color2) / 255.0f, (float) f->alpha2 / 255.0f };
-	float sh_c[4] = { gc[0], gc[1], gc[2], gc[3] };
-	for (int i = 0; i < 3; i++) { hi[i] *= hi[3]; sh_c[i] *= sh_c[3]; }
+	uint32_t lut[256];
+	if (is_grad) fb_grad_lut(f, lut);
 	int composite = 1;
 	if (f->kind == AVM2_FILTER_DROP_SHADOW) composite = !f->hide_object;
-	int bevel_type = f->on_top ? 2 : (f->inner ? 1 : 0);
 
 	for (int oy = 0; oy < oh; oy++)
 	{
@@ -4519,39 +4293,23 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 			uint32_t dr = 0;
 			if (sx >= 0 && sy >= 0 && sx < (int64_t) src->width && sy < (int64_t) src->height)
 				dr = bd_get_raw(src, (uint32_t) sx, (uint32_t) sy);
-			float d[4] = { (float) CR(dr) / 255.0f, (float) CG(dr) / 255.0f,
-			               (float) CB(dr) / 255.0f, (float) CA(dr) / 255.0f };
-			float c[4];
-			if (f->kind == AVM2_FILTER_BEVEL)
+			uint32_t px;
+			if (is_bevel)
 			{
-				float b_l = fb_alpha_at(bl, bw, bh, bx + (double) cx_off, by + (double) cy_off);
-				float b_r = fb_alpha_at(bl, bw, bh, bx - (double) cx_off, by - (double) cy_off);
-				float ha = fk_sat((b_l - b_r) * strength);
-				float sa = fk_sat((b_r - b_l) * strength);
-				float gg[4];
-				for (int i = 0; i < 4; i++) gg[i] = hi[i] * ha + sh_c[i] * sa;
-				int outer = (bevel_type == 0 || bevel_type == 2);
-				int inner = (bevel_type == 1 || bevel_type == 2);
-				for (int i = 0; i < 4; i++)
-				{
-					if (inner && outer)
-						c[i] = knockout ? gg[i] : d[i] - d[i] * gg[3] + gg[i];
-					else if (inner)
-						c[i] = knockout ? gg[i] * d[3] : gg[i] * d[3] + d[i] * (1.0f - gg[3]);
-					else
-						c[i] = knockout ? gg[i] - gg[i] * d[3] : d[i] + gg[i] - gg[i] * d[3];
-				}
+				int b_l = fb_alpha_level(bl, bw, bh, bx + (double) cx_off, by + (double) cy_off);
+				int b_r = fb_alpha_level(bl, bw, bh, bx - (double) cx_off, by - (double) cy_off);
+				px = is_grad ? fb_grad_pixel(f, lut, 0, b_l, b_r, dr)
+				             : fb_bevel_pixel(f, b_l, b_r, dr);
 			}
 			else
 			{
 				// The shadow lands at +offset, so it samples the blur at -offset.
 				int level = fb_alpha_level(bl, bw, bh, bx - (double) cx_off,
 				                           by - (double) cy_off);
-				out[(size_t) oy * (size_t) ow + (size_t) ox] =
-					fb_glow_pixel(f, level, dr, composite);
-				continue;
+				px = is_grad ? fb_grad_pixel(f, lut, level, 0, 0, dr)
+				             : fb_glow_pixel(f, level, dr, composite);
 			}
-			out[(size_t) oy * (size_t) ow + (size_t) ox] = fk_store(c);
+			out[(size_t) oy * (size_t) ow + (size_t) ox] = px;
 		}
 	}
 	free(bl);
@@ -4559,8 +4317,15 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 }
 
 // Write a grown premultiplied grid whose top-left lands at (x0, y0) in `dst`,
-// clipped to it; an opaque target keeps alpha 0xFF (RGB stays premultiplied,
-// as the old blur arm and ruffle's copy_pixels_to_bitmapdata do).
+// clipped to it. An OPAQUE target composites the grid over its own pixel:
+// c + (dst * (255 - a)) >> 8, alpha 0xFF (s27 w2b-filter-kernels-residual,
+// Flash probe `blur trans->opaque`: ff1e253b over a white target, where the
+// old "keep RGB premultiplied" rule -- ruffle's copy_pixels_to_bitmapdata --
+// gave ff060d23; fitted on that one pixel, every channel exact). That form
+// would turn an untouched white texel (a = 0) into 0xFE, so a fully
+// transparent grid texel leaves the opaque target as it is (unmeasured;
+// session27-fanout-reports/w2b-filter-kernels-residual-fixtures/
+// avm2_applyfilter_opaque_target_probe asks Flash).
 static void fb_write_grid(Avm2BitmapDataExt* dst, const uint32_t* grid, int w, int h,
                           int64_t x0, int64_t y0)
 {
@@ -4573,13 +4338,23 @@ static void fb_write_grid(Avm2BitmapDataExt* dst, const uint32_t* grid, int w, i
 			int64_t tx = x0 + x;
 			if (tx < 0 || tx >= (int64_t) dst->width) continue;
 			uint32_t c = grid[(size_t) y * (size_t) w + (size_t) x];
-			bd_set_raw(dst, (uint32_t) tx, (uint32_t) ty,
-			           dst->transparency ? c : with_alpha(c, 0xFF));
+			if (!dst->transparency)
+			{
+				if (CA(c) == 0) continue;
+				uint32_t under = bd_get_raw(dst, (uint32_t) tx, (uint32_t) ty);
+				uint32_t inv = 255u - CA(c);
+				uint32_t r = CR(c) + ((CR(under) * inv) >> 8);
+				uint32_t gg = CG(c) + ((CG(under) * inv) >> 8);
+				uint32_t b = CB(c) + ((CB(under) * inv) >> 8);
+				c = CMK(r > 255u ? 255u : r, gg > 255u ? 255u : gg, b > 255u ? 255u : b, 0xFFu);
+			}
+			bd_set_raw(dst, (uint32_t) tx, (uint32_t) ty, c);
 		}
 	}
 }
 
-// Flash-model applyFilter for Blur and Glow/DS/Bevel. Returns 1 if handled.
+// Flash-model applyFilter for Blur, Glow/DS/Bevel and the two gradient
+// filters. Returns 1 if handled.
 static int fb_apply_grown(Avm2BitmapDataExt* dst, Avm2BitmapDataExt* src,
                           int32_t sx, int32_t sy, int32_t sw, int32_t sh,
                           int32_t dx, int32_t dy, const Avm2FilterVal* f)
@@ -4665,15 +4440,14 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 		return avm2_undefined();
 	}
 
-	// GradientGlow / GradientBevel / an empty-matrix Convolution: ruffle's
-	// is_filter_supported is false, so applyFilter falls through to
-	// copy_on_cpu(merge_alpha = false) -- "until we support these filters,
-	// treat this like a copy". (Before s26 a gradient filter WITH blur or
-	// distance was a no-op here, which matched neither ruffle nor Flash.)
-	// Convolution itself now convolves with Flash's semantics
-	// (bd_convolve_source_region); see RUFFLE_VS_FLASH_DIFFERENCES.md.
-	int passthrough = (f.kind == AVM2_FILTER_GRADIENT_GLOW
-	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL);
+	// An empty-matrix Convolution: ruffle's is_filter_supported is false, so
+	// applyFilter falls through to copy_on_cpu(merge_alpha = false) -- "until
+	// we support these filters, treat this like a copy". Convolution itself
+	// convolves with Flash's semantics (bd_convolve_source_region); see
+	// RUFFLE_VS_FLASH_DIFFERENCES.md. GradientGlow / GradientBevel were the
+	// same pass-through until s27 w2b-filter-kernels-residual; they now run
+	// the Flash kernels (fb_grad_pixel), like Flash and unlike ruffle.
+	int passthrough = 0;
 	int is_conv = (f.kind == AVM2_FILTER_CONVOLUTION);
 	if (is_conv && (f.conv_cols == 0 || f.conv_rows == 0 || f.conv_matrix == NULL))
 	{
@@ -4682,7 +4456,8 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	}
 	int is_blur = (f.kind == AVM2_FILTER_BLUR);
 	int is_displace = (f.kind == AVM2_FILTER_DISPLACEMENT_MAP);
-	int is_glow = fk_is_glowlike(f.kind);
+	int is_glow = fk_is_glowlike(f.kind) || f.kind == AVM2_FILTER_GRADIENT_GLOW
+	              || f.kind == AVM2_FILTER_GRADIENT_BEVEL;
 	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur && !is_displace
 	    && !is_glow && !is_conv)
 	{
@@ -4695,11 +4470,15 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 		avm2_filter_release(ctx, &f);
 		return avm2_undefined();
 	}
-	// Flash Player 32 throws Error #2077 for a Glow / DropShadow / Bevel onto
-	// an OPAQUE target (avm2_applyfilter_glow_kernels `glow to opaque`: the
-	// trace stops there with "Error: Error #2077: This filter operation
-	// cannot be performed with the specified input parameters."; ruffle
-	// writes the pixels). The target is left untouched.
+	// Flash Player 32 throws Error #2077 for a Glow / DropShadow / Bevel /
+	// GradientGlow / GradientBevel onto an OPAQUE target, whatever the source
+	// (avm2_applyfilter_glow_kernels `glow to opaque`: the trace stops there
+	// with "Error: Error #2077: This filter operation cannot be performed with
+	// the specified input parameters."; ruffle writes the pixels). The
+	// avm2_applyfilter_gradient_opaque_probe Flash capture pins the set: every
+	// glow-like kind (inner / knockout too) throws, an opaque SOURCE onto a
+	// transparent target does not, and Blur / ColorMatrix / Convolution onto
+	// an opaque target do not. The target is left untouched.
 	if (is_glow && !dst->transparency)
 	{
 		avm2_filter_release(ctx, &f);

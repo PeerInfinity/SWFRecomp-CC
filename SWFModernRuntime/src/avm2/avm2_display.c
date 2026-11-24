@@ -20542,6 +20542,10 @@ static void avm2_filter_layer_in_place(Avm2Context* ctx,
 	}
 }
 
+// s27 w2b: the transparency-group split (defined with the LAYER arm below).
+static Avm2Object* g_avm2_lga_strip;
+static int avm2_lga_split(const Avm2Cx* parent_cx, const Avm2DisplayObjectExt* ext,
+                          Avm2Cx* stripped_parent, float* ga, float* go);
 static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
                                  Avm2DisplayObjectExt* ext,
                                  const Mat* parent_world, double parent_alpha,
@@ -20588,10 +20592,59 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	if (n == 0)
 	{
 		// Every filter is impotent or unsupported: render normally.
+		// s27 w2b: but Flash still bitmap-caches a node with ANY filter, so
+		// it is a transparency group (n3g_filter_cm: an identity ColorMatrix
+		// + 50% shows only the top child, (128,128,255)). With an alpha row
+		// to split, render it into a LAYER-shaped group (premultiplied over,
+		// the row applied once at the composite); else as before.
+		Avm2Cx fsp;
+		float fm = 1.0f, fo = 0.0f;
+		if (avm2_lga_split(parent_cx, ext, &fsp, &fm, &fo))
+		{
+			int root_layer = renderer_blend_mode_is_layered(context, 2);
+			int child_layer = !root_layer && renderer_begin_child_layer(context);
+			if (root_layer || child_layer)
+			{
+				if (root_layer)
+				{
+					renderer_suspend_pass(context);
+					renderer_begin_offscreen_pass(context);
+				}
+				Avm2Object* saved_strip = g_avm2_lga_strip;
+				g_avm2_lga_strip = obj;
+				avm2_render_node(ctx, obj, parent_world, 1.0, &fsp);
+				g_avm2_lga_strip = saved_strip;
+				if (root_layer)
+				{
+					renderer_end_offscreen_pass(context);
+					renderer_resume_pass(context);
+				}
+				renderer_set_group_alpha_row(context, fm, fo);
+				if (root_layer)
+					renderer_composite_blend(context, 2,
+						renderer_clip_ref(context) > 0 ? 1 : 0);
+				else
+					renderer_end_child_layer(context, 2);
+				g_avm2_filter_active = saved_active;
+				return;
+			}
+		}
 		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
 		g_avm2_filter_active = saved_active;
 		return;
 	}
+
+	// s27 w2b-group-alpha-triggers: a filtered node is a TRANSPARENCY GROUP
+	// in Flash (Flash Player 32, n3g_filter_cm: identity ColorMatrix + 50%
+	// shows only the top child at the overlap). Its concatenated alpha row is
+	// stripped from the source render, every filter composes INTO the layer
+	// (avm2_filter_one_in_place, the tag.c render_filtered_core group arm) and
+	// the row is applied once at the composite.
+	Avm2Cx lga_sp;
+	float lga_m = 1.0f, lga_o = 0.0f;
+	int group = avm2_lga_split(parent_cx, ext, &lga_sp, &lga_m, &lga_o);
+	Avm2Object* lga_saved = g_avm2_lga_strip;
+	if (group) { parent_cx = &lga_sp; parent_alpha = 1.0; }
 
 	// Only the LAST filter's composition flags reach the framebuffer; the
 	// earlier ones fold into the ping-pong (see the chaining note below).
@@ -20663,7 +20716,9 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 		if (pad) renderer_set_filter_pad(context, avm2_filter_reach_px(list, n, vs, 1));
 	}
 	renderer_begin_offscreen_pass(context);
+	if (group) g_avm2_lga_strip = obj;   // the node's OWN alpha too
 	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+	if (group) g_avm2_lga_strip = lga_saved;
 	renderer_end_offscreen_pass(context);
 	if (needs_source_tex && !chained)
 		renderer_snapshot_filter_source(context);
@@ -20673,7 +20728,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	// blur tail past the stage edge, so reading the BLUR at +offset cut a
 	// shadow thrown back onto the stage; shifting the blur's INPUT read is exact.
 	int shadow_pre_shifted = 0;
-	if (is_shadow && n == 1)
+	if (is_shadow && n == 1 && !group)
 	{
 		float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
 		float a_ = avm2_filter_fixed16(last->angle);
@@ -20711,12 +20766,12 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 			continue;
 		}
 		int f_is_blur = (f->kind == AVM2_FILTER_BLUR);
-		if (chained && !f_last && !f_is_blur)
+		if ((group || (chained && !f_last)) && !f_is_blur)
 		{
 			avm2_filter_one_in_place(ctx, f);
 			continue;
 		}
-		if (chained && f_last)
+		if (chained && f_last && !group)
 			renderer_snapshot_filter_source(context);
 		// AS3 BlurFilter has no `strength` property, so Avm2FilterVal.strength
 		// stays 0 for it - passing that through would multiply the layer by
@@ -20737,6 +20792,14 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 
 	renderer_resume_pass(context);
 
+	if (group)
+	{
+		renderer_set_group_alpha_row(context, lga_m, lga_o);
+		renderer_composite_filtered_group(context);
+		if (nested_filter) renderer_end_nested_filter(context);
+		g_avm2_filter_active = saved_active;
+		return;
+	}
 	if (legacy)
 	{
 		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
@@ -21234,31 +21297,39 @@ static int avm2_render_blend_shader(Avm2Context* ctx, Avm2Object* obj,
 // Only a pure multiplier in (0,1): no alpha offset on either side.
 static Avm2Object* g_avm2_lga_strip;   // the node whose OWN alpha is stripped
 
+// s27 w2b-group-alpha-triggers: the whole concatenated alpha ROW
+// a' = a*m + o (parent_cx then the node's own alpha / cx_aa), not only a
+// multiplier: Flash Player 32 groups an alpha OFFSET too (n3g_layer_aadd).
 static int avm2_lga_split(const Avm2Cx* parent_cx, const Avm2DisplayObjectExt* ext,
-                          Avm2Cx* stripped_parent, float* ga)
+                          Avm2Cx* stripped_parent, float* ga, float* go)
 {
-	if (parent_cx->add[3] != 0.0f || ext->cx_aa != 0) return 0;
-	float m = parent_cx->mult[3] * ((float) ext->alpha_fixed8 / 256.0f);
-	if (!(m > 0.0f && m < 1.0f)) return 0;
+	float om = (float) ext->alpha_fixed8 / 256.0f;
+	float oa = (float) ext->cx_aa / 255.0f;
+	float m = parent_cx->mult[3] * om;
+	float o = parent_cx->mult[3] * oa + parent_cx->add[3];
+	if (!(m > 0.0f && m <= 1.0f) || (m == 1.0f && o == 0.0f)) return 0;
 	*stripped_parent = *parent_cx;
 	stripped_parent->mult[3] = 1.0f;
+	stripped_parent->add[3] = 0.0f;
 	*ga = m;
+	*go = o;
 	return 1;
 }
 
-// Render `obj` (blend-wrapped) into the open LAYER group, stripped when it
-// splits; returns the group alpha for renderer_set_group_alpha (1 = none).
+// Render `obj` (blend-wrapped) into the open group, stripped when it splits;
+// returns the group alpha row for renderer_set_group_alpha_row (1, 0 = none).
 static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
                              const Mat* parent_world, double parent_alpha,
                              const Avm2Cx* parent_cx);
 static float avm2_render_layer_group(Avm2Context* ctx, Avm2Object* obj,
                                      const Avm2DisplayObjectExt* ext,
                                      const Mat* parent_world, double parent_alpha,
-                                     const Avm2Cx* parent_cx)
+                                     const Avm2Cx* parent_cx, float* go)
 {
 	Avm2Cx sp;
 	float ga = 1.0f;
-	if (avm2_lga_split(parent_cx, ext, &sp, &ga))
+	*go = 0.0f;
+	if (avm2_lga_split(parent_cx, ext, &sp, &ga, go))
 	{
 		Avm2Object* saved = g_avm2_lga_strip;
 		g_avm2_lga_strip = obj;
@@ -21340,17 +21411,16 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 			renderer_suspend_pass(context);
 			renderer_capture_backdrop(context, bm);
 			renderer_begin_offscreen_pass(context);
-			float lga = 1.0f;
+			// s27 transparency group; w2b: every blend mode's layer is a
+			// group in Flash (n3g_multiply), and the row may carry an offset.
+			float lga_o = 0.0f;
 			if (bm == 2) g_avm2_layer_group_depth++;
-			if (bm == 2)   // s27 transparency group
-				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
-					parent_alpha, parent_cx);
-			else
-				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+			float lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
+				parent_alpha, parent_cx, &lga_o);
 			if (bm == 2) g_avm2_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
-			renderer_set_group_alpha(context, lga);
+			renderer_set_group_alpha_row(context, lga, lga_o);
 			// The stencil reference is read from the context inside
 			// composite_blend; the argument is the legacy boolean.
 			renderer_composite_blend(context, bm,
@@ -21363,17 +21433,17 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 			// ALPHA / ERASE node inside a group, or a LAYER nested in a
 			// filter/blend offscreen, renders into its own child layer and
 			// composites once (alpha/erase.wgsl, or premultiplied over).
-			float lga = 1.0f;
+			float lga = 1.0f, lga_o = 0.0f;
 			if (bm == 2)
 			{
 				g_avm2_layer_group_depth++;
 				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
-					parent_alpha, parent_cx);   // s27 transparency group
+					parent_alpha, parent_cx, &lga_o);   // s27 transparency group
 				g_avm2_layer_group_depth--;
 			}
 			else
 				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
-			renderer_set_group_alpha(context, lga);
+			renderer_set_group_alpha_row(context, lga, lga_o);
 			renderer_end_child_layer(context, bm);
 		}
 		else
@@ -21449,7 +21519,7 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// and every child re-publishes on entry, so a single global is enough.
 	Avm2Cx own_cx, node_cx;
 	avm2_cx_of_ext(&own_cx, ext);
-	if (lga_own) own_cx.mult[3] = 1.0f;
+	if (lga_own) { own_cx.mult[3] = 1.0f; own_cx.add[3] = 0.0f; }   // s27 / w2b row
 	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
 	g_avm2_cur_cx = node_cx;
 

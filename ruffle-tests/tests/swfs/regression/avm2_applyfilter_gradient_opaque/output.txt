@@ -1,0 +1,24 @@
+glow trans->opaque: err 2077
+glow opaque->opaque: err 2077
+glow opaque->trans: ok ff000000
+blur trans->opaque: ok ff1e253b
+dropshadow trans->opaque: err 2077
+dropshadow inner trans->opaque: err 2077
+bevel trans->opaque: err 2077
+glow inner trans->opaque: err 2077
+glow knockout trans->opaque: err 2077
+gradientglow trans->opaque: err 2077
+gradientbevel trans->opaque: err 2077
+colormatrix trans->opaque: ok ff000000
+convolution trans->opaque: ok ff000000
+gradientglow outer y=6: 0 0 0 0 0 993466ff 9b3664fc a03b63f4 a53e61ec aa3f63e5 ac4065e3 ac4065e3 ac4065e3 ac4065e3 ac4065e3 2f9d5c00 27b04e00 1bc63900 fdd1100 3ff0000
+gradientglow outer y=10: 0 0 0 0 0 9b3664fc ac4065e3 cb278ac0 ff000000 ff000000 ff000000 ff000000 ff1f3dff ff1f3dff ff1f3dff ff0000ff ff0000ff af009d60 6336c600 1dc13500
+gradientglow inner y=6: 0 0 0 0 0 993466ff 993764fa 993f61ec 994461df 994862d3 994866ce 994866ce 994866ce 994866ce 994866ce 0 0 0 0 0
+gradientglow inner y=10: 0 0 0 0 0 993764fa 994866ce 991baf82 ff005179 ff0000ff ff0000ff ff0000ff 990000ff 990000ff 990000ff 0 0 0 0 0
+gradientglow full knockout y=6: 0 0 11e11e00 388d7200 5d42ba00 8400f30a aa00a855 d10059a3 e40033c9 e40033c9 e40033c9 e40033c9 d10059a3 aa00a855 8400f30a 5d42ba00 388d7200 11e11e00 0 0
+gradientglow full knockout y=10: 0 0 11e11e00 388d7200 5d42ba00 9000db22 d10059a3 ff0000ff ff0000ff ff0000ff ff0000ff ff0000ff ff0000ff d10059a3 9000db22 5d42ba00 388d7200 11e11e00 0 0
+gradientbevel inner y=6: 0 0 0 0 0 99351637 99250f25 99280f26 993a193f 994d255c 99583483 995a46b0 994d57d8 993466ff 99445deb 0 0 0 0 0
+gradientbevel inner y=10: 0 0 0 0 0 99552d71 99583480 995c43a6 ff240000 ff000000 ff2d0808 ff591f1f 999c76bf 99b78dc4 99bc96c6 0 0 0 0 0
+gradientbevel outer y=6: 2ff0000 16e80000 3cc30000 64990000 906e0000 df3b46af e03b45ae e13a45ad da3f47b3 d1434aba c9474dc2 b94954d2 a8415ce8 993466ff a7455eeb 2dff2d2d 21ff1f1f 13ff0d0d 7ff0000 0
+gradientbevel outer y=10: 2ff0000 16e80000 3cc30000 629c0000 8a730000 d44249b7 c9474dc2 bd4952ce ff000000 ff000000 ff000000 ff000000 c86368de d0696fe0 d86f76e2 8fff8e8e 63ff6262 3dff3b3b 17ff1616 1ff0000
+done

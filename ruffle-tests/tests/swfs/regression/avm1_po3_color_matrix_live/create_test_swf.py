@@ -6,22 +6,25 @@ renderer_run_color_matrix). s26 w2-cm-chain-cab-edge.
 
 Four cases (the s26 w1 probe `cm_offdiag`, 200x150, SWF 10, no script):
   (10,10)   red 60x40, CM R<->B swap            -> fold exact: pure blue
-  (110,10)  two red bars + gap, CM blue+255 a+128 -> kept FOLDED (alpha bias):
-            the gap stays white, as Ruffle renders it (a = 0 texels stay empty)
+  (110,10)  two red bars + gap, CM blue+255 a+128 -> LIVE (alpha bias); FLASH tints
+            the whole cache rect, gap included: (127,127,255) over 110..170 x
+            10..50 (floor of both bounds ends: column 170 / row 50 too)
   (10,80)   grey 200, CM x2 then CM x0.5        -> LIVE: per-pass clamp, 128
             (the fold gave 200)
-  (110,80)  red 59x39 at a .5 offset, CM A' = 0.5 R -> LIVE: filtered entry, so
-            it is bitmap-cached and blit-snapped (+0.5 px) like Ruffle, and the
-            alpha is read from unpremultiplied colour: crisp (255,127,127),
-            no AA edge (the fold gave a (255,191,191) half-coverage rim)
-
-Golden: the Ruffle exporter at 0ddd12b6a (coordinator-run, archived as
+  (110,80)  red 59x39 at a .5 offset, CM A' = 0.5 R -> LIVE and UNSNAPPED in
+            Flash: 110..169 x 80..119 at the full (255,127,127), rim included
+            (alpha is read from unpremultiplied colour); Ruffle snaps to 111..169
+Golden (both this test and _nested): FLASH PLAYER 32, coordinator capture
+SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/
+avm1_po3_color_matrix_live/flash.png (s27 w2b-avm1-applyfilter-flash; tag.c
+obj_live_cm_only / cm_cache_rect_px, render_webgpu.c render_webgpu_set_cm_bias_rect).
+It replaced the s26 Ruffle-exporter golden (0ddd12b6a, archived as
 SWFRecompDocs/plans/session26-fanout-reports/w1-local-oracles/layer-colour/
-cm_offdiag.exporter-0ddd12b6a.png). The _nested twin puts the same four
-placements inside one DefineSprite placed at the origin (the sprite arm's
-fold / tagSetColorMatrixLive); its golden is the same PNG (see the s26
-w2-cm-chain-cab-edge report, LOCAL ORACLE REQUESTS, for its exporter check).
-
+cm_offdiag.exporter-0ddd12b6a.png), which differs in quadrants 2 and 4 (1000 px).
+The _nested twin puts the same four placements inside one DefineSprite placed
+at the origin (the sprite arm's tagSetColorMatrixLive); it reuses the root
+capture (a Flash capture of the nested SWF itself is requested in the s27
+w2b-avm1-applyfilter-flash report).
 avm1_po3_color_matrix_live_clear (SWF 8): the same x2/x0.5 chain on two placed
 SPRITES `g` and `h`; frame 1 runs `g.filters = []`. Ruffle set_filters replaces
 the whole authored list, so `g` renders unfiltered grey 200 and `h` 128

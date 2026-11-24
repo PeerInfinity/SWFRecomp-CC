@@ -918,6 +918,32 @@ static void input_events_pump_tick(SWFAppContext* app_context)
     }
 }
 
+// s27 w2-exec-order-land: nested-sprite frame order. Flash/Ruffle walk the
+// AVM1 exec list newest-first with _root LAST (avm1/runtime.rs run_frame), so a
+// timeline sprite nested inside a root-level sprite (always instantiated after
+// _root) queues its frame script BEFORE _root's onEnterFrame and frame script.
+// We used to defer that nested advance (Phase 3) until after the root frame
+// func, so a nested child's frame script ran after the root's DoAction on the
+// tick it advanced (Flash oracle: regression/avm1_exec_order_dynamic_eligible,
+// `inner f2` before `root ef`). The nested pass now runs FIRST, before Phase 1
+// and the enterFrame flush: a nested child is newer than its root-level parent,
+// so it runs its frame before the parent's (Flash IDE golden avm1/execution_order4:
+// `clip1.child: frame 2` precedes `clip2`/`clip1: frame 3` on the next tick; run
+// after Phase 1 the child advanced on its own placement tick). Its scripts drain
+// ahead of the root DoAction (aq FIFO), root-last fires _root.onEnterFrame after
+// them, and a child its parent removes this tick has its queued script dropped
+// (aq_sprite_ctx_removed; Ruffle run_actions skips removed clips the same way).
+// Kill switch for A/B work: SWF_EXEC_ORDER_NESTED_EARLY=0.
+static int exec_order_nested_early(void)
+{
+	static int s_v = -1;
+	if (s_v < 0) {
+		const char* ev = getenv("SWF_EXEC_ORDER_NESTED_EARLY");
+		s_v = (ev != NULL && ev[0] == '0') ? 0 : 1;
+	}
+	return s_v;
+}
+
 // Console-only swfStart implementation
 void swfStart(SWFAppContext* app_context)
 {
@@ -1179,6 +1205,11 @@ void swfStart(SWFAppContext* app_context)
 			// Phase 1: Advance root-level sprites (defer nested child recursion)
 			// Phase 2: Run root frame script (EnterFrame flushes between RemoveObject & DoAction)
 			// Phase 3: Advance nested children of sprites
+			// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
+			// nested sprites first, then their root-level parents (Phase 1).
+			const int nested_early = exec_order_nested_early();
+			if (nested_early)
+				advance_nested_sprite_frames(app_context);
 			extern int g_advance_defer_nested;
 			g_advance_defer_nested = 1;
 			advance_sprite_frames(app_context);
@@ -1198,6 +1229,8 @@ void swfStart(SWFAppContext* app_context)
 			// onEnterFrame fires in the Phase-2 flush reads their post-advance
 			// value, matching Ruffle's instantiation-ordered exec list (#10a).
 			// Writes only mc->currentframe — playhead + scripts stay in Phase 3.
+			// Not needed (and would read one frame ahead) when Phase 3 ran early.
+			if (!nested_early)
 			{
 				extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
 				presync_nested_sprite_currentframe(app_context);
@@ -1263,8 +1296,10 @@ void swfStart(SWFAppContext* app_context)
 				if (g_enterframe_flush_pending)
 					tagFlushPendingEnterFrame(app_context);
 			}
-			// Phase 3: advance nested sprite children (deferred from Phase 1)
-			advance_nested_sprite_frames(app_context);
+			// Phase 3: advance nested sprite children (deferred from Phase 1),
+			// unless it already ran early (exec_order_nested_early).
+			if (!nested_early)
+				advance_nested_sprite_frames(app_context);
 
 			// Phase 7b: drain any AQ_KIND_SCRIPT entries queued during
 			// advance_sprite_frames (Phase 1 + Phase 3) that weren't covered

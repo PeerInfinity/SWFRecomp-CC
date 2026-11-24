@@ -187,6 +187,9 @@ struct MovieClip {
 	// corpus regression (child-timeline-advance.md section 2.2). Allocated by
 	// actionChildMovieShell, swapped in around every frame call of the movie.
 	void* loaded_dl_shell;
+	// s27 w1-exec-order: g_tick_count of this clip's last onEnterFrame
+	// dispatch (Flash/Ruffle run exactly one per clip per frame).
+	size_t ef_fired_tick;
 };
 
 // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d

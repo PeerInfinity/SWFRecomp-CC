@@ -4690,10 +4690,16 @@ static const char* composite_wgsl =
 	"\n"
 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
 	"  let ga = select(1.0, params.offset_and_mode.w, params.offset_and_mode.w > 0.0);\n"
-	"  let c = textureSample(in_tex, in_samp, uv) * ga;\n"
+	"  let raw = textureSample(in_tex, in_samp, uv);\n"
+	"  let c = raw * ga;\n"
 	"  let a_tinted = c.a * params.tint.a;\n"
 	"  let tinted = vec4f(params.tint.rgb * a_tinted, a_tinted);\n"
-	"  return select(c, tinted, params.offset_and_mode.z > 0.5);\n"
+	// s27 w2b: z > 1.5 = group ALPHA ROW, a' = clamp(a*ga + tint.a) on the
+	// unpremultiplied group (an empty texel stays empty).
+	"  let a_row = clamp(raw.a * ga + params.tint.a, 0.0, 1.0);\n"
+	"  let rowed = select(vec4f(0.0), raw * (a_row / max(raw.a, 1e-6)), raw.a > 0.0);\n"
+	"  return select(select(c, tinted, params.offset_and_mode.z > 0.5), rowed,\n"
+	"                params.offset_and_mode.z > 1.5);\n"
 	"}\n";
 
 // Flash's glow/drop-shadow/bevel filters do not simply draw a blurred copy
@@ -5233,6 +5239,16 @@ static const char* blend_shader_wgsl_head =
 	"@group(0) @binding(0) var parent_tex: texture_2d<f32>;\n"
 	"@group(0) @binding(1) var current_tex: texture_2d<f32>;\n"
 	"@group(0) @binding(2) var tex_samp: sampler;\n"
+	// s27 w2b: the group alpha row (composite_wgsl's layout: offset_and_mode.w =
+	// m (0 = 1), .z > 1.5 = with offset tint.a). All zero = untouched.
+	"struct GroupParams { offset_and_mode: vec4f, tint: vec4f }\n"
+	"@group(0) @binding(3) var<uniform> gparams: GroupParams;\n"
+	"fn group_row(raw: vec4f) -> vec4f {\n"
+	"  let ga = select(1.0, gparams.offset_and_mode.w, gparams.offset_and_mode.w > 0.0);\n"
+	"  let a_row = clamp(raw.a * ga + gparams.tint.a, 0.0, 1.0);\n"
+	"  let rowed = select(vec4f(0.0), raw * (a_row / max(raw.a, 1e-6)), raw.a > 0.0);\n"
+	"  return select(raw * ga, rowed, gparams.offset_and_mode.z > 1.5);\n"
+	"}\n"
 	"\n"
 	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
 	"\n"
@@ -5263,7 +5279,7 @@ static const char* blend_shader_wgsl_head =
 static const char* blend_shader_wgsl_frag =
 	"@fragment fn %s(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
 	"  let dst = textureSample(parent_tex, tex_samp, uv);\n"
-	"  let src = textureSample(current_tex, tex_samp, uv);\n"
+	"  let src = group_row(textureSample(current_tex, tex_samp, uv));\n"
 	"  if (src.a > 0.0) {\n"
 	"    if (dst.a > 0.0) {\n"
 	"      let s = src.rgb / src.a;\n"
@@ -5395,7 +5411,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 
 	// --- Complex blends: one pipeline per mode, no hardware blending. ---
 	{
-		WGPUBindGroupLayoutEntry entries[3] = {0};
+		WGPUBindGroupLayoutEntry entries[4] = {0};
 		entries[0].binding = 0;
 		entries[0].visibility = WGPUShaderStage_Fragment;
 		entries[0].texture.sampleType = WGPUTextureSampleType_Float;
@@ -5407,10 +5423,15 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 		entries[2].binding = 2;
 		entries[2].visibility = WGPUShaderStage_Fragment;
 		entries[2].sampler.type = WGPUSamplerBindingType_Filtering;
+		// s27 w2b: group alpha row (blend_params_buf zeros = none).
+		entries[3].binding = 3;
+		entries[3].visibility = WGPUShaderStage_Fragment;
+		entries[3].buffer.type = WGPUBufferBindingType_Uniform;
+		entries[3].buffer.minBindingSize = 32;
 
 		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
 		bgl_desc.label = WGPU_LABEL("blend_shader_bgl");
-		bgl_desc.entryCount = 3;
+		bgl_desc.entryCount = 4;
 		bgl_desc.entries = entries;
 		ctx->blend_shader_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
 
@@ -5511,28 +5532,54 @@ void render_webgpu_capture_backdrop(WebGPURenderContext* ctx, u8 blend_mode)
 // subtree's colour transforms and hand it here just before the composite.
 // composite_wgsl's params.w is the group alpha (premultiplied: rgb AND a
 // scale), so the LAYER pipelines' over blend gives dst*(1 - a*ga) + c*ga.
+//
+// s27 w2b-group-alpha-triggers: the pending value is a general alpha ROW
+// a' = a*m + o (Flash Player 32: an alpha OFFSET on a LAYER also groups,
+// n3g_layer_aadd), and every blend group (not only LAYER) and the filter
+// layer consume it (n3g_multiply, n3g_filter_cm group in Flash).
 static float g_group_alpha_pending = 1.0f;
+static float g_group_alpha_offset_pending = 0.0f;
 
 void render_webgpu_set_group_alpha(WebGPURenderContext* ctx, float group_alpha)
 {
 	(void) ctx;
 	g_group_alpha_pending = group_alpha;
+	g_group_alpha_offset_pending = 0.0f;
+}
+
+void render_webgpu_set_group_alpha_row(WebGPURenderContext* ctx, float m, float o)
+{
+	(void) ctx;
+	g_group_alpha_pending = m;
+	g_group_alpha_offset_pending = o;
 }
 
 // Consume the pending group alpha; returns a value in (0, 1) or 1 (= none).
-static float take_group_alpha(void)
+// *o_out (may be NULL) receives the pending offset (0 = none); an offset
+// forces the row path even at m == 1.
+static float take_group_alpha_row(float* o_out)
 {
 	float ga = g_group_alpha_pending;
+	float o = g_group_alpha_offset_pending;
 	g_group_alpha_pending = 1.0f;
-	return (ga > 0.0f && ga < 1.0f) ? ga : 1.0f;
+	g_group_alpha_offset_pending = 0.0f;
+	if (!(ga > 0.0f)) { o = 0.0f; ga = 1.0f; }
+	if (ga > 1.0f) ga = 1.0f;
+	if (o_out != NULL) *o_out = o;
+	return ga;
 }
 
-// The params binding for a LAYER composite with group alpha `ga` < 1: its
-// own filter-ring slot (a queue write to the shared, permanently zero
-// blend_params_buf would land on EVERY composite of the frame).
-static void group_alpha_params(WebGPURenderContext* ctx, float ga, WGPUBindGroupEntry* e)
+// Whether a taken (ga, o) is a real group alpha.
+static inline int group_row_active(float ga, float o) { return ga < 1.0f || o != 0.0f; }
+
+// The params binding for a composite with group alpha row (ga, o): its own
+// filter-ring slot (a queue write to the shared, permanently zero
+// blend_params_buf would land on EVERY composite of the frame). o == 0 keeps
+// the s27 multiplier-only encoding byte-for-byte.
+static void group_alpha_row_params(WebGPURenderContext* ctx, float ga, float o,
+                                   WGPUBindGroupEntry* e)
 {
-	float params[8] = { 0.0f, 0.0f, 0.0f, ga, 0.0f, 0.0f, 0.0f, 0.0f };
+	float params[8] = { 0.0f, 0.0f, o != 0.0f ? 2.0f : 0.0f, ga, 0.0f, 0.0f, 0.0f, o };
 	e->buffer = ctx->filter_uniform_ring;
 	e->offset = filter_uniform_push(ctx, params, 32);
 	e->size = 32;
@@ -5541,7 +5588,9 @@ static void group_alpha_params(WebGPURenderContext* ctx, float ga, WGPUBindGroup
 // Composite the layer in filter_tex_a onto the resumed main pass.
 void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 stencil_ref)
 {
-	float group_alpha = take_group_alpha();
+	float group_off = 0.0f;
+	float group_alpha = take_group_alpha_row(&group_off);
+	int group_row = group_row_active(group_alpha, group_off);
 	if (!ctx->renderer_ok) return;
 	render_webgpu_ensure_blend_resources(ctx);
 
@@ -5551,16 +5600,21 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 
 	if (blend_mode_is_complex(blend_mode))
 	{
 		pipeline = ctx->blend_shader_pipeline[blend_mode];
-		WGPUBindGroupEntry e[3] = {0};
+		WGPUBindGroupEntry e[4] = {0};
 		e[0].binding = 0;
 		e[0].textureView = ctx->filter_view_b;   // backdrop ("parent")
 		e[1].binding = 1;
 		e[1].textureView = ctx->filter_view_a;   // this object's layer ("current")
 		e[2].binding = 2;
 		e[2].sampler = ctx->filter_sampler;
+		e[3].binding = 3;
+		e[3].buffer = ctx->blend_params_buf;
+		e[3].size = 32;
+		if (group_row)   // s27 w2b: a complex blend group's alpha
+			group_alpha_row_params(ctx, group_alpha, group_off, &e[3]);
 		WGPUBindGroupDescriptor bd = {0};
 		bd.layout = ctx->blend_shader_bgl;
-		bd.entryCount = 3;
+		bd.entryCount = 4;
 		bd.entries = e;
 		bg = wgpuDeviceCreateBindGroup(ctx->device, &bd);
 	}
@@ -5575,8 +5629,8 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 
 		e[2].binding = 2;
 		e[2].buffer = ctx->blend_params_buf;
 		e[2].size = 32;
-		if (blend_mode == 2 && group_alpha < 1.0f)
-			group_alpha_params(ctx, group_alpha, &e[2]);
+		if (group_row)   // s27: LAYER; w2b: every trivial blend group too
+			group_alpha_row_params(ctx, group_alpha, group_off, &e[2]);
 		WGPUBindGroupDescriptor bd = {0};
 		bd.layout = ctx->composite_bgl;
 		bd.entryCount = 3;
@@ -5774,7 +5828,8 @@ int render_webgpu_begin_child_layer(WebGPURenderContext* ctx)
 
 void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
 {
-	float group_alpha = take_group_alpha();
+	float group_off = 0.0f;
+	float group_alpha = take_group_alpha_row(&group_off);
 	if (!ctx->renderer_ok || ctx->child_layer_open <= 0) return;
 	int level = --ctx->child_layer_open;
 	render_webgpu_end_offscreen_pass(ctx);      // offscreen_depth -> parent; un-parks clip
@@ -5820,9 +5875,10 @@ void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
 	// blend_layer_pipeline[2] (composite_wgsl, which reads params.w): the
 	// same premultiplied-over blend, layout and stencil as child_layer_over.
 	WGPURenderPipeline pl = ctx->child_layer_pipeline[k];
-	if (k == 2 && group_alpha < 1.0f && ctx->blend_layer_pipeline[2] != NULL)
+	if (k == 2 && group_row_active(group_alpha, group_off)
+	    && ctx->blend_layer_pipeline[2] != NULL)
 	{
-		group_alpha_params(ctx, group_alpha, &e[2]);
+		group_alpha_row_params(ctx, group_alpha, group_off, &e[2]);
 		pl = ctx->blend_layer_pipeline[2];
 	}
 	WGPUBindGroupDescriptor bd = {0};
@@ -6506,6 +6562,22 @@ void render_webgpu_composite_filtered_alpha(WebGPURenderContext* ctx, float grou
 	composite_filtered_impl(ctx, 0.0f, 0.0f, 0, 0, 0, 0, group_alpha);
 }
 
+// s27 w2b-group-alpha-triggers: a TIMELINE filtered clip is a transparency
+// group in Flash (Flash Player 32, n3g_filter_cm: an identity ColorMatrix +
+// 50% alpha shows only the top child at the overlap, (128,128,255)): the
+// pending group alpha row is applied once to the filter layer. Row-free
+// (m == 1, o == 0): byte-identical to composite_filtered(0, 0, no tint).
+static void composite_filtered_params(WebGPURenderContext* ctx, const float params[8]);
+void render_webgpu_composite_filtered_group(WebGPURenderContext* ctx)
+{
+	float o = 0.0f;
+	float ga = take_group_alpha_row(&o);
+	if (!ctx->renderer_ok) return;
+	if (o == 0.0f) { composite_filtered_impl(ctx, 0.0f, 0.0f, 0, 0, 0, 0, ga < 1.0f ? ga : 0.0f); return; }
+	float params[8] = { 0.0f, 0.0f, 2.0f, ga, 0.0f, 0.0f, 0.0f, o };
+	composite_filtered_params(ctx, params);
+}
+
 static void composite_filtered_impl(WebGPURenderContext* ctx,
 	float offset_x, float offset_y,
 	float tint_r, float tint_g, float tint_b, float tint_a, float group_alpha)
@@ -6514,6 +6586,11 @@ static void composite_filtered_impl(WebGPURenderContext* ctx,
 	// offset_x/y are in NDC space; tint rgba = 0 means passthrough
 	float has_tint = (tint_r != 0 || tint_g != 0 || tint_b != 0 || tint_a != 0) ? 1.0f : 0.0f;
 	float params[8] = {offset_x, offset_y, has_tint, group_alpha, tint_r, tint_g, tint_b, tint_a};
+	composite_filtered_params(ctx, params);
+}
+
+static void composite_filtered_params(WebGPURenderContext* ctx, const float params[8])
+{
 	u32 params_offset = filter_uniform_push(ctx, params, 32);
 
 	// Create bind group for composite: read filter_tex_a
@@ -7244,10 +7321,32 @@ void render_webgpu_set_cm_keep_empty(WebGPURenderContext* ctx, int on)
 	g_cm_keep_empty = on ? 1 : 0;
 }
 
+// s27 w2b-avm1-applyfilter-flash: one-shot "the object's cache rect" for the
+// NEXT run_color_matrix, in DEVICE pixels (inclusive; the filter pad is added
+// here). Flash runs a CM pass over the object's whole cache bitmap, so an
+// alpha bias tints the EMPTY texels inside it (FP32 capture of
+// regression/avm1_po3_color_matrix_live: the 20 px gap between quadrant 2's
+// two bars reads (127,127,255), and so do column 170 / row 50 -- the cache
+// spans floor(xmin)..floor(xmax) of the 110..170 x 10..50 px bounds), while
+// texels outside it stay empty. With the rect set, the keep-empty pass runs
+// as before and a second, scissored pass without keep-empty rewrites the
+// rect, so the result is identical outside it.
+static int g_cm_bias_rect_on = 0;
+static int g_cm_bias_rect[4];
+void render_webgpu_set_cm_bias_rect(WebGPURenderContext* ctx, int x0, int y0, int x1, int y1)
+{
+	(void)ctx;
+	g_cm_bias_rect_on = 1;
+	g_cm_bias_rect[0] = x0; g_cm_bias_rect[1] = y0;
+	g_cm_bias_rect[2] = x1; g_cm_bias_rect[3] = y1;
+}
+
 void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
 {
 	int keep_empty = g_cm_keep_empty;
 	g_cm_keep_empty = 0;
+	int bias_rect = g_cm_bias_rect_on;
+	g_cm_bias_rect_on = 0;
 	if (!ctx->renderer_ok || m20 == NULL) return;
 	render_webgpu_ensure_filter_resources(ctx);
 	ensure_color_matrix_resources(ctx);
@@ -7260,6 +7359,9 @@ void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
 		for (int col = 0; col < 4; col++) params[row * 4 + col] = m20[row * 5 + col];
 		params[16 + row] = m20[row * 5 + 4];
 	}
+	u32 rect_params_offset = 0;
+	if (keep_empty && bias_rect) rect_params_offset = filter_uniform_push(ctx, params, 80);
+	else bias_rect = 0;
 	if (keep_empty) params[19] += 65536.0f;
 	u32 params_offset = filter_uniform_push(ctx, params, 80);
 
@@ -7296,6 +7398,35 @@ void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
 	wgpuRenderPassEncoderEnd(pass);
 	wgpuRenderPassEncoderRelease(pass);
 	wgpuBindGroupRelease(bg);
+
+	if (bias_rect)
+	{
+		// The bias rect: the same matrix WITHOUT keep-empty, scissored to the
+		// object's cache rect, over the keep-empty result.
+		int P = ctx->filter_pad;
+		int tw = (int) filter_tex_w(ctx), th = (int) filter_tex_h(ctx);
+		int x0 = g_cm_bias_rect[0] + P, y0 = g_cm_bias_rect[1] + P;
+		int x1 = g_cm_bias_rect[2] + P + 1, y1 = g_cm_bias_rect[3] + P + 1;
+		if (x0 < 0) x0 = 0;
+		if (y0 < 0) y0 = 0;
+		if (x1 > tw) x1 = tw;
+		if (y1 > th) y1 = th;
+		if (x1 > x0 && y1 > y0)
+		{
+			bg_entries[1].offset = rect_params_offset;
+			WGPUBindGroup bg2 = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+			color_att.loadOp = WGPULoadOp_Load;
+			WGPURenderPassEncoder p2 = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+			wgpuRenderPassEncoderSetPipeline(p2, g_cm_pipeline);
+			wgpuRenderPassEncoderSetBindGroup(p2, 0, bg2, 0, NULL);
+			wgpuRenderPassEncoderSetScissorRect(p2, (uint32_t) x0, (uint32_t) y0,
+			                                    (uint32_t) (x1 - x0), (uint32_t) (y1 - y0));
+			wgpuRenderPassEncoderDraw(p2, 6, 1, 0, 0);
+			wgpuRenderPassEncoderEnd(p2);
+			wgpuRenderPassEncoderRelease(p2);
+			wgpuBindGroupRelease(bg2);
+		}
+	}
 
 	// Back into filter_tex_a (same legality argument as the displacement pass).
 	WGPUTexelCopyTextureInfo src = {0};

@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""avm1_timer_overflow: 70 live setTimeout(fn, 10) at once: ids past the old fixed 64-entry table
-(MAX_TIMERS) are returned and fire (timer.c timerFreeSlot growth).
-STABLE-PREFIX DESIGN: the Flash capture of the w1 SWF (traces 'n=' on frames
-2-9) shows all 70 fired before frame 2 (n=70 throughout); our clock is Ruffle's
-Timers model (MAX_TICKS = 10 fires per update), which reaches 70 only on frame
-8. This SWF keeps frames 2-9 but traces only on frame 10, where both agree;
-the golden is the Flash capture's first and last lines. The MAX_TICKS
-divergence itself is a separate lead (s27 w2-timers-land report).
+"""avm1_timer_overflow: 70 live setTimeout(fn, 10) at once: ids past the old
+fixed 64-entry table (MAX_TIMERS) are returned and fire (timer.c timerFreeSlot
+growth), and ALL 70 fire in the first timer update: Flash has no per-update
+fire cap (Ruffle's Timers::MAX_TICKS = 10 is Ruffle's own "sanity" limit,
+which timer.c used to port: n=10,20,...,60,70 on frames 2-8). This is the w1
+SWF (traces 'n=' on frames 2-9) byte-for-byte; the s27 w2-timers-land
+stable-prefix variant (frames 2-9 empty) is retired now that timer.c drops
+the cap (s27 w2b-timers-tail).
 
-s27 w2-timers-land. GOLDEN = real Flash Player 32 (LNX 32,0,0,465) trace of
-this SWF, coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
-w1-local-oracles/w1-timers-robustness/caps_timers/flash.wrapped.txt) (first and last line; see above). Ruffle is NOT an
-oracle here: its exporter fires no timers and runs DoInitActions at preload.
+GOLDEN = real Flash Player 32 (LNX 32,0,0,465) trace of this SWF,
+coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
+w1-local-oracles/w1-timers-robustness/caps_timers/flash.wrapped.txt,
+identical to flash.direct.txt), verbatim. Ruffle is NOT an oracle here: its
+exporter fires no timers.
 
 Usage: create_test_swf.py <out.swf> timers
 """
@@ -40,7 +41,7 @@ elif kind == 'timers':
     for i in range(N):
         f1 += setroot('id%d' % i, push(10) + get('_root.fn') + push(2, 'setTimeout') + CALLF)
     f1 += T('id0=', get('_root.id0'), ' id63=', get('_root.id63'), ' id64=', get('_root.id64'), ' id69=', get('_root.id69'))
-    frames = [f1] + [b''] * 8 + [T('end n=', get('_root.n')) + STOP]
+    frames = [f1] + [T('n=', get('_root.n'))] * 8 + [T('end n=', get('_root.n')) + STOP]
 elif kind == 'watch':
     defs = b''
     h = deffunc1('', ['p', 'o', 'v'], setroot('wc', get('_root.wc') + push(1) + ADD2) + push('v') + GETVAR + RETURN)

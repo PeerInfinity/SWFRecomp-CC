@@ -1,0 +1,6 @@
+# s26 w2-avm2-applyfilter-kernels fixture; landed by s27 w2b-filter-kernels-residual.
+# output.txt = the FLASH Player 32 capture (SWFRecompDocs/plans/flash-oracle-captures/
+# avm2_bitmapdata_draw_filtered/output.flash.txt; 3/3 runs, Windows identical) MINUS
+# the held `bevel` case's 2 lines (create_test_swf.py HELD; one level off at x/y=16).
+# Do NOT replace it with a Ruffle trace: Ruffle's draw() ignores the source's filters.
+num_frames = 1

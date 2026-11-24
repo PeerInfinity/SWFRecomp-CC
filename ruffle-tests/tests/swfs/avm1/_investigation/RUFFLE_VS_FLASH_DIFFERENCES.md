@@ -710,6 +710,16 @@ Flash's device serif, where the golden has Ruffle's default font (with_default_f
 prune criterion:** a golden built from the Flash capture with the text band masked out, or a fixture twin without that
 field.
 
+**s27 w2 re-measure (`cceb5133a` PASS_SCALES growth, `w2b-filter-kernels-residual`; lavapipe, CI-identical before
+leg):** against the Ruffle golden the row moved 39 351 → **47 515** outliers (max diff 238 unchanged) because Flash's
+grown band is now reproduced (each side grows `ceil(PASS_SCALES[q-1] * blur / 2)`, so `(3,3,4)` grows 5, `(5,5,3)` 7,
+`(10,1,15)` 4 in y). Against the Flash capture, ours has **0 px over diff 1 outside the three text bands** (rows
+87–104, 305–323, 523–545, one per cell row); all 17 231 px over 1 sit inside them (Flash's device serif vs the
+golden's Ruffle default font). The Ruffle golden is 65 735 px over 1 off the same Flash capture. **Scope of this
+image-axis disposition:** `avm2/bitmapdata_applyfilter_blur output` at up to ~47.5 k outliers vs the Ruffle golden,
+max 238. A count materially above that, or any ours-vs-`flash.png` difference over 1 outside the three text bands,
+is NOT covered: re-triage the blur path.
+
 
 ## AVM1 typing into an HTML TextField at index 0: Flash keeps the run's format, Ruffle drops it (`c0=0`)
 
@@ -731,6 +741,28 @@ Ruffle's `replace_text` at index 0 gives the new character the default format (`
 
 **Decision:** match Flash (user ruling: Flash over Ruffle). The fixture's golden is Flash's output. **Prune
 criterion:** Ruffle's `replace_text` inherits the run format at index 0.
+
+## AVM1 `BitmapData.applyFilter` onto an OPAQUE target, and live PlaceObject3 ColorMatrix caches (s27 w2b-avm1-applyfilter-flash)
+
+**Tests** (all `regression/`, Flash Player 32 goldens captured by the coordinator, archived under
+`SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/`):
+`avm1_applyfilter_{blur,glow,bevel,convolution}` (trace + image), `avm1_po3_color_matrix_live{,_nested}` (image).
+
+**Flash** (what we now implement; Ruffle at `1e604fa87` does none of it):
+1. `applyFilter` of a DropShadow / Glow / Bevel / GradientGlow / GradientBevel onto an **opaque** BitmapData returns
+   **-6** and leaves the target untouched (`opaque ret -6`, every probe `-1`). Ruffle applies the filter and returns 0.
+   (The AVM2 analogue is Error #2077, already implemented in `avm2_bitmap.c`.)
+2. A **Blur** into an opaque target stores the premultiplied word *with* its alpha: `getPixel32` reads `0x6B640005`
+   where the transparent twin reads `0x6BEE000C`, and `0` on the empty grown rim; the display ignores that alpha (the
+   rim draws black). Ruffle forces alpha 0xFF (`dop 20,20 -16777216`).
+3. A live (unfoldable) PlaceObject3 ColorMatrix-only entry is **not pixel-snapped** (quadrant 4: a rect at x 110.5
+   covers 110..169, its half-covered rim at the full `(255,127,127)`; Ruffle snaps to 111..169), and an **alpha
+   bias tints empty texels** inside the cache rect `floor(xmin)..floor(xmax)` (quadrant 2: the 20 px gap between two
+   bars, plus column 170 / row 50, read `(127,127,255)`; Ruffle leaves them white).
+
+**Decision:** match Flash (user ruling). The two `avm1_po3_color_matrix_live*` goldens were Ruffle-exporter PNGs and are
+replaced by the Flash capture. Example (before → after the change, vs Flash): `avm1_po3_color_matrix_live` 1000 px /
+max 128 → 0.
 
 ## `visual/filters/blur_quality` (image): the golden is not Flash, and ours is pixel-identical to Flash (s27 golden-provenance)
 

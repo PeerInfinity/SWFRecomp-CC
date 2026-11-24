@@ -542,6 +542,9 @@ void render_webgpu_run_displacement(WebGPURenderContext* context,
 // bias column in 0..255 units.
 void render_webgpu_run_color_matrix(WebGPURenderContext* context, const float* m20);
 void render_webgpu_set_cm_keep_empty(WebGPURenderContext* context, int on);
+// s27 w2b-avm1-applyfilter-flash: one-shot bias rect (device px, inclusive)
+// for the NEXT run_color_matrix; see render_webgpu.c.
+void render_webgpu_set_cm_bias_rect(WebGPURenderContext* context, int x0, int y0, int x1, int y1);
 // Blend-mode layer compositing: 1 when this mode must be rendered to its own
 // layer and composited once, 0 when the caller should keep the legacy per-draw
 // pipeline (nested layers, or a backdrop we cannot sample).
@@ -562,6 +565,14 @@ void render_webgpu_end_child_layer(WebGPURenderContext* context, u8 blend_mode);
 // render_webgpu_end_child_layer(.., 2) (Flash's transparency group). The value
 // is consumed (reset to 1) by that call, whatever its mode.
 void render_webgpu_set_group_alpha(WebGPURenderContext* context, float group_alpha);
+// s27 w2b-group-alpha-triggers: the general group ALPHA ROW a' = a*m + o
+// (o in 0..1 units, m in (0,1]; o == 0 is exactly set_group_alpha(m)). Also
+// consumed by every blend composite (trivial and complex modes, not only
+// LAYER) and by render_webgpu_composite_filtered_group.
+void render_webgpu_set_group_alpha_row(WebGPURenderContext* context, float m, float o);
+// The filter layer blitted (premultiplied over) with the pending group alpha
+// row applied once (a filtered clip is a transparency group in Flash).
+void render_webgpu_composite_filtered_group(WebGPURenderContext* context);
 int  render_webgpu_begin_nested_filter(WebGPURenderContext* context);   // s26 N1
 void render_webgpu_end_nested_filter(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);

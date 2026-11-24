@@ -1,0 +1,688 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 8a86a1d6..a4108dcf 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -16975,6 +16975,13 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
+ 	g_this_depth = saved_this_depth;
+ 	if (flags & INV_DEPTH_GUARD) g_call_depth--;
+ 	if (flags & INV_SPECIAL_GUARD) g_special_depth--;
++	// s27 w2b-timers-tail: a user-function return is Flash's flush point for
++	// init actions a root goto queued (tag.c tagFlushGotoInitsAtCallReturn;
++	// natives have swf_version 0, so the goto's own call never flushes).
++	if (func->swf_version != 0) {
++		extern void tagFlushGotoInitsAtCallReturn(SWFAppContext* app_context);
++		tagFlushGotoInitsAtCallReturn(app_context);
++	}
+ 	return result;
+ }
+ 
+@@ -25764,8 +25771,18 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, i
+ // When unloadMovie is called, the MC's frame/bytes properties should not change until
+ // the next frame. We queue MCs here and set their unloaded flag at the start of the next frame.
+ #define MAX_DEFERRED_UNLOADS 32
+-static MovieClip* g_deferred_unload_mcs[MAX_DEFERRED_UNLOADS];
++// s27 w2b-timers-tail: growable (was a fixed MAX_DEFERRED_UNLOADS = 32: the
++// 33rd unloadMovie of a frame never reset its clip's frame/bytes state).
++// Nothing runs script while the queue is drained, so realloc is safe.
++static MovieClip** g_deferred_unload_mcs = NULL;
++static size_t g_deferred_unload_mcs_cap = 0;
+ static int g_deferred_unload_mc_count = 0;
++static int deferred_unload_room(void)
++{
++	return (size_t)g_deferred_unload_mc_count < g_deferred_unload_mcs_cap
++		|| ng_table_grow((void**)&g_deferred_unload_mcs, &g_deferred_unload_mcs_cap,
++		                 sizeof(MovieClip*), MAX_DEFERRED_UNLOADS);
++}
+ 
+ void actionProcessDeferredUnloads(void)
+ {
+@@ -25798,8 +25815,18 @@ typedef struct {
+ 	char url[512];
+ } DeferredFailedLoad;
+ #define MAX_DEFERRED_FAILED_LOADS 16
+-static DeferredFailedLoad g_deferred_failed_loads[MAX_DEFERRED_FAILED_LOADS];
++// s27 w2b-timers-tail: growable (was a fixed MAX_DEFERRED_FAILED_LOADS = 16:
++// the 17th failed loadMovie of a frame kept its clip's old state forever).
++// The drain runs no script, so realloc by an enqueue is never mid-drain.
++static DeferredFailedLoad* g_deferred_failed_loads = NULL;
++static size_t g_deferred_failed_loads_cap = 0;
+ static int g_deferred_failed_load_count = 0;
++static int deferred_failed_load_room(void)
++{
++	return (size_t)g_deferred_failed_load_count < g_deferred_failed_loads_cap
++		|| ng_table_grow((void**)&g_deferred_failed_loads, &g_deferred_failed_loads_cap,
++		                 sizeof(DeferredFailedLoad), MAX_DEFERRED_FAILED_LOADS);
++}
+ 
+ // Construct a child URL relative to root_movieclip's base directory.
+ // E.g., root url "file:///test_name/test.swf" + child "target.swf" -> "file:///test_name/target.swf"
+@@ -40288,7 +40315,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
+ 			}
+ 		} else if (mc != NULL) {
+ 			// Failed load: defer state change to next frame (async load simulation)
+-			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
++			if (deferred_failed_load_room()) {
+ 				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+ 				dfl->mc = mc;
+ 				constructChildURL(dfl->url, sizeof(dfl->url), url_mut);
+@@ -40366,7 +40393,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
+ 			}
+ 		} else if (mc != NULL) {
+ 			// Failed load: defer state change to next frame (async load simulation)
+-			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
++			if (deferred_failed_load_room()) {
+ 				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+ 				dfl->mc = mc;
+ 				constructChildURL(dfl->url, sizeof(dfl->url), url_mut2);
+@@ -45917,8 +45944,23 @@ typedef struct PendingLoadVarsLoad {
+ 	int success;            // 0 = failure (file missing), 1 = success
+ 	int is_stylesheet;      // StyleSheet.load: parse() + onLoad(result), no onData
+ } PendingLoadVarsLoad;
+-static PendingLoadVarsLoad g_pending_lv_loads[MAX_PENDING_LV_LOADS];
++// s27 w2b-timers-tail: growable (was a fixed MAX_PENDING_LV_LOADS = 32: the
++// 33rd LoadVars.load / XML-less form load of a tick was dropped, its onData /
++// onLoad never fired). processLoadVarsLoads drains a heap snapshot
++// (g_lv_inflight, a GC root: the not-yet-fired entries' instances were only
++// marked while they sat in the live queue) so onData calling load() again
++// may grow the live queue.
++static PendingLoadVarsLoad* g_pending_lv_loads = NULL;
++static size_t g_pending_lv_loads_cap = 0;
+ static int g_pending_lv_load_count = 0;
++static PendingLoadVarsLoad* g_lv_inflight = NULL;
++static int g_lv_inflight_n = 0;
++static int lv_load_room(void)
++{
++	return (size_t)g_pending_lv_load_count < g_pending_lv_loads_cap
++		|| ng_table_grow((void**)&g_pending_lv_loads, &g_pending_lv_loads_cap,
++		                 sizeof(PendingLoadVarsLoad), MAX_PENDING_LV_LOADS);
++}
+ 
+ int actionHasPendingLoadVarsLoads(void) { return g_pending_lv_load_count > 0; }
+ 
+@@ -46013,10 +46055,15 @@ void processLoadVarsLoads(SWFAppContext* app_context)
+ 	while (g_pending_lv_load_count > 0 && guard++ < 16) {
+ 		// Copy locally so onData handlers that call load() again don't
+ 		// clobber our array.
+-		PendingLoadVarsLoad local[MAX_PENDING_LV_LOADS];
+ 		int count = g_pending_lv_load_count;
++		PendingLoadVarsLoad* local = (PendingLoadVarsLoad*) malloc((size_t)count * sizeof(PendingLoadVarsLoad));
++		if (local == NULL) break;
+ 		for (int i = 0; i < count; i++) local[i] = g_pending_lv_loads[i];
+ 		g_pending_lv_load_count = 0;
++		PendingLoadVarsLoad* saved_inflight = g_lv_inflight;
++		int saved_inflight_n = g_lv_inflight_n;
++		g_lv_inflight = local;
++		g_lv_inflight_n = count;
+ 
+ 		for (int i = 0; i < count; i++) {
+ 			PendingLoadVarsLoad* p = &local[i];
+@@ -46036,6 +46083,7 @@ void processLoadVarsLoads(SWFAppContext* app_context)
+ 				}
+ 				fireLoadVarsCallback(app_context, lv, "onLoad", 6, &ok, 1);
+ 				releaseObject(app_context, lv);
++			p->lv = NULL;  // fired: no longer a GC root
+ 				continue;
+ 			}
+ 
+@@ -46060,7 +46108,11 @@ void processLoadVarsLoads(SWFAppContext* app_context)
+ 			fireLoadVarsCallback(app_context, lv, "onData", 6, &cb, 1);
+ 
+ 			releaseObject(app_context, lv);
++			p->lv = NULL;  // fired: no longer a GC root
+ 		}
++		g_lv_inflight = saved_inflight;
++		g_lv_inflight_n = saved_inflight_n;
++		free(local);
+ 	}
+ }
+ 
+@@ -46138,7 +46190,7 @@ static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* ar
+ 	DataFileEntry* data = findDataFile(url_utf8);
+ 
+ 	// Enqueue deferred dispatch.
+-	if (g_pending_lv_load_count < MAX_PENDING_LV_LOADS) {
++	if (lv_load_room()) {
+ 		PendingLoadVarsLoad* p = &g_pending_lv_loads[g_pending_lv_load_count++];
+ 		p->lv = lv;
+ 		p->is_stylesheet = g_lv_enqueue_ss;
+@@ -56188,7 +56240,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
+ 					actionClearChildMovieShell(app_context, _gu2_mc);  // s26 w2 phase 5
+ 				}
+ 				// Defer marking MC as unloaded until next frame (Flash defers unload state)
+-				if (g_deferred_unload_mc_count < MAX_DEFERRED_UNLOADS) {
++				if (deferred_unload_room()) {
+ 					g_deferred_unload_mcs[g_deferred_unload_mc_count++] = _gu2_mc;
+ 				}
+ 			}
+@@ -56290,7 +56342,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
+ 			}
+ 		} else if (_gu2_mc != NULL) {
+ 			// Failed load: defer state change to next frame (async load simulation)
+-			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
++			if (deferred_failed_load_room()) {
+ 				DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+ 				dfl->mc = _gu2_mc;
+ 				constructChildURL(dfl->url, sizeof(dfl->url), url_utf8);
+@@ -80699,7 +80751,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 						}
+ 					} else if (mc != NULL) {
+ 						// Failed load: defer state change to next frame
+-						if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
++						if (deferred_failed_load_room()) {
+ 							DeferredFailedLoad* dfl = &g_deferred_failed_loads[g_deferred_failed_load_count++];
+ 							dfl->mc = mc;
+ 							constructChildURL(dfl->url, sizeof(dfl->url), _lm_url);
+@@ -85996,8 +86048,16 @@ void actionGcMarkRoots(void)
+ 		swfGcMarkObject(g_pending_mcl_loads_next_tick[i].mcl);
+ 	// Deferred LoadVars loads (queue holds a retain, but retained-by-C-queue
+ 	// is still invisible to the trace — must be an explicit root).
+-	for (int i = 0; i < g_pending_lv_load_count && i < MAX_PENDING_LV_LOADS; i++)
++	for (int i = 0; i < g_pending_lv_load_count; i++)
+ 		swfGcMarkObject(g_pending_lv_loads[i].lv);
++	for (int i = 0; i < g_lv_inflight_n; i++)
++		swfGcMarkObject(g_lv_inflight[i].lv);
++	// s27 w2b-timers-tail: MCL Phase-3 queue (onLoadInit waiting for the
++	// child's first frame) -- the loader's broadcaster must stay alive until
++	// it fires (Ruffle roots it in the load manager); it was only marked
++	// while in the two earlier queues.
++	for (int i = 0; i < g_pending_load_init_count; i++)
++		swfGcMarkObject(g_pending_load_inits[i].mcl);
+ 	// Deferred XML loads ride the ActionQueue as heap payloads — walk the
+ 	// queue and mark the doc of every aq_dispatch_xml_load entry.
+ 	actionQueueGcForEach(gcMarkXmlLoadPayload);
+@@ -86089,7 +86149,13 @@ void actionGcScrubStashes(const void* p)
+ 	for (int i = 0; i < g_pending_mcl_load_count_next_tick; i++)
+ 		if ((const void*)g_pending_mcl_loads_next_tick[i].mcl == p)
+ 			g_pending_mcl_loads_next_tick[i].mcl = NULL;
+-	for (int i = 0; i < g_pending_lv_load_count && i < MAX_PENDING_LV_LOADS; i++)
++	for (int i = 0; i < g_pending_lv_load_count; i++)
+ 		if ((const void*)g_pending_lv_loads[i].lv == p)
+ 			g_pending_lv_loads[i].lv = NULL;
++	for (int i = 0; i < g_lv_inflight_n; i++)
++		if ((const void*)g_lv_inflight[i].lv == p)
++			g_lv_inflight[i].lv = NULL;
++	for (int i = 0; i < g_pending_load_init_count; i++)
++		if ((const void*)g_pending_load_inits[i].mcl == p)
++			g_pending_load_inits[i].mcl = NULL;
+ }
+diff --git a/SWFModernRuntime/src/actionmodern/timer.c b/SWFModernRuntime/src/actionmodern/timer.c
+index 8789d37c..5cf4380a 100644
+--- a/SWFModernRuntime/src/actionmodern/timer.c
++++ b/SWFModernRuntime/src/actionmodern/timer.c
+@@ -89,16 +89,24 @@ static int g_next_timer_id = 1;
+ // * a timer fires while its due time is STRICTLY before the clock, earliest
+ //   due time first; a repeating timer then moves its due time forward by one
+ //   interval (catch-up: several fires in one update are possible);
+-// * at most TIMER_MAX_TICKS (10) fires per update in total; on the 11th the
+-//   clock is pulled back to just before that timer (tick - 100 us) and the
+-//   update ends (MAX_TICKS);
++// * NO per-update fire cap (s27 w2b-timers-tail). Ruffle stops after
++//   MAX_TICKS = 10 fires per update ("for sanity", timer.rs) and pulls the
++//   clock back; Flash Player 32 does not: 70 one-shot setTimeout(fn, 10)
++//   created in frame 1 had ALL fired before frame 2 at 10 fps
++//   (session27-fanout-reports/w1-local-oracles/w1-timers-robustness/
++//   caps_timers, regression/avm1_timer_overflow). Every timer due before the
++//   clock fires, and a repeating one catches up (a 10 ms interval fires ~10x
++//   per 100 ms frame, as Flash's real-time interval does). The loop is
++//   finite without a cap (a timer created in a callback is due after the
++//   advanced clock, and each interval is >= 10 ms); TIMER_SANITY_TICKS is a
++//   hang guard only, with Ruffle's clock pull-back if it is ever reached;
+ // * a timer created inside a callback is due >= 10 ms after the CURRENT
+ //   clock, so it never fires in the update that created it.
+ // Ties on the due time fire in id (creation) order; Ruffle's BinaryHeap
+ // order for ties is a heap-layout accident (it alternates 1,2,2,1,... for
+ // two equal intervals), so creation order is the deliberate choice here.
+ #define TIMER_MIN_INTERVAL_MS 10
+-#define TIMER_MAX_TICKS 10
++#define TIMER_SANITY_TICKS 1000000
+ static uint64_t g_timer_cur_us = 0;
+ 
+ static uint64_t timerIntervalUs(double delay_int32)
+@@ -603,7 +611,7 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ 			have_batch = 0;
+ 			continue; // the init actions / target frame may have cleared or created timers
+ 		}
+-		if (++tick_count > TIMER_MAX_TICKS)
++		if (++tick_count > TIMER_SANITY_TICKS)
+ 		{
+ 			g_timer_cur_us = t->tick_us - 100;
+ 			break;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index c353061c..d8dd2d43 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -14936,9 +14936,21 @@ static void tagDrainGotoInitActionsAQ(SWFAppContext* app_context, void* user)
+ 	tagDrainGotoInitActions(app_context, 1);
+ }
+ 
++static int g_goto_init_draining = 0;
++static void tagDrainGotoInitActionsNow(SWFAppContext* app_context);
++
+ void tagDrainGotoInitActions(SWFAppContext* app_context, int force)
+ {
+-	if (!force) {
++	if (force) {
++		// Not re-entrant: an init action's own function returns
++		// (tagFlushGotoInitsAtCallReturn) must not restart the drain.
++		if (g_goto_init_draining) return;
++		g_goto_init_draining = 1;
++		tagDrainGotoInitActionsNow(app_context);
++		g_goto_init_draining = 0;
++		return;
++	}
++	{
+ 		// End of a goto: Flash runs the init actions after the script that
+ 		// issued the goto, before the target frame's scripts (gnash
+ 		// action_execution_order_test12 `0+1+2+3+4+`): one SCRIPT-kind queue
+@@ -14951,6 +14963,28 @@ void tagDrainGotoInitActions(SWFAppContext* app_context, int force)
+ 		                      AQ_PRIORITY_INITIALIZE, NULL, 0, AQ_KIND_SCRIPT);
+ 		return;
+ 	}
++}
++
++// s27 w2b-timers-tail: Flash's flush point for goto-queued init actions is
++// the RETURN of the next user-function call inside the issuing script
++// (Flash Player 32, regression/avm1_goto_skipped_init_call:
++// `f1 / g f3 / init2 f3 / init3 f3 / f1 after g / f3`): the callee's body
++// runs first, the inits run when it returns, before the rest of the caller.
++// Without such a call they still run after the issuing script (the
++// AQ_PRIORITY_INITIALIZE entry above). Called from action.c
++// invokeFunctionValue for user-defined (DefineFunction/DefineFunction2)
++// callees only, so the native goto call itself never flushes. Inside a root
++// goto catch-up (capture) and inside a timer pass (processTimers drains at
++// its batch boundaries: gnash gotoFrameFromInterval `x0xx1x234`) it waits.
++void tagFlushGotoInitsAtCallReturn(SWFAppContext* app_context)
++{
++	if (g_pending_goto_inits_n == 0 || g_goto_init_capture > 0
++	    || g_goto_init_timer_pass > 0 || g_goto_init_draining) return;
++	tagDrainGotoInitActions(app_context, 1);
++}
++
++static void tagDrainGotoInitActionsNow(SWFAppContext* app_context)
++{
+ 	size_t i = 0;
+ 	while (i < g_pending_goto_inits_n) {
+ 		PendingGotoInit p = g_pending_goto_inits[i++];
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/create_test_swf.py
+new file mode 100644
+index 00000000..62a81367
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/create_test_swf.py
+@@ -0,0 +1,30 @@
++#!/usr/bin/env python3
++"""avm1_goto_skipped_init_call: the FLUSH POINT of goto-queued DoInitActions.
++Frame 1: _root.gotoAndPlay(3), then a call to a user function g (traces
++'g f3'), then 'f1 after g'. Frames 2/3 carry DoInitActions. Flash runs the
++queued inits (init2/init3) at the RETURN of g -- after g's body, before the
++rest of the issuing script; with no call after the goto they run after the
++issuing script (regression/avm1_goto_skipped_init_script).
++Owner: tag.c tagDrainGotoInitActions / tagFlushGotoInitsAtCallReturn, called
++from action.c actionCallFunction / actionCallMethod.
++
++s27 w2b-timers-tail. GOLDEN = real Flash Player 32 (LNX 32,0,0,465) DIRECT
++trace of this SWF, coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
++w2-local-oracles/w2-timers-land/goto_skipped_init_call/flash.direct.txt).
++Ruffle is NOT an oracle here: it runs DoInitActions at preload.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import sys, struct
++import os
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *
++T = trace_concat
++def initact(cid, code): return tag(59, struct.pack('<H', cid) + code + b'\0')
++spr = lambda cid: sprite(cid, [b''])
++g = deffunc1('', [], T('g f', get('_root._currentframe')))
++f1 = doaction(push('_root') + GETVAR + push('g') + g + SETMEM + T('f1') + callm('_root', 'gotoAndPlay', 3)
++              + push(0, 'g') + CALLF + POP + T('f1 after g'))
++f2 = spr(2) + export(2, 'e2') + initact(2, T('init2 f', get('_root._currentframe'))) + doaction(T('f2'))
++f3 = spr(3) + export(3, 'e3') + initact(3, T('init3 f', get('_root._currentframe'))) + doaction(T('f3') + STOP)
++open(sys.argv[1], 'wb').write(swf(8, b'', [f1, f2, f3, doaction(T('f4'))], fps=10))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/output.txt b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/output.txt
+new file mode 100644
+index 00000000..82d97c6e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/output.txt
+@@ -0,0 +1,6 @@
++f1
++g f3
++init2 f3
++init3 f3
++f1 after g
++f3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/test.swf b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c97fda333650157b10e2e50886b9746486882e75
+GIT binary patch
+literal 366
+zcma*hF;2rk5QX92-b5QmkSJ9e3Re~_HZ3A3DCrUe1tqdzZAAhbt(Jn0OR!BE?!g7P
+z4M#BJ5FyfKnwjFwH#57v=~V$dGyH(hH~JkeM@UV>rfJUAyNq7LovmxfkylW%?zV|z
+zy!0|Ib^=4m-oIFDDp%P2$*`CwOW%RwghUp!2<@Vlt2>K_V%4s`s2;8!^H;9NzK0x^
+zDmfebgI0+1!WkQvBuw~<LIUZa2LT}_<$Dm~BUn`{m+tWxk=neLZb9`ARG3Ua^#^AA
+Rfc;-EBhm8OmOtI_@B@wwOzQvu
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/test.toml b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/test.toml
+new file mode 100644
+index 00000000..c9072e53
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_goto_skipped_init_call/test.toml
+@@ -0,0 +1 @@
++num_frames = 6
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/create_test_swf.py
+index 55e0a77e..a0f330a5 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/create_test_swf.py
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/create_test_swf.py
+@@ -13,13 +13,21 @@
+                                     fb's setTimeout(fn, 0) is created against
+                                     the current clock, so it fires next update
+   F4  setInterval(fc, 10), setInterval(fc, 13)
+-                                    16 fires are due per update; at most 10
+-                                    run (Ruffle MAX_TICKS) -> cnt=10 each frame
++                                    every due fire runs, catching up (no
++                                    per-update cap: s27 w2b-timers-tail; Flash
++                                    fired 70 due one-shots in one update,
++                                    regression/avm1_timer_overflow): F5 sees
++                                    9+7 = 16 (10..90 / 13..91), F6 and F7 see
++                                    10+8 = 18. Ruffle's MAX_TICKS = 10 ("for
++                                    sanity") gave cnt=10 each frame.
+   F7  clears both; F8 sees cnt=0.
+ 
+-s26 w2-timer-semantics. GOLDEN IS ANALYTIC (Ruffle-source-derived; the Ruffle
+-exporter never fires timers): core/src/timer.rs Timers::update_timers /
+-add_timer (MIN_INTERVAL 10, MAX_TICKS 10, TIMER_SCALE 1000, `tick_time <
++s26 w2-timer-semantics; F5-F7 re-derived s27 w2b-timers-tail without the
++MAX_TICKS cap. GOLDEN IS ANALYTIC (Ruffle-source-derived; the Ruffle
++exporter never fires timers; a Flash capture of this SWF is requested in
++session27-fanout-reports/w2b-timers-tail-report.md -- Flash's real-time clock
++may jitter F5-F7 by a fire): core/src/timer.rs Timers::update_timers /
++add_timer (MIN_INTERVAL 10, MAX_TICKS 10 [dropped], TIMER_SCALE 1000, `tick_time <
+ cur_time`), avm1/globals.rs create_timer (coerce_to_i32), tests/framework
+ runner.rs (run_frame then update_timers(frame_time) per tick). Computed by a
+ line-for-line simulation of that model INCLUDING std BinaryHeap tie order
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/output.txt b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/output.txt
+index 521b13fe..a3063554 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/output.txt
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/output.txt
+@@ -12,8 +12,8 @@ e f3
+ n f3
+ a4 f3
+ F4
+-F5 cnt=10
+-F6 cnt=10
+-F7 cnt=10
++F5 cnt=16
++F6 cnt=18
++F7 cnt=18
+ F8 cnt=0
+ F9 end
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/create_test_swf.py
+index fe4e47d9..72de06a7 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/create_test_swf.py
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/create_test_swf.py
+@@ -1,17 +1,18 @@
+ #!/usr/bin/env python3
+-"""avm1_timer_overflow: 70 live setTimeout(fn, 10) at once: ids past the old fixed 64-entry table
+-(MAX_TIMERS) are returned and fire (timer.c timerFreeSlot growth).
+-STABLE-PREFIX DESIGN: the Flash capture of the w1 SWF (traces 'n=' on frames
+-2-9) shows all 70 fired before frame 2 (n=70 throughout); our clock is Ruffle's
+-Timers model (MAX_TICKS = 10 fires per update), which reaches 70 only on frame
+-8. This SWF keeps frames 2-9 but traces only on frame 10, where both agree;
+-the golden is the Flash capture's first and last lines. The MAX_TICKS
+-divergence itself is a separate lead (s27 w2-timers-land report).
++"""avm1_timer_overflow: 70 live setTimeout(fn, 10) at once: ids past the old
++fixed 64-entry table (MAX_TIMERS) are returned and fire (timer.c timerFreeSlot
++growth), and ALL 70 fire in the first timer update: Flash has no per-update
++fire cap (Ruffle's Timers::MAX_TICKS = 10 is Ruffle's own "sanity" limit,
++which timer.c used to port: n=10,20,...,60,70 on frames 2-8). This is the w1
++SWF (traces 'n=' on frames 2-9) byte-for-byte; the s27 w2-timers-land
++stable-prefix variant (frames 2-9 empty) is retired now that timer.c drops
++the cap (s27 w2b-timers-tail).
+ 
+-s27 w2-timers-land. GOLDEN = real Flash Player 32 (LNX 32,0,0,465) trace of
+-this SWF, coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
+-w1-local-oracles/w1-timers-robustness/caps_timers/flash.wrapped.txt) (first and last line; see above). Ruffle is NOT an
+-oracle here: its exporter fires no timers and runs DoInitActions at preload.
++GOLDEN = real Flash Player 32 (LNX 32,0,0,465) trace of this SWF,
++coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
++w1-local-oracles/w1-timers-robustness/caps_timers/flash.wrapped.txt,
++identical to flash.direct.txt), verbatim. Ruffle is NOT an oracle here: its
++exporter fires no timers.
+ 
+ Usage: create_test_swf.py <out.swf> timers
+ """
+@@ -40,7 +41,7 @@ elif kind == 'timers':
+     for i in range(N):
+         f1 += setroot('id%d' % i, push(10) + get('_root.fn') + push(2, 'setTimeout') + CALLF)
+     f1 += T('id0=', get('_root.id0'), ' id63=', get('_root.id63'), ' id64=', get('_root.id64'), ' id69=', get('_root.id69'))
+-    frames = [f1] + [b''] * 8 + [T('end n=', get('_root.n')) + STOP]
++    frames = [f1] + [T('n=', get('_root.n'))] * 8 + [T('end n=', get('_root.n')) + STOP]
+ elif kind == 'watch':
+     defs = b''
+     h = deffunc1('', ['p', 'o', 'v'], setroot('wc', get('_root.wc') + push(1) + ADD2) + push('v') + GETVAR + RETURN)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/output.txt b/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/output.txt
+index 4005ddb8..19d70cc2 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/output.txt
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/output.txt
+@@ -1,2 +1,10 @@
+ id0=1 id63=64 id64=65 id69=70
++n=70
++n=70
++n=70
++n=70
++n=70
++n=70
++n=70
++n=70
+ end n=70
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/test.swf b/ruffle-tests/tests/swfs/regression/avm1_timer_overflow/test.swf
+index 25f2b57a627d8548da950d043c171c0eeeb66dce..4532b69068adcaae5aa60b176ad3e02ac52b90e4 100644
+GIT binary patch
+delta 275
+zcmdm_(WS-a79PyOCAyLAu5i5!^E4I)hCEw_Y3vLP@kROhB@8mtn1Lb;e(q`v4h%Gw
+Pucx&I1k9hzDWVAg{{lDq
+
+delta 57
+icmeCu+N8ne79PxDB(jn1uCOX2GlK&IA!70a5iI}~<_ItV
+
