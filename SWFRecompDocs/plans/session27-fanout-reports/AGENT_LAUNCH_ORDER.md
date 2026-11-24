@@ -23,3 +23,17 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 | 8 | w1-avm1-leftovers | | `briefs/w1-avm1-leftovers.md` | session_018CoDi6RWXyLdLEJhQj9e9Q |
 | 9 | w1-timers-robustness | | `briefs/w1-timers-robustness.md` | session_018CoDi67YHojVBN6gBU6L2N |
 | 10 | w1-exec-order | | `briefs/w1-exec-order.md` | session_018CoDi3kpoY381JK8xx3ueY |
+
+## N ladder (local one-task sessions)
+
+- `n-trap-stroke` DONE (report `5eeda6444`, code `d70f2c0aa`; REPORT BACK verified on disk): trap switch = Ruffle
+  tessellation-cache artifact (Flash rule kept); exit-door = strokes in line-style-id order (fixed); fixtures pass in CI.
+- `n-ragdoll-strokes` launched 2026-11-24 ~01:45 UTC (run.S7bGuoXf, cwd verified, handshake sent): ragdoll Drawing-API
+  thin strokes under scale, then the native residual (fps counter, edge px). CI folded into the coordinator's runs.
+- `flash-oracle` (launched by s26-coordinator at Robert's request): real Flash Player 32 oracle; captures come to s27.
+
+## Grading runs
+
+| run | mode / categories / images | code | result |
+|---|---|---|---|
+| 45300086369 | graphics / full / images (wave 0, dispatched by n-trap-stroke) | d70f2c0aa | **exact**: trace 4684 eff on the 4722 intersection, 0 moves; +2 new fixture rows pass (4686 / 4724); pixels 0 moves, 0 band moves (595 / 639 summed incl. the 2 fixtures). Results `da51f878f` |
