@@ -1,0 +1,21 @@
+ready
+_level0.m1 onRollOver
+_level0.m1 onPress
+_level0.m1 onRelease
+_level0.m1 onRollOut
+_level0 B2 rollOver
+_level0 B2 press
+_level0 B2 release
+_level0 B2 rollOut
+_level0.hi onRollOver
+_level0.hi onPress
+_level0.hi onRelease
+_level0.hi onRollOut
+_level0.par onRollOver
+_level0.par onPress
+_level0.par onRelease
+_level0.par onRollOut
+_level0.par onRollOver
+_level0.par onPress
+_level0.par onRelease
+_level0.par onRollOut

@@ -1,0 +1,2 @@
+ready: ABCD caret=1
+changed #1: AXBCD caret=2
