@@ -1427,3 +1427,90 @@ pixel work ran in cloud sessions on lavapipe with CI-grade fidelity proven per r
 - Fan-outs run full size when the user wants the credits used; a thin board is filled with plan-of-record arcs.
 - Pixel fixtures: an "analytic" golden must be confirmed against the Ruffle exporter before landing; when the test runs at
   `quality = "low"`, compare exporter(twin) vs exporter(original) instead (the exporter renders high only).
+
+## 25. Session-26 state of the board (2026-11-23)
+
+Baseline: the s25 FINAL images run `45078991452` (`9277f3799`), **572 / 624** (561 / 613 on the s24 set).
+
+Images runs:
+- Interims: `45094460914` (+2), `45104409805` (+5 cmp), `45114820633` (+2).
+- FINAL `45240685954` at `1396f1e10`; confirming run `45273227748` at `7e14f54dd`, 592 / 637 (+ `avm1_morph_instances_ratio`; − `pixelbender_dithering` = upstream drift: Ruffle `5128d3943` replaced its golden with a Flash Player reference after our final run — now a real Flash target, excess 1801 over 32500).
+
+Result: **593 / 636** (final); 592 / 637 at the confirm and again at `005bea42a` (run `45284922078`, 0 moves).
+- **+11 by name.** The s24 set went 561 → 570 / 613, and the s25 set 572 → 581 / 624.
+- **12 new regression-fixture comparisons**, all passing.
+- **2 priced losses**, each dispositioned with an `<!-- image-axis -->` marker.
+
+Trace side: `polish-sweep-arc.md` §27.
+
+| patch | flips | comparisons |
+|---|---:|---|
+| `5f4db0e60` w2-acid-clip-fill-region (per-layer fill/stroke interleave for StateNewStyles; DefineText glyph translation rounded to whole twips) | +4 cmp | `acid-clip`, `3_joystick` (1 level headroom), `acid-text-6` output + frame5 |
+| `509768d1d` w1-pixel-nearpass (sprite-nested EditText at its root ancestor depth; TrueType implied midpoints truncate) | +2 | `morph_test1` frame1, `filters/bevel` (0 headroom 6/6) |
+| `1aef9cc7b` w2-tail-bitmap-draw (AVM1 `draw()` of timeline shapes + static text; bitmap-fill shapes kept) | +2 | `static_text_offstage`, `pixelbender_dithering`; `bitmapbuttons` 618042 → 52 |
+| `b66bfdfc8` w2-blendshader-cpu-pbj (blendShader through the CPU PixelBender evaluator) | +1 | `blend_shader_luma_lighten` (s25 NO-GO fell); `shader_as_mask` 2100 → 366 |
+| `0cb6a9512` w1-attached-button-dispatch (b) | +1 | `String_path_variable_button` |
+| `6a6699c55` w2-applyfilter-edge-growth (Flash blur model: whole-source taps, output grown by the reach, 6-bit size) | +1 / −2 | +`bitmapdata_applyfilter_destpoint_edges`. −`bitmapdata_applyfilter_blur` (Ruffle-generated golden; ACCEPTED Cat 2 + RVF). −`filters/blur_quality` (golden inconsistent with `blur_fractional`) |
+| `84e4fefc0` + `5f5304072` text-cx-jpeg3, edittext-border-cx | 0 | `acid-color-0` 17315 → 308 (floor ~110: never flips without step 3) |
+| `18a58261a`, `ed35fe421`, `3a8e02dcd`, `f0fa5cfb7`, `c948d0e61` | 0 (game-visible) | applyFilter Glow/DropShadow/Bevel/Convolution (`destpoint_edges` 149477 → 30394 before edge growth); N1 filtered child in a layer group (AVM1+AVM2); live PO3 ColorMatrix passes; attached-holder render; per-instance morph ratio (N gold streaks) |
+
+- **Bands improved without a flip:** `bitmapbuttons`, `acid-color-0`, `shader_as_mask`, `destpoint` (before its flip).
+- **Zero-headroom watch list additions:** `filters/bevel` (6/6), `3_joystick` (1 level).
+- **Refutations:**
+  - The off-diagonal CM "needs the GPU pass" (false for RGB).
+  - The `bitmapbuttons` NO-GO.
+  - The stage3d "failing Context3D call" (it is a shading-budget latch).
+  - acid-clip "char 6 region order" (it is cross-layer stroke order).
+  - The EditText border-corner "runtime bug" (the oracle's Dx12 line-rect path).
+  - "Every JPEG3 row moves" (AVM2 rows use premultiplied `bd_seed_embedded`).
+
+### Left on the board (session 27)
+
+- **`avm2/pixelbender_dithering` now has a FLASH golden** (upstream `5128d3943`; limit 32500, we are 34301, 1801 over). This is the first real Flash oracle for the PixelBender CPU path, so re-sync the corpus first. Also, upstream `d87764213` re-renders the JPEG reference tests at high quality; price that drift before s27 wave 1.
+- **Flash captures unblock the held work.**
+  - `avm2_applyfilter_glow_kernels` (trace) and `avm2_bitmapdata_draw_filtered` (Ruffle's draw ignores filters). After the capture: switch `bd_draw_cm_filtered` to the `fb_*` model (S); GradientGlow/GradientBevel kernels (S).
+  - N3 layer-group alpha: capture `probes/n3_layer_alpha.swf`. Ruffle is per-child like us, so an exporter golden is invalid.
+  - A Flash image of `bitmapdata_applyfilter_blur`.
+- **applyFilter tail:**
+  - GPU display-filter blur vs the Flash model is untested (`blur_box_kernel`).
+  - `bitmapdata_drawwithquality` is at 3152/3197.
+  - AVM1 `applyFilter`/`draw()` has CM only.
+  - A Convolution with ≥20 entries is misread as a CM (XS).
+- **`cache_as_bitmap/avm1_color` NO-GO:** the Flash no-snap rule costs 3 passes (`avm2_button`, `drawing_api`, `scroll_rect`; all have Ruffle-made goldens). The RvF entry is still unwritten.
+- **ColorMatrix leftovers:** a live CM under a placement cxform; alpha-bias >0 CMs stay folded; a folded CM survives `filters=[]`.
+- **`shader_as_mask` 366:**
+  - truncating rounding in `renderer_composite_alpha_mask`;
+  - a blendShader node with mask/filters/scrollRect still draws NORMAL;
+  - RvF candidate: Ruffle composites OVER where Flash REPLACEs.
+- **`acid-color-0` 308:** step 3 (premultiplied timeline-bitmap sampling) is NO-GO. It is renderer-wide (32 rows plus an images run), and the floor is ~110.
+- **Text and glyphs:**
+  - The native renderer never soft-wraps `wordWrap` fields, possibly a large family (M–L).
+  - EditText glyph compose rounding for scaled fields.
+  - DefineText matrix fidelity in the recompiler (M).
+  - The AVM2 static-text and `avm2_render_textbox` cx twins.
+  - `draw()` of a tinted EditText.
+- **Holds:**
+  - bevel `O` 2 px (headroom only);
+  - the `3_joystick` tol-32 knob offset (the exporter has no input replay);
+  - `acid-shapes` self-intersecting translucent fills.
+- **Render and bitmap leads:**
+  - A holder's Drawing-API content paints over its attached children (S–M).
+  - Per-movie static bitmap bases for loaded children.
+  - AVM1 `draw()` Drawing-API paths are still aliased.
+  - `bitmapbuttons` 52 ch of corner AA.
+  - Stage3D cube sampling (needs the shading-budget latch lifted).
+- **N pixels:**
+  - level-1 trap-switch glyph colour, 27 px;
+  - exit-door panels, 36–64 px;
+  - ragdoll thin strokes.
+- **Flash-fidelity NO-GOs of record:**
+  - AVM2 `gfx_gen_ramp` twin (moves away from Flash), CPU gradient sampler;
+  - `blend_scroll`, `bitmapdata_opaque`, h263 IDCT;
+  - `graphics_draw_path`, `graphics_simple_shapes`, `gradientTransform`, `bitmapdata_draw`;
+  - `place_object_test`, `definefont4`, F/G device-font + FlashType rows, `font_lookup_as3`.
+
+### Process notes added in session 26
+
+- **Exporter on Dx12** inks line-rect corners at 3/4; use `WGPU_BACKEND=vulkan` for border goldens.
+- **Ruffle's test runner** is the oracle for timers and loaded children (one input step per frame). See also the shared-tree staging rule above.
+- **A Ruffle-generated golden is not a Flash oracle.** When a Flash-model change loses such a row, price the loss, disposition it (ACCEPTED + RVF + image-axis marker), and keep the Flash-correct pass (user ruling: Flash over Ruffle).

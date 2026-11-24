@@ -3543,3 +3543,118 @@ coordinator-run, or an upstream golden proven equivalent): `avm1_attached_clip_t
   ACCEPTED/RvF set.
 
 **Pixels.** See `graphics-fanout-playbook.md` §24.
+
+
+## 27. Session 26 (2026-11-23) — dual-axis fan-out #18, CLOUD-FIRST, full size: trace +4 by name, pixels +11 by name (593/636, 2 priced and dispositioned losses), 0 code regressions after the final-run fixes; N levels 2–4 routes byte-identical
+
+Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-ladder commits and 2 coordinator fixes, plus docs. Every report, patch, probe and oracle is under `session26-fanout-reports/`. The fan-out was cloud-first and full size: 9 wave-1 slots plus 13 wave-2 slots (env "SWFRecomp fan-out", Opus). All 22 delivered and none were lost; 7 wave-1 prototypes landed directly. In parallel, the local N one-task ladder ran: `n-pixel-pass` → `n-collector-uaf` → `n-exec-order` → `n-levels` → `n-gold-streaks`, then `n-browser-pfx` (`005bea42a`: an obsolete name-gated browser `pfx` one-shot hack removed; RNG hasher signed-overflow UB fixed so emcc and gcc draw the same sequence; level 1 route exporter = native = browser). Its successor `n-trap-stroke` was launched at closeout. Each slice's REPORT BACK was checked against disk before the next slice launched.
+
+**Baselines read fresh.** Trace: the s25 FINAL `45078991452` (results `9277f3799`): 4636 eff / 4677 rows, 41 failing. No-graphics: `45079002150` (`dffc41cf2`). Pixels: 572/624 (561/613 on the s24 comparison set). Upstream drift `3ac8dcb07..3e98d9ba6` (5 commits).
+
+**Grading runs.**
+
+| run | code | trace (graphics) | pixels | no-graphics |
+|---|---|---|---|---|
+| `45094460914` | drift, trace-tail-audit, pixel-nearpass | +2 by name | +2 by name | — |
+| `45096347136` | + attached-button (a)+(b) (tag.c NO_GRAPHICS arm) | — | — | +2 by name, exact |
+| `45104409805` | + layer-colour, per-movie DL phase 1, acid-clip, applyfilter-kernels, blendshader, dispatch-scope, n-pixel-pass | +1 | +4 cmp acid-clip family, +1 blendshader; 3 fixtures | — |
+| `45114820633` | + cm-chain, tail-bitmap-draw, text-cx-jpeg3, robustness, loaded-shell, timers, n-collector-uaf | +1 (gnash `BitmapDataDraw`); `gotoFrameFromInterval` newly graded (CI exclude lifted) | +2; `bitmapbuttons` −100 %, `acid-color-0` −98 % | — |
+| `45240685954` / `45240699289` (FINAL) at `1396f1e10` | + applyfilter-edge-growth, avm1-text-resolve, attached-holder-render, edittext-border-cx, n-exec-order, n-levels | +4 cumulative; **2 regressions** (`hitarea_remove_owner_drag`, `hitarea_sweep`) | **593/636** (+11 by name, 2 priced losses) | **2 regressions** (`hitarea_remove_owner_drag`, gnash `callFunction_test` SEGFAULT) |
+| `45273227748` / `45273247110` (CONFIRM) at `7e14f54dd` | + regression fixes, n-gold-streaks `c948d0e61` | **exact**: 4639 → 4642 eff on the 4680-row intersection (+3 by name: `file_reference_upload_request`, `video_prototype_lazy_swf6_child`, gnash `sound`; gnash `BitmapDataDraw` rm → pass), **0 regressions**; 42 new rows all effective (41 fixtures + `gotoFrameFromInterval` rm). Overall 4684 / 4722 eff, 38 failing. Results `7ed7ecef6` | 592 / 637: + `avm1_morph_instances_ratio`; − `avm2/pixelbender_dithering` = **upstream drift** (Ruffle `5128d3943`, 2026-11-23 20:33Z, swapped in a Flash Player golden, limit 32500; we are 34301) | 4637 → 4639 on the intersection (+3 by name, same rows); 1 move = the documented load-flake `from_shumway/as3-loader/bug1157243/empty` (passes 3/3 locally; passes again at `005bea42a` — load-flake confirmed, not a regression). Overall 4681 / 4722. Mode parity: only `audio/aac`, `audio_computespectrum` (predicted) + that flake. Results `d82bbd5d7` |
+| `45284922078` / `45284938521` at `005bea42a` | + n-browser-pfx (browser pfx, RNG hasher UB) | **identical to the confirm**: 4684 / 4722, 0 moves (shard 8 apt-get failure rerun with `--failed`). Results `df7729df2` | 592 / 637, 0 moves (upstream `d87764213` JPEG re-render moved none of our rows) | 4682 / 4722, 0 regressions; the flake row passes again. Results `81d32b9b2` |
+
+**The final-run regressions** were named, bisected and fixed in `7e14f54dd`. The confirming pair is the final record.
+- `hitarea_remove_owner_drag` and `hitarea_sweep` came from n-exec-order's root-last order (`4e66127cc`), found by reverting single commits in a worktree. The deferred `_root.onEnterFrame` fired after the per-frame `_droptarget` refresh, so it read the next pick. The fix defers the refresh along with the root arm (`g_root_ef_pending` bit 4). Turning root-last off instead would have regressed n-levels' `avm1_attach_from_stopped_root_enterframe`.
+- The no-graphics `callFunction_test` SEGFAULT came from dispatch-scope's generic stub arm (`a18a9cc61`), found by `git bisect run` plus ASan. `"_root:mc1:gotoAndStop"` was re-routed through the generic arm. The timeline-navigation stubs now keep their own arms (`cfIsTimelineNavName`).
+
+### 27.1 Ledger
+
+| patch | trace | pixels | notes |
+|---|---:|---:|---|
+| `c380aecd5` w1-drift | +1 | | `file_reference_upload_request` (both modes); pixelbender_conditional and vp6 drift are no-ops |
+| `f9a36d8fc` w1-trace-tail-audit | +1 | | gnash `sound`: SWF≤6 case-insensitive `gotoandPlay`. The "no audio" disposition fell; ignore entry pruned. pixelDissolve +16 lines, matrix_accuracy_test1 +2 |
+| `a6a696bf2` w1-per-movie-displaylist ph1 | +1 | | `video_prototype_lazy_swf6_child` (both modes). Priced at M, not L |
+| `1aef9cc7b` w2-tail-bitmap-draw | +1 | +2 | gnash `BitmapDataDraw` rm → pass; `static_text_offstage`, `pixelbender_dithering`; `bitmapbuttons` 618042 → 52 |
+| `509768d1d` w1-pixel-nearpass | | +2 | `morph_test1` frame1 (sprite-nested EditText z-order), `filters/bevel` (stb midpoint truncation; 0 headroom) |
+| `5f4db0e60` w2-acid-clip-fill-region | | +4 cmp | `acid-clip`, `3_joystick`, `acid-text-6` output + frame5: cross-layer stroke order; glyph translation rounded to whole twips |
+| `0cb6a9512` w1-attached-button-dispatch (b) | | +1 | `String_path_variable_button` |
+| `b66bfdfc8` w2-blendshader-cpu-pbj | | +1 | `blend_shader_luma_lighten`; `shader_as_mask` 2100 → 366 |
+| `6a6699c55` w2-applyfilter-edge-growth | | +1 / −2 | `bitmapdata_applyfilter_destpoint_edges`. Priced losses with dispositions: `bitmapdata_applyfilter_blur` (Ruffle-generated golden; ACCEPTED Cat 2 + RVF) and `filters/blur_quality` (golden inconsistent with `blur_fractional`) |
+| `84e4fefc0`, `5f5304072` text-cx-jpeg3, edittext-border-cx | | 0 | `acid-color-0` 17315 → 308. Border corners come from the oracle's Dx12 line-rect path, not from our runtime |
+| `18a58261a` applyfilter-kernels, `ed35fe421` layer-colour, `3a8e02dcd` cm-chain | | 0 | applyFilter Glow/DropShadow/Bevel/Convolution; N1 filtered child in a layer group; live PO3 CM passes. Fixtures exporter-confirmed |
+| `876e66704`, `f0fa5cfb7` attached-button (a), attached-holder-render | 0 | 0 | CI-mode attached-clip buttons, one topmost-button pick, holder render. Game-visible |
+| `a18a9cc61` dispatch-scope, `cca557e15` text-resolve | 0 | | 7 + 4 AVM1 fixes (bare-call `with`, type-2 flags, function-form timer, hairline hitTest, `__resolve`, wrap give-up, HTML-run edits). Game-visible |
+| `7f191285d` robustness, `da9b49b17` timers, `9fa68316e` loaded-shell | 0 | | Growable registries, `-fno-strict-aliasing`, func2 register OOB; Ruffle timer clock; loaded-shell bare goto (it was being DROPPED) |
+| N ladder: `8301fd233`, `495dbde90`, `440ecf35b`, `63d13990e`, `4e66127cc`, `1396f1e10`, `c948d0e61` | 0 | 0 | attached-pump UAF and hijack; retry-collector UAF; browser attached EditText wrap; root-last order; stopped-root attach-init; per-instance morph ratio |
+
+**New `regression/` fixtures (41)**, each golden from an oracle outside SWFRecomp: Ruffle exporter `0ddd12b6a`, Ruffle's test runner (timers and children), or analytic where marked. They are `avm1_bare_mc_method_scope`, `avm1_create_text_field_depth`, `avm1_device_edittext_xscale`, `avm1_hittest_hairline`, `avm1_set_new_text_format_color`, `avm1_timer_function_form_activation`, `avm1_type2_mc_receiver_dispatch`, `avm1_attached_clip_button_click`, `layer_group_filtered_child`, `avm2_layer_group_filtered_child`, `avm1_placed_drawing_color`, `avm1_attached_clip_samename_child`, `avm1_key_isdown_protected`, `avm1_removed_clip_dprops_gc`, `avm1_po3_color_matrix_live{,_nested,_clear}`, `avm1_edittext_placed_cxform{,_script}`, `avm1_jpeg3_alpha_bitmap`, `avm1_many_defs_registry`, `avm1_pixelbounds_dynamic_child`, `avm1_cxform_override_overflow`, `avm1_filter_list_overflow`, `avm1_long_text_layout`, `avm1_many_functions_registry`, `avm1_func2_param_register_oob`, `avm1_remove_same_name_other_parent`, `avm1_timer_clock_model`, `avm1_mc_resolve`, `avm1_wrap_giveup_mixed_runs`, `avm1_edittext_html_delete_runs`, `avm1_set_new_text_format_render`, `ei_mc_this_receiver` (analytic), `avm1_exec_order_attached_selfremove`, `avm1_textfield_x_bounds_offset`, `avm1_attached_clip_holder_render`, `avm1_button_pick_order`, `avm1_button_textfield_path_binding`, `avm1_attach_from_stopped_root_enterframe`, `avm1_morph_instances_ratio`.
+
+### 27.2 Standing verdicts that fell
+
+- **"A bare goto in a loaded movie routes to ROOT"**: the goto was silently DROPPED (`ng_gotoFrameByMC` dynamic arm). Fixed in `9fa68316e` (w2-loaded-shell-phase2).
+- **"Per-movie display lists = L"** (s25): phase 1 was M and gave +1. Phase 3 is not S: measured −2 on the `swf{5_to_6,6_to_5}_cross_call` pair.
+- **"Native attached-clip button dispatch is CI-visible"** (§26.4): no `input.json` row reaches it; 0 flips. Browser `getRGB`/`getBounds` are not CI-visible either.
+- **gnash `sound` "no audio simulation"** (ACCEPTED): it was SWF6 case-insensitive nav. The `pixelDissolve` ACCEPTED mechanism was wrong too, and `matrix_accuracy_test1`'s oracle is Flash 10 (docs corrected in `dc205324e`).
+- **`bitmapbuttons` NO-GO "feature slice"**: 618042 → 52. **"`pixelbender_dithering` needs the CPU bitmap-fill arm"**: needed but not enough, because `resolve_shape_geom` dropped bitmap-fill shapes.
+- **"stage3d fractal/raytrace: find the failing Context3D call"**: no call fails. It is the CPU shading-budget latch.
+- **"AVM1 off-diagonal ColorMatrix needs the GPU pass"**: false for RGB (the fold is a full 4×5 affine). The "alpha bias fills the filter bounds" HOLD is not Ruffle behaviour, since Ruffle divides by `src.a`.
+- **acid-clip "char 6 fill-region order", priced ≤50 %**: the cause was cross-layer stroke-over-fill order, and it flipped with headroom. `3_joystick` had the same bug, and `acid-text-6` needed no lyon f32 model.
+- **"Land `glow_kernels` with Ruffle's trace"**: retired, because `bitmapdata_applyfilter_blur`'s golden is Ruffle-generated. **"EditText border corners under a cx"**: no runtime bug; the cause is the oracle machine's Dx12 `emulate_line_rect`.
+- **"The whole `gotoFrameFromInterval` residual is timers"**: the rest is a goto-skipped DoInitAction. **"`action.c:10605` is a live miscompile"**: it is latent UB, fixed as prevention.
+- **"Native renderer wraps per character"** (7b): it has no soft wrap at all. The EI clip receiver ("wrong `this`") was a segfault.
+- **N**:
+  - The browser EditText "−2,−2" offset was really a field that was not drawn until AS touched it.
+  - The "last `h=` diff = root-ef order" (two briefs in a row) was two stopped-root attach bugs.
+  - The "levels 1–4 player-exact" result was really four runs of level 0 (`START_LEVEL` renamed level 0).
+  - The "gold streaks = nested morph timeline" was every morph instance drawing the last-composed ratio.
+
+### 27.3 Method notes (deltas vs s25)
+
+- **The final grading caught two regressions that no interim run could have.** Both came from commits landed after the last interim run: N-ladder `4e66127cc`, and a no-graphics-only crash from `a18a9cc61` (the NG leg runs only on the final). Recovery took about 1 h: revert single commits in a worktree; `git bisect run` with `SWFRecomp/build` symlinked; ASan for the crash. **Rule for s27:** schedule one interim run after the last local-ladder landing, and run the no-graphics leg on any interim that lands `actionCallFunction`/CallMethod dispatch changes.
+- **A "default OFF" quick fix can regress a fixture that a later commit relies on.** Before flipping an env-gated default, grep the regression suite for fixtures that landed after the gate. Here n-levels' fixture needed root-last ON, and the real fix was the ordering of a side effect (`_droptarget`) inside the deferred arm.
+- **Shared working tree:** stage a landing with `git apply --cached <patch>`, never with `git add <runtime file>`. I swept peer hunks twice this way (benign, but avoidable).
+- **Ruffle's own test runner** (`~/CC/ruffle/target/debug/deps/tests-*`, Feb-2026 build) is the oracle for fixtures with timers or loaded children, which the exporter can't serve. It consumes one input step per frame, so set `num_frames` ≥ the number of input steps. Treat its disagreements as "hold and re-derive" (3 loaded-shell fixtures are held).
+- **The exporter may run on Dx12**, which inks line-rect corners at 3/4. Pass `WGPU_BACKEND=vulkan` for border goldens.
+- **The report watcher missed two deliveries.** Check `git ls-remote origin 'refs/heads/fanout/*'` before declaring a wave incomplete. Interim placeholder reports need a `! grep PLACEHOLDER` gate.
+- **The Pages dry run caught a link-only break** (graphics host lacked the draws.c table pointers); fixed in `1357d1f45`. Keep dry runs on every recompiler/runtime landing.
+
+### 27.4 Left on the board (session 27)
+
+**Trace**
+- **N** (local ladder):
+  - `n-browser-pfx` is running: the browser removes self-removing particle clips 2 ticks late (`h=` only; native is exact).
+  - Next: the level 1 route (the key hollow is reachable only through a ~22 px notch), then levels 5+.
+- **Held fixtures (oracle-gated)**:
+  - Loaded-shell `avm1_loaded_bare_goto`, `_unload_shell`, `_shell_consumers`: the Feb-2026 runner disagrees on load/unload tick timing. Needs a current Ruffle runner or a re-derivation.
+  - `avm1_edittext_html_typed_runs`: Ruffle's `c0=0` is a `replace_text` index-0 artifact. Needs a Flash capture, then an RvF entry.
+- **Per-movie DL phase 3 NO-GO** (−2 on `cross_call`): synchronous cross-movie name lookup runs while the holder list is swapped in. Fix: a `ng_rootDisplayList()` accessor (M); build a fixture first. Loaded-shell remainder:
+  - buttons/hit-test over shells; text-field depth windows.
+  - label GotoFrame2 still resolves through the root label table.
+  - a parent-issued `holder.gotoAndStop` suppresses the target frame's DoAction.
+  - `_x`/`_y` getters keyed by name.
+- **Timer goto-skipped DoInitAction**: `_root.gotoAndPlay(9)` from a frame-7 timer never runs frame 8's DoInitActions (`gotoFrameFromInterval`, now graded `ruffle_matched`). Small timer gaps: method-form detection needs `num_args>=3`; `clearInterval` coercion.
+- **Exec order**:
+  - The per-clip sibling exec-list interleave is a NO-GO until the exec list becomes flat and instantiation-ordered. Root-last moved `ActionOrderTest3/4/5` closer, but none flip.
+  - Unverified: `swf.c` marks dynamic MCs eligible before the stopped-root SCRIPT drain, while `swf_core.c` marks them after promote.
+- **Browser AVM1 gaps**:
+  - `createTextField` and `getInstanceAtDepth` are no-ops in the browser `#else` arms, and `gate_inventory.py` can't see no-op arms.
+  - `getRGB` returns undefined (S); `getBounds` returns 6710886 (M).
+- **AVM1 leftovers**:
+  - Merge AS-handler MC mouse dispatch into the DefineButton pick (M).
+  - Path-variable scope for non-button EditTexts.
+  - `__resolve` through dotted GetVariable paths.
+  - `setNewTextFormat` size/font.
+  - Cut/Copy act on the whole text, not the selection.
+  - Grep the other SWF≤6 case-sensitive builtin arms.
+- **Robustness tail**:
+  - func2 register reads past RegisterCount (XS).
+  - Remaining fixed caps: `MAX_SCROLL_CROPS`, `MAX_TEXT_CULLED`, `LAZY_PROTOS`, `WATCH`, `EI_CALLBACKS`, `CLONE_DEPTH`, `TIMERS`.
+  - Dead `tagSetFilter*`.
+- **Upstream drift since the final run** (Ruffle `5128d3943`, `d87764213`): wave-1 drift slot. The corpus mirror has not been re-synced since `3e98d9ba6`.
+- **FileReference**: `download()` doesn't log under `log_fetch`; no `postData` accessor. No graded row.
+- **Unchanged NO-GOs**:
+  - the action_order family, `global_proto_decls(_delete)`, `global_instance_decls`, `native_objects_swf6`, `globals_monkeypatch`, `GradientFillTest`, `external_interface_monkeypatch`;
+  - shumway `esc` (AOT ceiling);
+  - the avm2 ACCEPTED/RvF set.
+
+**Pixels.** See `graphics-fanout-playbook.md` §25.
