@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T23:56:29.047485+00:00",
+    "old_timestamp": "2026-11-24T00:49:36.315980+00:00",
     "old_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
-    "new_timestamp": "2026-11-24T00:49:36.315980+00:00",
-    "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "new_timestamp": "2026-11-24T01:36:19.282271+00:00",
+    "new_git_sha": "d70f2c0aa67fd0701e0d0fe02ebf2e6c3d7e62c2",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 165,
+    "old_pass": 171,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 165,
-    "old_total": 165,
+    "old_effective_pass": 171,
+    "old_total": 171,
     "old_pass_rate": 100.0,
-    "new_pass": 171,
+    "new_pass": 173,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 171,
-    "new_total": 171,
+    "new_effective_pass": 173,
+    "new_total": 173,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,81 +25,33 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 165,
-    "added": 6,
+    "unchanged": 171,
+    "added": 2,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_long_text_layout",
+      "test": "avm1_hairline_scaled_instances",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
       }
     },
     {
-      "test": "avm1_many_chars_registry",
+      "test": "avm1_stroke_style_id_order",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "avm1_many_defs_registry",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      }
-    },
-    {
-      "test": "avm1_many_functions_registry",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "avm1_mc_resolve",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "avm1_mcl_holder_totalframes",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
       }
     }
   ]

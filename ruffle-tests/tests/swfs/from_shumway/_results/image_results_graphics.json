@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "timestamp": "2026-11-24T00:49:39.268569+00:00",
+    "timestamp": "2026-11-24T01:36:22.536602+00:00",
     "suite": "from_shumway",
     "stem": "results_graphics",
-    "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "git_sha": "d70f2c0aa67fd0701e0d0fe02ebf2e6c3d7e62c2",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45284922078",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45284922078",
-    "run_attempt": "2"
+    "run_id": "45300086369",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45300086369",
+    "run_attempt": "1"
   },
   "tests_with_comparisons": 71,
   "comparisons": 123,
@@ -2271,37 +2271,37 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 2496 outliers (limit 3000), max difference 199 (3 checks)",
-      "max_diff": 199,
+      "message": "Image check passed: 507 outliers (limit 3000), max difference 159 (3 checks)",
+      "max_diff": 159,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 23976,
-      "mean_diff": 0.8698,
+      "diff_channels": 23340,
+      "mean_diff": 0.6364,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 30000,
-          "outliers": 23976,
+          "outliers": 23340,
           "passed": true
         },
         {
           "tolerance": 20,
           "max_outliers": 20000,
-          "outliers": 11088,
+          "outliers": 9792,
           "passed": true
         },
         {
           "tolerance": 80,
           "max_outliers": 3000,
-          "outliers": 2496,
+          "outliers": 507,
           "passed": true
         }
       ],
       "applicable_checks": 3,
       "failed_checks": 0,
-      "outliers": 2496,
+      "outliers": 507,
       "max_outliers": 3000,
       "tolerance": 80,
       "excess_outliers": 0
@@ -2313,37 +2313,37 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 2190 outliers (limit 3000), max difference 215 (3 checks)",
-      "max_diff": 215,
+      "message": "Image check passed: 426 outliers (limit 3000), max difference 130 (3 checks)",
+      "max_diff": 130,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 23937,
-      "mean_diff": 0.8111,
+      "diff_channels": 23352,
+      "mean_diff": 0.6121,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 30000,
-          "outliers": 23937,
+          "outliers": 23352,
           "passed": true
         },
         {
           "tolerance": 20,
           "max_outliers": 21000,
-          "outliers": 10569,
+          "outliers": 9375,
           "passed": true
         },
         {
           "tolerance": 80,
           "max_outliers": 3000,
-          "outliers": 2190,
+          "outliers": 426,
           "passed": true
         }
       ],
       "applicable_checks": 3,
       "failed_checks": 0,
-      "outliers": 2190,
+      "outliers": 426,
       "max_outliers": 3000,
       "tolerance": 80,
       "excess_outliers": 0

@@ -1,21 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T23:56:28.931813+00:00",
+    "timestamp": "2026-11-24T00:49:36.226355+00:00",
     "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
-    "duration_seconds": 4911.77,
+    "duration_seconds": 5032.06,
     "total_available": 781,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 755,
-  "pass": 721,
+  "total": 781,
+  "pass": 747,
   "ruffle_matched": 22,
   "fail": 12,
-  "pass_rate": 95.5,
-  "effective_pass": 743,
-  "effective_pass_rate": 98.4,
+  "pass_rate": 95.6,
+  "effective_pass": 769,
+  "effective_pass_rate": 98.5,
   "breakdown": {
     "output_mismatch": 12
   },
@@ -3313,6 +3311,422 @@
         "matching_lines": 20
       },
       "duration": 1.6,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_bullet",
+      "phases": {
+        "recomp": 0.058,
+        "compile": 3.566,
+        "run": 4.04
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 7.67,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_default_format",
+      "phases": {
+        "recomp": 0.058,
+        "compile": 2.391,
+        "run": 0.29
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 221,
+        "expected_lines": 221,
+        "matching_lines": 221
+      },
+      "duration": 2.75,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_default_format_empty",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.123,
+        "run": 0.284
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 100,
+        "expected_lines": 100,
+        "matching_lines": 100
+      },
+      "duration": 2.42,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_default_format_font_style",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 2.268,
+        "run": 0.289
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 335,
+        "expected_lines": 335,
+        "matching_lines": 335
+      },
+      "duration": 2.59,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_drag_select",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 24.877,
+        "run": 0.312
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 25.25,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_focus_selection",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.138,
+        "run": 0.312
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 2.46,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_font_size",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 2.248,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 45,
+        "expected_lines": 45,
+        "matching_lines": 45
+      },
+      "duration": 2.63,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_hscroll",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 2.025,
+        "run": 0.284
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 27
+      },
+      "duration": 2.32,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_align_swf7",
+      "phases": {
+        "recomp": 0.056,
+        "compile": 2.419,
+        "run": 0.297
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 52,
+        "expected_lines": 52,
+        "matching_lines": 52
+      },
+      "duration": 2.78,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_align_swf8",
+      "phases": {
+        "recomp": 0.056,
+        "compile": 0.905,
+        "run": 0.291
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 52,
+        "expected_lines": 52,
+        "matching_lines": 52
+      },
+      "duration": 1.26,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_color",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.109,
+        "run": 0.284
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 114,
+        "expected_lines": 114,
+        "matching_lines": 114
+      },
+      "duration": 2.41,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_condensewhite_swf7",
+      "phases": {
+        "recomp": 0.056,
+        "compile": 2.489,
+        "run": 0.293
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 311,
+        "expected_lines": 311,
+        "matching_lines": 311
+      },
+      "duration": 2.85,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_condensewhite_swf8",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 0.961,
+        "run": 0.292
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 311,
+        "expected_lines": 311,
+        "matching_lines": 311
+      },
+      "duration": 1.32,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_duplicate_attributes",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.161,
+        "run": 0.36
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 247,
+        "expected_lines": 247,
+        "matching_lines": 247
+      },
+      "duration": 2.53,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_entity",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 2.129,
+        "run": 0.306
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 2.5,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_roundtrip",
+      "phases": {
+        "recomp": 0.017,
+        "compile": 2.139,
+        "run": 0.288
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "duration": 2.45,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_swf6",
+      "phases": {
+        "recomp": 0.058,
+        "compile": 3.766,
+        "run": 0.351
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5377,
+        "expected_lines": 5377,
+        "matching_lines": 5377
+      },
+      "duration": 4.2,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_swf7",
+      "phases": {
+        "recomp": 0.059,
+        "compile": 1.8,
+        "run": 0.351
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5377,
+        "expected_lines": 5377,
+        "matching_lines": 5377
+      },
+      "duration": 2.23,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_swf8",
+      "phases": {
+        "recomp": 0.059,
+        "compile": 0.999,
+        "run": 0.372
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5377,
+        "expected_lines": 5377,
+        "matching_lines": 5377
+      },
+      "duration": 1.45,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_ime_focus_lost",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 24.31,
+        "run": 0.268
+      },
+      "num_frames": 8,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 24.59,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_input",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.994,
+        "run": 0.307
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 2.31,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_input_newlines",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.063,
+        "run": 0.307
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 2.38,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_leading",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 2.074,
+        "run": 0.343
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 2.48,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_letter_spacing",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 2.092,
+        "run": 0.337
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "duration": 2.49,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_margins",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 2.104,
+        "run": 0.342
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 25,
+        "matching_lines": 25
+      },
+      "duration": 2.51,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_newline_stripping",
+      "phases": {
+        "recomp": 0.962,
+        "compile": 6.956,
+        "run": 0.312
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      },
+      "duration": 8.24,
       "status": "pass"
     },
     {

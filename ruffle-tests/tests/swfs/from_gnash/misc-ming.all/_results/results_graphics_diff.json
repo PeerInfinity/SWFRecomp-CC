@@ -1,82 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T23:56:29.084557+00:00",
+    "old_timestamp": "2026-11-24T00:49:36.342803+00:00",
     "old_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
-    "new_timestamp": "2026-11-24T00:49:36.342803+00:00",
-    "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "new_timestamp": "2026-11-24T01:36:19.308826+00:00",
+    "new_git_sha": "d70f2c0aa67fd0701e0d0fe02ebf2e6c3d7e62c2",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 68,
-    "old_ruffle_matched": 32,
-    "old_effective_pass": 100,
-    "old_total": 107,
-    "old_pass_rate": 63.6,
+    "old_pass": 70,
+    "old_ruffle_matched": 33,
+    "old_effective_pass": 103,
+    "old_total": 111,
+    "old_pass_rate": 63.1,
     "new_pass": 70,
     "new_ruffle_matched": 33,
     "new_effective_pass": 103,
     "new_total": 111,
     "new_pass_rate": 63.1,
-    "old_mismatched_lines": 941,
+    "old_mismatched_lines": 959,
     "new_mismatched_lines": 959,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 107,
-    "added": 4,
+    "unchanged": 111,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "action_order/action_execution_order_test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 18,
-        "expected_lines": 19,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "action_order/action_execution_order_test1",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      }
-    },
-    {
-      "test": "action_order/action_execution_order_test11",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 32,
-        "expected_lines": 32,
-        "matching_lines": 26
-      }
-    },
-    {
-      "test": "action_order/action_execution_order_test2",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    }
-  ]
+  "changes": []
 }

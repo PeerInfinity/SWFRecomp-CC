@@ -1,20 +1,18 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T23:56:29.047485+00:00",
+    "timestamp": "2026-11-24T00:49:36.315980+00:00",
     "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
-    "duration_seconds": 2097.28,
+    "duration_seconds": 2236.42,
     "total_available": 171,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 165,
-  "pass": 165,
+  "total": 171,
+  "pass": 171,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 165,
+  "effective_pass": 171,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -926,6 +924,136 @@
         "matching_lines": 8
       },
       "duration": 1.6,
+      "status": "pass"
+    },
+    {
+      "test": "avm1_long_text_layout",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 24.363,
+        "run": 0.278
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 24.69,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 200,
+            "height": 150,
+            "total_channels": 120000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 1,
+                "max_outliers": 0,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 1,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "avm1_many_chars_registry",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 24.822,
+        "run": 0.272
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 25.12,
+      "status": "pass"
+    },
+    {
+      "test": "avm1_many_defs_registry",
+      "phases": {
+        "recomp": 0.018,
+        "compile": 26.747,
+        "run": 0.295
+      },
+      "num_frames": 6,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 27.07,
+      "status": "pass"
+    },
+    {
+      "test": "avm1_many_functions_registry",
+      "phases": {
+        "recomp": 0.022,
+        "compile": 11.679,
+        "run": 0.293
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 12.0,
+      "status": "pass"
+    },
+    {
+      "test": "avm1_mc_resolve",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 24.854,
+        "run": 0.276
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 25.14,
+      "status": "pass"
+    },
+    {
+      "test": "avm1_mcl_holder_totalframes",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 24.571,
+        "run": 0.277
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 24.86,
       "status": "pass"
     },
     {
