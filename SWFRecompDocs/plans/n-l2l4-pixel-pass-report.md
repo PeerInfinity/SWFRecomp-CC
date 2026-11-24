@@ -157,7 +157,9 @@ Expected moves:
 - **browser:** the painter and the `double` scale are shared code, so they are browser-visible (Pages deploy is the
   coordinator's).
 
-*CI result: pending the coordinator's grading run (interim #2, with the no-graphics leg).*
+*CI result: f5565dcf9 landed after interim #2 was dispatched (at cceb5133a), so it is graded in **interim #3**
+(graphics + images + no-graphics). The by-name result is recorded in the s27 arc doc, not here. Successor:
+`n-levels-5plus` (levels 5+, then the textWidth tab metric).*
 
 ## 7. Next blocker / next slice
 
