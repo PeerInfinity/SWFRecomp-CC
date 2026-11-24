@@ -11311,7 +11311,27 @@ namespace SWFRecomp
 					}
 				};
 
-				for (size_t i = 0; i < paths.size(); ++i)
+				// Strokes draw per layer in LINE-STYLE-ID order, not record
+				// order: Ruffle's ShapeConverter collects every edge of a layer
+				// into one PendingPath per line style (shape_utils.rs `strokes`,
+				// indexed by style id) and flush_layer emits them in index
+				// order. When two styles stroke the same edge, the higher id
+				// lands on top whichever record came first (N's exit-door panel,
+				// char 202: a style-2 inner rect shares its right edge with the
+				// style-1 outer rect defined after it). Stable, so paths of one
+				// style keep their record order; layers stay ascending, which
+				// emit_layer_fills requires.
+				std::vector<size_t> stroke_order(paths.size());
+				for (size_t k = 0; k < paths.size(); ++k) stroke_order[k] = k;
+				std::stable_sort(stroke_order.begin(), stroke_order.end(),
+					[&](size_t a, size_t b)
+					{
+						if (paths[a].line_style_list != paths[b].line_style_list)
+							return paths[a].line_style_list < paths[b].line_style_list;
+						return paths[a].line_style < paths[b].line_style;
+					});
+
+				for (size_t i : stroke_order)
 				{
 					emit_layer_fills(paths[i].line_style_list);
 
