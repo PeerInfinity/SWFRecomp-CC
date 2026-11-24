@@ -158,7 +158,7 @@ Flash Player 32 trace of `regression/avm1_edittext_tabstops_metric` ('A' square 
   - `from_shumway/acid/acid-color-0`: baseline pass (3) → 1138 outliers locally. **Not this change:** a detached
     worktree at HEAD `931383092` with NONE of these hunks fails identically (1138). Either a commit after interim
     #3 or the shared recompiler build (`SWFRecomp/build` is symlinked in, and peers' uncommitted `swf.cpp` lives
-    there). Reported to the coordinator. Its golden is Ruffle-made ("not Flash", golden-provenance). In the
+    there). **Resolved by the coordinator:** an expected, priced Flash-over-Ruffle loss from `31d3e3237` (the Flash-faithful JPEG decoder), with an RvF entry written. Its golden is Ruffle-made ("not Flash", golden-provenance). In the
     moved pixels the local render is slightly closer to Flash than the golden (640 vs 706 channels > 3).
 - Trap: an env kill switch read via `getenv` in `textfield_render_cb` did not take effect through
   `verify_output.py` (the `avm1_edittext_border_subpixel` md5 was identical "on" and "off", although the snap
@@ -174,7 +174,7 @@ Expected moves: trace = 2 new regression rows pass (both modes); no corpus trace
 images pass; no corpus image row moves (the `acid-color-0` local failure predates this change). Browser-visible:
 text layout is shared code (Pages deploy is the coordinator's).
 
-*CI result: pending the coordinator's grading run.*
+*CI result: pending the coordinator's grading run. The coordinator verified the report back; the thin-stroke snapping slice goes on the s28 board as the N-ladder head (not launched in s27).*
 
 ## 9. Next blocker
 
