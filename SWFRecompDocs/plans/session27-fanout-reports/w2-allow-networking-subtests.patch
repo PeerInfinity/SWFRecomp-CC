@@ -1,0 +1,455 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_error.h b/SWFModernRuntime/include/avm2/avm2_error.h
+index 9dd31ec7..a6e5ff8a 100644
+--- a/SWFModernRuntime/include/avm2/avm2_error.h
++++ b/SWFModernRuntime/include/avm2/avm2_error.h
+@@ -172,4 +172,25 @@ _Noreturn void avm2_throw_1069(Avm2Context* ctx, const char* name, uint32_t name
+                                Avm2Class* cls);
+ _Noreturn void avm2_throw_1065(Avm2Context* ctx, const char* name, uint32_t name_len);
+ 
++// allowNetworking (s27 w2-allow-networking-subtests). The HTML/container
++// parameter is a build-time knob, like MOCK_PLATFORM: verify_output.py passes
++// -DALLOW_NETWORKING=1 (internal) or 2 (none) for a test.toml
++// `[subtests.X].player_options.allow_networking` row; unset = 0 = "all",
++// which every gate below treats as a no-op.
++#ifndef ALLOW_NETWORKING
++#define ALLOW_NETWORKING 0
++#endif
++#define AVM2_NET_INTERNAL 1  // blocked under "internal" and "none"
++#define AVM2_NET_NONE     2  // blocked under "none" only
++// When the mode blocks `api` (ALLOW_NETWORKING >= min_level), throw
++// SecurityError #2146 ("<SWF URL> cannot call <api> because ... value
++// internal|none"), Ruffle error.rs make_error_2146. `n_frames` native frame
++// names follow, OUTERMOST first, each pushed before the throw so the stack
++// trace carries FP's playerglobal frames (new URLLoader(r) -> "URLLoader/
++// load()" above "URLLoader()"). Returns normally when allowed.
++void avm2_networking_gate(Avm2Context* ctx, int min_level, const char* api,
++                          int n_frames, ...);
++// flash.system.fscommand under internal|none: SecurityError #2149.
++void avm2_fscommand_gate(Avm2Context* ctx);
++
+ #endif // AVM2_ERROR_H
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index c8ee2128..cfde0711 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -41034,9 +41034,21 @@ static ActionVar builtin_mcl_getProgress(SWFAppContext* app_context, ActionVar*
+ // entirely ("FP does not attempt to load the url if it is empty"), which is
+ // what keeps import_assets/empty_url fetch-free. The request is issued for
+ // every non-empty URL, including one that resolves to a recompiled child SWF.
++// allowNetworking="none" (verify_output.py -DALLOW_NETWORKING=2): Ruffle
++// movie_clip.rs import_assets returns before the fetch AND before any import
++// registers ("Blocked asset import ... allowNetworking is set to none"), so
++// both the GET block and the import are skipped. AVM1 has no other gate in
++// Ruffle; "internal" changes nothing here.
++#if defined(ALLOW_NETWORKING) && ALLOW_NETWORKING >= 2
++#define AVM1_IMPORT_ASSETS_BLOCKED 1
++#else
++#define AVM1_IMPORT_ASSETS_BLOCKED 0
++#endif
++
+ void actionPreloadImportAssets(SWFAppContext* app_context, const char* url)
+ {
+ 	(void) app_context;
++	if (AVM1_IMPORT_ASSETS_BLOCKED) return;
+ #if SWF_LOG_FETCH_ENABLED
+ 	if (url == NULL || url[0] == '\0') return;
+ 	swf_log_fetch_queue(url, strlen(url), "GET", 3, NULL, 0, NULL, 0,
+@@ -41052,6 +41064,7 @@ void actionPreloadImportAssets(SWFAppContext* app_context, const char* url)
+ // references another SWF file.
+ void actionImportAssets(SWFAppContext* app_context, const char* url)
+ {
++	if (AVM1_IMPORT_ASSETS_BLOCKED) return;
+ 	extern MovieEntry* findMovieEntry(const char* filename);
+ 	MovieEntry* entry = findMovieEntry(url);
+ 	if (entry == NULL) return;
+diff --git a/SWFModernRuntime/src/avm2/avm2_amf.c b/SWFModernRuntime/src/avm2/avm2_amf.c
+index a3fcf31f..dc73754d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_amf.c
++++ b/SWFModernRuntime/src/avm2/avm2_amf.c
+@@ -2295,6 +2295,9 @@ static Avm2Value so_get_local(Avm2Activation* act)
+ 	    && act->args[1].kind != AVM2_VALUE_UNDEFINED)
+ 		local_path = avm2_coerce_to_string(ctx, act->args[1]);
+ 	int secure = act->argc > 2 && avm2_coerce_to_boolean(act->args[2]);
++	// allowNetworking none (Ruffle 50f28249e shared_object.rs get_local):
++	// after the arguments are read, before the key is built.
++	avm2_networking_gate(ctx, AVM2_NET_NONE, "SharedObject.getLocal", 0);
+ 	char key[1024];
+ 	if (!so_full_key(avm2_string_cstr(ctx, name),
+ 	                 local_path != NULL ? avm2_string_cstr(ctx, local_path) : NULL,
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 3ed2e81f..6bd469a9 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -6813,6 +6813,10 @@ static Avm2Value loader_load(Avm2Activation* act)
+ 	Avm2Object* self = this_obj(act);
+ 	Avm2LoaderExt* ext = loader_ext_of(ctx, self);
+ 	if (ext == NULL) return avm2_undefined();
++	// allowNetworking none (Ruffle loader.rs load): after the request arg,
++	// before any load state is touched.
++	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
++		avm2_networking_gate(ctx, AVM2_NET_NONE, "Loader.load", 0);
+ 	Avm2Object* cli = loader_ensure_cli(ctx, ext, self);
+ 	if (cli == NULL) return avm2_undefined();
+ 
+@@ -7136,13 +7140,21 @@ static Avm2Value url_loader_init(Avm2Activation* act)
+ 	// `new URLLoader(request)` starts the load immediately (URLLoader.as).
+ 	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
+ 	    && url_loader_ext_of(this_obj(act)) != NULL)
++	{
++		// allowNetworking none: Ruffle url_loader.rs (FP's URLLoader rides on
++		// URLStream, hence the api name); the AS3 ctor's load() frame tops it.
++		avm2_networking_gate(act->ctx, AVM2_NET_NONE, "URLStream.load", 1,
++		                     "flash.net::URLLoader/load");
+ 		ul_start_load(act->ctx, this_obj(act), act->args[0], 0);
++	}
+ 	return avm2_undefined();
+ }
+ 
+ static Avm2Value url_loader_load(Avm2Activation* act)
+ {
+ 	if (url_loader_ext_of(this_obj(act)) == NULL) return avm2_undefined();
++	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
++		avm2_networking_gate(act->ctx, AVM2_NET_NONE, "URLStream.load", 0);
+ 	ul_start_load(act->ctx, this_obj(act),
+ 	              act->argc > 0 ? act->args[0] : avm2_null(), 0);
+ 	return avm2_undefined();
+@@ -7293,6 +7305,10 @@ static Avm2Value url_stream_load(Avm2Activation* act)
+ {
+ 	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+ 	if (ext == NULL) return avm2_undefined();
++	// URLStream.as load() -> URLLoader.load(), the native that gates.
++	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
++		avm2_networking_gate(act->ctx, AVM2_NET_NONE, "URLStream.load", 1,
++		                     "flash.net::URLLoader/load");
+ 	ul_start_load(act->ctx, this_obj(act),
+ 	              act->argc > 0 ? act->args[0] : avm2_null(), 1);
+ 	ext->connected = 1;
+diff --git a/SWFModernRuntime/src/avm2/avm2_error.c b/SWFModernRuntime/src/avm2/avm2_error.c
+index 2cbc019f..7e86f4fd 100644
+--- a/SWFModernRuntime/src/avm2/avm2_error.c
++++ b/SWFModernRuntime/src/avm2/avm2_error.c
+@@ -1760,3 +1760,50 @@ void avm2_register_error(Avm2Context* ctx)
+ 		avm2_builtin_add_method(ctx, cls, "toString", drm_error_to_string);
+ 	}
+ }
++
++// ---------------------------------------------------------------------------
++// allowNetworking gates (see avm2_error.h). Ruffle error.rs make_error_2146 /
++// make_error_2149; the URL is the caller movie's, "file:///test.swf" under the
++// harness (SWF_URL), as Flash's own output.none.txt prints it.
++// ---------------------------------------------------------------------------
++
++static const char* networking_swf_url(void)
++{
++#ifdef SWF_URL
++	return SWF_URL;
++#else
++	return "";
++#endif
++}
++
++void avm2_networking_gate(Avm2Context* ctx, int min_level, const char* api,
++                          int n_frames, ...)
++{
++	if (ALLOW_NETWORKING < min_level) return;
++	va_list ap;
++	va_start(ap, n_frames);
++	for (int i = 0; i < n_frames; i++)
++	{
++		Avm2MethodRef ref;
++		memset(&ref, 0, sizeof(ref));
++		ref.debug_name = va_arg(ap, const char*);  // literals: outlive the frame
++		avm2_callstack_push(ctx, &ref, NULL);
++	}
++	va_end(ap);
++	avm2_throw_error(ctx, ctx->builtins.security_error_class,
++	                 "Error #2146: Security sandbox violation: %s cannot call %s "
++	                 "because the HTML/container parameter allowNetworking has "
++	                 "the value %s.", networking_swf_url(), api,
++	                 ALLOW_NETWORKING >= AVM2_NET_NONE ? "none" : "internal");
++}
++
++void avm2_fscommand_gate(Avm2Context* ctx)
++{
++	if (ALLOW_NETWORKING < AVM2_NET_INTERNAL) return;
++	// Ruffle passes page_url (None under the harness -> "") and a hardcoded
++	// "always" allowScriptAccess; Flash's output.{internal,none}.txt agree.
++	avm2_throw_error(ctx, ctx->builtins.security_error_class,
++	                 "Error #2149: Security sandbox violation: %s cannot make "
++	                 "fscommand calls to %s (allowScriptAccess is %s).",
++	                 networking_swf_url(), "", "always");
++}
+diff --git a/SWFModernRuntime/src/avm2/avm2_globals.c b/SWFModernRuntime/src/avm2/avm2_globals.c
+index f6d0f801..36e24bb9 100644
+--- a/SWFModernRuntime/src/avm2/avm2_globals.c
++++ b/SWFModernRuntime/src/avm2/avm2_globals.c
+@@ -8220,6 +8220,22 @@ static Avm2Value net_navigate_to_url(Avm2Activation* act)
+ #define net_navigate_to_url net_noop
+ #endif
+ 
++// allowNetworking gates (globals/flash/net.rs): navigateToURL is refused
++// under internal AND none, sendToURL under none only. Both before any
++// argument is read.
++static Avm2Value net_navigate_to_url_gated(Avm2Activation* act)
++{
++	avm2_networking_gate(act->ctx, AVM2_NET_INTERNAL, "navigateToURL", 0);
++	return net_navigate_to_url(act);
++}
++
++static Avm2Value net_send_to_url(Avm2Activation* act)
++{
++	avm2_networking_gate(act->ctx, AVM2_NET_NONE, "sendToURL", 0);
++	return net_noop(act);
++}
++
++
+ static Avm2Value net_get_zero(Avm2Activation* act){ (void)act; return avm2_integer(0); }
+ static Avm2Value net_get_null(Avm2Activation* act){ (void)act; return avm2_null(); }
+ static Avm2Value net_get_true(Avm2Activation* act){ (void)act; return avm2_bool(1); }
+@@ -8401,8 +8417,8 @@ static void register_net(Avm2Context* ctx)
+ 
+ 	// Package-level functions.
+ 	builtin_add_global_fn_ns(ctx, "flash.net", "navigateToURL",
+-	                         net_navigate_to_url);
+-	builtin_add_global_fn_ns(ctx, "flash.net", "sendToURL", net_noop);
++	                         net_navigate_to_url_gated);
++	builtin_add_global_fn_ns(ctx, "flash.net", "sendToURL", net_send_to_url);
+ }
+ 
+ static void register_application_domain(Avm2Context* ctx)
+@@ -8676,6 +8692,7 @@ void avm2_builtin_add_flash_utils_fn(Avm2Context* ctx, const char* name,
+ static Avm2Value global_fscommand(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
++	avm2_fscommand_gate(ctx);  // allowNetworking internal|none: #2149
+ 	if (act->argc < 1) return avm2_undefined();
+ 	const Avm2String* cmd = avm2_coerce_to_string(ctx, act->args[0]);
+ 	if (cmd->len == 4 && memcmp(cmd->utf8, "quit", 4) == 0)
+diff --git a/SWFModernRuntime/src/avm2/avm2_media.c b/SWFModernRuntime/src/avm2/avm2_media.c
+index e196296a..cf043330 100644
+--- a/SWFModernRuntime/src/avm2/avm2_media.c
++++ b/SWFModernRuntime/src/avm2/avm2_media.c
+@@ -652,6 +652,10 @@ static Avm2Value sound_ctor(Avm2Activation* act)
+ 	// `new URLLoader(request)` does.
+ 	else if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+ 	{
++		// allowNetworking none (Ruffle sound.rs load), under the AS3 ctor's
++		// own load() frame.
++		avm2_networking_gate(ctx, AVM2_NET_NONE, "Sound.load", 1,
++		                     "flash.media::Sound/load");
+ 		sound_start_url_load(ctx, self, s, act->args[0]);
+ 		s->load_state = AVM2_SOUND_LOAD_LOADING;
+ 	}
+@@ -921,6 +925,7 @@ static Avm2Value sound_load(Avm2Activation* act)
+ 		                 "or earlier call was unsuccessful.");
+ 	// FP ignores `load(null)`.
+ 	if (act->args[0].kind != AVM2_VALUE_OBJECT) return avm2_undefined();
++	avm2_networking_gate(act->ctx, AVM2_NET_NONE, "Sound.load", 0);
+ 	sound_start_url_load(act->ctx, this_obj(act), s, act->args[0]);
+ 	s->load_state = AVM2_SOUND_LOAD_LOADING;
+ 	return avm2_undefined();
+diff --git a/SWFModernRuntime/src/avm2/avm2_net.c b/SWFModernRuntime/src/avm2/avm2_net.c
+index 6b780b56..444cd9ee 100644
+--- a/SWFModernRuntime/src/avm2/avm2_net.c
++++ b/SWFModernRuntime/src/avm2/avm2_net.c
+@@ -270,6 +270,8 @@ static Avm2Value socket_connect(Avm2Activation* act)
+ 		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+ 		                 "Error #2003: Invalid socket port number specified.");
+ 	}
++	// allowNetworking none (Ruffle socket.rs connect): after the port check.
++	avm2_networking_gate(ctx, AVM2_NET_NONE, "Socket.connect", 0);
+ 
+ 	socket_root(e->self);
+ 
+@@ -1630,6 +1632,9 @@ static Avm2Value lc_connect(Avm2Activation* act)
+ 	Avm2LocalConnectionExt* e = lc_ext(act);
+ 	const Avm2String* name = lc_arg_string(act, 0, "connectionName");
+ 	if (name->len == 0) lc_throw_2085(ctx, "connectionName");
++	// allowNetworking none (Ruffle local_connection.rs connect): after the
++	// name's null/empty checks, before the ':' check.
++	avm2_networking_gate(ctx, AVM2_NET_NONE, "LocalConnection.connect", 0);
+ 	if (memchr(name->utf8, ':', name->len) != NULL) lc_throw_2004(ctx, 0);
+ 	if (e == NULL || self == NULL) return avm2_undefined();
+ 
+@@ -1687,6 +1692,8 @@ static Avm2Value lc_send(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+ 	Avm2Object* self = net2_this(act);
++	// allowNetworking none (Ruffle local_connection.rs send): first of all.
++	avm2_networking_gate(ctx, AVM2_NET_NONE, "LocalConnection.send", 0);
+ 	const Avm2String* cname = lc_arg_string(act, 0, "connectionName");
+ 	const Avm2String* method = lc_arg_string(act, 1, "methodName");
+ 	if (cname->len == 0) lc_throw_2085(ctx, "connectionName");
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 69953404..7e565dbf 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -436,6 +436,11 @@ def resolve_expected_filename(test_dir, suffix_override=None):
+     if suffix_override:
+         return f"output.{suffix_override}.txt"
+ 
++    # A `<test>__<variant>` allow_networking row grades its own variant.
++    if (SUBTEST_VARIANT is not None
++            and Path(test_dir).resolve() == SUBTEST_VARIANT["dir"]):
++        return SUBTEST_VARIANT["output_path"]
++
+     if (test_dir / "output.txt").exists():
+         return "output.txt"
+ 
+@@ -479,6 +484,77 @@ def resolve_expected_filename(test_dir, suffix_override=None):
+     return best_output_path
+ 
+ 
++# --- allowNetworking subtest rows (s27 w2-allow-networking-subtests) -------
++# A `[subtests.X]` set keyed on `player_options.allow_networking` (avm2
++# allow_networking / local_connection_allow_networking, avm1
++# allow_networking_import_assets{,2}) is graded ONE ROW PER VARIANT. The
++# variant resolve_expected_filename() picks (the first, `all`) keeps the bare
++# test name, so every existing results key is unchanged; each further variant
++# is its own row `<test>__<variant>` (the `__` join the image axis already
++# uses for its `<subtest>__<cmp>` split), graded against that variant's
++# `output_path` and built with -DALLOW_NETWORKING=<0 all|1 internal|2 none>.
++ALLOW_NETWORKING_LEVELS = {"all": 0, "internal": 1, "none": 2}
++SUBTEST_VARIANT = None  # set while running a `<test>__<variant>` row
++
++
++def networking_variants(test_dir):
++    """[(variant_name, output_path, level)] for a test's allow_networking
++    subtests, in test.toml order; [] when it has none."""
++    toml_path = test_dir / "test.toml"
++    if not toml_path.is_file():
++        return []
++    try:
++        with open(toml_path, "rb") as f:
++            subtests = tomllib.load(f).get("subtests")
++    except Exception:
++        return []
++    out = []
++    if not isinstance(subtests, dict):
++        return out
++    for vname, v in subtests.items():
++        if not isinstance(v, dict) or not v.get("output_path"):
++            continue
++        po = v.get("player_options")
++        lvl = po.get("allow_networking") if isinstance(po, dict) else None
++        if isinstance(lvl, str) and lvl.lower() in ALLOW_NETWORKING_LEVELS:
++            out.append((vname, v["output_path"],
++                        ALLOW_NETWORKING_LEVELS[lvl.lower()]))
++    return out
++
++
++def extra_variant_rows(tests_dir, name):
++    """The `<name>__<variant>` rows a discovered test adds (all but the
++    variant its bare row grades), whose expected file exists."""
++    test_dir = tests_dir / name
++    base_out = resolve_expected_filename(test_dir)
++    return [f"{name}__{vn}" for vn, out, _ in networking_variants(test_dir)
++            if out != base_out and (test_dir / out).exists()]
++
++
++def split_variant_row(tests_dir, name):
++    """(dir_name, variant) for a results-row name: a `<test>__<variant>` row
++    maps to its test dir plus {name, output_path, level}; anything else
++    (including a real directory such as avm1/__framework__) is (name, None)."""
++    if (tests_dir / name).is_dir() or "__" not in name:
++        return name, None
++    base, vname = name.rsplit("__", 1)
++    if not base or not (tests_dir / base).is_dir():
++        return name, None
++    for vn, out, lvl in networking_variants(tests_dir / base):
++        if vn == vname:
++            return base, {"name": vn, "output_path": out, "level": lvl}
++    return name, None
++
++
++def bare_row_networking_level(test_dir):
++    """The allow_networking level the BARE row's graded variant asks for."""
++    base_out = resolve_expected_filename(test_dir)
++    for _vn, out, lvl in networking_variants(test_dir):
++        if out == base_out:
++            return lvl
++    return None
++
++
+ # Platform the per-check `filter` expressions are evaluated against. Ruffle
+ # evaluates them against the host's `std::env::consts` (OS/ARCH/FAMILY); our
+ # grading platform is CI's Linux x86_64 (lavapipe), and pinning it keeps a
+@@ -1062,6 +1138,9 @@ def discover_tests(tests_dir, expected_filename=None, suffix_override=None):
+             _walk(child)
+ 
+     _walk(tests_dir)
++    if expected_filename is None and not suffix_override:
++        results += [row for t in results
++                    for row in extra_variant_rows(tests_dir, t)]
+     return sorted(results)
+ 
+ # Lines to filter from runtime output
+@@ -3009,6 +3088,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
+     if mock_platform is None:
+         mock_platform = 1  # Linux -- Ruffle's universal default, see the helper
+     extra_defines.append(f"-DMOCK_PLATFORM={mock_platform}")
++    _net_level = (SUBTEST_VARIANT["level"] if SUBTEST_VARIANT is not None
++                  else bare_row_networking_level(test_dir))
++    if _net_level:  # 0 = all = the runtime default; emit only a restriction
++        extra_defines.append(f"-DALLOW_NETWORKING={_net_level}")
+     if get_log_fetch(test_dir):
+         extra_defines.append("-DLOG_FETCH=1")
+     if get_runtime_is_air(test_dir):
+@@ -4344,6 +4427,7 @@ def _rerun_subtest_variants(test_dir, num_frames, build_dir, args,
+ 
+ def main():
+     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
++    global SUBTEST_VARIANT
+     args = parse_args()
+     enable_core_dumps()
+ 
+@@ -4408,14 +4492,16 @@ def main():
+         # conventions are per-suite.
+         swfs_root = SCRIPT_DIR / "tests" / "swfs"
+         literals = [t for t in args.test if "*" not in t and "?" not in t]
+-        if literals and not all((TESTS_DIR / t).is_dir() for t in literals):
++        def _row_is_dir(d, t):
++            return (d / split_variant_row(d, t)[0]).is_dir()
++        if literals and not all(_row_is_dir(TESTS_DIR, t) for t in literals):
+             suites = [swfs_root / s for s in SUITE_DIRS]
+             homes = {}
+             for t in literals:
+-                if (TESTS_DIR / t).is_dir():
++                if _row_is_dir(TESTS_DIR, t):
+                     homes[t] = TESTS_DIR
+                     continue
+-                hits = [d for d in suites if (d / t).is_dir()]
++                hits = [d for d in suites if _row_is_dir(d, t)]
+                 if len(hits) == 1:
+                     homes[t] = hits[0]
+                 elif len(hits) > 1:
+@@ -4472,7 +4558,7 @@ def main():
+                     print(f"Warning: no tests match pattern '{t}'")
+                 tests.extend(matched)
+             else:
+-                test_dir = TESTS_DIR / t
++                test_dir = TESTS_DIR / split_variant_row(TESTS_DIR, t)[0]
+                 if not test_dir.is_dir():
+                     print(f"Error: test directory not found: {test_dir}")
+                     sys.exit(1)
+@@ -4594,7 +4680,10 @@ def main():
+ 
+     for i, name in enumerate(tests):
+       try:
+-        test_dir = TESTS_DIR / name
++        _dir_name, SUBTEST_VARIANT = split_variant_row(TESTS_DIR, name)
++        test_dir = TESTS_DIR / _dir_name
++        if SUBTEST_VARIANT is not None:
++            SUBTEST_VARIANT["dir"] = test_dir.resolve()
+         epsilon = get_epsilon(test_dir)
+         number_patterns = get_number_patterns(test_dir)
+         if args.verbose:
+@@ -4602,6 +4691,8 @@ def main():
+ 
+         test_start = time.monotonic()
+         entry = {"test": name}
++        if SUBTEST_VARIANT is not None:
++            entry["subtest"] = SUBTEST_VARIANT["name"]
+         phase_times = {}
+         entry["phases"] = phase_times
+         image_comparisons = {}

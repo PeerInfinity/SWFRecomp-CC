@@ -436,6 +436,11 @@ def resolve_expected_filename(test_dir, suffix_override=None):
     if suffix_override:
         return f"output.{suffix_override}.txt"
 
+    # A `<test>__<variant>` allow_networking row grades its own variant.
+    if (SUBTEST_VARIANT is not None
+            and Path(test_dir).resolve() == SUBTEST_VARIANT["dir"]):
+        return SUBTEST_VARIANT["output_path"]
+
     if (test_dir / "output.txt").exists():
         return "output.txt"
 
@@ -477,6 +482,77 @@ def resolve_expected_filename(test_dir, suffix_override=None):
             best_version = v
             best_output_path = output_path
     return best_output_path
+
+
+# --- allowNetworking subtest rows (s27 w2-allow-networking-subtests) -------
+# A `[subtests.X]` set keyed on `player_options.allow_networking` (avm2
+# allow_networking / local_connection_allow_networking, avm1
+# allow_networking_import_assets{,2}) is graded ONE ROW PER VARIANT. The
+# variant resolve_expected_filename() picks (the first, `all`) keeps the bare
+# test name, so every existing results key is unchanged; each further variant
+# is its own row `<test>__<variant>` (the `__` join the image axis already
+# uses for its `<subtest>__<cmp>` split), graded against that variant's
+# `output_path` and built with -DALLOW_NETWORKING=<0 all|1 internal|2 none>.
+ALLOW_NETWORKING_LEVELS = {"all": 0, "internal": 1, "none": 2}
+SUBTEST_VARIANT = None  # set while running a `<test>__<variant>` row
+
+
+def networking_variants(test_dir):
+    """[(variant_name, output_path, level)] for a test's allow_networking
+    subtests, in test.toml order; [] when it has none."""
+    toml_path = test_dir / "test.toml"
+    if not toml_path.is_file():
+        return []
+    try:
+        with open(toml_path, "rb") as f:
+            subtests = tomllib.load(f).get("subtests")
+    except Exception:
+        return []
+    out = []
+    if not isinstance(subtests, dict):
+        return out
+    for vname, v in subtests.items():
+        if not isinstance(v, dict) or not v.get("output_path"):
+            continue
+        po = v.get("player_options")
+        lvl = po.get("allow_networking") if isinstance(po, dict) else None
+        if isinstance(lvl, str) and lvl.lower() in ALLOW_NETWORKING_LEVELS:
+            out.append((vname, v["output_path"],
+                        ALLOW_NETWORKING_LEVELS[lvl.lower()]))
+    return out
+
+
+def extra_variant_rows(tests_dir, name):
+    """The `<name>__<variant>` rows a discovered test adds (all but the
+    variant its bare row grades), whose expected file exists."""
+    test_dir = tests_dir / name
+    base_out = resolve_expected_filename(test_dir)
+    return [f"{name}__{vn}" for vn, out, _ in networking_variants(test_dir)
+            if out != base_out and (test_dir / out).exists()]
+
+
+def split_variant_row(tests_dir, name):
+    """(dir_name, variant) for a results-row name: a `<test>__<variant>` row
+    maps to its test dir plus {name, output_path, level}; anything else
+    (including a real directory such as avm1/__framework__) is (name, None)."""
+    if (tests_dir / name).is_dir() or "__" not in name:
+        return name, None
+    base, vname = name.rsplit("__", 1)
+    if not base or not (tests_dir / base).is_dir():
+        return name, None
+    for vn, out, lvl in networking_variants(tests_dir / base):
+        if vn == vname:
+            return base, {"name": vn, "output_path": out, "level": lvl}
+    return name, None
+
+
+def bare_row_networking_level(test_dir):
+    """The allow_networking level the BARE row's graded variant asks for."""
+    base_out = resolve_expected_filename(test_dir)
+    for _vn, out, lvl in networking_variants(test_dir):
+        if out == base_out:
+            return lvl
+    return None
 
 
 # Platform the per-check `filter` expressions are evaluated against. Ruffle
@@ -1062,6 +1138,9 @@ def discover_tests(tests_dir, expected_filename=None, suffix_override=None):
             _walk(child)
 
     _walk(tests_dir)
+    if expected_filename is None and not suffix_override:
+        results += [row for t in results
+                    for row in extra_variant_rows(tests_dir, t)]
     return sorted(results)
 
 # Lines to filter from runtime output
@@ -3009,6 +3088,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     if mock_platform is None:
         mock_platform = 1  # Linux -- Ruffle's universal default, see the helper
     extra_defines.append(f"-DMOCK_PLATFORM={mock_platform}")
+    _net_level = (SUBTEST_VARIANT["level"] if SUBTEST_VARIANT is not None
+                  else bare_row_networking_level(test_dir))
+    if _net_level:  # 0 = all = the runtime default; emit only a restriction
+        extra_defines.append(f"-DALLOW_NETWORKING={_net_level}")
     if get_log_fetch(test_dir):
         extra_defines.append("-DLOG_FETCH=1")
     if get_runtime_is_air(test_dir):
@@ -4344,6 +4427,7 @@ def _rerun_subtest_variants(test_dir, num_frames, build_dir, args,
 
 def main():
     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
+    global SUBTEST_VARIANT
     args = parse_args()
     enable_core_dumps()
 
@@ -4408,14 +4492,16 @@ def main():
         # conventions are per-suite.
         swfs_root = SCRIPT_DIR / "tests" / "swfs"
         literals = [t for t in args.test if "*" not in t and "?" not in t]
-        if literals and not all((TESTS_DIR / t).is_dir() for t in literals):
+        def _row_is_dir(d, t):
+            return (d / split_variant_row(d, t)[0]).is_dir()
+        if literals and not all(_row_is_dir(TESTS_DIR, t) for t in literals):
             suites = [swfs_root / s for s in SUITE_DIRS]
             homes = {}
             for t in literals:
-                if (TESTS_DIR / t).is_dir():
+                if _row_is_dir(TESTS_DIR, t):
                     homes[t] = TESTS_DIR
                     continue
-                hits = [d for d in suites if (d / t).is_dir()]
+                hits = [d for d in suites if _row_is_dir(d, t)]
                 if len(hits) == 1:
                     homes[t] = hits[0]
                 elif len(hits) > 1:
@@ -4472,7 +4558,7 @@ def main():
                     print(f"Warning: no tests match pattern '{t}'")
                 tests.extend(matched)
             else:
-                test_dir = TESTS_DIR / t
+                test_dir = TESTS_DIR / split_variant_row(TESTS_DIR, t)[0]
                 if not test_dir.is_dir():
                     print(f"Error: test directory not found: {test_dir}")
                     sys.exit(1)
@@ -4594,7 +4680,10 @@ def main():
 
     for i, name in enumerate(tests):
       try:
-        test_dir = TESTS_DIR / name
+        _dir_name, SUBTEST_VARIANT = split_variant_row(TESTS_DIR, name)
+        test_dir = TESTS_DIR / _dir_name
+        if SUBTEST_VARIANT is not None:
+            SUBTEST_VARIANT["dir"] = test_dir.resolve()
         epsilon = get_epsilon(test_dir)
         number_patterns = get_number_patterns(test_dir)
         if args.verbose:
@@ -4602,6 +4691,8 @@ def main():
 
         test_start = time.monotonic()
         entry = {"test": name}
+        if SUBTEST_VARIANT is not None:
+            entry["subtest"] = SUBTEST_VARIANT["name"]
         phase_times = {}
         entry["phases"] = phase_times
         image_comparisons = {}

@@ -172,4 +172,25 @@ _Noreturn void avm2_throw_1069(Avm2Context* ctx, const char* name, uint32_t name
                                Avm2Class* cls);
 _Noreturn void avm2_throw_1065(Avm2Context* ctx, const char* name, uint32_t name_len);
 
+// allowNetworking (s27 w2-allow-networking-subtests). The HTML/container
+// parameter is a build-time knob, like MOCK_PLATFORM: verify_output.py passes
+// -DALLOW_NETWORKING=1 (internal) or 2 (none) for a test.toml
+// `[subtests.X].player_options.allow_networking` row; unset = 0 = "all",
+// which every gate below treats as a no-op.
+#ifndef ALLOW_NETWORKING
+#define ALLOW_NETWORKING 0
+#endif
+#define AVM2_NET_INTERNAL 1  // blocked under "internal" and "none"
+#define AVM2_NET_NONE     2  // blocked under "none" only
+// When the mode blocks `api` (ALLOW_NETWORKING >= min_level), throw
+// SecurityError #2146 ("<SWF URL> cannot call <api> because ... value
+// internal|none"), Ruffle error.rs make_error_2146. `n_frames` native frame
+// names follow, OUTERMOST first, each pushed before the throw so the stack
+// trace carries FP's playerglobal frames (new URLLoader(r) -> "URLLoader/
+// load()" above "URLLoader()"). Returns normally when allowed.
+void avm2_networking_gate(Avm2Context* ctx, int min_level, const char* api,
+                          int n_frames, ...);
+// flash.system.fscommand under internal|none: SecurityError #2149.
+void avm2_fscommand_gate(Avm2Context* ctx);
+
 #endif // AVM2_ERROR_H

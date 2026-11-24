@@ -1760,3 +1760,50 @@ void avm2_register_error(Avm2Context* ctx)
 		avm2_builtin_add_method(ctx, cls, "toString", drm_error_to_string);
 	}
 }
+
+// ---------------------------------------------------------------------------
+// allowNetworking gates (see avm2_error.h). Ruffle error.rs make_error_2146 /
+// make_error_2149; the URL is the caller movie's, "file:///test.swf" under the
+// harness (SWF_URL), as Flash's own output.none.txt prints it.
+// ---------------------------------------------------------------------------
+
+static const char* networking_swf_url(void)
+{
+#ifdef SWF_URL
+	return SWF_URL;
+#else
+	return "";
+#endif
+}
+
+void avm2_networking_gate(Avm2Context* ctx, int min_level, const char* api,
+                          int n_frames, ...)
+{
+	if (ALLOW_NETWORKING < min_level) return;
+	va_list ap;
+	va_start(ap, n_frames);
+	for (int i = 0; i < n_frames; i++)
+	{
+		Avm2MethodRef ref;
+		memset(&ref, 0, sizeof(ref));
+		ref.debug_name = va_arg(ap, const char*);  // literals: outlive the frame
+		avm2_callstack_push(ctx, &ref, NULL);
+	}
+	va_end(ap);
+	avm2_throw_error(ctx, ctx->builtins.security_error_class,
+	                 "Error #2146: Security sandbox violation: %s cannot call %s "
+	                 "because the HTML/container parameter allowNetworking has "
+	                 "the value %s.", networking_swf_url(), api,
+	                 ALLOW_NETWORKING >= AVM2_NET_NONE ? "none" : "internal");
+}
+
+void avm2_fscommand_gate(Avm2Context* ctx)
+{
+	if (ALLOW_NETWORKING < AVM2_NET_INTERNAL) return;
+	// Ruffle passes page_url (None under the harness -> "") and a hardcoded
+	// "always" allowScriptAccess; Flash's output.{internal,none}.txt agree.
+	avm2_throw_error(ctx, ctx->builtins.security_error_class,
+	                 "Error #2149: Security sandbox violation: %s cannot make "
+	                 "fscommand calls to %s (allowScriptAccess is %s).",
+	                 networking_swf_url(), "", "always");
+}

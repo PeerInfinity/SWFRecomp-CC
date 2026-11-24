@@ -41034,9 +41034,21 @@ static ActionVar builtin_mcl_getProgress(SWFAppContext* app_context, ActionVar* 
 // entirely ("FP does not attempt to load the url if it is empty"), which is
 // what keeps import_assets/empty_url fetch-free. The request is issued for
 // every non-empty URL, including one that resolves to a recompiled child SWF.
+// allowNetworking="none" (verify_output.py -DALLOW_NETWORKING=2): Ruffle
+// movie_clip.rs import_assets returns before the fetch AND before any import
+// registers ("Blocked asset import ... allowNetworking is set to none"), so
+// both the GET block and the import are skipped. AVM1 has no other gate in
+// Ruffle; "internal" changes nothing here.
+#if defined(ALLOW_NETWORKING) && ALLOW_NETWORKING >= 2
+#define AVM1_IMPORT_ASSETS_BLOCKED 1
+#else
+#define AVM1_IMPORT_ASSETS_BLOCKED 0
+#endif
+
 void actionPreloadImportAssets(SWFAppContext* app_context, const char* url)
 {
 	(void) app_context;
+	if (AVM1_IMPORT_ASSETS_BLOCKED) return;
 #if SWF_LOG_FETCH_ENABLED
 	if (url == NULL || url[0] == '\0') return;
 	swf_log_fetch_queue(url, strlen(url), "GET", 3, NULL, 0, NULL, 0,
@@ -41052,6 +41064,7 @@ void actionPreloadImportAssets(SWFAppContext* app_context, const char* url)
 // references another SWF file.
 void actionImportAssets(SWFAppContext* app_context, const char* url)
 {
+	if (AVM1_IMPORT_ASSETS_BLOCKED) return;
 	extern MovieEntry* findMovieEntry(const char* filename);
 	MovieEntry* entry = findMovieEntry(url);
 	if (entry == NULL) return;

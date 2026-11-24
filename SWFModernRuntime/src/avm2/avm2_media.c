@@ -652,6 +652,10 @@ static Avm2Value sound_ctor(Avm2Activation* act)
 	// `new URLLoader(request)` does.
 	else if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
 	{
+		// allowNetworking none (Ruffle sound.rs load), under the AS3 ctor's
+		// own load() frame.
+		avm2_networking_gate(ctx, AVM2_NET_NONE, "Sound.load", 1,
+		                     "flash.media::Sound/load");
 		sound_start_url_load(ctx, self, s, act->args[0]);
 		s->load_state = AVM2_SOUND_LOAD_LOADING;
 	}
@@ -921,6 +925,7 @@ static Avm2Value sound_load(Avm2Activation* act)
 		                 "or earlier call was unsuccessful.");
 	// FP ignores `load(null)`.
 	if (act->args[0].kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	avm2_networking_gate(act->ctx, AVM2_NET_NONE, "Sound.load", 0);
 	sound_start_url_load(act->ctx, this_obj(act), s, act->args[0]);
 	s->load_state = AVM2_SOUND_LOAD_LOADING;
 	return avm2_undefined();

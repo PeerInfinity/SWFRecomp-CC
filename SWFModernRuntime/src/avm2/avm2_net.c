@@ -270,6 +270,8 @@ static Avm2Value socket_connect(Avm2Activation* act)
 		avm2_throw_error(ctx, ctx->builtins.range_error_class,
 		                 "Error #2003: Invalid socket port number specified.");
 	}
+	// allowNetworking none (Ruffle socket.rs connect): after the port check.
+	avm2_networking_gate(ctx, AVM2_NET_NONE, "Socket.connect", 0);
 
 	socket_root(e->self);
 
@@ -1630,6 +1632,9 @@ static Avm2Value lc_connect(Avm2Activation* act)
 	Avm2LocalConnectionExt* e = lc_ext(act);
 	const Avm2String* name = lc_arg_string(act, 0, "connectionName");
 	if (name->len == 0) lc_throw_2085(ctx, "connectionName");
+	// allowNetworking none (Ruffle local_connection.rs connect): after the
+	// name's null/empty checks, before the ':' check.
+	avm2_networking_gate(ctx, AVM2_NET_NONE, "LocalConnection.connect", 0);
 	if (memchr(name->utf8, ':', name->len) != NULL) lc_throw_2004(ctx, 0);
 	if (e == NULL || self == NULL) return avm2_undefined();
 
@@ -1687,6 +1692,8 @@ static Avm2Value lc_send(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* self = net2_this(act);
+	// allowNetworking none (Ruffle local_connection.rs send): first of all.
+	avm2_networking_gate(ctx, AVM2_NET_NONE, "LocalConnection.send", 0);
 	const Avm2String* cname = lc_arg_string(act, 0, "connectionName");
 	const Avm2String* method = lc_arg_string(act, 1, "methodName");
 	if (cname->len == 0) lc_throw_2085(ctx, "connectionName");

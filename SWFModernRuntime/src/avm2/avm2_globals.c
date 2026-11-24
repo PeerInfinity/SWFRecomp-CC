@@ -8220,6 +8220,22 @@ static Avm2Value net_navigate_to_url(Avm2Activation* act)
 #define net_navigate_to_url net_noop
 #endif
 
+// allowNetworking gates (globals/flash/net.rs): navigateToURL is refused
+// under internal AND none, sendToURL under none only. Both before any
+// argument is read.
+static Avm2Value net_navigate_to_url_gated(Avm2Activation* act)
+{
+	avm2_networking_gate(act->ctx, AVM2_NET_INTERNAL, "navigateToURL", 0);
+	return net_navigate_to_url(act);
+}
+
+static Avm2Value net_send_to_url(Avm2Activation* act)
+{
+	avm2_networking_gate(act->ctx, AVM2_NET_NONE, "sendToURL", 0);
+	return net_noop(act);
+}
+
+
 static Avm2Value net_get_zero(Avm2Activation* act){ (void)act; return avm2_integer(0); }
 static Avm2Value net_get_null(Avm2Activation* act){ (void)act; return avm2_null(); }
 static Avm2Value net_get_true(Avm2Activation* act){ (void)act; return avm2_bool(1); }
@@ -8401,8 +8417,8 @@ static void register_net(Avm2Context* ctx)
 
 	// Package-level functions.
 	builtin_add_global_fn_ns(ctx, "flash.net", "navigateToURL",
-	                         net_navigate_to_url);
-	builtin_add_global_fn_ns(ctx, "flash.net", "sendToURL", net_noop);
+	                         net_navigate_to_url_gated);
+	builtin_add_global_fn_ns(ctx, "flash.net", "sendToURL", net_send_to_url);
 }
 
 static void register_application_domain(Avm2Context* ctx)
@@ -8676,6 +8692,7 @@ void avm2_builtin_add_flash_utils_fn(Avm2Context* ctx, const char* name,
 static Avm2Value global_fscommand(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	avm2_fscommand_gate(ctx);  // allowNetworking internal|none: #2149
 	if (act->argc < 1) return avm2_undefined();
 	const Avm2String* cmd = avm2_coerce_to_string(ctx, act->args[0]);
 	if (cmd->len == 4 && memcmp(cmd->utf8, "quit", 4) == 0)

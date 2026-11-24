@@ -2295,6 +2295,9 @@ static Avm2Value so_get_local(Avm2Activation* act)
 	    && act->args[1].kind != AVM2_VALUE_UNDEFINED)
 		local_path = avm2_coerce_to_string(ctx, act->args[1]);
 	int secure = act->argc > 2 && avm2_coerce_to_boolean(act->args[2]);
+	// allowNetworking none (Ruffle 50f28249e shared_object.rs get_local):
+	// after the arguments are read, before the key is built.
+	avm2_networking_gate(ctx, AVM2_NET_NONE, "SharedObject.getLocal", 0);
 	char key[1024];
 	if (!so_full_key(avm2_string_cstr(ctx, name),
 	                 local_path != NULL ? avm2_string_cstr(ctx, local_path) : NULL,

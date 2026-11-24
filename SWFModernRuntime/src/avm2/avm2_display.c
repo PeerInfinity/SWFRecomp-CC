@@ -6813,6 +6813,10 @@ static Avm2Value loader_load(Avm2Activation* act)
 	Avm2Object* self = this_obj(act);
 	Avm2LoaderExt* ext = loader_ext_of(ctx, self);
 	if (ext == NULL) return avm2_undefined();
+	// allowNetworking none (Ruffle loader.rs load): after the request arg,
+	// before any load state is touched.
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		avm2_networking_gate(ctx, AVM2_NET_NONE, "Loader.load", 0);
 	Avm2Object* cli = loader_ensure_cli(ctx, ext, self);
 	if (cli == NULL) return avm2_undefined();
 
@@ -7136,13 +7140,21 @@ static Avm2Value url_loader_init(Avm2Activation* act)
 	// `new URLLoader(request)` starts the load immediately (URLLoader.as).
 	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
 	    && url_loader_ext_of(this_obj(act)) != NULL)
+	{
+		// allowNetworking none: Ruffle url_loader.rs (FP's URLLoader rides on
+		// URLStream, hence the api name); the AS3 ctor's load() frame tops it.
+		avm2_networking_gate(act->ctx, AVM2_NET_NONE, "URLStream.load", 1,
+		                     "flash.net::URLLoader/load");
 		ul_start_load(act->ctx, this_obj(act), act->args[0], 0);
+	}
 	return avm2_undefined();
 }
 
 static Avm2Value url_loader_load(Avm2Activation* act)
 {
 	if (url_loader_ext_of(this_obj(act)) == NULL) return avm2_undefined();
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		avm2_networking_gate(act->ctx, AVM2_NET_NONE, "URLStream.load", 0);
 	ul_start_load(act->ctx, this_obj(act),
 	              act->argc > 0 ? act->args[0] : avm2_null(), 0);
 	return avm2_undefined();
@@ -7293,6 +7305,10 @@ static Avm2Value url_stream_load(Avm2Activation* act)
 {
 	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
 	if (ext == NULL) return avm2_undefined();
+	// URLStream.as load() -> URLLoader.load(), the native that gates.
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		avm2_networking_gate(act->ctx, AVM2_NET_NONE, "URLStream.load", 1,
+		                     "flash.net::URLLoader/load");
 	ul_start_load(act->ctx, this_obj(act),
 	              act->argc > 0 ? act->args[0] : avm2_null(), 1);
 	ext->connected = 1;
