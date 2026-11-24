@@ -17,6 +17,7 @@
 #include <zlib.h>
 #include <stb_image.h>
 #include <jpeg_helpers.hpp>
+#include <jpeg_flash.hpp>
 
 namespace SWFRecomp
 {
@@ -597,7 +598,9 @@ bool decodeJpegCharacter(const uint8_t* img, size_t img_len,
 		buf.resize(len + 2);
 		SWFRecomp::stripInvalidJpegMarkers(buf.data(), len);
 		SWFRecomp::appendTrailingEoiIfMissing(buf.data(), len, buf.size());
-		pixels = stbi_load_from_memory(buf.data(), (int) len, &w, &h, &comp, 3);
+		// s27: Flash-faithful decode (IJG ISLOW + DCT-scaled chroma), stb fallback.
+		pixels = SWFRecomp::decodeJpegRgb(buf.data(), len, &w, &h, "AVM2 DefineBits*");
+		comp = 3;
 	}
 	else if (fmt == SWFRecomp::JpegTagFormat::Png
 	         || fmt == SWFRecomp::JpegTagFormat::Gif)

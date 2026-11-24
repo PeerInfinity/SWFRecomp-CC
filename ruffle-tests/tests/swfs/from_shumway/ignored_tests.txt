@@ -90,8 +90,3 @@ esc
 flash_net_SharedObject
 flash_text_TextField2
 getobjectsunderpoint
-
-# --- Accepted diffs (see avm1/_investigation/ACCEPTED_DIFFS.md Category 9) ---
-# JPEG decoder parity: Flash 200d04 vs ours/libjpeg-turbo 220a06, 1 of 2 lines.
-# Prune criterion: a decoder that reproduces Flash's IDCT/upsampling lands.
-bitmapdata/getpixel-from-embedded

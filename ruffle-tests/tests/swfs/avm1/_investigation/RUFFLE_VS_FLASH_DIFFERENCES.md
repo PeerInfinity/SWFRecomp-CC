@@ -790,3 +790,34 @@ against the golden. Any ours-vs-Flash-PNG difference over tolerance 6 is NOT cov
 
 **Prune criterion:** upstream replaces the golden with a Flash reference (then the row passes outright), or our render
 drifts off the Flash PNG.
+
+## JPEG chroma upsampling: Flash's IJG-v7+ DCT-scaled decode vs Ruffle's triangle filter (pixel axis)
+
+<!-- image-axis: from_shumway/acid/acid-color-0 output -->
+
+**Test (pixel axis, Ruffle-rendered golden):** `from_shumway/acid/acid-color-0` (`quality = "low"`, tolerance 3,
+max_outliers 3). It passes at 3/3 with the old stb_image decode and fails at **1138 / 3** with the s27 Flash-faithful
+decoder (`SWFRecomp/src/jpeg_flash.cpp`, s27 `w2-jpeg-flash-decode` + `w2b-jpeg-refine`). Every new outlier lies in the
+DefineBitsJPEG3 footprint (x 8–249, y 388–498: a 500×500 4:2:0 JPEG with alpha, drawn minified and unsmoothed at
+quality low).
+
+**Ruffle** decodes with the `jpeg-decoder` crate: libjpeg-6b-style "fancy" triangle chroma upsampling and rounded
+YCbCr→RGB, i.e. stb-like. That is why stb sat on the golden.
+
+**Flash** (Flash Player 32 LNX 32,0,0,465 capture of this SWF, quality low; draw() wrapper,
+`SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-jpeg-flash-decode/acid-color-0/flash.png`) decodes
+the way IJG v7+ does: chroma upsampled by a 16×16 IDCT, truncating colour (bit-exact on the Flash golden of
+`bitmapdata-clone`). On the 15 836 footprint pixels where the two decoders differ (same box, lavapipe, s27
+`w2b-jpeg-refine`):
+
+| | closer to Flash | exact = Flash | sum \|RGB − Flash\| | > 3 vs Flash |
+|---|---|---|---|---|
+| stb decode (= the Ruffle golden; 1 px > 3 apart) | 3 300 px | 992 | 89 326 | 2 647 |
+| **Flash decode (ours)** | **5 441 px** | **1 978** | **85 251** | **2 567** |
+
+(7 095 ties.) Whole footprint vs Flash: golden 2 963 px > 3, ours 2 887. The rest of the footprint gap is texel
+choice in Flash's quality-low minification (max 186, same in both legs), not decode.
+
+**Decision:** match Flash (user ruling, Flash over Ruffle). The row stays a visible pixel fail; it is not added to
+an ignore list. **Prune criterion:** a Flash-made golden for this row (the capture above, once its whole frame is
+checked against our render), or Ruffle adopting a DCT-scaled decoder.

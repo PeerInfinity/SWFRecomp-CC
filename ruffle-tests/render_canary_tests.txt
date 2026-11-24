@@ -804,3 +804,10 @@ regression/avm1_applyfilter_blur                       # opaque-target blur, alp
 regression/avm1_applyfilter_glow                       # glow kernel + opaque -6                    1 cmp
 regression/avm1_applyfilter_bevel                      # bevel kernel + opaque -6                   1 cmp
 regression/avm1_applyfilter_convolution                # convolution into both targets              1 cmp
+# s27 w2-jpeg-flash-decode: Flash-faithful JPEG decode (IJG v7+ ISLOW + DCT-scaled chroma + truncating YCbCr).
+# FLASH golden, tolerance 77; stb decode sat at max_diff 77 (zero headroom), the Flash decoder gives 0.
+# tier=1
+from_shumway/avm2/flash/display/bitmapdata/bitmapdata-clone   # JPEG3 4:2:0 decode vs Flash  1 cmp
+# s27 w2b-jpeg-refine: GPU nearest tie rule (render_webgpu.c bitmap_nearest_*), Flash golden, tol 0.
+# tier=1
+regression/avm1_bitmap_nearest_tie_stage   # 0x43 fill at scale 1.5, ties up  1 cmp

@@ -16,6 +16,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <jpeg_helpers.hpp>
+#include <jpeg_flash.hpp>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
@@ -1778,7 +1779,9 @@ namespace SWFRecomp
 				int w;
 				int h;
 				int comp;
-				u8* decompressed = stbi_load_from_memory(jpeg_data, (int) jpeg_data_size, &w, &h, &comp, 3);
+				// s27: Flash-faithful decode (IJG ISLOW + DCT-scaled chroma), stb fallback.
+				comp = 3;
+				u8* decompressed = decodeJpegRgb(jpeg_data, jpeg_data_size, &w, &h, "DefineBits");
 
 				if (decompressed == nullptr)
 				{
@@ -1875,7 +1878,8 @@ namespace SWFRecomp
 					stripInvalidJpegMarkers(work_buf, len);
 					appendTrailingEoiIfMissing(work_buf, len, cap);
 
-					decompressed = stbi_load_from_memory(work_buf, (int) len, &w, &h, &comp, 3);
+					decompressed = decodeJpegRgb(work_buf, len, &w, &h, "DefineBitsJPEG2/3/4");  // s27: Flash-faithful, stb fallback
+					comp = 3;
 					if (decompressed == nullptr)
 					{
 						delete[] work_buf;
@@ -2015,7 +2019,8 @@ namespace SWFRecomp
 					stripInvalidJpegMarkers(work_buf, len);
 					appendTrailingEoiIfMissing(work_buf, len, cap);
 
-					decompressed = stbi_load_from_memory(work_buf, (int) len, &w, &h, &comp, 3);
+					decompressed = decodeJpegRgb(work_buf, len, &w, &h, "DefineBitsJPEG2/3/4");  // s27: Flash-faithful, stb fallback
+					comp = 3;
 					if (decompressed == nullptr)
 					{
 						delete[] work_buf;

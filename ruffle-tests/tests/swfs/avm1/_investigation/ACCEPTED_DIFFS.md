@@ -702,7 +702,14 @@ statement and says nothing about the pixels. Measured at run `31647430265`
 (`bf585e448`). Re-triage with the video/decoder arc — it is a live pixel row, not
 a capped one.
 
-### `from_shumway/bitmapdata/getpixel-from-embedded` — JPEG decoder parity (1 diff line of 2; trace axis)
+### ~~`from_shumway/bitmapdata/getpixel-from-embedded` — JPEG decoder parity (1 diff line of 2; trace axis)~~ — **RESOLVED 2026-11-24 (s27 `w2-jpeg-flash-decode`)**
+
+> **RESOLUTION.** The premise "no standard decoder configuration reproduces Flash" is refuted. Flash decodes
+> like IJG libjpeg **v7+** (ISLOW IDCT, chroma upsampled by DCT scaling: a 16x16 IDCT of the 8x8 chroma
+> block, not libjpeg-turbo's triangle filter) followed by a **truncating** per-term YCbCr->RGB. That
+> pipeline returns `200d04` here exactly, is bit-exact on the Flash golden of `bitmapdata-clone`, and takes
+> `pixelbender_dithering` from 9413 to 27 outliers. It landed as `SWFRecomp/src/jpeg_flash.cpp`. Ignore
+> entry pruned (its own prune criterion). Report: `SWFRecompDocs/plans/session27-fanout-reports/w2-jpeg-flash-decode-report.md`.
 
 <!-- image-axis: none -->
 
@@ -1304,7 +1311,7 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | `avm1/netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | **44** image outliers, max diff **3** (was ~52k/64, then 1654/8) | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected twice: the colour half was `sws_scale` (ported exactly, 2026-08-06) and the second half was the missing deblocking filter (ported 2026-08-12); the residual is Spark IDCT precision × the GPU sample-stretch |
 | `visual/video/deblocking` | Spark IDCT precision on the least-quantised stream (Category 9) — deblocking filter + flags byte + `MAX_EMBEDDED_VIDEO_STREAMS` 8→16 all landed 2026-08-12 | **104** image outlier channels, max **4**, mean 0.0 (was 2 906 999 / 255) | Accept (image axis only; trace passes). 11 of 12 streams byte-exact; all 104 channels are one Cb level on chroma row 232 of stream 9, whose planes have no remainder lane — decoder precision, not the filter |
 | `visual/video/colorconversion/h263` | Spark IDCT precision after the exact BT.601 port (Category 9) | 10 808 image outlier channels, max 2 | Accept (image axis only; trace passes). Every `idct_algo` arm still fails `max_outliers = 0`, and the closest one is a float IDCT = CI determinism hazard |
-| `from_shumway/bitmapdata/getpixel-from-embedded` | JPEG decoder parity: Flash `200d04` vs ours/libjpeg-turbo `220a06` (Category 9) | 1 of 2 (trace) | Accept; no standard decoder configuration reproduces Flash; Ruffle is platform-variable (`known_failure.ruffle_check = false`), no `output.ruffle.txt`. Added s26 |
+| ~~`from_shumway/bitmapdata/getpixel-from-embedded`~~ | ~~JPEG decoder parity (Category 9)~~ | **0** | **RESOLVED 2026-11-24 (s27 `w2-jpeg-flash-decode`): IJG v7+ DCT-scaled chroma + truncating YCbCr reproduce Flash `200d04`; ignore entry pruned** |
 | ~~`visual/simple_shapes/masks`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
 | ~~`visual/simple_shapes/masks_equal_clipdepth`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
 | `avm2/verify_method_info_duplicate` | Cross-test inconsistent Flash captures (Category 2) — the trailing `#1065` contradicts the PASSING `verify_method_info_oob` | 1 of 2 | Accept; the +1 is only reachable by keying the error on `1121`, which would demote `_oob` to `ruffle_matched`. Suite-local ignore only |

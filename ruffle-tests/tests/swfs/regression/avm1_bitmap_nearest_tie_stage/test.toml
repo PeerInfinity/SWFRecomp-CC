@@ -1,0 +1,6 @@
+# s27 w2b-jpeg-refine. Golden = Flash Player 32 draw() capture (see create_test_swf.py).
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 0
+max_outliers = 0

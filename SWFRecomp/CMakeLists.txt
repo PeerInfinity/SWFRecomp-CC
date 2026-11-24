@@ -17,6 +17,7 @@ set(SOURCES
     ${CMAKE_SOURCE_DIR}/src/config.cpp
     ${CMAKE_SOURCE_DIR}/src/recompilation.cpp
     ${CMAKE_SOURCE_DIR}/src/swf.cpp
+    ${CMAKE_SOURCE_DIR}/src/jpeg_flash.cpp
     ${CMAKE_SOURCE_DIR}/src/tag.cpp
     ${CMAKE_SOURCE_DIR}/src/field.cpp
     ${CMAKE_SOURCE_DIR}/src/action/action.cpp

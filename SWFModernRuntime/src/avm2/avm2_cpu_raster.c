@@ -230,6 +230,11 @@ typedef struct {
 	// texels; (ia..ity) map shape twips -> bitmap px.
 	const uint8_t* bmp;
 	int bmp_w, bmp_h, bmp_repeat, bmp_smooth;
+	// Flash mipmap (s27 w2b-jpeg-refine): when > 0, `bmp` is the 2^bmp_mip
+	// box-reduced level (cpu_bmp_mip_level), u/v are scaled by bmp_mip_scale
+	// and the bilinear weights TRUNCATE (measured on gnash BitmapDataDraw).
+	int bmp_mip;
+	double bmp_mip_scale;
 } RasterCtx;
 
 // libswf/tag.c (declared in libswf/tag.h, which this TU does not include).
@@ -283,9 +288,80 @@ static inline uint32_t bmp_texel(const RasterCtx* R, int x, int y)
 	return ((uint32_t) p[3] << 24) | ((uint32_t) p[0] << 16) | ((uint32_t) p[1] << 8) | p[2];
 }
 
+// Flash Player mipmaps a SMOOTHED bitmap that is drawn minified: it box-reduces
+// the bitmap by 2 per level while both dimensions are even (Adobe: "use even
+// dimensions, ideally powers of two, for mipmapping"), each channel the
+// TRUNCATED mean of the 2x2 texels, and samples the chosen level bilinearly
+// with truncating weights. Measured (s27 w2b-jpeg-refine) on
+// from_gnash/misc-ming.all/BitmapDataDraw line 284: the 170x170 JPEG (IJG v7+
+// Flash decode) drawn through a 0x40 fill at 1.25 x 2.5 texels/pixel reads
+// 0x014400 in Flash Player 15 and 32 only as level 1 (85x85) + truncating
+// bilinear; full-res bilinear gives 0x004600 / 0x014700, rounding variants
+// 0x024401 / 0x034402. Level = floor(log2(max texels per pixel)), the GPU LOD
+// rule, capped by the evenness chain. Cache: a few levels, keyed by the source
+// texel pointer + size (timeline / embedded bitmaps live for the whole run).
+#define CPU_BMP_MIP_CACHE 8
+static const uint8_t* cpu_bmp_mip_level(const uint8_t* src, int w, int h, int level,
+                                        int* out_w, int* out_h)
+{
+	static struct { const uint8_t* src; int w, h, level, ow, oh; uint8_t* px; } cache[CPU_BMP_MIP_CACHE];
+	static int next = 0;
+	for (int i = 0; i < CPU_BMP_MIP_CACHE; i++)
+		if (cache[i].px != NULL && cache[i].src == src && cache[i].w == w && cache[i].h == h
+		    && cache[i].level == level)
+		{ *out_w = cache[i].ow; *out_h = cache[i].oh; return cache[i].px; }
+	const uint8_t* cur = src;
+	uint8_t* owned = NULL;
+	int cw = w, ch = h;
+	for (int l = 0; l < level; l++)
+	{
+		int nw = cw / 2, nh = ch / 2;
+		uint8_t* d = (uint8_t*) malloc((size_t) nw * nh * 4);
+		if (d == NULL) { free(owned); return NULL; }
+		for (int y = 0; y < nh; y++)
+			for (int x = 0; x < nw; x++)
+			{
+				const uint8_t* a = cur + ((size_t) (2 * y) * cw + 2 * x) * 4;
+				const uint8_t* b = a + (size_t) cw * 4;
+				uint8_t* o = d + ((size_t) y * nw + x) * 4;
+				for (int k = 0; k < 4; k++)
+					o[k] = (uint8_t) ((a[k] + a[4 + k] + b[k] + b[4 + k]) >> 2);
+			}
+		free(owned);
+		owned = d; cur = d; cw = nw; ch = nh;
+	}
+	int slot = next; next = (next + 1) % CPU_BMP_MIP_CACHE;
+	free(cache[slot].px);
+	cache[slot].src = src; cache[slot].w = w; cache[slot].h = h; cache[slot].level = level;
+	cache[slot].ow = cw; cache[slot].oh = ch; cache[slot].px = owned;
+	*out_w = cw; *out_h = ch;
+	return owned;
+}
+
+// Pick the Flash mip level for a smoothed bitmap fill and swap it into R.
+// (ja,jb,jc,jd): d(u,v)/d(device x,y) in source texels.
+static void cpu_bmp_apply_mip(RasterCtx* R, double ja, double jb, double jc, double jd)
+{
+	R->bmp_mip = 0; R->bmp_mip_scale = 1.0;
+	if (!R->bmp_smooth) return;
+	double lx = sqrt(ja * ja + jb * jb), ly = sqrt(jc * jc + jd * jd);
+	double m = lx > ly ? lx : ly;
+	if (!(m >= 2.0)) return;
+	int level = 0, w = R->bmp_w, h = R->bmp_h;
+	while (m >= 2.0 && (w & 1) == 0 && (h & 1) == 0 && w >= 2 && h >= 2)
+	{ level++; m *= 0.5; w >>= 1; h >>= 1; }
+	if (level == 0) return;
+	int ow, oh;
+	const uint8_t* px = cpu_bmp_mip_level(R->bmp, R->bmp_w, R->bmp_h, level, &ow, &oh);
+	if (px == NULL) return;
+	R->bmp = px; R->bmp_w = ow; R->bmp_h = oh;
+	R->bmp_mip = level; R->bmp_mip_scale = 1.0 / (double) (1 << level);
+}
+
 static uint32_t bmp_sample(const RasterCtx* R, double u, double v)
 {
 	uint32_t c;
+	if (R->bmp_mip > 0) { u *= R->bmp_mip_scale; v *= R->bmp_mip_scale; }
 	if (!R->bmp_smooth) {
 		// Nearest: a pixel centre on (or within float noise of) a texel
 		// boundary takes the UPPER texel (floor of the exact coordinate), as
@@ -308,8 +384,9 @@ static uint32_t bmp_sample(const RasterCtx* R, double u, double v)
 			for (int ch = 0; ch < 4; ch++)
 				acc[ch] += wq[k] * (double) ((q[k] >> (24 - 8 * ch)) & 0xFF);
 		c = 0;
+		double rnd = R->bmp_mip > 0 ? 0.0 : 0.5;
 		for (int ch = 0; ch < 4; ch++) {
-			uint32_t b = (uint32_t) (acc[ch] + 0.5); if (b > 255) b = 255;
+			uint32_t b = (uint32_t) (acc[ch] + rnd); if (b > 255) b = 255;
 			c |= b << (24 - 8 * ch);
 		}
 	}
@@ -724,7 +801,7 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 		R.buf = buf; R.W = W; R.H = H;
 		R.node_alpha = node_alpha;
 		R.ramp = NULL; R.linear_out = 0;   // static path: use gradient_data row
-		R.bmp = NULL;
+		R.bmp = NULL; R.bmp_mip = 0;
 
 		if (is_bmp)
 		{
@@ -761,6 +838,18 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 			R.ic = -_ic * _inv;  R.id =  _ia * _inv;
 			R.itx = (_ic * _ity - _id * _itx) * _inv;
 			R.ity = (_ib * _itx - _ia * _ity) * _inv;
+			// texels per device pixel: B (bitmap<-shape) * 20 * inv(W).
+			{
+				double wdet = wa * wd - wb * wc;
+				R.bmp_mip = 0; R.bmp_mip_scale = 1.0;
+				if (wdet != 0.0)
+				{
+					double k = 20.0 / wdet;
+					double sxx = wd * k, sxy = -wb * k, syx = -wc * k, syy = wa * k;
+					cpu_bmp_apply_mip(&R, R.ia * sxx + R.ic * sxy, R.ib * sxx + R.id * sxy,
+					                  R.ia * syx + R.ic * syy, R.ib * syx + R.id * syy);
+				}
+			}
 			raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
 			continue;
 		}
@@ -828,7 +917,7 @@ void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
 	RasterCtx R;
 	R.buf = buf; R.W = W; R.H = H;
 	R.node_alpha = node_alpha;
-	R.ramp = NULL; R.linear_out = 0; R.bmp = NULL;
+	R.ramp = NULL; R.linear_out = 0; R.bmp = NULL; R.bmp_mip = 0;
 
 	if (fill->kind == 2)
 	{
@@ -952,7 +1041,7 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 		RasterCtx R;
 		R.buf = buf; R.W = W; R.H = H;
 		R.node_alpha = node_alpha;
-		R.ramp = NULL; R.linear_out = 0; R.bmp = NULL;
+		R.ramp = NULL; R.linear_out = 0; R.bmp = NULL; R.bmp_mip = 0;
 		R.is_gradient = 0;
 		R.solid_argb = (a_out << 24) | (cr << 16) | (cg << 8) | cb;
 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);

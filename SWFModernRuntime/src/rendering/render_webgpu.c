@@ -350,6 +350,61 @@ static const char* fragment_wgsl =
 "  if (r.a <= 0.0) { return vec4f(0.0); }\n"
 "  return vec4f(r.rgb / r.a, r.a);\n"
 "}\n"
+// s27 w2b-jpeg-refine: NON-smoothed bitmap fills (0x42 / 0x43) take the
+// texel floor(coord + TIE) by textureLoad instead of the hardware Nearest
+// sampler. A pixel centre that falls exactly on a texel boundary (scale 1.5,
+// 3, ...) is a tie; the hardware resolves it from the interpolated UV, which
+// lands a hair on either side of the boundary (lavapipe: neither rule). Flash
+// takes the UPPER texel: its draw() capture of the s27 fixture
+// regression/avm1_bitmap_nearest_tie_stage (scale exactly 1.5, 80 tie pixels)
+// equals the ties-up prediction at 0 px, and the CPU nearest sampler
+// (avm2_cpu_raster.c bmp_sample) already uses ties-up against the Flash golden
+// of avm2/pixelbender_dithering. NEAREST_TIE is in texels and deliberately
+// tiny: bias 0 reproduces the hardware sampler bit-for-bit; 1e-4 already
+// settles the fixture; 1e-3 also moves from_shumway/acid/acid-blend's
+// periodic NEAR-tie columns (4 -> 275 outliers vs its Ruffle golden), where
+// Flash's behaviour is unmeasured. The moved set is monotone in the bias.
+"fn pool_texel(pool: u32, ij: vec2i, layer: i32) -> vec4f {\n"
+"  switch (pool) {\n"
+"    case 0u: { return textureLoad(bitmap_pool0, ij, layer, 0); }\n"
+"    case 1u: { return textureLoad(bitmap_pool1, ij, layer, 0); }\n"
+"    case 2u: { return textureLoad(bitmap_pool2, ij, layer, 0); }\n"
+"    case 3u: { return textureLoad(bitmap_pool3, ij, layer, 0); }\n"
+"    case 4u: { return textureLoad(bitmap_pool4, ij, layer, 0); }\n"
+"    case 5u: { return textureLoad(bitmap_pool5, ij, layer, 0); }\n"
+"    case 6u: { return textureLoad(bitmap_pool6, ij, layer, 0); }\n"
+"    case 7u: { return textureLoad(bitmap_pool7, ij, layer, 0); }\n"
+"    case 8u: { return textureLoad(bitmap_pool8, ij, layer, 0); }\n"
+"    case 9u: { return textureLoad(bitmap_pool9, ij, layer, 0); }\n"
+"    case 10u: { return textureLoad(bitmap_pool10, ij, layer, 0); }\n"
+"    case 11u: { return textureLoad(bitmap_pool11, ij, layer, 0); }\n"
+"    default: { return vec4f(0.0); }\n"
+"  }\n"
+"}\n"
+"fn pool_dims(pool: u32) -> vec2i {\n"
+"  switch (pool) {\n"
+"    case 8u: { return vec2i(textureDimensions(bitmap_pool8)); }\n"
+"    case 9u: { return vec2i(textureDimensions(bitmap_pool9)); }\n"
+"    case 10u: { return vec2i(textureDimensions(bitmap_pool10)); }\n"
+"    case 11u: { return vec2i(textureDimensions(bitmap_pool11)); }\n"
+"    default: { return static_dims(pool); }\n"
+"  }\n"
+"}\n"
+"const NEAREST_TIE: f32 = 1e-5;\n"
+// 0x42: xy counts bitmap repeats; ratio = bitmap / layer size.
+"fn bitmap_nearest_repeat(pool: u32, xy: vec2f, ratio: vec2f, layer: i32) -> vec4f {\n"
+"  let dim = vec2f(pool_dims(pool));\n"
+"  let bd = max(round(ratio * dim), vec2f(1.0));\n"
+"  let t = floor(xy * bd + vec2f(NEAREST_TIE));\n"
+"  let w = t - floor(t / bd) * bd;\n"
+"  return pool_texel(pool, clamp(vec2i(w), vec2i(0), vec2i(dim) - vec2i(1)), layer);\n"
+"}\n"
+// 0x43: uv is layer-normalised; clamp-to-edge like the Nearest sampler.
+"fn bitmap_nearest_clamp(pool: u32, uv: vec2f, layer: i32) -> vec4f {\n"
+"  let dim = pool_dims(pool);\n"
+"  let t = floor(uv * vec2f(dim) + vec2f(NEAREST_TIE));\n"
+"  return pool_texel(pool, clamp(vec2i(t), vec2i(0), dim - vec2i(1)), layer);\n"
+"}\n"
 "fn sample_bitmap(pool: u32, uv: vec2f, layer: i32, smoothed: bool) -> vec4f {\n"
 "  var c = vec4f(0.0);\n"
 "  if (smoothed) {\n"
@@ -417,12 +472,20 @@ static const char* fragment_wgsl =
 "    color = sample_gradient(focal_radial_t(in.v_args), i32(in.v_style_id));\n"
 "  } else if (ftype == 0x40u || ftype == 0x42u) {\n"
 "    let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
-"    let uv = fract(in.v_args.xy) * bm_ratio;\n"
-"    color = sample_bitmap(in.v_style_id >> 16u, uv, i32(in.v_style_id & 0xFFFFu), ftype == 0x40u);\n"
+"    if (ftype == 0x42u) {\n"
+"      color = bitmap_nearest_repeat(in.v_style_id >> 16u, in.v_args.xy, bm_ratio, i32(in.v_style_id & 0xFFFFu));\n"
+"    } else {\n"
+"      let uv = fract(in.v_args.xy) * bm_ratio;\n"
+"      color = sample_bitmap(in.v_style_id >> 16u, uv, i32(in.v_style_id & 0xFFFFu), true);\n"
+"    }\n"
 "  } else if (ftype == 0x41u || ftype == 0x43u) {\n"
 "    var uv = in.v_args.xy;\n"
 "    if ((in.v_style_type & 0x100u) != 0u) { uv = clamp(uv, vec2f(0.0), in.v_args.zw); }\n"
-"    color = sample_bitmap(in.v_style_id >> 16u, uv, i32(in.v_style_id & 0xFFFFu), ftype == 0x41u);\n"
+"    if (ftype == 0x43u) {\n"
+"      color = bitmap_nearest_clamp(in.v_style_id >> 16u, uv, i32(in.v_style_id & 0xFFFFu));\n"
+"    } else {\n"
+"      color = sample_bitmap(in.v_style_id >> 16u, uv, i32(in.v_style_id & 0xFFFFu), true);\n"
+"    }\n"
 "  } else {\n"
 "    color = vec4f(0.0);\n"
 "  }\n"
