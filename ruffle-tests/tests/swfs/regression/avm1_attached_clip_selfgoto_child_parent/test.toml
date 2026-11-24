@@ -1,0 +1,5 @@
+num_frames = 6
+
+[image_comparisons.output]
+tolerance = 0
+max_outliers = 0

@@ -2468,10 +2468,24 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 	{
 		DisplayObject* obj = g_self_goto_objs[i];
 		if (obj == NULL || obj->char_id == 0) continue;
+		// attachMovie'd clip root: its entry is a standalone display_obj (no
+		// instance name, not in any timeline list), so no name lookup or
+		// deferred top-of-loop path ever reaches it (ng_attached_run_tree
+		// returns on a pending manual nav). Bind its clip by display_obj.
+		MovieClip* att_mc = NULL;
+		if (obj->instance_name == NULL) {
+			extern MovieClip* child_mc_cache[];
+			extern int child_mc_count;
+			for (int ai = 0; ai < child_mc_count; ai++) {
+				MovieClip* c = child_mc_cache[ai];
+				if (c != NULL && c->display_obj == (void*)obj && c->depth != INT_MIN) { att_mc = c; break; }
+			}
+		}
 		// Only a still-PLAYING pending nav is the gotoAndPlay self-loop. A
 		// gotoAndStop (is_playing==0) keeps its manual flag and the deferred
-		// top-of-loop path handles it next tick exactly as before.
-		if (!obj->sprite_manual_next_frame || !obj->sprite_is_playing) continue;
+		// top-of-loop path handles it next tick exactly as before. An attached
+		// root has no deferred path, so its gotoAndStop is applied here too.
+		if (!obj->sprite_manual_next_frame || (!obj->sprite_is_playing && att_mc == NULL)) continue;
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count == 0) continue;
 
@@ -2526,8 +2540,9 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 			if (any_needs_init) {
 				extern MovieClip* actionFindMovieClipByName(const char* instance_name);
 				extern MovieClip root_movieclip;
-				MovieClip* parent_for_init = (obj->instance_name != NULL)
-					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				// Children belong to the navigating clip, never _root (same
+				// rule as advance_sprite_frames' post-frame init, 438121c22).
+				MovieClip* parent_for_init = att_mc ? att_mc : ng_mc_for_sprite_obj(obj);
 				process_sprite_needs_init(app_context, parent_for_init ? parent_for_init : &root_movieclip);
 			}
 		}
@@ -2547,6 +2562,9 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 		// tick; the observer already read the issuing frame in the flush).
 		obj->sprite_current_frame = (target + 1) % ch->sprite_frame_count;
 		obj->enterframe_eligible = 1;
+		// Attached roots report _currentframe from mc->currentframe, which
+		// only ng_attached_run_tree's natural advance writes.
+		if (att_mc) att_mc->currentframe = (int)target + 1;
 
 		obj->sprite_display_list = display_list;
 		obj->sprite_max_depth = max_depth;
@@ -7868,6 +7886,24 @@ static u32 tf_glyph_xform_slot(const float m[6])
 	return slot;
 }
 
+// s27 n-l2l4-pixel-pass: a TAB with no TextFormat.tabStops moves the pen to the
+// next DEFAULT stop. Flash Player 32 oracle (regression/avm1_edittext_tab_render):
+// the stops are multiples of T = 2 * (ascent + descent), each truncated to whole
+// twips at the run's size, counted from the field's left EDGE (the line's
+// layout x + the 2 px gutter); the line is then aligned as a whole. Ruffle's
+// layout.rs tab() uses 2.7 * size from the text origin instead; Flash wins.
+// `line_x` is the pen offset from the line's layout start, in twips. Explicit
+// tabStops are not handled by this painter (the textWidth metric honours them).
+static float tf_default_tab_stop(float line_x, s16 ascent, s16 descent, int em, u16 fh, float gutter)
+{
+	if (em <= 0) return line_x;
+	float t = 2.0f * (floorf((float)ascent * (float)fh / (float)em)
+	                  + floorf((float)descent * (float)fh / (float)em));
+	if (!(t > 0.0f)) return line_x;
+	float fx = line_x + gutter;
+	return (floorf(fx / t) + 1.0f) * t - gutter;
+}
+
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
 {
 	GEN_EXTERN_SHAPE_DATA;
@@ -8129,6 +8165,13 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				}
 				trail = 0.0f;
 				par_has_run = 0;
+				continue;
+			}
+			if (cp == '\t') {
+				if (MAX_TF_PARAGRAPHS_ROOM(cur_par))
+					pars[cur_par].width = tf_default_tab_stop(pars[cur_par].width, ascent, descent,
+					                                          em_square, cur_fh, gutter_twips);
+				trail = 0.0f;
 				continue;
 			}
 
@@ -8484,6 +8527,12 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			y_pos += tf_line_pitch_twips(ascent, descent, em_square,
 			                             info->font_height, info->leading_twips);
 			line_no++;
+			continue;
+		}
+		if (cp == '\t') {
+			float line_start = base_x + (par_idx < par_count ? par_x_offset[par_idx] : 0.0f);
+			x_pos = line_start + tf_default_tab_stop(x_pos - line_start, ascent, descent,
+			                                         em_square, cur_fh, gutter_twips);
 			continue;
 		}
 

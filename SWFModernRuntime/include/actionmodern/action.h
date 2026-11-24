@@ -27,7 +27,9 @@ typedef struct Avm1TextFieldBinding {
 
 struct MovieClip {
 	float x, y;
-	float xscale, yscale;
+	// double (s27 n-l2l4-pixel-pass): Flash/Ruffle keep an AS-set _xscale/_yscale
+	// exact (82.99999999 reads back 82.99999999, floor 82); f32 read 83.
+	double xscale, yscale;
 	float rotation;
 	float alpha;
 	float width, height;
@@ -86,7 +88,8 @@ struct MovieClip {
 	// _yscale / _rotation setter writes a different value, the snapshot stops
 	// matching, and the getter self-invalidates back to recomposition.
 	double exact_m_a, exact_m_b, exact_m_c, exact_m_d;
-	float exact_m_xs, exact_m_ys, exact_m_rot, exact_m_skew;
+	double exact_m_xs, exact_m_ys;
+	float exact_m_rot, exact_m_skew;
 	u8 has_exact_matrix;
 	// Drawing API bounds tracking (updated by moveTo/lineTo calls)
 	float draw_xmin, draw_xmax, draw_ymin, draw_ymax;

@@ -10524,8 +10524,8 @@ static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* ar
 	double rot_y = atan2(-c, d);
 	double xs = sqrt(a*a + b*b);
 	double ys = sqrt(c*c + d*d);
-	mc->xscale = (float)(xs * 100.0);
-	mc->yscale = (float)(ys * 100.0);
+	mc->xscale = xs * 100.0;
+	mc->yscale = ys * 100.0;
 	mc->rotation = normalizeRotation((float)(rot_x * 180.0 / 3.14159265358979323846));
 	mc->skew = (float)(rot_y - rot_x);
 	mc->as_set_flags |= (1|2|4|8|16);
@@ -35229,8 +35229,8 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 	}
 	if (!isfinite(new_sx)) new_sx = 0.0;
 	if (!isfinite(new_sy)) new_sy = 0.0;
-	mc->xscale = (float)(new_sx * 100.0);
-	mc->yscale = (float)(new_sy * 100.0);
+	mc->xscale = new_sx * 100.0;
+	mc->yscale = new_sy * 100.0;
 	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
 	markTransformedByScript(mc);
 }
@@ -35279,8 +35279,8 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 	}
 	if (!isfinite(new_sx)) new_sx = 0.0;
 	if (!isfinite(new_sy)) new_sy = 0.0;
-	mc->xscale = (float)(new_sx * 100.0);
-	mc->yscale = (float)(new_sy * 100.0);
+	mc->xscale = new_sx * 100.0;
+	mc->yscale = new_sy * 100.0;
 	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
 	markTransformedByScript(mc);
 }
@@ -51438,8 +51438,8 @@ check_special_vars:
 			MovieClip* mc = &root_movieclip;
 			if (strcasecmp(var_name, "_x") == 0) { double v = spvTwipsQuantizePixels((double)mc->x); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
 			if (strcasecmp(var_name, "_y") == 0) { double v = spvTwipsQuantizePixels((double)mc->y); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
-			if (strcasecmp(var_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_xscale") == 0) { double v = mc->xscale; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
+			if (strcasecmp(var_name, "_yscale") == 0) { double v = mc->yscale; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
 			if (strcasecmp(var_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_alpha") == 0) { float v = mcReadAlpha(mc); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
@@ -52052,13 +52052,13 @@ void actionSetVariable(SWFAppContext* app_context)
 			mc->as_set_flags |= 2; markTransformedByScript(mc);
 #endif
 			} handled = 1; }
-		else if (strcasecmp(var_name, "_xscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->xscale = fval;
+		else if (strcasecmp(var_name, "_xscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->xscale = dval;
 			mc->as_set_flags |= 4;
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 			markTransformedByScript(mc);
 #endif
 			} handled = 1; }
-		else if (strcasecmp(var_name, "_yscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->yscale = fval;
+		else if (strcasecmp(var_name, "_yscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->yscale = dval;
 			mc->as_set_flags |= 8;
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 			markTransformedByScript(mc);
@@ -53205,12 +53205,12 @@ void actionGetProperty(SWFAppContext* app_context)
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
 		case 2:  // _xscale
 			if (mc) syncTransformIfNeeded(mc);
-			value = mc ? mc->xscale : 100.0f;
-			break;
+			{ double _s = mc ? mc->xscale : 100.0; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_s)); }
+			return;
 		case 3:  // _yscale
 			if (mc) syncTransformIfNeeded(mc);
-			value = mc ? mc->yscale : 100.0f;
-			break;
+			{ double _s = mc ? mc->yscale : 100.0; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_s)); }
+			return;
 		case 4:  // _currentframe
 			value = mc ? (float)mc->currentframe : 1.0f;
 			break;
@@ -58083,7 +58083,7 @@ void actionSetMember(SWFAppContext* app_context)
 					mc->as_set_flags |= 4;
 					markTransformedByScript(mc);
 
-					mc->xscale = pfval; return;
+					mc->xscale = pdval; return;
 				}
 				if (strcasecmp(prop_name, "_yscale") == 0) {
 					SM_RESOLVE_NUM_PROP();
@@ -58092,7 +58092,7 @@ void actionSetMember(SWFAppContext* app_context)
 					mc->as_set_flags |= 8;
 					markTransformedByScript(mc);
 
-					mc->yscale = pfval; return;
+					mc->yscale = pdval; return;
 				}
 				if (strcasecmp(prop_name, "_rotation") == 0) {
 					SM_RESOLVE_NUM_PROP();
@@ -59631,18 +59631,22 @@ void actionSetMember(SWFAppContext* app_context)
 					// Invoke addProperty setter with this = MC
 					ASFunction* _sf = (ASFunction*)_setter_prop->setter;
 					if (_sf->function_type == 2) {
-						g_special_depth++;
-						if (g_special_depth < MAX_SPECIAL_DEPTH) {
-							ActionVar* _regs = NULL;
-							if (_sf->register_count > 0) _regs = (ActionVar*) HCALLOC(_sf->register_count, sizeof(ActionVar));
-							ASObject* _ls = allocObject(app_context, 8);
-							if (scope_depth < MAX_SCOPE_DEPTH) { scope_is_with[scope_depth] = 0; scope_mc[scope_depth] = NULL; scope_chain[scope_depth++] = _ls; }
-							_sf->advanced_func(app_context, &value_var, 1, _regs, (void*)mc);
-							if (scope_depth > 0) scope_depth--;
-							releaseObject(app_context, _ls);
-							if (_regs != NULL) FREE(_regs);
-						}
-						g_special_depth--;
+						// s27 n-l2l4-pixel-pass: was `_sf->advanced_func(..., (void*)mc)`,
+						// i.e. a MovieClip* where the callee expects an ASObject* `this`;
+						// the body's `this.x = ...` then read MovieClip bytes as
+						// ASObject->properties (survived by layout luck until
+						// MovieClip.xscale became double; FLVPlayback's setters in
+						// avm1/netstream_play_flv_screen segfaulted). Same MOVIECLIP
+						// binding as invokePropertySetter's MC-receiver path.
+						ActionVar _tv = {0};
+						_tv.type = ACTION_STACK_VALUE_MOVIECLIP;
+						_tv.data.numeric_value = (u64)(uintptr_t)mc;
+						InvokeOpts _so = { .flags = (u16)(INV_DEPTH_GUARD | INV_RESET_THIS_DEPTH |
+						                                  INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+						                                  INV_BIND_THIS | INV_BASE_CLIP |
+						                                  INV_MC_THIS_NULL_PTR | INV_EVENT_THIS_MC),
+						                   .super_depth = 0 };
+						(void) invokeFunctionValue(app_context, _sf, &_tv, &value_var, 1, &_so);
 					} else if (_sf->function_type == 1 && _sf->simple_func != NULL) {
 						g_special_depth++;
 						if (g_special_depth < MAX_SPECIAL_DEPTH) {
@@ -61990,12 +61994,12 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				syncTransformIfNeeded(mc);
 #endif
-				float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+				double v = mc->xscale; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
 			if (strcasecmp(prop_name, "_yscale") == 0) {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				syncTransformIfNeeded(mc);
 #endif
-				float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+				double v = mc->yscale; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
 			if (strcasecmp(prop_name, "_rotation") == 0) {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				syncTransformIfNeeded(mc);
@@ -65561,12 +65565,12 @@ void actionSetProperty(SWFAppContext* app_context)
 			markTransformedByScript(mc);
 			break;
 		case 2:  // _xscale
-			mc->xscale = num_value;
+			mc->xscale = dnum;
 			mc->as_set_flags |= 4;
 			markTransformedByScript(mc);
 			break;
 		case 3:  // _yscale
-			mc->yscale = num_value;
+			mc->yscale = dnum;
 			mc->as_set_flags |= 8;
 			markTransformedByScript(mc);
 			break;
@@ -66435,8 +66439,8 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 
 	if (strcasecmp(name, "_x") == 0) { double v = spvTwipsQuantizePixels((double)mc->x); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
 	if (strcasecmp(name, "_y") == 0) { double v = spvTwipsQuantizePixels((double)mc->y); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
-	if (strcasecmp(name, "_xscale") == 0) { float v = mc->xscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_yscale") == 0) { float v = mc->yscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_xscale") == 0) { double v = mc->xscale; result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
+	if (strcasecmp(name, "_yscale") == 0) { double v = mc->yscale; result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
 	if (strcasecmp(name, "_rotation") == 0) { float v = mc->rotation; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_alpha") == 0) { float v = mcReadAlpha(mc); result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_visible") == 0) { result->type = ACTION_STACK_VALUE_BOOLEAN; result->data.numeric_value = mc->visible ? 1 : 0; return 1; }
@@ -66501,13 +66505,13 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
 		mc->as_set_flags |= 4;
 		markTransformedByScript(mc);
-		mc->xscale = fval; return 1;
+		mc->xscale = dval; return 1;
 	}
 	if (strcasecmp(name, "_yscale") == 0) {
 		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
 		mc->as_set_flags |= 8;
 		markTransformedByScript(mc);
-		mc->yscale = fval; return 1;
+		mc->yscale = dval; return 1;
 	}
 	if (strcasecmp(name, "_rotation") == 0) {
 		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;

@@ -1,0 +1,14 @@
+num_frames = 1
+
+# s27 n-l2l4-pixel-pass. AVM1 EditText TAB default stops (tag.c
+# tf_default_tab_stop). Goldens = FLASH PLAYER 32 oracle (tools/flash-oracle
+# run_trace.py / run_image.py tick 1). Ours lands every glyph within 0.25 px of
+# Flash; the residual is sub-pixel glyph-edge AA (max channel delta 64 at
+# 2026-11-23). Before the fix the tabs were skipped: glyphs 20-80 px off,
+# 255-delta outliers. The Ruffle exporter is NOT a golden here (27/54 px stops).
+[image_comparisons.output]
+tolerance = 64
+max_outliers = 0
+
+[player_options]
+with_renderer = { optional = false }
