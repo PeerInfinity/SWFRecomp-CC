@@ -45,6 +45,7 @@ cp "$GEN"/movie_*.c  "$OUT/" 2>/dev/null || true   # movie_registry.c + movie_<c
 cp "${SRC}"/actionmodern/{action.c,variables.c,object.c,math.c,date.c,timer.c,registered_class.c,avm1_amf.c,unicode_case_tables.h,action_queue.c,sprite_frame_scripts.c} "$OUT/"
 cp "${SRC}"/{utils.c,amf_packet.c} "$OUT/"
 cp "${SRC}"/libswf/{swf.c,tag.c,tag_stubs.c,ng_shared.c,hit_test.c,shape_hit_test.c,graphics_stubs.c} "$OUT/"
+cp "${SRC}"/avm2/avm2_cpu_raster.c "$OUT/"  # AVM1 draw() timeline arm (s26 1aef9cc7b); build_test.sh carries it too
 cp "${SRC}"/actionmodern/{image_decode.c,video_codec.c} "$OUT/"
 cp "${SRC}"/libswf/stb_image_impl.c "$OUT/"; cp "${RT}"/lib/stb/stb_image.h "$OUT/"
 cp "${SRC}"/rendering/render_webgpu.c "$OUT/"
