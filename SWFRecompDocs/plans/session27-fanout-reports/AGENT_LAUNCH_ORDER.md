@@ -29,23 +29,25 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
 | w2-layer-alpha-group | Flash capture n3_layer_alpha | fixtures (Flash golden); priced Ruffle-golden losses | session_018CoDi4H4DqA4qwhbCgk45g — DELIVERED, LANDED `fb6fe4ba4` (0 corpus; 2 Flash-golden fixtures; Flash probes: filters/blend/aoffset group, cAB does not) |
-| w2b-group-alpha-triggers | w2-layer-alpha-group + Flash probes | corpus filter/blend rows will move | session_018CoDi5TpfA7P8yRuUGbTVQ |
+| w2b-group-alpha-triggers | w2-layer-alpha-group + Flash probes | corpus filter/blend rows will move | session_018CoDi5TpfA7P8yRuUGbTVQ — DELIVERED, LANDED `78fee9e13` (10 Flash fixtures; 8 extra Flash probes confirm grouped model) |
 | w2-flash-filter-kernels | Flash captures glow_kernels/draw_filtered | 2 fixtures (Flash trace) | session_018CoDi5rf6MrkHLk3QibWyX — DELIVERED, LANDED `cceb5133a` (source; glow 16/23, draw_filtered 11/13 vs Flash; fixtures held; applyfilter_blur Ruffle golden 39351→47515 priced) |
 | w2-jpeg-flash-decode | w1-drift lead 1 | headroom on 2 Flash-golden rows | session_018CoDi66FA1hXSXXAwLB8kW — DELIVERED, HELD: IJG v7+ model bit-exact on clone, 27 on dithering, +1 getpixel; but Flash 32 BitmapDataDraw = 82944 (stb flat) contradicts → w2b-jpeg-refine |
-| w2b-jpeg-refine | w2-jpeg-flash-decode + Flash oracles | refined decoder or NO-GO | session_018CoDi3cn6pb1EqGj5vDUvC |
+| w2b-jpeg-refine | w2-jpeg-flash-decode + Flash oracles | refined decoder or NO-GO | session_018CoDi3cn6pb1EqGj5vDUvC — DELIVERED, LANDED `31d3e3237` with w2-jpeg-flash-decode (+1 trace getpixel-from-embedded; clone bit-exact vs Flash; acid-color-0 priced Flash-over-Ruffle loss) |
 | w2-allow-networking-subtests | w1-drift §3 | NEW subtest rows | session_018CoDi4rozCuYyCVd6iWznD — DELIVERED, LANDED `d37ca69b5` (+8 NEW trace rows, all pass both modes) |
-| w2-draw-cx-text | w1-text-glyph-fidelity §4 | 2 fixtures (Flash trace) | session_018CoDi5MC3ifTEYbRy5fxSf |
+| w2-draw-cx-text | w1-text-glyph-fidelity §4 | 2 fixtures (Flash trace) | session_018CoDi5MC3ifTEYbRy5fxSf — DELIVERED, LANDED `85cca4df6` (2 Flash-golden fixtures; embedded-field tint → w2b-draw-text-tint) |
 | w2-applyfilter-cm | w1-applyfilter-tail items 3, 5 | 3 CM fixtures (Flash PNG) | session_018CoDi4dFuVDgVxQdWMdvo7 — DELIVERED, LANDED `cceb5133a` (AVM1 applyFilter bridge; 3 Flash-golden CM fixtures + kernels fixture) |
 | w2-holder-drawing-full | w1-render-bitmap-leads §1/1b | fixture (hand == Flash) | session_018CoDi6o54ceV3pKjPBKyS1 — DELIVERED, LANDED `c2f237a94` (0 corpus; 2 Flash-golden fixtures) |
 | w2-avm2-text-tail | w1-text-glyph-fidelity §2b, 5 | fixture avm2_definetext_matrix (== Flash) | session_018CoDi48vpYNmCMWk66aLEA — DELIVERED, LANDED `c2f237a94` (0 corpus; avm2_definetext_matrix == Flash; DefineFont4 CFF data; selection tint HOLD) |
 | w2-avm1-text-layout | w1-text-wordwrap + glyph §1 | fixtures (Flash) | session_018CoDi6dEUJbfDeuFy5EEvU — DELIVERED, LANDED `c2f237a94` (0 corpus; scaled_glyphs Flash golden; wordwrap font fixed for Flash, interim Ruffle PNG golden) |
-| w2-avm1-leftovers-land | w1-avm1-leftovers | fixtures re-targeted to Flash | session_018CoDi5K5YhaAgXDJHqPMyp |
+| w2-avm1-leftovers-land | w1-avm1-leftovers | fixtures re-targeted to Flash | session_018CoDi5K5YhaAgXDJHqPMyp — DELIVERED, LANDED `85cca4df6` (Flash direct-mode goldens; 8 rows) |
 | w2-timers-land | w1-timers-robustness | trace `InitActionTest2` +1; timer fixtures (Flash only) | session_018CoDi6CHnwMMMavVzvAyco — DELIVERED, LANDED `cceb5133a` (+1 trace InitActionTest2; 11 fixtures; NG code) |
-| w2-exec-order-land | w1-exec-order | 2 fixtures (Flash); nested-frame order | session_018CoDi4AMuRxHCCPT8zNJJ7 |
-| w2-loaded-shell-land | w1-per-movie-dl-phase3 | 3–6 fixtures (Flash prefix) | session_018CoDi7GWpU4jrHWENpzHVk |
-| w2b-timers-tail | w2-timers-land + Flash init-flush probe | init flush at call return; MAX_TICKS; queues | session_018CoDi5hmHyLYhYb9rCdGqq |
-| w2b-avm1-applyfilter-flash | w2-applyfilter-cm + 8 Flash captures | AVM1 applyFilter kinds + CM live no-snap | session_018CoDi6Wn2mhRQxeVrpZw3T |
-| w2b-filter-kernels-residual | w2-flash-filter-kernels + Flash gradient probe | held fixtures, gradient kernels, GPU growth, blur disposition | session_018CoDi4YkJ5WVk6w3oD8vUD |
+| w2-exec-order-land | w1-exec-order | 2 fixtures (Flash); nested-frame order | session_018CoDi4AMuRxHCCPT8zNJJ7 — DELIVERED, LANDED `78fee9e13` (NG code; 2 Flash-golden fixtures; nested frames before Phase 1) |
+| w2-loaded-shell-land | w1-per-movie-dl-phase3 | 3–6 fixtures (Flash prefix) | session_018CoDi7GWpU4jrHWENpzHVk — DELIVERED, LANDED `78fee9e13` (full delivery-tick patch; Flash confirms 3 of 5 re-goldened fixtures exactly, the other 2 move toward Flash; merged by hand with timers' growable queue) |
+| w2b-timers-tail | w2-timers-land + Flash init-flush probe | init flush at call return; MAX_TICKS; queues | session_018CoDi5hmHyLYhYb9rCdGqq — DELIVERED, LANDED `78fee9e13` |
+| w2b-avm1-applyfilter-flash | w2-applyfilter-cm + 8 Flash captures | AVM1 applyFilter kinds + CM live no-snap | session_018CoDi6Wn2mhRQxeVrpZw3T — DELIVERED, LANDED `78fee9e13` (4 Flash fixtures; CM live goldens → Flash) |
+| w2b-filter-kernels-residual | w2-flash-filter-kernels + Flash gradient probe | held fixtures, gradient kernels, GPU growth, blur disposition | session_018CoDi4YkJ5WVk6w3oD8vUD — DELIVERED, LANDED `78fee9e13` (held fixtures landed green; gradient kernels) |
+| w2b-draw-text-tint | w2-draw-cx-text + Flash embed/device verdicts | embedded box/glyph tint; child_color fixture | session_018CoDi3usm8aPaCUzdZcrkH |
+| w2b-avm1-text-edit | w2-avm1-leftovers-land + Flash | setNewTextFormat instance, maxChars onChanged, depth gate fixtures | session_018CoDi5Yb9rgWbo4fjZ2XdZ |
 | local `browser-arms-land` | w1-browser-avm1-gaps + real-browser probe | browser-only (0 CI) + TextField getBounds undefined (CI-visible) | DONE `91418ebbe` (REPORT BACK verified); successor local `browser-eager-init` launched; launched ~02:47 UTC, cwd verified, handshake sent |
 
 ## N ladder (local one-task sessions)
@@ -56,6 +58,9 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
   thin strokes under scale, then the native residual (fps counter, edge px). CI folded into the coordinator's runs.
 - `n-ragdoll-strokes` DONE (`438121c22`; REPORT BACK verified): shot-1560 class = attachMovie'd clip's timeline children parented to _root (not ragdoll/strokes); fixture `avm1_attached_clip_timeline_child_parent`.
 - `n-l2l4-pixel-pass` launched ~03:05 UTC (cwd verified, handshake sent): L2/L4 native pixel pass, goto-rebuild _root fallback.
+- `browser-eager-init` DONE `fe6eb5f9d` (REPORT BACK verified) → `browser-advance-order` launched.
+- `n-l2l4-pixel-pass` DONE `f5565dcf9` (attached self-goto, AVM1 tab stops, _xscale double, MC-as-ASObject setter bug) → `n-levels-5plus` launched.
+- `golden-provenance` (Robert's request via s26-coordinator) DONE `ae4a46c74`: 389 image tests / 596 comparisons vs Flash 32 → `golden-provenance-2` launched.
 - `flash-oracle` (launched by s26-coordinator at Robert's request): real Flash Player 32 oracle; captures come to s27.
 
 ## Grading runs
@@ -65,3 +70,4 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 | 45300086369 | graphics / full / images (wave 0, dispatched by n-trap-stroke) | d70f2c0aa | **exact**: trace 4684 eff on the 4722 intersection, 0 moves; +2 new fixture rows pass (4686 / 4724); pixels 0 moves, 0 band moves (595 / 639 summed incl. the 2 fixtures). Results `da51f878f` |
 | 45312833576 | graphics / full / images (interim #1) | b8d3b736a (drift, glyph-fidelity, applyfilter-tail, render-bitmap-leads, html_typed_runs fixture; Pages dry run 45312837356 success) | **exact**: trace 0 moves on the 4724 intersection, +5 new fixture rows pass (4691 / 4729 eff); pixels +3 by name (`pixelbender_dithering`, `acid-color-0`, `shader_as_mask`), +3 new fixture images pass, 0 regressions, 0 band moves. Results `a0e485e5f` |
 | 45339607994 / 45339610962 | graphics full images / no-graphics full (interim #2) | cceb5133a (allow-networking, layer-alpha, text-layout, holder-full, avm2-text-tail, timers, filter-kernels, applyfilter-cm, n-ragdoll 438121c22, browser-arms 91418ebbe; Pages dry run 45339614012 FAILED: bundle snapshot lacked avm1_filter_kernels.c, fixed 1994a761f) | **exact both modes**: graphics 4691 → 4692 on the 4729 intersection (+1 `InitActionTest2` ruffle_matched → pass), 34 new rows all pass (8 allow_networking variants + fixtures) → **4725 / 4763 eff**; pixels 0 flips, 1 priced band move (`bitmapdata_applyfilter_blur` 39351 → 47515, Ruffle golden), 11 new fixture images pass, 0 regressions. No-graphics 4723 / 4763 (same +1), mode diffs only `audio/aac`, `audio_computespectrum`. Results `dc5d2936a` / `9e6d2a9bd` |
+| 45434403230 / 45434410378 | graphics full images / no-graphics full (interim #3) | 78fee9e13 (+ leftovers/draw-cx 85cca4df6, loaded-shell, exec-order, w2b group-alpha/timers/applyfilter/kernels, n-l2l4 f5565dcf9, browser-eager fe6eb5f9d; Pages dry run 45434415667) | pending |
