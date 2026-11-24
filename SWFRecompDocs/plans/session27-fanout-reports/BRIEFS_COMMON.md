@@ -58,6 +58,23 @@ only** (a `quality = "low"` golden never matches it — validate a twin fixture 
 it rejects a zero/negative-width header RECT. It is a good oracle for frame-script traces (`--trace-log`) and
 non-quality-low renders. Usage: `exporter -s -f <frames> --trace-log out.txt in.swf out.png`.
 
+## A REAL FLASH ORACLE EXISTS (new in s27, coordinator-run)
+
+Since 2026-11-23 the coordinator can run **real Flash Player 32** (debug projector, LNX 32,0,0,465) locally:
+`tools/flash-oracle/run_trace.py` (traces; `--wrapped` cuts at exactly `num_frames`; direct mode for `loadMovie`
+children; XTest **typing** via `--type`, but no mouse input) and `tools/flash-oracle/run_image.py` (stage PNG via an AS3
+`draw()` wrapper, `--screen` for the real screen; `draw()` mis-renders non-LAYER blend modes, so use `--screen` for those).
+Binaries never leave the coordinator's box, so you cannot run it in the cloud. **Flash is now the first-choice oracle**:
+the exporter/runner are Ruffle and are fallbacks only. Put Flash needs under `## LOCAL ORACLE REQUESTS` as
+"FLASH: <fixture dir>, trace|image, frames, what to compare"; the coordinator runs them between waves and archives the
+outputs under `session27-fanout-reports/w1-local-oracles/` (or `flash-oracle-captures/`). Wave-2 briefs name the archived
+goldens you must use. **A Flash golden overrules a Ruffle golden and any analytic derivation.** Two traps measured so far:
+- A synthetic square-glyph DefineFont2 fixture can be **Flash-invalid**: Flash drew no glyphs at all for
+  `w1-text-wordwrap-fixtures/avm1_edittext_wordwrap_render` (and its metrics then read as one line), while Ruffle drew
+  them. Fixtures with fonts must be checked in Flash before their golden counts.
+- The exporter's text-field border corners differ from Flash by 64 on the 4 corner pixels per box; budget them
+  (existing `avm1_edittext_placed_cxform` pattern: 19 outliers).
+
 ## Baseline — read fresh (verify before implementing anything)
 
 - **s27 BASELINE = the s26 record pair** at code **`005bea42a`**: graphics/full/images run `45284922078` (results
