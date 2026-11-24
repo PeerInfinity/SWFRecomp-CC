@@ -20,8 +20,9 @@ rows: `golden-provenance-data/merged.json`.
 > the golden is 342 k px / max 9 off Flash. That meets the s26 ACCEPTED_DIFFS prune criterion; an RvF entry is
 > written.
 > Upstream has started replacing goldens with Flash references (26 "Flash Player output/reference" commits; latest
-> `5128d3943` / `7facc1fcc`, 2026-11-23). Our mirror is stale for 2 of them (`avm2/pixelbender_dithering`,
-> `bitmapdata-clone`), and the upstream files equal our Flash capture at 0 px, so sync them.
+> `5128d3943` / `7facc1fcc`, 2026-11-23). Only the LOCAL mirror is stale for 2 of them (`avm2/pixelbender_dithering`,
+> `bitmapdata-clone`). CI downloads upstream master at run time, so it already grades against those Flash references,
+> which equal our Flash capture at 0 px.
 > **Oracle limit found:** the Linux projector's stage window races its startup size (about 640×480 first). Direct
 > runs of SWFs narrower than 640 stay show-all scaled, so coordinate-dependent direct traces are unreliable there.
 > `movieclip_hittest`'s Flash `false` was re-checked and still holds (stable in direct ×2 and in wrapped mode).
@@ -227,7 +228,8 @@ The 17 differing traces split as:
 
 ## Next slice
 
-1. Sync the 2 stale upstream Flash goldens (`5128d3943`, `7facc1fcc`: golden + test.toml).
+1. (No CI action: CI downloads upstream master, so it already uses `5128d3943` / `7facc1fcc`. Refresh the local mirror
+   only if local runs need them.)
 2. Coordinator: decide whether non-Flash goldens should be graded against the archived Flash PNGs (a per-row
    override), for the 14 board rows above.
 3. Pin the projector window size in direct mode. Then re-run the 24 direct-only rows, the hitTest candidates and
