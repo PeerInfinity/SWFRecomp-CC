@@ -1,0 +1,181 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index 348dc2caa..f8b8a51a7 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -482,6 +482,7 @@ void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float bl
+ // from the source layer (whose content ends on-stage) rather than from the
+ // blurred layer (whose tail past the stage edge was never stored).
+ void render_webgpu_set_blur_shift(WebGPURenderContext* context, int sx, int sy);
++void render_webgpu_set_blur_exact(WebGPURenderContext* context, int on);
+ // Request a padded layer for the NEXT (outermost) filter capture. growth_px is
+ // the filter list's reach past the object bounds in device px; the pad P is
+ // derived from it (bucketed, capped; render_webgpu.c). <= 0: no pad.
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index c670a83c2..f55c154f1 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -59,6 +59,7 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_end_offscreen_pass(ctx)              render_webgpu_end_offscreen_pass(ctx)
+ #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) render_webgpu_run_blur(ctx, bx, by, q, s, r, g, b, a, c)
+ #define renderer_set_blur_shift(ctx, sx, sy)          render_webgpu_set_blur_shift(ctx, sx, sy)
++#define renderer_set_blur_exact(ctx, on)              render_webgpu_set_blur_exact(ctx, on)
+ #define renderer_set_filter_pad(ctx, p)               render_webgpu_set_filter_pad(ctx, p)
+ #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) render_webgpu_composite_filtered(ctx, ox, oy, tr, tg, tb, ta)
+ #define renderer_composite_filtered_alpha(ctx, ga)   render_webgpu_composite_filtered_alpha(ctx, ga)
+@@ -133,6 +134,7 @@ typedef FlashbangContext RenderContext;
+ #define renderer_end_offscreen_pass(ctx)              ((void)0)
+ #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) ((void)0)
+ #define renderer_set_blur_shift(ctx, sx, sy)          ((void)0)
++#define renderer_set_blur_exact(ctx, on)              ((void)0)
+ #define renderer_set_filter_pad(ctx, p)               ((void)0)
+ #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) ((void)0)
+ #define renderer_composite_filtered_alpha(ctx, ga)   ((void)0)
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index aea7864be..31457bdff 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -14580,6 +14580,8 @@ static uint32_t applyColorMatrixPixel(uint32_t argb_premul, const float matrix[2
+     return (oa << 24) | (or_ << 16) | (og << 8) | ob;
+ }
+ 
++static int avm1FilterTypeOf(ASObject* o);   // defined with the runtime-filters lowering
++
+ // BitmapData.applyFilter(sourceBitmap, sourceRect, destPoint, filter)
+ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+@@ -14623,6 +14625,14 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
+     if (args[3].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+     ASObject* filter_obj = (ASObject*) args[3].data.numeric_value;
+     if (!filter_obj) { r = makeF64(0); return r; }
++    // Type the filter by its class, not by a `matrix` array: a ConvolutionFilter
++    // with >= 20 entries (5x4, 5x5, ...) also has one and was run through the
++    // ColorMatrix arm. Ruffle (avm1 bitmap_data.rs apply_filter ->
++    // bitmap_filter::avm1_to_filter) matches the native filter kind and returns
++    // -1 for a non-filter object such as a bare {matrix: [...]}.
++    int filter_type = avm1FilterTypeOf(filter_obj);
++    if (filter_type == 0) { r = makeF64(-1); return r; }
++    if (filter_type != 6) { r = makeF64(0); return r; }   // non-CM kinds: not yet wired
+     ActionVar* matrix_var = getProperty(filter_obj, "matrix", 6);
+     if (!matrix_var || matrix_var->type != ACTION_STACK_VALUE_ARRAY) { r = makeF64(0); return r; }
+     ASArray* matrix_arr = (ASArray*)(u64)matrix_var->data.numeric_value;
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index ab0afb839..677ad7651 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -20439,6 +20439,7 @@ static void avm2_filter_one_in_place(Avm2Context* ctx, const Avm2FilterVal* f)
+ 	float cg = (float) ((f->color >> 8) & 0xFF) / 255.0f;
+ 	float cb = (float) (f->color & 0xFF) / 255.0f;
+ 	float ca = (float) f->alpha / 255.0f;
++	renderer_set_blur_exact(context, is_blur);   // s27 prototype
+ 	renderer_run_blur(context,
+ 		avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
+ 		f->quality, 1.0f, cr, cg, cb, ca, 0);
+@@ -20672,6 +20673,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 		// composition shader instead (inner needs the RAW blurred alpha).
+ 		// (Non-final composed filters never reach here: they took the
+ 		// in-place arm above.)
++		renderer_set_blur_exact(context, f_is_blur);   // s27 prototype
+ 		renderer_run_blur(context,
+ 			avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
+ 			f->quality, 1.0f,
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 3bbbe9a85..3fe7f8609 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -5112,6 +5112,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+ 		// A3: the filter's own colour carries the object's colour transform.
+ 		double fr = f->color_r, fg = f->color_g, fb = f->color_b, fa = f->color_a;
+ 		if (have_obj_cx) cxform_apply_rgba(obj_cx, &fr, &fg, &fb, &fa);
++		renderer_set_blur_exact(context, f_is_blur);   // s27 prototype
+ 		renderer_run_blur(context,
+ 			f->blur_x, f->blur_y,
+ 			f->quality,
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 44e55f7e8..5ee703443 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -4555,7 +4555,14 @@ static const char* blur_wgsl =
+ 	"  return out;\n"
+ 	"}\n"
+ 	"\n"
+-	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
++	"fn texel(ip: vec2i) -> vec4f {\n"
++	"  let dims = vec2i(textureDimensions(in_tex));\n"
++	"  let inside = all(ip >= vec2i(0)) && all(ip < dims);\n"
++	"  if (!inside && params.border > 0.5) { return vec4f(0.0); }\n"
++	"  return textureLoad(in_tex, clamp(ip, vec2i(0), dims - vec2i(1)), 0);\n"
++	"}\n"
++	"\n"
++"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+ 	"  let step = params.direction * params.texel_size;\n"
+ 	// Integer texel shift (0 except on a shifted run's first H / first V pass):
+ 	// out(x) = blur(in)(x + shift). A whole-texel move keeps the paired linear
+@@ -4578,12 +4585,26 @@ static const char* blur_wgsl =
+ 	// The last pair, fused into one sample: last_offset/last_weight are chosen
+ 	// so texel m lands on weight 1 and texel m+1 on first_weight.
+ 	"  total += tap(base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
++	// s27 w1-applyfilter-tail PROTOTYPE (variant B): a pure BlurFilter run
++	// (params.shift_pad = 1: render_webgpu_set_blur_exact, one-shot)
++	// reads every tap with textureLoad, so a pass is floor(sum / size) like the
++	// CPU applyFilter model and Flash's blur_pass_scaling golden (display row ==
++	// applyFilter row). The paired linear taps above leak the sampler's 8-bit
++	// subtexel weights into the sum.
++	"  if (params.shift_pad > 0.5) {\n"
++	"    let p = vec2i(floor(uv_s * vec2f(textureDimensions(in_tex))));\n"
++	"    let d = vec2i(params.direction);\n"
++	"    let mi = i32(params.m);\n"
++	"    var c2 = vec4f(0.0);\n"
++	"    for (var t = -mi; t <= mi; t = t + 1) { c2 += texel(p + d * t); }\n"
++	"    total = c2 + (texel(p - d * (mi + 1)) + texel(p + d * (mi + 1))) * params.first_weight;\n"
++	"  }\n"
+ 	"  var result = total / params.full_size;\n"
+ 	"  if (params.full_size > 1.0) {\n"
+ 	// Imitate FP's fixed-point accumulator (ruffle blur.wgsl does the same).
+ 	// Skipped for the full_size<=1 identity pass, where an 8-bit round-trip
+ 	// through floor() could shave a level off an already-exact copy.
+-	"    result = floor(result * 255.0) / 255.0;\n"
++	"    result = floor(result * 255.0 + params.shift_pad * 0.0005) / 255.0;\n"
+ 	"  }\n"
+ 	"  result = clamp(result * params.strength, vec4f(0.0), vec4f(1.0));\n"
+ 	"  if (params.colorize > 0.5) {\n"
+@@ -6197,6 +6218,8 @@ void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
+ // `out` receives {full_size, m, m2, first_weight, last_offset, last_weight};
+ // see blur_wgsl above for how the fragment shader consumes them. Ported from
+ // ruffle render/wgpu/src/filters/blur.rs.
++static int g_blur_exact_once = 0;   // s27 prototype (render_webgpu_set_blur_exact)
++
+ static void blur_box_kernel(float full_size, float out[6])
+ {
+ 	// FP caps the window at 255 texels.
+@@ -6263,6 +6286,9 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 	ctx->blur_shift_x = 0; ctx->blur_shift_y = 0;
+ 	// The whole shifted run reads transparent past the layer edge (tap()).
+ 	float border = (shift_x != 0.0f || shift_y != 0.0f) ? 1.0f : 0.0f;
++	// s27 prototype: one-shot "texel-exact taps" (render_webgpu_set_blur_exact).
++	float exact = g_blur_exact_once ? 1.0f : 0.0f;
++	g_blur_exact_once = 0;
+ 
+ 	for (u8 q = 0; q < quality; q++)
+ 	{
+@@ -6280,7 +6306,7 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 		params[11] = 0.0f;                                 // colorize: V pass only
+ 		params[12] = r; params[13] = g; params[14] = b; params[15] = a; // color
+ 		params[16] = (q == 0) ? shift_x : 0.0f; params[17] = 0.0f;
+-		params[18] = border; params[19] = 0.0f;
++		params[18] = border; params[19] = exact;   // s27 prototype: exact taps for a pure BlurFilter
+ 
+ 		// Create bind group for H-blur: read filter_tex_a
+ 		WGPUBindGroupEntry bg_entries[3] = {0};
+@@ -6345,6 +6371,12 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 	}
+ }
+ 
++void render_webgpu_set_blur_exact(WebGPURenderContext* ctx, int on)
++{
++	(void)ctx;
++	g_blur_exact_once = on ? 1 : 0;
++}
++
+ void render_webgpu_set_blur_shift(WebGPURenderContext* ctx, int sx, int sy)
+ {
+ 	if (ctx == NULL) return;

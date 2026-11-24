@@ -4555,7 +4555,14 @@ static const char* blur_wgsl =
 	"  return out;\n"
 	"}\n"
 	"\n"
-	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"fn texel(ip: vec2i) -> vec4f {\n"
+	"  let dims = vec2i(textureDimensions(in_tex));\n"
+	"  let inside = all(ip >= vec2i(0)) && all(ip < dims);\n"
+	"  if (!inside && params.border > 0.5) { return vec4f(0.0); }\n"
+	"  return textureLoad(in_tex, clamp(ip, vec2i(0), dims - vec2i(1)), 0);\n"
+	"}\n"
+	"\n"
+"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
 	"  let step = params.direction * params.texel_size;\n"
 	// Integer texel shift (0 except on a shifted run's first H / first V pass):
 	// out(x) = blur(in)(x + shift). A whole-texel move keeps the paired linear
@@ -4578,12 +4585,26 @@ static const char* blur_wgsl =
 	// The last pair, fused into one sample: last_offset/last_weight are chosen
 	// so texel m lands on weight 1 and texel m+1 on first_weight.
 	"  total += tap(base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
+	// s27 w1-applyfilter-tail PROTOTYPE (variant B): a pure BlurFilter run
+	// (params.shift_pad = 1: render_webgpu_set_blur_exact, one-shot)
+	// reads every tap with textureLoad, so a pass is floor(sum / size) like the
+	// CPU applyFilter model and Flash's blur_pass_scaling golden (display row ==
+	// applyFilter row). The paired linear taps above leak the sampler's 8-bit
+	// subtexel weights into the sum.
+	"  if (params.shift_pad > 0.5) {\n"
+	"    let p = vec2i(floor(uv_s * vec2f(textureDimensions(in_tex))));\n"
+	"    let d = vec2i(params.direction);\n"
+	"    let mi = i32(params.m);\n"
+	"    var c2 = vec4f(0.0);\n"
+	"    for (var t = -mi; t <= mi; t = t + 1) { c2 += texel(p + d * t); }\n"
+	"    total = c2 + (texel(p - d * (mi + 1)) + texel(p + d * (mi + 1))) * params.first_weight;\n"
+	"  }\n"
 	"  var result = total / params.full_size;\n"
 	"  if (params.full_size > 1.0) {\n"
 	// Imitate FP's fixed-point accumulator (ruffle blur.wgsl does the same).
 	// Skipped for the full_size<=1 identity pass, where an 8-bit round-trip
 	// through floor() could shave a level off an already-exact copy.
-	"    result = floor(result * 255.0) / 255.0;\n"
+	"    result = floor(result * 255.0 + params.shift_pad * 0.0005) / 255.0;\n"
 	"  }\n"
 	"  result = clamp(result * params.strength, vec4f(0.0), vec4f(1.0));\n"
 	"  if (params.colorize > 0.5) {\n"
@@ -6197,6 +6218,8 @@ void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
 // `out` receives {full_size, m, m2, first_weight, last_offset, last_weight};
 // see blur_wgsl above for how the fragment shader consumes them. Ported from
 // ruffle render/wgpu/src/filters/blur.rs.
+static int g_blur_exact_once = 0;   // s27 prototype (render_webgpu_set_blur_exact)
+
 static void blur_box_kernel(float full_size, float out[6])
 {
 	// FP caps the window at 255 texels.
@@ -6263,6 +6286,9 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 	ctx->blur_shift_x = 0; ctx->blur_shift_y = 0;
 	// The whole shifted run reads transparent past the layer edge (tap()).
 	float border = (shift_x != 0.0f || shift_y != 0.0f) ? 1.0f : 0.0f;
+	// s27 prototype: one-shot "texel-exact taps" (render_webgpu_set_blur_exact).
+	float exact = g_blur_exact_once ? 1.0f : 0.0f;
+	g_blur_exact_once = 0;
 
 	for (u8 q = 0; q < quality; q++)
 	{
@@ -6280,7 +6306,7 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		params[11] = 0.0f;                                 // colorize: V pass only
 		params[12] = r; params[13] = g; params[14] = b; params[15] = a; // color
 		params[16] = (q == 0) ? shift_x : 0.0f; params[17] = 0.0f;
-		params[18] = border; params[19] = 0.0f;
+		params[18] = border; params[19] = exact;   // s27 prototype: exact taps for a pure BlurFilter
 
 		// Create bind group for H-blur: read filter_tex_a
 		WGPUBindGroupEntry bg_entries[3] = {0};
@@ -6343,6 +6369,12 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		wgpuRenderPassEncoderRelease(pass);
 		wgpuBindGroupRelease(bg);
 	}
+}
+
+void render_webgpu_set_blur_exact(WebGPURenderContext* ctx, int on)
+{
+	(void)ctx;
+	g_blur_exact_once = on ? 1 : 0;
 }
 
 void render_webgpu_set_blur_shift(WebGPURenderContext* ctx, int sx, int sy)

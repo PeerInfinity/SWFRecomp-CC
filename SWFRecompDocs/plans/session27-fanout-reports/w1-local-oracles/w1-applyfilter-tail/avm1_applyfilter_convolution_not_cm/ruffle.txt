@@ -1,0 +1,10 @@
+start
+conv5x5 ret 0
+conv5x5 px -13408615
+conv5x4 ret 0
+conv5x4 px -13408615
+cmswap ret 0
+cmswap px -6724045
+plainobj ret -1
+plainobj px -13408615
+done

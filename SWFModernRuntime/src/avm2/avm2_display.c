@@ -20464,6 +20464,7 @@ static void avm2_filter_one_in_place(Avm2Context* ctx, const Avm2FilterVal* f)
 	float cg = (float) ((f->color >> 8) & 0xFF) / 255.0f;
 	float cb = (float) (f->color & 0xFF) / 255.0f;
 	float ca = (float) f->alpha / 255.0f;
+	renderer_set_blur_exact(context, is_blur);   // s27 prototype
 	renderer_run_blur(context,
 		avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
 		f->quality, 1.0f, cr, cg, cb, ca, 0);
@@ -20697,6 +20698,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 		// composition shader instead (inner needs the RAW blurred alpha).
 		// (Non-final composed filters never reach here: they took the
 		// in-place arm above.)
+		renderer_set_blur_exact(context, f_is_blur);   // s27 prototype
 		renderer_run_blur(context,
 			avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
 			f->quality, 1.0f,

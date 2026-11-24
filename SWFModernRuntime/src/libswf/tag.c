@@ -5112,6 +5112,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		// A3: the filter's own colour carries the object's colour transform.
 		double fr = f->color_r, fg = f->color_g, fb = f->color_b, fa = f->color_a;
 		if (have_obj_cx) cxform_apply_rgba(obj_cx, &fr, &fg, &fb, &fa);
+		renderer_set_blur_exact(context, f_is_blur);   // s27 prototype
 		renderer_run_blur(context,
 			f->blur_x, f->blur_y,
 			f->quality,

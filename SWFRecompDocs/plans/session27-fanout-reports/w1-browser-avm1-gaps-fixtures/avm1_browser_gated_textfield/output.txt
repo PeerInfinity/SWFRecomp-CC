@@ -1,0 +1,7 @@
+cf typeof r=object tfA=object
+cf tfA x=10 y=20 w=30 h=40
+cf tfA depth=5
+cm tfB=object depth=6
+tfB w=10.05 h=3.95 xs=100
+newfmt color=16711680 size=17
+tfA bounds 10,20,40,60

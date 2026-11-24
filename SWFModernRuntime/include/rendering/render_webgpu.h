@@ -482,6 +482,7 @@ void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float bl
 // from the source layer (whose content ends on-stage) rather than from the
 // blurred layer (whose tail past the stage edge was never stored).
 void render_webgpu_set_blur_shift(WebGPURenderContext* context, int sx, int sy);
+void render_webgpu_set_blur_exact(WebGPURenderContext* context, int on);
 // Request a padded layer for the NEXT (outermost) filter capture. growth_px is
 // the filter list's reach past the object bounds in device px; the pad P is
 // derived from it (bucketed, capped; render_webgpu.c). <= 0: no pad.

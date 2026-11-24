@@ -14580,6 +14580,8 @@ static uint32_t applyColorMatrixPixel(uint32_t argb_premul, const float matrix[2
     return (oa << 24) | (or_ << 16) | (og << 8) | ob;
 }
 
+static int avm1FilterTypeOf(ASObject* o);   // defined with the runtime-filters lowering
+
 // BitmapData.applyFilter(sourceBitmap, sourceRect, destPoint, filter)
 static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -14623,6 +14625,14 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
     if (args[3].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
     ASObject* filter_obj = (ASObject*) args[3].data.numeric_value;
     if (!filter_obj) { r = makeF64(0); return r; }
+    // Type the filter by its class, not by a `matrix` array: a ConvolutionFilter
+    // with >= 20 entries (5x4, 5x5, ...) also has one and was run through the
+    // ColorMatrix arm. Ruffle (avm1 bitmap_data.rs apply_filter ->
+    // bitmap_filter::avm1_to_filter) matches the native filter kind and returns
+    // -1 for a non-filter object such as a bare {matrix: [...]}.
+    int filter_type = avm1FilterTypeOf(filter_obj);
+    if (filter_type == 0) { r = makeF64(-1); return r; }
+    if (filter_type != 6) { r = makeF64(0); return r; }   // non-CM kinds: not yet wired
     ActionVar* matrix_var = getProperty(filter_obj, "matrix", 6);
     if (!matrix_var || matrix_var->type != ACTION_STACK_VALUE_ARRAY) { r = makeF64(0); return r; }
     ASArray* matrix_arr = (ASArray*)(u64)matrix_var->data.numeric_value;
