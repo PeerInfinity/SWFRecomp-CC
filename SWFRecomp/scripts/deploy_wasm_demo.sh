@@ -64,6 +64,7 @@ RUNTIME_C=(
     actionmodern/avm1_amf.c actionmodern/object.c actionmodern/action_queue.c
     actionmodern/sprite_frame_scripts.c actionmodern/image_decode.c
     actionmodern/video_codec.c actionmodern/unicode_case_tables.h
+    actionmodern/avm1_filter_kernels.c   # s27 AVM1 applyFilter (bundle/build.sh includes it)
     utils.c amf_packet.c
     libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
     libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c
