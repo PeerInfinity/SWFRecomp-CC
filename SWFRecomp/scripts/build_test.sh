@@ -320,6 +320,13 @@ if [ "$TARGET" == "wasm" ]; then
 
     cd "${BUILD_DIR}"
 
+    # wasm-ld guard: a call through an undeclared (implicit int) prototype whose
+    # definition returns something else links as a "function signature mismatch"
+    # stub that traps at run time -- silently, the frame loop just stops
+    # (s27: ng_rootDLLeave, 78fee9e13 -> eaa3e70f7). A clean browser link has zero
+    # wasm-ld warnings, so any warning fails the build. SWF_WASM_LD_WARN_OK=1 opts out.
+    WASM_LD_GUARD=(-Wl,--fatal-warnings); [ "${SWF_WASM_LD_WARN_OK:-0}" = "1" ] && WASM_LD_GUARD=()
+
     # Build exported functions list
     # ng_ime_compose_set / ng_ime_commit_set are called from JS-side
     # composition listeners registered by ng_register_ime_listeners.
@@ -352,6 +359,7 @@ if [ "$TARGET" == "wasm" ]; then
             ${EXTRA_DEFINES} \
             --use-port=emdawnwebgpu \
             -Wno-error=implicit-function-declaration \
+            "${WASM_LD_GUARD[@]}" \
             -I. \
             -I"${SWFMODERN_INC}" \
             -I"${SWFMODERN_INC}/actionmodern" \
@@ -375,6 +383,7 @@ if [ "$TARGET" == "wasm" ]; then
             *.c \
             -DNO_GRAPHICS \
             ${EXTRA_DEFINES} \
+            "${WASM_LD_GUARD[@]}" \
             -I. \
             -I"${SWFMODERN_INC}" \
             -I"${SWFMODERN_INC}/actionmodern" \

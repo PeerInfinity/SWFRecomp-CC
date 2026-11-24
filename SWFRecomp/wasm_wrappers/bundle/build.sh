@@ -130,8 +130,14 @@ done
 echo "  (${N} TUs compiled)"
 
 echo "=== Linking out/${NAME}.js + out/${NAME}.wasm ==="
+# wasm-ld guard: a call through an undeclared (implicit int) prototype whose
+# definition returns something else links as a "function signature mismatch"
+# stub that traps at run time -- silently, the frame loop just stops
+# (s27: ng_rootDLLeave, 78fee9e13 -> eaa3e70f7). A clean browser link has zero
+# wasm-ld warnings, so any warning fails the build. SWF_WASM_LD_WARN_OK=1 opts out.
+WASM_LD_GUARD=(-Wl,--fatal-warnings); [ "${SWF_WASM_LD_WARN_OK:-0}" = "1" ] && WASM_LD_GUARD=()
 LINK_EXTRA=(); [ "${IS_AVM2}" = true ] && LINK_EXTRA=(-sUSE_ZLIB=1 -s MAXIMUM_MEMORY=4GB)
-emcc "${OBJS[@]}" --use-port=emdawnwebgpu "${SIMD[@]}" \
+emcc "${OBJS[@]}" --use-port=emdawnwebgpu "${SIMD[@]}" "${WASM_LD_GUARD[@]}" \
     -o "${OUT}/${NAME}.js" \
     -s WASM=1 \
     -s EXPORTED_FUNCTIONS="${EXPORTED_FUNCS}" \

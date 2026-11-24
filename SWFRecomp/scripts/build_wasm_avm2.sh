@@ -76,6 +76,7 @@ RUNTIME_C=(
     actionmodern/avm1_amf.c
     actionmodern/object.c actionmodern/action_queue.c actionmodern/sprite_frame_scripts.c
     actionmodern/image_decode.c actionmodern/video_codec.c
+    actionmodern/avm1_filter_kernels.c
     utils.c amf_packet.c
     libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
     libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c libswf/stb_image_impl.c
@@ -85,6 +86,7 @@ RUNTIME_C=(
 )
 for f in "${RUNTIME_C[@]}"; do cp -p "${SWFMODERN_SRC}/${f}" "${SRC_DIR}/"; done
 cp -p "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${SRC_DIR}/"
+cp -p "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${SRC_DIR}/avm2_bitmap_kernels.inc"  # avm1_filter_kernels.c (s27), as bundle/build.sh
 
 # AVM2 runtime tree
 for f in "${SWFMODERN_SRC}"/avm2/*.c; do cp -p "${f}" "${SRC_DIR}/"; done
@@ -219,8 +221,15 @@ EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_avm2_ei_dispatch","_av
 # the at-load commit ~4x, grown on demand. MAXIMUM_MEMORY stays 4GB — a
 # harmless address-space cap; it can drop to ~1GB once the 512 MB arena is
 # browser-validated (avm2-browser-footprint.md §6.3).
+# wasm-ld guard: a call through an undeclared (implicit int) prototype whose
+# definition returns something else links as a "function signature mismatch"
+# stub that traps at run time -- silently, the frame loop just stops
+# (s27: ng_rootDLLeave, 78fee9e13 -> eaa3e70f7). A clean browser link has zero
+# wasm-ld warnings, so any warning fails the build. SWF_WASM_LD_WARN_OK=1 opts out.
+WASM_LD_GUARD=(-Wl,--fatal-warnings); [ "${SWF_WASM_LD_WARN_OK:-0}" = "1" ] && WASM_LD_GUARD=()
 emcc "${OBJS[@]}" \
     --use-port=emdawnwebgpu \
+    "${WASM_LD_GUARD[@]}" \
     "${SIMD_FLAGS[@]}" \
     -o "${OUT_DIR}/${NAME}.js" \
     -s WASM=1 \
