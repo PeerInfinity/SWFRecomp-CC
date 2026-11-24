@@ -29,3 +29,13 @@
   the TextField box" is device-only.
 - `w2-draw-cx-text/avm1_bitmapdata_draw_text_glyph_cx`: device glyphs read neither colour in all 4 (as AVM2 device).
 - `w2-draw-cx-text/avm1_bitmapdata_draw_child_color`: `65280 / 65280 / 8323200 / 65535 / 16711680`.
+
+## Batch 4
+
+- `w2-loaded-shell-land/<fixture>/flash.direct.txt` (Flash 32, direct, prefix to the fixture length). The delivery-tick
+  patch's PREDICTED goldens vs Flash: `child_timeline_advance`, `_frame1_stop`, `_holder_stop` **== Flash exactly**;
+  `child_timeline_loop` 22 lines off (old golden 30), `mcl_holder_totalframes` 2 off (old 4: Flash line 3 is
+  `m [tf:4 fl:4 bt:35]`), `mcl_load_tick` 8 off (old 8). Every fixture moves toward or stays level with Flash, so the
+  full patch lands; residuals → follow-up.
+- `w2b-group-alpha-triggers/<probe>/flash.screen.png`: all 8 grouped as predicted, ≤ 2 levels, except
+  `w2b_shadow_shape_a50` (768 px, max 20: the shadow edge).
