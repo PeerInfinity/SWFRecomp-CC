@@ -703,3 +703,31 @@ to pass.
 **Decision:** match Flash (user ruling 2026-09-29, Flash over Ruffle). **Prune criterion:** a Flash capture of this
 SWF (s26 local oracle request) re-grades it.
 
+**s27 Flash capture** (`SWFRecompDocs/plans/flash-oracle-captures/bitmapdata_applyfilter_blur/flash.png`, Flash Player
+32 LNX, `--screen`, quality low; screen == draw()): it confirms the grown-output blur model. The trace is
+byte-identical to `output.txt`. The capture cannot replace the golden as is, because its "Ruffle" text band renders in
+Flash's device serif, where the golden has Ruffle's default font (with_default_font has no Flash equivalent). **Updated
+prune criterion:** a golden built from the Flash capture with the text band masked out, or a fixture twin without that
+field.
+
+
+## AVM1 typing into an HTML TextField at index 0: Flash keeps the run's format, Ruffle drops it (`c0=0`)
+
+**Test:** `regression/avm1_edittext_html_typed_runs` (s26 fixture, held until a Flash capture existed; landed s27).
+`input.json` types "C" at the end of an HTML field holding red runs, then "D" at index 0.
+
+**Diff (Ruffle test runner vs Flash):**
+```
+- changed: text=DABC c0=16711680 c1=16711680 c2=16711680 n=4
++ changed: text=DABC c0=0 ...
+```
+
+**Flash** (Flash Player 32 debug projector, LNX 32,0,0,465, XTest typing; 3/3 identical runs;
+`SWFRecompDocs/plans/flash-oracle-captures/avm1_edittext_html_typed_runs/output.flash.txt`) is byte-identical to the
+fixture's analytic `output.txt`: a character inserted at index 0 takes the format of the run it is inserted into.
+Ruffle's `replace_text` at index 0 gives the new character the default format (`c0=0`).
+
+**Ours** matches Flash (the s26 `a18a9cc61` insert path).
+
+**Decision:** match Flash (user ruling: Flash over Ruffle). The fixture's golden is Flash's output. **Prune
+criterion:** Ruffle's `replace_text` inherits the run format at index 0.
