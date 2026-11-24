@@ -28,20 +28,20 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
-| w2-layer-alpha-group | Flash capture n3_layer_alpha | fixtures (Flash golden); priced Ruffle-golden losses | |
-| w2-flash-filter-kernels | Flash captures glow_kernels/draw_filtered | 2 fixtures (Flash trace) | |
-| w2-jpeg-flash-decode | w1-drift lead 1 | headroom on 2 Flash-golden rows | |
-| w2-allow-networking-subtests | w1-drift §3 | NEW subtest rows | |
-| w2-draw-cx-text | w1-text-glyph-fidelity §4 | 2 fixtures (Flash trace) | |
-| w2-applyfilter-cm | w1-applyfilter-tail items 3, 5 | 3 CM fixtures (Flash PNG) | |
-| w2-holder-drawing-full | w1-render-bitmap-leads §1/1b | fixture (hand == Flash) | |
-| w2-avm2-text-tail | w1-text-glyph-fidelity §2b, 5 | fixture avm2_definetext_matrix (== Flash) | |
-| w2-avm1-text-layout | w1-text-wordwrap + glyph §1 | fixtures (Flash) | |
-| w2-avm1-leftovers-land | w1-avm1-leftovers | fixtures re-targeted to Flash | |
-| w2-timers-land | w1-timers-robustness | trace `InitActionTest2` +1; timer fixtures (Flash only) | |
-| w2-exec-order-land | w1-exec-order | 2 fixtures (Flash); nested-frame order | |
-| w2-loaded-shell-land | w1-per-movie-dl-phase3 | 3–6 fixtures (Flash prefix) | |
-| local `browser-arms-land` | w1-browser-avm1-gaps + real-browser probe | browser-only (0 CI) | |
+| w2-layer-alpha-group | Flash capture n3_layer_alpha | fixtures (Flash golden); priced Ruffle-golden losses | session_018CoDi4H4DqA4qwhbCgk45g |
+| w2-flash-filter-kernels | Flash captures glow_kernels/draw_filtered | 2 fixtures (Flash trace) | session_018CoDi5rf6MrkHLk3QibWyX |
+| w2-jpeg-flash-decode | w1-drift lead 1 | headroom on 2 Flash-golden rows | session_018CoDi66FA1hXSXXAwLB8kW |
+| w2-allow-networking-subtests | w1-drift §3 | NEW subtest rows | session_018CoDi4rozCuYyCVd6iWznD |
+| w2-draw-cx-text | w1-text-glyph-fidelity §4 | 2 fixtures (Flash trace) | session_018CoDi5MC3ifTEYbRy5fxSf |
+| w2-applyfilter-cm | w1-applyfilter-tail items 3, 5 | 3 CM fixtures (Flash PNG) | session_018CoDi4dFuVDgVxQdWMdvo7 |
+| w2-holder-drawing-full | w1-render-bitmap-leads §1/1b | fixture (hand == Flash) | session_018CoDi6o54ceV3pKjPBKyS1 |
+| w2-avm2-text-tail | w1-text-glyph-fidelity §2b, 5 | fixture avm2_definetext_matrix (== Flash) | session_018CoDi48vpYNmCMWk66aLEA |
+| w2-avm1-text-layout | w1-text-wordwrap + glyph §1 | fixtures (Flash) | session_018CoDi6dEUJbfDeuFy5EEvU |
+| w2-avm1-leftovers-land | w1-avm1-leftovers | fixtures re-targeted to Flash | session_018CoDi5K5YhaAgXDJHqPMyp |
+| w2-timers-land | w1-timers-robustness | trace `InitActionTest2` +1; timer fixtures (Flash only) | session_018CoDi6CHnwMMMavVzvAyco |
+| w2-exec-order-land | w1-exec-order | 2 fixtures (Flash); nested-frame order | session_018CoDi4AMuRxHCCPT8zNJJ7 |
+| w2-loaded-shell-land | w1-per-movie-dl-phase3 | 3–6 fixtures (Flash prefix) | session_018CoDi7GWpU4jrHWENpzHVk |
+| local `browser-arms-land` | w1-browser-avm1-gaps + real-browser probe | browser-only (0 CI) | launched ~03:25 UTC, cwd verified, handshake sent |
 
 ## N ladder (local one-task sessions)
 
