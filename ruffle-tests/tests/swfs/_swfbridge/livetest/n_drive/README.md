@@ -131,3 +131,19 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   (native through verify_output/run_native.py already defines it). With it, the
   level 3 route is byte-identical exporter = browser on every NF field incl.
   `h=`/`o=`. Record: `SWFRecompDocs/plans/n-browser-pfx-report.md`.
+
+## s27 n-ragdoll-strokes additions
+
+- `TRACKPLAYER=lo:hi` (probe frames): after each `RunApp`, one
+  `NP f= <name> x= y= xs= ys= rot= cf= v=` line for `player.mc`, each of its
+  child clips, and the five ragdoll stick clips (`rag.armL` …). The postlevel
+  phase prints no `NF` lines, so this is how its player state is compared. At
+  frame `lo` it also prints `NH f= <path> …` for every clip (≤ 4 levels under
+  `_root`) whose bounds contain the player's position.
+- The for-in over `player.mc` mints AVM1 wrappers for its timeline children.
+  It did not change the result here (the bug reproduced with and without the
+  knob), but keep that in mind before trusting a TRACKPLAYER run as
+  side-effect-free.
+- Record: `SWFRecompDocs/plans/n-ragdoll-strokes-report.md`. The "ragdoll
+  thin strokes" at shot 1560 were the ninja's own limb bones drawn by a
+  runtime bug, not the ragdoll and not a stroke-width rule.

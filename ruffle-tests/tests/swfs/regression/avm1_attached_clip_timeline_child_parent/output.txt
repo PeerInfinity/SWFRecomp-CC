@@ -1,0 +1,6 @@
+h frame: 2
+typeof _root.kid: undefined
+typeof _root.bone: undefined
+typeof h.kid: movieclip
+h.kid target: /h/kid
+h.bone target: /h/bone

@@ -1021,6 +1021,16 @@ void ng_set_script_only_mode(int mode)
 // performed by advance_nested_sprite_frames() after the root frame script.
 int g_advance_defer_nested = 0;
 
+// Set by ng_attached_run_tree for the duration of its advance_sprite_frames
+// call: the temp entry it advances and the attachMovie'd clip that owns it.
+// That entry has no instance_name (ng_attachMovie mints a standalone
+// display_obj), so the post-frame child-init block below cannot find the
+// owner by name; without this it parented every sprite the clip's timeline
+// places to _root (s27 n-ragdoll-strokes: N's ninja limbs became
+// _root.instanceNNN / _root.footL orphans).
+static DisplayObject* g_attached_advance_obj = NULL;
+static MovieClip* g_attached_advance_mc = NULL;
+
 // When > 0, advance_sprite_frames is recursing into a parent's display list as
 // part of a manual-nav (gotoAndStop/gotoAndPlay) catch-up rebuild. A child
 // freshly placed by the replayed frames must NOT advance its own playhead on
@@ -1736,10 +1746,20 @@ void advance_sprite_frames(SWFAppContext* app_context)
 				}
 			}
 			if (any_needs_init) {
-				extern MovieClip* actionFindMovieClipByName(const char* instance_name);
 				extern MovieClip root_movieclip;
-				MovieClip* parent_for_init = (obj->instance_name != NULL)
-					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				// The children's parent is the clip that owns `obj`.
+				// - Named entry: ng_mc_for_sprite_obj prefers the clip bound to
+				//   this very entry over a same-named one elsewhere.
+				// - The attachMovie'd clip ng_attached_run_tree is advancing:
+				//   unnamed entry, owner handed over explicitly.
+				// _root is only the last resort. A child parented there is an
+				// orphan: AS sees _root.<name>, and the OFFSCREEN attached pass
+				// draws it a second time at the stage origin, leaving the shared
+				// child entries on dynamic transform slots so the real compose
+				// reads an identity local matrix (N's d=0 limb bones showed).
+				MovieClip* parent_for_init = ng_mc_for_sprite_obj(obj);
+				if (parent_for_init == NULL && obj == g_attached_advance_obj)
+					parent_for_init = g_attached_advance_mc;
 				process_sprite_needs_init(app_context, parent_for_init ? parent_for_init : &root_movieclip);
 			}
 		}
@@ -2240,7 +2260,13 @@ static void ng_attached_run_tree(SWFAppContext* app_context, DisplayObject* obj,
 		name_hit = actionFindMovieClipByName(obj->instance_name);
 		if (name_hit) name_hit_prev = name_hit->display_obj;
 	}
+	DisplayObject* saved_att_obj = g_attached_advance_obj;
+	MovieClip* saved_att_mc = g_attached_advance_mc;
+	g_attached_advance_obj = &tmp[1];
+	g_attached_advance_mc = self_mc;
 	advance_sprite_frames(app_context);
+	g_attached_advance_obj = saved_att_obj;
+	g_attached_advance_mc = saved_att_mc;
 	actionSetCurrentContext(saved_ctx2);
 	actionSetBaseClip(saved_base2);
 	g_advance_defer_nested = saved_defer;

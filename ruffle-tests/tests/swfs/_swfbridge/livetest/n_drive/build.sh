@@ -17,6 +17,7 @@ sed -e "s#static var SCRIPT:String = \"\";#static var SCRIPT:String = \"$1\";#" 
     -e "s|static var OBJDUMP:Boolean = false;|static var OBJDUMP:Boolean = ${OBJDUMP:-false};|" \
     -e "s|static var TRACKOBJ:Number = -1;|static var TRACKOBJ:Number = ${TRACKOBJ:--1};|" \
     -e "s|static var TRACKGOLD:Boolean = false;|static var TRACKGOLD:Boolean = ${TRACKGOLD:-false};|" \
+    -e "s|static var TRACKPLAYER:String = \"\";|static var TRACKPLAYER:String = \"${TRACKPLAYER:-}\";|" \
     -e "s|static var FREEZE:String = \"[^\"]*\";|static var FREEZE:String = \"${FREEZE-0:250,0:330,1:200,1:409,1:520,1:663,2:60}\";|" "$HERE/NDrive.as" > "$W/NDrive.as"
 ( cd "$W" && "$HOME/CC/mtasc/bin/mtasc" -cp "$HOME/CC/mtasc/ocaml/mtasc/std" -cp "$HOME/CC/mtasc/ocaml/mtasc/std8" -cp . -main \
 	-header 640:480:30 NDrive.as -swf nd.swf -version 8 )

@@ -46,6 +46,12 @@ class NDrive {
 	// TRACKGOLD (s26 n-gold-streaks): after each RunApp, one "NG f= i= cf= v=" line
 	// per gold object whose clip is off its NOT_COLLECTED frame 1.
 	static var TRACKGOLD:Boolean = false;
+	// TRACKPLAYER (s27 n-ragdoll-strokes) "lo:hi" probe frames: after each RunApp,
+	// "NP f= <name> x= y= xs= ys= rot= cf= v=" for player.mc, its child clips and
+	// the ragdoll stick clips. Postlevel has no NF lines; this covers it. At frame
+	// lo it also prints "NH f= <path> ..." for every clip (<= 4 levels under
+	// _root) whose bounds contain the player: who draws at the player's spot.
+	static var TRACKPLAYER:String = "";
 	static var lastSet:Object;
 	static var freezeLeft:Number = 0;
 	static var freezeLabel:String = "";
@@ -148,6 +154,37 @@ class NDrive {
 			if (o == undefined || Number(o.OBJ_TYPE) != 0 || o.mc == undefined) continue;
 			if (o.mc._currentframe != 1) trace("NG f=" + frame + " t=" + r.game.tickCounter + " i=" + i + " cf=" + o.mc._currentframe + " v=" + o.mc._visible);
 		}
+	}
+	static function mcLine(n:String, m:MovieClip):String {
+		return "NP f=" + frame + " " + n + " x=" + m._x + " y=" + m._y + " xs=" + m._xscale + " ys=" + m._yscale + " rot=" + m._rotation + " cf=" + m._currentframe + " v=" + m._visible;
+	}
+	// clips (<= 4 levels) whose bounds contain the player's position: who draws there
+	static function hitWalk(m:Object, path:String, lvl:Number):Void {
+		var px:Number = r.player.pos.x;
+		var py:Number = r.player.pos.y - 5;
+		for (var k:String in m) {
+			var c:Object = m[k];
+			if (typeof(c) != "movieclip" || c._parent != m) continue;
+			if (c.hitTest(px, py, false)) trace("NH f=" + frame + " " + path + "." + k + " v=" + c._visible + " cf=" + c._currentframe + " x=" + c._x + " y=" + c._y + " xs=" + c._xscale + " ys=" + c._yscale + " rot=" + c._rotation);
+			if (lvl < 4) hitWalk(c, path + "." + k, lvl + 1);
+		}
+	}
+	static function playerTrace():Void {
+		var lh:Array = TRACKPLAYER.split(":");
+		if (frame < Number(lh[0]) || frame > Number(lh[1])) return;
+		if (frame == Number(lh[0])) hitWalk(r, "_root", 0);
+		var p:Object = r.player;
+		if (p == undefined || p.mc == undefined) return;
+		trace(mcLine("mc", p.mc));
+		var names:Array = new Array();
+		for (var k:String in p.mc) if (typeof(p.mc[k]) == "movieclip") names.push(k);
+		names.sort();
+		for (var i:Number = 0; i < names.length; i++) trace(mcLine("mc." + names[i], p.mc[names[i]]));
+		var sl:Object = p.raggy.sList;
+		var sn:Array = new Array();
+		for (var k2:String in sl) sn.push(k2);
+		sn.sort();
+		for (var j:Number = 0; j < sn.length; j++) trace(mcLine("rag." + sn[j], sl[sn[j]].mc));
 	}
 	static function worldHash():String {
 		var arr:Array = r.objects.objArray;
@@ -256,7 +293,7 @@ class NDrive {
 		frame++;
 		if (FRAMELOCK && !locked && r.RunApp != undefined && r.onEnterFrame == r.RunApp) {
 			locked = true;
-			r.onEnterFrame = function():Void { NDrive.preFrame(); NDrive.r.RunApp(); if (NDrive.TRACKGOLD) NDrive.goldTrace(); };
+			r.onEnterFrame = function():Void { NDrive.preFrame(); NDrive.r.RunApp(); if (NDrive.TRACKGOLD) NDrive.goldTrace(); if (NDrive.TRACKPLAYER != "") NDrive.playerTrace(); };
 			trace("ND framelock on frame=" + frame);
 		}
 		if (!started) {
