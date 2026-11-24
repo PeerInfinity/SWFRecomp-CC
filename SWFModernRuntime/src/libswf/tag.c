@@ -4255,6 +4255,7 @@ static int g_clip_mask_capture = 0;
 extern void actionDrawingInlineReset(void);
 extern void* actionFindMCForDisplayObj(const void* obj);
 extern int actionRenderMCDrawingsInline(void* mc_v, DrawingRenderCallback cb, void* user_data);
+extern int actionRenderHolderDrawingsInline(void* mc_v, DrawingRenderCallback cb, void* user_data);
 extern int actionRenderMCDrawingsInlineEntryCx(void* mc_v, DrawingRenderCallback cb, void* user_data, u32 entry_cx_slot);
 extern void* actionGetRootMC(void);
 static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data);
@@ -8909,7 +8910,11 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;
 			if (!offscreen_attached_pass_member(mc)) continue;
-			if (mc->display_obj == NULL && mc->loaded_dl_shell == NULL) continue;
+			if (mc->display_obj == NULL && mc->loaded_dl_shell == NULL) {
+				// s27 prototype: drawing-only holder, as render_attached_child.
+				actionRenderHolderDrawingsInline(mc, drawing_render_cb, NULL);
+				continue;
+			}
 			// AS-set _visible=false: tagShowFrame's pass skips it inside
 			// render_attached_child; this capture pass drew it anyway, so a
 			// hidden root-attached clip showed up in every captured image.
@@ -9130,7 +9135,12 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 {
 	extern MovieClip root_movieclip;
 	DisplayObject* _content = mc_content_dobj(mc);
-	if (_content == NULL) return;                   // no sprite content
+	if (_content == NULL) {                         // no sprite content
+		// s27 prototype: a drawing-only holder paints its Graphics here, at
+		// its sorted attached position (beneath its children).
+		actionRenderHolderDrawingsInline(mc, drawing_render_cb, NULL);
+		return;
+	}
 	if (!mc->visible) return;                       // AS-set _visible=false
 	// A live setMask masker is stencil-only, never ordinary content
 	// (mask defect B).

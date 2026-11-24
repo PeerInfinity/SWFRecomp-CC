@@ -34498,6 +34498,34 @@ int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
 	return count;
 }
 
+// s27 w1-render-bitmap-leads PROTOTYPE (lead 1): a drawing-only clip (a
+// createEmptyMovieClip holder: no display_obj, no loaded shell) has no sprite
+// content, so render_attached_child returned before its inline-drawing call
+// and the global actionIterateDrawings pass painted its Graphics AFTER the
+// whole attached pass -- over its own attached children and over attached
+// siblings at higher depths. Flash/Ruffle (MovieClip::render_self) draw the
+// Graphics at the clip's own render position, beneath its children. Filter-
+// root-claimed subtrees keep the global hook route.
+int actionRenderHolderDrawingsInline(void* mc_v, DrawingRenderCallback cb, void* user_data)
+{
+	MovieClip* mc = (MovieClip*) mc_v;
+	if (mc == NULL || mc->drawing_state == NULL) return 0;
+	if (mc->display_obj != NULL || mc->loaded_dl_shell != NULL) return 0;
+	if (g_avm1_runtime_filter_mcs > 0 && dynFilterRootOf(mc) != NULL) return 0;
+	// Narrow variant: only a holder WITH live attached children moves. A
+	// childless empty clip keeps the global (late) pass, because text inside
+	// timeline sprites is still drawn by the late TF_WINDOW_REST pass; moving
+	// a childless clip's drawing earlier puts such text over it
+	// (from_gnash BeginBitmapFill: xtrace sprite text over mc1..mc9, 939->1188).
+	int has_child = 0;
+	for (int i = 0; i < child_mc_count && !has_child; i++) {
+		MovieClip* c = child_mc_cache[i];
+		if (c != NULL && c->depth != INT_MIN && c->parent == mc) has_child = 1;
+	}
+	if (!has_child) return 0;
+	return actionRenderMCDrawingsInline(mc, cb, user_data);
+}
+
 int actionIterateMaskedDrawings(DrawingMaskedCallback cb, void* user_data)
 {
 	int count = 0;

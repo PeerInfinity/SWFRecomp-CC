@@ -303,6 +303,53 @@ static const char* fragment_wgsl =
 // Sample one bitmap pool at (uv, layer). WGSL cannot index a binding by a
 // runtime value, so this is a switch; textureSampleLevel with an explicit LOD
 // has no uniformity requirement, so being inside a non-uniform branch is fine.
+// s27 w1-render-bitmap-leads PROTOTYPE (premultiplied sampling, static pools):
+// static bitmaps are stored STRAIGHT alpha, so the hardware LINEAR filter
+// blends colour unweighted by alpha (dark/transparent texels bleed into the
+// edge). Flash and Ruffle filter PREMULTIPLIED texels. Where the hardware
+// sample is translucent, redo the 2x2 bilinear by hand with alpha weights.
+"fn static_texel(pool: u32, ij: vec2i, layer: i32) -> vec4f {\n"
+"  switch (pool) {\n"
+"    case 0u: { return textureLoad(bitmap_pool0, ij, layer, 0); }\n"
+"    case 1u: { return textureLoad(bitmap_pool1, ij, layer, 0); }\n"
+"    case 2u: { return textureLoad(bitmap_pool2, ij, layer, 0); }\n"
+"    case 3u: { return textureLoad(bitmap_pool3, ij, layer, 0); }\n"
+"    case 4u: { return textureLoad(bitmap_pool4, ij, layer, 0); }\n"
+"    case 5u: { return textureLoad(bitmap_pool5, ij, layer, 0); }\n"
+"    case 6u: { return textureLoad(bitmap_pool6, ij, layer, 0); }\n"
+"    case 7u: { return textureLoad(bitmap_pool7, ij, layer, 0); }\n"
+"    default: { return vec4f(0.0); }\n"
+"  }\n"
+"}\n"
+"fn static_dims(pool: u32) -> vec2i {\n"
+"  switch (pool) {\n"
+"    case 0u: { return vec2i(textureDimensions(bitmap_pool0)); }\n"
+"    case 1u: { return vec2i(textureDimensions(bitmap_pool1)); }\n"
+"    case 2u: { return vec2i(textureDimensions(bitmap_pool2)); }\n"
+"    case 3u: { return vec2i(textureDimensions(bitmap_pool3)); }\n"
+"    case 4u: { return vec2i(textureDimensions(bitmap_pool4)); }\n"
+"    case 5u: { return vec2i(textureDimensions(bitmap_pool5)); }\n"
+"    case 6u: { return vec2i(textureDimensions(bitmap_pool6)); }\n"
+"    case 7u: { return vec2i(textureDimensions(bitmap_pool7)); }\n"
+"    default: { return vec2i(1, 1); }\n"
+"  }\n"
+"}\n"
+"fn static_premul_bilinear(pool: u32, uv: vec2f, layer: i32) -> vec4f {\n"
+"  let dim = static_dims(pool);\n"
+"  let p = uv * vec2f(dim) - vec2f(0.5);\n"
+"  let i0 = vec2i(floor(p));\n"
+"  let f = p - floor(p);\n"
+"  let mx = dim - vec2i(1);\n"
+"  let a = static_texel(pool, clamp(i0, vec2i(0), mx), layer);\n"
+"  let b = static_texel(pool, clamp(i0 + vec2i(1, 0), vec2i(0), mx), layer);\n"
+"  let c = static_texel(pool, clamp(i0 + vec2i(0, 1), vec2i(0), mx), layer);\n"
+"  let d = static_texel(pool, clamp(i0 + vec2i(1, 1), vec2i(0), mx), layer);\n"
+"  let pa = vec4f(a.rgb * a.a, a.a); let pb = vec4f(b.rgb * b.a, b.a);\n"
+"  let pc = vec4f(c.rgb * c.a, c.a); let pd = vec4f(d.rgb * d.a, d.a);\n"
+"  let r = mix(mix(pa, pb, f.x), mix(pc, pd, f.x), f.y);\n"
+"  if (r.a <= 0.0) { return vec4f(0.0); }\n"
+"  return vec4f(r.rgb / r.a, r.a);\n"
+"}\n"
 "fn sample_bitmap(pool: u32, uv: vec2f, layer: i32, smoothed: bool) -> vec4f {\n"
 "  var c = vec4f(0.0);\n"
 "  if (smoothed) {\n"
@@ -338,6 +385,7 @@ static const char* fragment_wgsl =
 "      default: {}\n"
 "    }\n"
 "  }\n"
+"  if (smoothed && pool < 8u && c.a < 0.999) { c = static_premul_bilinear(pool, uv, layer); }\n"
 "  return c;\n"
 "}\n"
 "\n"
@@ -5114,7 +5162,8 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 			"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
 			"  let c = textureSample(maskee_tex, in_samp, uv);\n"
 			"  let m = textureSample(mask_tex, in_samp, uv);\n"
-			"  return c * m.a;\n"
+			"  let a8 = round(m.a * 255.0);\n"
+			"  return floor(round(c * 255.0) * a8 / 256.0) / 255.0;\n"
 			"}\n";
 
 		WGPUShaderModule am_sm = create_shader(ctx->device, alpha_mask_wgsl,
