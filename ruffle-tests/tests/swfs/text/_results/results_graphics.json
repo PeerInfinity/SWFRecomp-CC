@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-24T07:25:12.227967+00:00",
-    "git_sha": "cceb5133a189db82d8715e3e9afe9ad500af5908",
-    "duration_seconds": 213.44,
+    "timestamp": "2026-11-24T17:26:56.686459+00:00",
+    "git_sha": "78fee9e13f853501e2dc637877cddb20254a603f",
+    "duration_seconds": 221.67,
     "total_available": 12,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "auto_size/height",
       "phases": {
         "recomp": 0.041,
-        "compile": 27.909,
-        "run": 1.063
+        "compile": 27.896,
+        "run": 1.024
       },
       "num_frames": 1,
       "lines": {
@@ -29,7 +29,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 29.06,
+      "duration": 29.01,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -69,9 +69,9 @@
     {
       "test": "auto_size/return",
       "phases": {
-        "recomp": 0.044,
-        "compile": 24.733,
-        "run": 1.094
+        "recomp": 0.043,
+        "compile": 27.95,
+        "run": 1.055
       },
       "num_frames": 1,
       "lines": {
@@ -79,7 +79,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 25.96,
+      "duration": 29.14,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -119,9 +119,9 @@
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.057,
-        "compile": 26.206,
-        "run": 0.369
+        "recomp": 0.043,
+        "compile": 24.897,
+        "run": 0.339
       },
       "num_frames": 1,
       "lines": {
@@ -129,7 +129,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 26.73,
+      "duration": 25.36,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -169,9 +169,9 @@
     {
       "test": "br_at_start",
       "phases": {
-        "recomp": 0.017,
-        "compile": 1.359,
-        "run": 0.323
+        "recomp": 0.03,
+        "compile": 2.321,
+        "run": 0.445
       },
       "num_frames": 1,
       "lines": {
@@ -179,7 +179,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.83,
+      "duration": 3.01,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -219,9 +219,9 @@
     {
       "test": "html_entity_parsing",
       "phases": {
-        "recomp": 0.004,
-        "compile": 6.587,
-        "run": 0.298
+        "recomp": 0.006,
+        "compile": 8.624,
+        "run": 0.365
       },
       "num_frames": 1,
       "lines": {
@@ -229,15 +229,15 @@
         "expected_lines": 213,
         "matching_lines": 213
       },
-      "duration": 6.9,
+      "duration": 9.0,
       "status": "pass"
     },
     {
       "test": "html_entity_whitespace",
       "phases": {
         "recomp": 0.003,
-        "compile": 1.3,
-        "run": 0.301
+        "compile": 1.29,
+        "run": 0.297
       },
       "num_frames": 1,
       "lines": {
@@ -245,15 +245,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.61,
+      "duration": 1.59,
       "status": "pass"
     },
     {
       "test": "links_in_scrolled_text",
       "phases": {
-        "recomp": 0.032,
-        "compile": 1.501,
-        "run": 0.33
+        "recomp": 0.033,
+        "compile": 1.475,
+        "run": 0.334
       },
       "num_frames": 2,
       "lines": {
@@ -261,14 +261,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.87,
+      "duration": 1.85,
       "status": "pass"
     },
     {
       "test": "style_changes_in_html",
       "phases": {
         "recomp": 0.013,
-        "compile": 18.202,
+        "compile": 18.704,
         "run": 0.296
       },
       "num_frames": 1,
@@ -277,7 +277,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 18.56,
+      "duration": 19.06,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -318,8 +318,8 @@
       "test": "text_caret_placement_align",
       "phases": {
         "recomp": 0.037,
-        "compile": 24.167,
-        "run": 0.334
+        "compile": 25.11,
+        "run": 0.352
       },
       "num_frames": 2,
       "lines": {
@@ -327,15 +327,15 @@
         "expected_lines": 248,
         "matching_lines": 248
       },
-      "duration": 24.55,
+      "duration": 25.51,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
-        "recomp": 0.037,
-        "compile": 25.183,
-        "run": 0.335
+        "recomp": 0.051,
+        "compile": 28.078,
+        "run": 0.386
       },
       "num_frames": 2,
       "lines": {
@@ -343,15 +343,15 @@
         "expected_lines": 244,
         "matching_lines": 244
       },
-      "duration": 25.56,
+      "duration": 28.53,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
-        "recomp": 0.037,
-        "compile": 24.167,
-        "run": 0.307
+        "recomp": 0.063,
+        "compile": 32.798,
+        "run": 0.422
       },
       "num_frames": 2,
       "lines": {
@@ -359,15 +359,15 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 24.52,
+      "duration": 33.31,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
-        "recomp": 0.052,
-        "compile": 25.434,
-        "run": 0.417
+        "recomp": 0.029,
+        "compile": 15.6,
+        "run": 0.266
       },
       "num_frames": 2,
       "lines": {
@@ -375,7 +375,7 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 25.91,
+      "duration": 15.9,
       "status": "pass"
     }
   ]
