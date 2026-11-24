@@ -3274,6 +3274,21 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     # One-shot gcc src1.c src2.c ... -o bin bypasses ccache because ccache only
     # caches single-file compilations. Compiling per-file also lets unchanged
     # sources hit the cache while the changed generated scripts recompile.
+    if os.environ.get("SWF_BROWSER_ARMS_TU") and "-DOFFSCREEN_RENDER" in mode_defines:
+        # Browser-arm harness (see SWF_BROWSER_ARMS_TU below): symbols action.c
+        # defines only under NO_GRAPHICS||OFFSCREEN_RENDER but the CI-graphics
+        # TUs still reference. Weak, so a non-harness build never sees them.
+        # In the real browser build graphics_stubs.c supplies the globals and
+        # the callers of the three functions are compiled out.
+        (build_dir / "zz_browser_arm_shim.c").write_text(
+            "typedef struct FocusRectInfo FocusRectInfo;\n"
+            "__attribute__((weak)) int g_settarget_none = 0;\n"
+            "__attribute__((weak)) int g_settarget_invalid = 0;\n"
+            "__attribute__((weak)) int g_settarget_explicit_root = 0;\n"
+            "__attribute__((weak)) int g_clone_depth_already_unbiased = 0;\n"
+            "__attribute__((weak)) void actionRewindCleanup(void* a) { (void)a; }\n"
+            "__attribute__((weak)) void actionRenameMovieClip(const char* o, const char* n) { (void)o; (void)n; }\n"
+            "__attribute__((weak)) int actionGetFocusRectInfo(FocusRectInfo* o) { (void)o; return 0; }\n")
     sources = sorted(build_dir.glob("*.c"))
     # Use "-I." for the per-test build dir and run gcc with cwd=build_dir so the
     # command line is identical across runs (no random tmpdir name embedded in
@@ -3320,13 +3335,42 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         except ValueError:
             pass
 
+    # SWF_BROWSER_ARMS_TU=action.c[,tag.c]: browser-arm harness (s27
+    # w1-browser-avm1-gaps). In --mode=graphics, compile the named TUs WITHOUT
+    # -DOFFSCREEN_RENDER / -DHEADLESS_RENDER_ENABLED, so their
+    # `#if NO_GRAPHICS || OFFSCREEN_RENDER ... #else` gates take the arm the
+    # browser-WASM build takes, while the rest of the binary stays the CI
+    # graphics build. Only valid for TUs that do not touch
+    # WebGPURenderContext (whose layout differs by OFFSCREEN_RENDER); action.c
+    # qualifies. Not a browser build: it runs one TU's browser arms natively.
+    #
+    # FIDELITY LIMIT (measured in the real browser, s27 browser-arms-land):
+    # tag.c / swf.c / tag_stubs.c stay CI-graphics, so a row that passes here
+    # can still fail in the browser when it depends on
+    #   1. a definition-time table the browser never fills (tagDefineButton's
+    #      ng_record_button was gated NG||OR: the harness passed avm1/color,
+    #      the browser resolved `btn` to _root). gate_inventory.py flags these
+    #      as `browser-registry`.
+    #   2. the browser's LAZY sprite build: browser tagPlaceObject2 skips
+    #      ng_on_place_object2 / process_sprite_needs_init, and sprite children
+    #      exist only after tagShowFrame's advance_sprite_frames. A frame-N
+    #      DoAction querying a sprite placed on frame N (getBounds, nested
+    #      clip.clip lookups) sees no children (avm1/movieclip_getbounds).
+    #   3. AQ_KIND_LOAD ordering (browser queue_clip_load_events_kind):
+    #      onClipEvent(load) order differs (avm1/duplicate_movie_clip).
+    # Confirm harness passes with tools/browser-test/child_probe/.
+    browser_tus = set(filter(None, os.environ.get("SWF_BROWSER_ARMS_TU", "").split(",")))
+    browser_flags = [f for f in common_flags
+                     if f not in ("-DOFFSCREEN_RENDER", "-DHEADLESS_RENDER_ENABLED")]
+
     objects = []
     try:
         for src in sources:
             obj = src.with_suffix(".o")
             objects.append(obj)
+            _flags = browser_flags if (src.name in browser_tus and "-DOFFSCREEN_RENDER" in common_flags) else common_flags
             proc = subprocess.Popen(
-                [*cc, "-c", src.name, *common_flags, "-o", obj.name],
+                [*cc, "-c", src.name, *_flags, "-o", obj.name],
                 cwd=str(build_dir),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

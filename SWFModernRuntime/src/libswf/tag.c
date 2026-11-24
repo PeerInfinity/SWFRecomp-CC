@@ -14913,9 +14913,12 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 	dictionary[char_id].button_actions = actions;
 	dictionary[char_id].button_action_count = action_count;
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Every build, browser-WASM included: ng_find_button feeds
+	// ng_isScriptableAtDepth (GetVariable's name lookup), the auto-instance
+	// "instanceN" naming and the browser tagPlaceObject2 arm. Gated to
+	// NG||OR, the browser resolved every named button to _root
+	// (s27 browser-arms-land: avm1/color "Pre-tinted button" read identity).
 	ng_record_button(char_id);
-#endif
 }
 
 // Public accessor: returns the hit-shape character ID for a button character,

@@ -10569,15 +10569,11 @@ static ActionVar transformConcatMatrixGetter(SWFAppContext* app_context, ActionV
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
 	if (!flashGeomClassAvailable("Matrix", 6)) return r;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a, b, c, d, tx, ty;
 	getConcatMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
 	ASObject* mat = makeMatrixObject(app_context, a, b, c, d, tx, ty);
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) mat;
-#else
-	(void)app_context;
-#endif
 	return r;
 }
 
@@ -10592,15 +10588,11 @@ static ActionVar transformConcatCTGetter(SWFAppContext* app_context, ActionVar* 
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
 	if (!flashGeomClassAvailable("ColorTransform", 14)) return r;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	getConcatCTForMC(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
 	ASObject* ct = makeCTObject(app_context, ra, ga, ba, aa, rb, gb, bb, ab);
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) ct;
-#else
-	(void)app_context;
-#endif
 	return r;
 }
 
@@ -10617,7 +10609,6 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
 	if (!flashGeomClassAvailable("Rectangle", 9)) return r;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	DisplayObject* _pb_dl = NULL; size_t _pb_dl_max = 0;
 	double _pb_xmin_tw, _pb_ymin_tw, _pb_xmax_tw, _pb_ymax_tw;
 	int _pb_has = resolveMCDisplayList(mc, &_pb_dl, &_pb_dl_max)
@@ -10713,9 +10704,6 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) rect;
-#else
-	(void)app_context;
-#endif
 	return r;
 }
 
@@ -12191,7 +12179,6 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 	if (!param) return undef;
 
 	char name[256] = {0};
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (!colorGetMCName(app_context, self, name, sizeof(name))) return undef;
 
 	// Read current transform
@@ -12233,36 +12220,6 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 		_mc->cx_rb = (float)rb; _mc->cx_gb = (float)gb;
 		_mc->cx_bb = (float)bb; _mc->cx_ab = (float)ab;
 	}
-#else
-	// Browser-WASM: apply the transform to the bound clip + sync to the renderer
-	// (mirrors colorSetRGB's #else). Without this Color.setTransform was a no-op.
-	MovieClip* _mc = colorGetTargetMC(app_context, self);
-	if (_mc) {
-		double ra=100,ga=100,ba=100,aa=100,rb=0,gb=0,bb=0,ab=0;
-		ActionVar* pv;
-		pv = getProperty(param, "ra", 2); if (pv) ra = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
-		pv = getProperty(param, "ga", 2); if (pv) ga = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
-		pv = getProperty(param, "ba", 2); if (pv) ba = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
-		pv = getProperty(param, "aa", 2); if (pv) aa = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
-		pv = getProperty(param, "rb", 2); if (pv) rb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
-		pv = getProperty(param, "gb", 2); if (pv) gb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
-		pv = getProperty(param, "bb", 2); if (pv) bb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
-		pv = getProperty(param, "ab", 2); if (pv) ab = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
-		_mc->alpha = (float)aa;
-		_mc->cx_ra = (float)ra; _mc->cx_ga = (float)ga; _mc->cx_ba = (float)ba; _mc->cx_aa = (float)aa;
-		_mc->cx_rb = (float)rb; _mc->cx_gb = (float)gb; _mc->cx_bb = (float)bb; _mc->cx_ab = (float)ab;
-		mcSyncColorToDisplayObj(_mc);
-		// mcSyncColorToDisplayObj only reaches clips with a linked display_obj
-		// (attached/nested); a root-timeline clip's entry is resolved by the
-		// name walk instead — write it so the tint renders (the cx_overridden
-		// pass allocates a dynamic cxform slot) and getTransform reads it back.
-		if (_mc->display_obj == NULL) {
-			DisplayObject* _entry = resolveMCDisplayEntry(_mc);
-			if (_entry) ng_setCTOnObj(_entry, ra, ga, ba, aa, rb, gb, bb, ab);
-		}
-	}
-	(void)name;
-#endif
 	return undef;
 }
 
@@ -12274,7 +12231,6 @@ static ActionVar colorGetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 	ASObject* obj = (ASObject*)this_obj;
 	char name[256] = {0};
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (!colorGetMCName(app_context, obj, name, sizeof(name))) return undef;
 	double ra, ga, ba, aa, rb, gb, bb, ab;
 	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) {
@@ -12292,9 +12248,6 @@ static ActionVar colorGetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 	                   ((uint32_t)(int32_t)gb << 8) |
 	                   (uint32_t)(int32_t)bb;
 	return makeF64((double)(int32_t)color_u);
-#else
-	return undef;
-#endif
 }
 
 // Color.setRGB(n) - sets ra=ga=ba=0, rb/gb/bb from n's bytes; aa and ab unchanged.
@@ -35173,7 +35126,6 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, double v)
 {
 	if (mc == NULL) return;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// TextFields (static or dynamic) store _width as a direct dimension, not via xscale.
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
@@ -35217,10 +35169,6 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 	mc->yscale = (float)(new_sy * 100.0);
 	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
 	markTransformedByScript(mc);
-#else
-	(void)app_context;
-	mc->width = (float)v;
-#endif
 }
 
 // Set _height on a MovieClip by adjusting both xscale and yscale.
@@ -35228,7 +35176,6 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, double v)
 {
 	if (mc == NULL) return;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// TextFields (static or dynamic) store _height as a direct dimension, not via yscale.
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
@@ -35272,10 +35219,6 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 	mc->yscale = (float)(new_sy * 100.0);
 	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
 	markTransformedByScript(mc);
-#else
-	(void)app_context;
-	mc->height = (float)v;
-#endif
 }
 
 /**
@@ -51103,19 +51046,6 @@ check_special_vars:
 				name_buf[63] = '\0';
 			}
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-			DisplayObject* dobj = findDisplayObjectByName(name_buf);
-			if (dobj != NULL)
-			{
-				extern MovieClip root_movieclip;
-				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
-				if (child_mc != NULL)
-				{
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
-					return;
-				}
-			}
-#else
 			// In graphics-native (OFFSCREEN_RENDER) and NO_GRAPHICS, route name
 			// lookup through ng_findDisplayEntryByName, which uses swf_name_match
 			// (case-insensitive in SWF<=6). The wasm-graphics branch above uses
@@ -51177,7 +51107,6 @@ check_special_vars:
 				}
 			}
 			}
-#endif
 
 			// AS-created clips (createEmptyMovieClip / attachMovie /
 			// duplicateMovieClip) have no display-list entry, so the searches
@@ -69024,7 +68953,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				return;
 			}
 		}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (num_args >= 6) {
 			extern MovieClip root_movieclip;
 			MovieClip* mc = &root_movieclip;
@@ -69267,10 +69195,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 		}
-#else
-		if (args != NULL) FREE(args);
-		pushUndefined(app_context);
-#endif
 		builtin_handled = 1;
 	}
 	// createEmptyMovieClip(name, depth) — MovieClip method called as CallFunction
@@ -69295,7 +69219,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (num_args >= 2) {
 			extern MovieClip root_movieclip;
 			MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
@@ -69398,10 +69321,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 		}
-#else
-		if (args != NULL) FREE(args);
-		pushUndefined(app_context);
-#endif
 		builtin_handled = 1;
 	}
 	// attachMovie(linkageId, newName, depth [, initObject]) — MC method called as CallFunction
@@ -69607,7 +69526,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				return;
 			}
 		}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern MovieClip root_movieclip;
 		MovieClip* parent_mc = g_current_context ? g_current_context : &root_movieclip;
 		if (num_args == 0 ||
@@ -69671,11 +69589,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (!_pushed) pushUndefined(app_context);
 			builtin_handled = 1;
 		}
-#else
-		if (args != NULL) FREE(args);
-		pushUndefined(app_context);
-		builtin_handled = 1;
-#endif
 	}
 
 	// setInterval(func, delay, ...args) or setInterval(obj, methodName, delay, ...args)
@@ -76989,7 +76902,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 15 && strncasecmp(method_name, "removeTextField", 15) == 0)
 		{
 			// removeTextField(): remove a dynamically-created text field
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Remove from child_mc_cache
 			for (int i = 0; i < child_mc_count; i++) {
 				if (child_mc_cache[i] == mc) {
@@ -77008,7 +76920,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			mcDropParentInstanceBinding(app_context, mc);
 			mc->avm1_removed = 1;
 			mc->depth = INT_MIN;
-#endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
@@ -77017,7 +76928,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// createTextField(instanceName, depth, x, y, width, height)
 			// Creates a new dynamic text field as a child of this movie clip
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (num_args >= 6) {
 				char _mctf_name_buf[512];
 				const char* inst_name = "";
@@ -77245,10 +77155,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if (method_name_len == 11 && strncasecmp(method_name, "attachMovie", 11) == 0)
@@ -77620,7 +77526,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// duplicateMovieClip(target, depth [, initObject])
 			// Clones this MC to a new name/depth, optionally applying initObject properties.
 			// Returns the new MovieClip.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (num_args >= 2) {
 				// Coerce args[0] to string — Ruffle uses coerce_to_string which turns
 				// null → "null", undefined → "undefined" (SWF≥7) or "" (SWF<7), numbers
@@ -77717,10 +77622,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if (method_name_len == 13 && strncasecmp(method_name, "setTextFormat", 13) == 0)
@@ -78060,7 +77961,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 16 && strncasecmp(method_name, "setNewTextFormat", 16) == 0)
 		{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// setNewTextFormat(fmt): set the default format for newly-typed text
 			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 				ASObject* fmt_obj = (ASObject*) args[0].data.numeric_value;
@@ -78164,10 +78064,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			applyAutoSize(app_context, mc, 0);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if (method_name_len == 13 && strncasecmp(method_name, "getTextFormat", 13) == 0)
@@ -78875,7 +78771,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						_target->depth = _tmp;
 						mc->depth_swapped = 1;
 						_target->depth_swapped = 1;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						if (mc->name[0] && _target->name[0]) {
 							// Try a full display list swap first
 							ng_swapDisplayDepths(mc->name, _target->name);
@@ -78891,7 +78786,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							if (_d2 != SIZE_MAX && (int)_d2 - 16384 != _target->depth)
 								ng_updateDisplayDepth(_target->name, _target->depth);
 						}
-#endif
 						// Sync clone-depth table for each MC that has an entry
 						{
 							extern void ng_clone_update_swf_depth(const char* name, int new_swf_depth);
@@ -78978,10 +78872,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			mc->depth = _new_depth;
 			mc->depth_swapped = 1;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc->name[0])
 				ng_updateDisplayDepth(mc->name, _new_depth);
-#endif
 			// Keep the clone-depth table in sync so survives_rewind uses the
 			// post-swap SWF depth. No-op for timeline MCs (not registered).
 			{
@@ -78998,7 +78890,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// undefined and calling undefined() yields undefined.
 			// Returns the MovieClip at the given depth, or the parent MC for non-MC objects,
 			// or undefined if no object at that depth.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
 			    args[0].type == ACTION_STACK_VALUE_NULL) {
 				if (args != NULL) FREE(args);
@@ -79055,10 +78946,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 			pushUndefined(app_context);
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if ((method_name_len == 9 && strncasecmp(method_name, "getBounds", 9) == 0) ||
@@ -79072,6 +78959,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Ruffle's dead MovieClipReference coerces to no receiver, so the
 			// whole call is undefined (MovieClip.as:998 umc after removal).
 			if (mc == NULL || mc->depth == INT_MIN) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			// An AVM1 TextField has no getBounds/getRect (they are
+			// MovieClip.prototype methods): the call is undefined. Flash 32
+			// and Ruffle agree (s27 avm1_browser_gated_textfield line 7).
+			if (MC_IS_TEXTFIELD(mc)) {
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 				return;
@@ -79140,7 +79035,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				return;
 			}
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
 				extern DisplayObject* display_list;
 				extern size_t max_depth;
@@ -79301,17 +79195,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							}
 						}
 					}
-				}
-
-				// Include text field bounds (this MC is a text field)
-				if (mc != NULL && MC_IS_TEXTFIELD(mc) && !has_bounds) {
-					// Text field's own bounds in parent space (twips)
-					// Round to nearest twip to match Ruffle's integer Twips model
-					lxmin = round((double)mc->x * 20.0);
-					lymin = round((double)mc->y * 20.0);
-					lxmax = round((double)mc->x * 20.0) + round((double)mc->width * 20.0);
-					lymax = round((double)mc->y * 20.0) + round((double)mc->height * 20.0);
-					has_bounds = 1;
 				}
 
 				// Include child MovieClip bounds (text fields created via createTextField)
@@ -79522,7 +79405,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
 				return;
 			}
-#endif
 			// Fallback: sentinel values
 			// Flag already checked/flipped above based on g_swf_version >= 8
 			int use_new_fb = g_use_new_invalid_bounds;

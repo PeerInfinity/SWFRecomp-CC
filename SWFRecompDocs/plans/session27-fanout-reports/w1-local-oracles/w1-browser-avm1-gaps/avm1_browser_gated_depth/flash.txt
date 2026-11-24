@@ -1,0 +1,7 @@
+cf e1=movieclip depth=3
+cm giad(4)=_level0.e2
+cf giad(3)=_level0.e1
+cm giad(99)=undefined
+dup ret=_level0.e3 e3=movieclip depth=7
+e3 marker=undefined giad(7)=_level0.e3
+e1 w=0 xs=0 ys=0

@@ -313,10 +313,11 @@ DIRECTIVE_RE = re.compile(r"^\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b(.*)$")
 
 
 class Code:
-    __slots__ = ("lines",)
+    __slots__ = ("lines", "texts")
 
     def __init__(self):
         self.lines = 0
+        self.texts = []
 
 
 class Arm:
@@ -407,6 +408,7 @@ def parse_file(path, text):
                 if not children or not isinstance(children[-1], Code):
                     children.append(Code())
                 children[-1].lines += 1
+                children[-1].texts.append(line.strip())
             continue
         kind, rest = m.group(1), m.group(2).strip()
         if kind in ("if", "ifdef", "ifndef"):
@@ -488,6 +490,60 @@ def lines_seen(children, defined, undefined):
                 total += sub
                 unknown_flag = unknown_flag or sub_unknown
     return total, unknown_flag, macros
+
+
+def text_seen(children, defined, undefined):
+    """Code lines this config *definitely* compiles (undecidable arms skipped)."""
+    out = []
+    for node in children:
+        if isinstance(node, Code):
+            out.extend(node.texts)
+            continue
+        for i, arm in enumerate(node.arms):
+            sel, _ = arm_selected(node, i, defined, undefined)
+            if sel is TRUE:
+                out.extend(text_seen(arm.children, defined, undefined))
+    return out
+
+
+# --------------------------------------------------------------------------
+# No-op ("stub") arm detection
+# --------------------------------------------------------------------------
+#
+# A gate whose browser-WASM arm *has* code still hides a gap when that code is
+# only a placeholder -- e.g. a builtin whose native arm builds a TextField while
+# the `#else` just frees the args and pushes undefined.  Line counts alone
+# classify such a site `all-configs`.  We strip the lines that never do real
+# work (braces, arg frees, `pushUndefined`, bare returns/breaks, `(void)x;`,
+# `builtin_handled = 1;`) and compare what is left.
+
+TRIVIAL_LINE_RES = [re.compile(p) for p in (
+    r"^[{}();\s]*$",
+    r"^(else\s*)?[{}]?\s*$",
+    r"^break\s*;$",
+    r"^return\s*(0|NULL|false|-1|\(void\)\s*0)?\s*;\s*}?$",
+    r"^\(void\)\s*\(?\s*[A-Za-z_][A-Za-z0-9_\[\]\.>-]*\s*\)?\s*;$",
+    r"^(if\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*(!=\s*NULL)?\s*\)\s*)?FREE\s*\([A-Za-z_][A-Za-z0-9_]*\)\s*;$",
+    r"^(if\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*(!=\s*NULL)?\s*\)\s*)?free\s*\([A-Za-z_][A-Za-z0-9_]*\)\s*;$",
+    r"^pushUndefined\s*\(\s*app_context\s*\)\s*;$",
+    r"^PUSH_UNDEFINED\s*\(.*\)\s*;$",
+    r"^PUSH\s*\(\s*ACTION_STACK_VALUE_UNDEFINED\s*,\s*0\s*\)\s*;$",
+    r"^builtin_handled\s*=\s*1\s*;$",
+    r"^[A-Za-z_][A-Za-z0-9_]*\s*=\s*(0|NULL|false)\s*;$",
+)]
+
+# Browser arm substantive lines at or below this, native arm at or above
+# STUB_NATIVE_MIN -> `browser-stub`.
+STUB_BROWSER_MAX = 0
+STUB_NATIVE_MIN = 3
+# A weaker signal: the browser arm does a little (a constant return, one call)
+# where the native arm does a lot.  Reported as `browser-thin` for triage.
+THIN_BROWSER_MAX = 3
+THIN_NATIVE_MIN = 8
+
+
+def substantive(texts):
+    return [t for t in texts if not any(r.match(t) for r in TRIVIAL_LINE_RES)]
 
 
 def walk_sites(children, path, stack, out):
@@ -613,6 +669,7 @@ def analyse_site(path, group, stack):
             "partial_unknown": bool(unknown and lines > 0),
             "macros": sorted(m for m in macros if not m.startswith("<")),
             "arms": taken,
+            "substantive": len(substantive(text_seen([group], d, u))),
         }
     site.reachable = reachable
     site.category = categorise(site)
@@ -640,18 +697,66 @@ def categorise(site):
             else "browser-none-partial"
     if ln[bw] > 0 and natives and not with_code:
         return "browser-only"
+    if is_browser_stub(site, natives):
+        return "browser-stub"
+    if is_browser_stub(site, natives, THIN_BROWSER_MAX, THIN_NATIVE_MIN):
+        return "browser-thin"
     if len(natives) == 2 and (ln[ng] > 0) != (ln[gn] > 0):
         return "native-asym"
     return "all-configs"
 
 
-CATEGORY_ORDER = ["browser-none", "browser-none-partial", "browser-only",
+def is_browser_stub(site, natives, bmax=None, nmin=None):
+    """Browser takes a different top-level arm than a native config, and that
+    arm does no real work while the native arm does."""
+    bw = CONFIG_NAMES[2]
+    pb = site.per_config[bw]
+    if pb["state"] != "code" or pb["partial_unknown"]:
+        return False
+    bmax = STUB_BROWSER_MAX if bmax is None else bmax
+    nmin = STUB_NATIVE_MIN if nmin is None else nmin
+    if pb["substantive"] > bmax:
+        return False
+    for n in natives:
+        pn = site.per_config[n]
+        if pn["arms"] != pb["arms"] and pn["substantive"] >= nmin:
+            return True
+    return False
+
+
+# A `browser-none` site that feeds a definition-time table (a `tagDefine*`
+# body, or an `ng_record_*` / `ng_register_*` call). The table's READERS are
+# usually unconditional and live in other TUs (action.c's GetVariable reads
+# the button registry via ng_isScriptableAtDepth), so the browser silently
+# gets the "not registered" answer everywhere. The native browser-arms harness
+# (verify_output.py SWF_BROWSER_ARMS_TU=action.c) cannot see these: it builds
+# tag.c with the CI defines, so the table is filled. s27 browser-arms-land:
+# tagDefineButton's ng_record_button was one, and every named button resolved
+# to _root in the real browser. Always a bug candidate; always check it in the
+# real browser build (tools/browser-test/child_probe/).
+REGISTRY_CALL_RE = re.compile(r"\bng_(?:record|register)_\w+\s*\(")
+
+
+def is_browser_registry(site, stripped_text):
+    if site.category not in ("browser-none", "browser-none-partial"):
+        return False
+    if site.function.startswith("tagDefine"):
+        return True
+    body = "\n".join(stripped_text.split("\n")[site.start - 1:site.end])
+    return REGISTRY_CALL_RE.search(body) is not None
+
+
+CATEGORY_ORDER = ["browser-registry", "browser-none", "browser-none-partial", "browser-stub",
+                  "browser-thin", "browser-only",
                   "native-asym", "depends", "browser-unreachable",
                   "all-configs"]
 
 CATEGORY_DESC = {
+    "browser-registry": "browser-WASM gets zero code at a definition-time table feed (`tagDefine*` body or `ng_record_*`/`ng_register_*` call) whose readers run in every config; invisible to the action.c browser-arms harness",
     "browser-none": "browser-WASM gets **zero** code; both native configs get code",
     "browser-none-partial": "browser-WASM gets zero code; exactly one native config gets code (the other gets none, or cannot reach the site)",
+    "browser-stub": "browser-WASM takes an arm with only placeholder code (free args / push undefined / return) while a native arm does real work",
+    "browser-thin": "browser-WASM's arm does at most 3 lines of real work where a native arm does 8+ (a constant return, one call); triage candidates",
     "browser-only": "only browser-WASM gets code (reachable native configs get none)",
     "native-asym": "no-graphics vs graphics-native disagree; browser-WASM gets code",
     "depends": "result hinges on a macro outside the three config sets",
@@ -698,6 +803,8 @@ def collect(root):
         for group, stack in found:
             site = analyse_site(rel, group, stack)
             site.function = function_at(fn_index, site.start)
+            if is_browser_registry(site, stripped):
+                site.category = "browser-registry"
             sites.append(site)
     sites.sort(key=lambda s: (s.path, s.start))
     return sites
@@ -728,8 +835,9 @@ def text_report(sites, stream=sys.stdout):
     for cat in CATEGORY_ORDER:
         if cat in by_cat:
             stream.write("  %-22s %4d\n" % (cat, len(by_cat[cat])))
-    stream.write("\nflagged (browser-WASM gets no code):\n")
-    for cat in ("browser-none", "browser-none-partial"):
+    stream.write("\nflagged (browser-WASM gets no code, or only a no-op stub):\n")
+    for cat in ("browser-registry", "browser-none", "browser-none-partial", "browser-stub",
+                "browser-thin"):
         for s in by_cat.get(cat, []):
             stream.write("  %s:%d-%d  [%s]  %s\n" % (
                 s.path, s.start, s.end, cat, s.arms[0]["cond"][:70]))
@@ -849,7 +957,8 @@ def markdown_report(sites, root, existing_path=None):
     w("arm's size and which configs take it (`ng`/`gn`/`bw`; a trailing `?` means the")
     w("selection depends on a macro outside the config sets).")
     w("")
-    for cat in ("browser-none", "browser-none-partial"):
+    for cat in ("browser-registry", "browser-none", "browser-none-partial", "browser-stub",
+                "browser-thin"):
         rows = by_cat.get(cat, [])
         w("### `%s` — %d sites" % (cat, len(rows)))
         w("")
@@ -1025,6 +1134,14 @@ const char *s = "#ifdef OFFSCREEN_RENDER in a string";
         int nested_native_graphics;
     #endif
 #endif
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+    MovieClip* child = createMovieClip(name, mc);
+    child->x = x;
+    setProperty(app_context, props, "text", 4, &sval);
+#else
+    if (args != NULL) FREE(args);
+    pushUndefined(app_context);
+#endif
 """
 
 
@@ -1057,6 +1174,8 @@ def selftest():
         # with no-graphics excluded by the enclosing stack (so it is not
         # mis-flagged as a native asymmetry).
         (27, "all-configs", (0, 1, 1), ("unreachable", "code", "code")),
+        # native arm does work; the browser #else only frees + pushes undefined.
+        (33, "browser-stub", (3, 3, 2), ("code", "code", "code")),
     ]
     ok = True
     if got != expect:
