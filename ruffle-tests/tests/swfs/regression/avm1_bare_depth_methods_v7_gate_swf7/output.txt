@@ -1,0 +1,6 @@
+typeof gv getNextHighestDepth: function [type Function]
+cf getNextHighestDepth: number 6
+cm _root.getNextHighestDepth: number 6
+cf getInstanceAtDepth(5): movieclip _level0.c1
+cm _root.getInstanceAtDepth(5): movieclip _level0.c1
+cf getDepth: number -16384

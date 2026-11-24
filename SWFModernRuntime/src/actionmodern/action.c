@@ -30381,10 +30381,12 @@ static TFPlainSpans* tf_ps_get(SWFAppContext* app_context, MovieClip* mc)
 }
 
 // Forget a field's spans (its clip is gone or became a different field).
+static void tf_snf_drop(MovieClip* mc); // s27 w2b item 1
 static void tf_ps_drop(MovieClip* mc)
 {
 	TFPlainSpans* ps = tf_ps_find(mc);
 	if (ps != NULL) memset(ps, 0, sizeof(*ps));
+	tf_snf_drop(mc); // nor a dead field's parked setNewTextFormat size/font
 }
 
 static void tf_ps_reset_spans(TFPlainSpans* ps, u32 len, const TFPSFmt* f)
@@ -30500,6 +30502,97 @@ static void tf_ps_set_text_format(SWFAppContext* app_context, MovieClip* mc, u32
 		if (!(f->size > 0)) f->size = old_size;   // size must stay positive
 	}
 	tf_ps_normalize(ps);
+}
+
+// s27 w2b-avm1-text-edit (w1-avm1-leftovers item 4, Flash-confirmed): a real
+// TextFormat passed to setNewTextFormat formats only text inserted LATER. The
+// field-wide _tf_fontHeight / _tf_fontId keys lay out the EXISTING text, so
+// while the field holds text the size/font are parked here and applied by
+// tf_snf_apply_pending at the next text replacement (`text =`, text-synonym
+// htmlText, typed input). Flash 32 direct: after setNewTextFormat(size 40)
+// textWidth/textHeight and getTextFormat(0).size are unchanged, nsize=40; after
+// `text =` size0=40 (regression/avm1_set_new_text_format_instance).
+#define TF_SNF_MAX 16
+static struct {
+	MovieClip* mc;
+	int has_size; double size;
+	int has_font; char font[128]; int bold, italic;
+} g_tf_snf[TF_SNF_MAX];
+
+static int tf_snf_slot(MovieClip* mc, int create)
+{
+	int free_i = -1;
+	for (int i = 0; i < TF_SNF_MAX; i++) {
+		if (g_tf_snf[i].mc == mc) return i;
+		if (g_tf_snf[i].mc == NULL && free_i < 0) free_i = i;
+	}
+	if (!create) return -1;
+	if (free_i < 0) return -1; // table full: caller applies immediately (old behaviour)
+	memset(&g_tf_snf[free_i], 0, sizeof(g_tf_snf[free_i]));
+	g_tf_snf[free_i].mc = mc;
+	return free_i;
+}
+
+static int tf_fmt_flag_set(ASObject* fmt, const char* name, u32 len);
+
+// Returns 1 (caller skips the immediate size/font write) when the field has
+// text and the size/font were parked.
+static int tf_snf_defer(MovieClip* mc, ASObject* fmt)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 0;
+	ActionVar* tp = getProperty((ASObject*)mc->dynamic_props, "text", 4);
+	if (tp == NULL || tp->type != ACTION_STACK_VALUE_STRING || tp->str_size == 0) {
+		int i = tf_snf_slot(mc, 0);
+		if (i >= 0) g_tf_snf[i].mc = NULL;   // an immediate write supersedes a parked one
+		return 0;
+	}
+	ActionVar* sz = getProperty(fmt, "size", 4);
+	ActionVar* ft = getProperty(fmt, "font", 4);
+	int have_sz = sz != NULL && sz->type == ACTION_STACK_VALUE_F64;
+	int have_ft = ft != NULL && ft->type == ACTION_STACK_VALUE_STRING && ft->str_size > 0;
+	if (!have_sz && !have_ft) return 1;
+	int i = tf_snf_slot(mc, 1);
+	if (i < 0) return 0;
+	if (have_sz) {
+		double d; memcpy(&d, &sz->data.numeric_value, sizeof(double));
+		if (!isnan(d) && !isinf(d) && d > 0) { g_tf_snf[i].has_size = 1; g_tf_snf[i].size = d; }
+	}
+	if (have_ft) {
+		size_t n = u16_to_utf8(varGetU16Ptr(ft), ft->str_size, g_tf_snf[i].font, sizeof(g_tf_snf[i].font));
+		g_tf_snf[i].font[n < 127 ? n : 127] = '\0';
+		g_tf_snf[i].has_font = 1;
+		g_tf_snf[i].bold = tf_fmt_flag_set(fmt, "bold", 4);
+		g_tf_snf[i].italic = tf_fmt_flag_set(fmt, "italic", 6);
+	}
+	return 1;
+}
+
+static void tf_snf_drop(MovieClip* mc)
+{
+	int i = tf_snf_slot(mc, 0);
+	if (i >= 0) g_tf_snf[i].mc = NULL;
+}
+
+static void tf_snf_apply_pending(SWFAppContext* app_context, MovieClip* mc)
+{
+	int i = tf_snf_slot(mc, 0);
+	if (i < 0) return;
+	ASObject* props = (ASObject*)mc->dynamic_props;
+	g_tf_snf[i].mc = NULL;
+	if (props == NULL) return;
+	if (g_tf_snf[i].has_size) {
+		ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &v.data.numeric_value) = (double)(u16)(g_tf_snf[i].size * 20.0);
+		setProperty(app_context, props, "_tf_fontHeight", 14, &v);
+	}
+	if (g_tf_snf[i].has_font) {
+		u16 fid = ng_resolveTextFormatFontId(g_tf_snf[i].font, g_tf_snf[i].bold, g_tf_snf[i].italic);
+		ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &v.data.numeric_value) = (double)fid;
+		setProperty(app_context, props, "_tf_fontId", 10, &v);
+		ActionVar fname_val = makeStringActionVar(app_context, g_tf_snf[i].font, strlen(g_tf_snf[i].font));
+		setProperty(app_context, props, "_tf_fontName", 12, &fname_val);
+	}
 }
 
 static void tf_ps_set_new_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* fmt)
@@ -59357,6 +59450,7 @@ void actionSetMember(SWFAppContext* app_context)
 				// including an HTML field's runs; otherwise one span of the new
 				// text format. Runs before the old text is overwritten.
 				int _ps_same = MC_IS_TEXTFIELD(mc) ? tf_ps_text_assign(mc, &value_var) : 0;
+				if (MC_IS_TEXTFIELD(mc) && !_ps_same) tf_snf_apply_pending(app_context, mc); // s27 w2b item 1
 				TFPlainSpans* _ps_nf = MC_IS_TEXTFIELD(mc) ? tf_ps_find(mc) : NULL;
 				// Update length property (str_size is UTF-16 code unit count)
 				u32 _txt_len = 0;
@@ -59679,7 +59773,7 @@ void actionSetMember(SWFAppContext* app_context)
 						ActionVar _rc_one = {0}; _rc_one.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &_rc_one.data.numeric_value) = 1.0;
 						setProperty(app_context, props, "_tf_raw_content", 15, &_rc_one);
-						tf_ps_text_assign(mc, &value_var); // s25 span model (text synonym)
+						if (!tf_ps_text_assign(mc, &value_var)) tf_snf_apply_pending(app_context, mc); // s25 span model (text synonym); s27 w2b item 1
 						setProperty(app_context, props, "text", 4, &value_var);
 						ActionVar len_val = {0};
 						len_val.type = ACTION_STACK_VALUE_F64;
@@ -78767,8 +78861,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					VAL(double, &cv.data.numeric_value) = (double)color_u32;
 					setProperty(app_context, (ASObject*)mc->dynamic_props, "textColor", 9, &cv);
 				}
+				// s27 w2b item 1: with text present, a real TextFormat's size/font
+				// are parked until the next text replacement (Flash 32: the
+				// existing text keeps its format). See tf_snf_defer.
+				int _snf_defer = tf_snf_defer(mc, fmt_obj);
 				// Store font size from TextFormat for textWidth/textHeight computation
-				ActionVar* sz_prop = getProperty(fmt_obj, "size", 4);
+				ActionVar* sz_prop = _snf_defer ? NULL : getProperty(fmt_obj, "size", 4);
 				if (sz_prop != NULL && sz_prop->type == ACTION_STACK_VALUE_F64) {
 					double sz; memcpy(&sz, &sz_prop->data.numeric_value, sizeof(double));
 					if (!isnan(sz) && !isinf(sz) && sz > 0) {
@@ -78780,7 +78878,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 				// Store font name → resolve to font_id
-				ActionVar* font_prop = getProperty(fmt_obj, "font", 4);
+				ActionVar* font_prop = _snf_defer ? NULL : getProperty(fmt_obj, "font", 4);
 				if (font_prop != NULL && font_prop->type == ACTION_STACK_VALUE_STRING && font_prop->str_size > 0) {
 					char _font_name[128];
 					size_t _fn_len = u16_to_utf8(varGetU16Ptr(font_prop), font_prop->str_size, _font_name, sizeof(_font_name));
@@ -85344,7 +85442,7 @@ void actionTextControlSelectAll(SWFAppContext* app_context)
 	g_tf_select_all = 1;
 }
 
-static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
+static int tf_replace_selection(SWFAppContext* app_context, ASObject* props,
                                  const uint16_t* ins, u32 ins_len);
 
 // s27 w1-avm1-leftovers (item 5): the focused field's selected range [*lo, *hi)
@@ -86119,7 +86217,7 @@ void actionTextFieldImeCommit(SWFAppContext* app_context, const char* text)
 // insert at the caret; the whole text after a select-all) with `ins`, move
 // the caret past it and fire onChanged. Shared by typing (actionTextFieldInput),
 // Paste and Cut (ins_len = 0). Ruffle: text_input / replace_text(sel, ..).
-static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
+static int tf_replace_selection(SWFAppContext* app_context, ASObject* props,
                                  const uint16_t* ins, u32 ins_len)
 {
 	// Existing text (UTF-16). When the whole field is selected, the input
@@ -86163,7 +86261,7 @@ static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
 			double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
 			if (d > 0 && d == d) {
 				long avail = (long)(int)d - ((long)old_len - (long)(del_hi - del_lo));
-				if (avail <= 0) return;
+				if (avail <= 0) return 0; // dropped: no edit (caller decides onChanged)
 				if ((long)ins_len > avail) ins_len = (u32)avail;
 			}
 		}
@@ -86191,6 +86289,7 @@ static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
 	int _typed_in_place = 0;
 	if ((int)u16_len == (int)(del_lo + ins_len + tail_len))
 		_typed_in_place = tf_ps_on_typed(app_context, g_focused_mc, del_lo, del_hi, ins, ins_len);
+	if (ins_len > 0) tf_snf_apply_pending(app_context, g_focused_mc); // s27 w2b item 1
 	// Set text property
 	ActionVar new_text = {0};
 	new_text.type = ACTION_STACK_VALUE_STRING;
@@ -86219,6 +86318,7 @@ static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
 
 	// Fire onChanged callback
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+	return 1;
 }
 
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
@@ -86272,7 +86372,12 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	u32 ch_u16_len = 0;
 	uint16_t* ch_u16 = utf8_to_u16(app_context, ch_utf8, (u32)ch_len, &ch_u16_len);
 
-	tf_replace_selection(app_context, props, ch_u16, ch_u16_len);
+	// s27 w2b-avm1-text-edit: Flash 32 fires onChanged for EVERY typed key,
+	// even one maxChars drops (typed XYZ into maxChars 5 "ABCD": changed #2/#3
+	// both read "AXBCD caret=2"; regression/avm1_edittext_maxchars_clips_insertion).
+	// Ruffle skips it there. Typing only: Paste/Cut keep the no-edit no-event path.
+	if (!tf_replace_selection(app_context, props, ch_u16, ch_u16_len))
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
 // (was: #endif — see comment above for the open)
