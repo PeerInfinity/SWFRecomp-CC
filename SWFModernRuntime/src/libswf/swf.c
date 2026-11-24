@@ -466,13 +466,8 @@ Character* dictionary = NULL;
 DisplayObject* display_list = NULL;
 size_t max_depth = 0;
 
-// Dummy sprite object pointer for the wasm browser graphics build only —
-// in --mode=graphics native (OFFSCREEN_RENDER), tag.c's widened
-// (NO_GRAPHICS || OFFSCREEN_RENDER) arm provides the real one and defining
-// it here would conflict.
-#ifndef OFFSCREEN_RENDER
-DisplayObject* g_current_sprite_obj = NULL;
-#endif
+// g_current_sprite_obj is defined in tag.c for every build (s27
+// browser-eager-init removed the browser-only dummy that lived here).
 
 RenderContext* context;
 

@@ -310,11 +310,9 @@ size_t g_place_gen = 0;
 // NOT bumped by swapDepths — depth changes, instantiation order is preserved.
 size_t g_place_seq = 0;
 
-// Frame-helper machinery used by both the NO_GRAPHICS frame loop
-// (swf_core.c) and the --mode=graphics native build (swf.c with
-// OFFSCREEN_RENDER). wasm graphics still uses the #else stubs in
-// graphics_stubs.c.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Frame-helper machinery used by every frame loop: swf_core.c (NO_GRAPHICS),
+// swf.c under OFFSCREEN_RENDER, and browser-WASM swf.c (ungated in s27
+// browser-eager-init; graphics_stubs.c used to stub it out for the browser).
 // Tracks the currently-executing sprite's DisplayObject.
 // Set by advance_sprite_frames before each sprite frame function call.
 DisplayObject* g_current_sprite_obj = NULL;
@@ -418,7 +416,6 @@ static int g_eager_init_depth = 0;
 // Key test: avm1/issue_9885.
 static int g_button_state_change_depth = 0;
 
-#endif // NO_GRAPHICS || OFFSCREEN_RENDER
 
 // Snapshot of (depth → char_id) and (depth → instance_name) of a button's
 // children at the start of a state transition. tagPlaceObject2 consults this
@@ -524,7 +521,6 @@ static MovieClip* ng_mc_for_sprite_obj(DisplayObject* obj)
 	return mc;
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 
 int actionEagerInitActive(void) {
 	return g_eager_init_depth > 0 && g_button_state_change_depth == 0;
@@ -987,20 +983,9 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 		}
 }
 
-#else
-// Graphics builds (wasm and native): use exec_sprite_frame from graphics_stubs.c
-// so sprite frame_funcs run with the right MC context (saves/restores
-// g_current_sprite_obj, g_current_context, base_clip, settarget state, and
-// active transform_data). Previously this was a bare `(f)(app)` — sprite
-// scripts ran in the root's context, which broke any test exercising
-// SetTarget / sprite-relative variable lookup in sprite-emitted code.
-extern void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f);
-#define CALL_FRAME(app, obj, f) exec_sprite_frame(app, obj, f)
-#endif
 
 // Public wrapper for process_sprite_needs_init (called from tag_stubs.c for
 // attachMovie'd sprite child initialization).
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc)
 {
 	process_sprite_needs_init(app_context, parent_mc);
@@ -1011,7 +996,6 @@ void ng_set_script_only_mode(int mode)
 {
 	g_script_only_mode = mode;
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // Helper 1: Advance sprite timelines recursively
@@ -1285,6 +1269,12 @@ static void ng_sprite_park_no_end_tag(DisplayObject* obj)
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+// Set only around tagShowFrame's top-level browser-WASM advance_sprite_frames
+// call (the per-tick pump), so other advance callers (goto replay, attached
+// clips) keep their behaviour. See the placed_at_tick skip in the loop.
+static int g_browser_tick_advance = 0;
+#endif
 void advance_sprite_frames(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -1419,6 +1409,21 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			if (obj->placed_at_tick == g_tick_count)
 				continue;
 		}
+
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM: tagShowFrame's per-tick advance runs AFTER the frame's
+		// placements, unlike the CI loops (before the root frame func). A sprite
+		// placed this tick already built its frame 0 through eager placement init
+		// (tagPlaceObject2), so advancing it here would run its frame 2 on the
+		// placement tick. Skip it, as advance_nested_sprite_frames already does;
+		// it first advances next tick, like CI. (s27 browser-eager-init.)
+		if (g_browser_tick_advance && !just_allocated)
+		{
+			extern size_t g_tick_count;
+			if (obj->placed_at_tick == g_tick_count)
+				continue;
+		}
+#endif
 
 		// Check for manual frame navigation (gotoAndPlay/gotoAndStop)
 		size_t frame = obj->sprite_current_frame;
@@ -10181,6 +10186,32 @@ void tagShowFrame(SWFAppContext* app_context)
 	// advance / draining LOAD while nested inside a CLIP_RELEASE handler
 	// corrupts global state used by getDisplayListJSON and other consumers.
 	if (catch_up_mode) return;
+	// Browser-WASM eager placement init (s27 browser-eager-init). tagPlaceObject2
+	// now runs the CI placement path in this build too: ng_on_place_object2,
+	// the INIT/CONSTRUCT/REGISTER_CTOR/LOAD queue and the frame-0 eager build
+	// (catch_up_mode=1), so a frame-N script sees a frame-N sprite's children.
+	// This is the Phase-2 half the CI arm above runs: drain the clip-event
+	// queues, then process_sprite_needs_init (registerClass ctors, deferred
+	// goto-catch-up frame-0 scripts, sprite_initialized=1), then the late
+	// SCRIPT drain and the duplicateMovieClip onLoad drain, in the CI order.
+	// The sprites it built are skipped by this tick's advance_sprite_frames
+	// below (placed_at_tick), as advance_nested_sprite_frames already does:
+	// in CI they first advance on the next tick.
+	if (!g_goto_catchup_active) {
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+	}
+	if (!g_defer_sprite_init)
+	{
+		extern void ng_sync_root_display_obj(void);
+		ng_sync_root_display_obj();
+		MovieClip* _si_parent = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+		process_sprite_needs_init(app_context, _si_parent);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+		ng_fire_pending_loads(app_context);
+		actionFlushPendingOnLoads(app_context);
+	}
 	// Browser-WASM: tagShowFrame is the only sprite-advance pump in this
 	// build (unlike OFFSCREEN_RENDER, where swf.c's main tick loop runs
 	// the same defer+nested pattern). Without the nested pass, sprites
@@ -10193,7 +10224,9 @@ void tagShowFrame(SWFAppContext* app_context)
 		extern int g_advance_defer_nested;
 		extern void advance_nested_sprite_frames(SWFAppContext* app_context);
 		g_advance_defer_nested = 1;
+		g_browser_tick_advance = 1;
 		advance_sprite_frames(app_context);
+		g_browser_tick_advance = 0;
 		g_advance_defer_nested = 0;
 		advance_nested_sprite_frames(app_context);
 		// Apply deferred gotoAndStop/Play navs on attachMovie'd clips (e.g.
@@ -11705,7 +11738,6 @@ static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* d
 	}
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Phase 4 of ACTION_QUEUE_PLAN: CLIP_EVENT_INITIALIZE handlers are routed
 // through the unified ActionQueue at AQ_PRIORITY_INITIALIZE / AQ_KIND_CLIP_INIT.
 //
@@ -11922,7 +11954,6 @@ static void queue_register_ctor(SWFAppContext* app_context, size_t depth, size_t
 	                      AQ_KIND_REGISTER_CTOR);
 }
 
-#endif // close NO_GRAPHICS||OFFSCREEN_RENDER gate around queue_register_ctor
 
 // Phase 7a: CLIP_EVENT_LOAD clip-action enqueue. Queued at placement time in
 // tagPlaceObject2 / tagPlaceObject2Ratio (before eager init so this sprite's
@@ -12922,51 +12953,6 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		g_pending_clip_action_count = 0;
 	}
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM: ng_on_place_object2 (which assigns auto-instance names
-	// to unnamed scriptable placements) is gated and doesn't fire here, so
-	// handle that subset inline so queue_clip_load_events can find the
-	// entry by name. Mirrors ng_on_place_object2 lines 705-720.
-	if (display_list[depth].instance_name == NULL
-	    && display_list[depth].char_id != 0) {
-		size_t _ainame_cid = display_list[depth].char_id;
-		int _ainame_is_sprite = (_ainame_cid < INITIAL_DICTIONARY_CAPACITY
-		                         && dictionary[_ainame_cid].type == CHAR_TYPE_SPRITE);
-		int _ainame_is_button = ng_find_button(_ainame_cid);
-		int _ainame_is_tf     = (ng_find_textfield(_ainame_cid) >= 0);
-		if (_ainame_is_sprite || _ainame_is_button || _ainame_is_tf) {
-			char _ainame_buf[32];
-			snprintf(_ainame_buf, sizeof(_ainame_buf), "instance%u",
-			         ng_increment_auto_instance_counter());
-			display_list[depth].instance_name = strdup(_ainame_buf);
-			display_list[depth].instance_name_owned = 1;
-		}
-	}
-	// Browser-WASM: mark sprite as initialized so dispatch_enterframe_clip_actions
-	// will start firing CLIP_EVENT_ENTER_FRAME on the next tick (after
-	// upgrade_sprite_initialized in tagShowFrame bumps 1→2). Without this,
-	// sprite_initialized stays at 0 (process_sprite_needs_init is a stub in
-	// browser-WASM) and EnterFrame handlers — including the hero's physics
-	// in Doodle Jump — never run.
-	if (display_list[depth].char_id != 0
-	    && display_list[depth].char_id < INITIAL_DICTIONARY_CAPACITY
-	    && dictionary[display_list[depth].char_id].type == CHAR_TYPE_SPRITE
-	    && display_list[depth].sprite_initialized == 0) {
-		display_list[depth].sprite_initialized = 1;
-	}
-	// Browser-WASM: queue LOAD clip-actions on AQ_KIND_LOAD so they
-	// drain AFTER tagShowFrame's advance_sprite_frames has populated
-	// sprite children. Without this deferral the LOAD handler runs
-	// during actionDrainAllInPriorityOrder (before tagShowFrame), and
-	// scripts like Doodle Jump's `this.button_txt.text = "scores"` see
-	// no `button_txt` child yet and silently no-op — buttons keep their
-	// static placeholder text. AQ_KIND_LOAD is NOT touched by the
-	// in-frame actionDrainAllInPriorityOrder so the entries persist
-	// until tagShowFrame's explicit drain.
-	queue_clip_load_events_kind(app_context, depth, AQ_KIND_LOAD);
-#endif
-
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_on_place_object2(app_context, depth, char_id);
 
 	// Queue CLIP_EVENT_INITIALIZE / CLIP_EVENT_CONSTRUCT handlers and the
@@ -13113,9 +13099,6 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// then every REGISTER_CTOR), instead of the per-sprite serial pattern
 	// the per-placement drain produced.
 
-#else
-	(void)app_context;
-#endif
 }
 
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
@@ -13517,37 +13500,6 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		g_pending_clip_action_count = 0;
 	}
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM: inline auto-instance-name for unnamed scriptable
-	// placements (mirrors ng_on_place_object2). See tagPlaceObject2 above.
-	if (display_list[depth].instance_name == NULL
-	    && display_list[depth].char_id != 0) {
-		size_t _ainame_cid = display_list[depth].char_id;
-		int _ainame_is_sprite = (_ainame_cid < INITIAL_DICTIONARY_CAPACITY
-		                         && dictionary[_ainame_cid].type == CHAR_TYPE_SPRITE);
-		int _ainame_is_button = ng_find_button(_ainame_cid);
-		int _ainame_is_tf     = (ng_find_textfield(_ainame_cid) >= 0);
-		if (_ainame_is_sprite || _ainame_is_button || _ainame_is_tf) {
-			char _ainame_buf[32];
-			snprintf(_ainame_buf, sizeof(_ainame_buf), "instance%u",
-			         ng_increment_auto_instance_counter());
-			display_list[depth].instance_name = strdup(_ainame_buf);
-			display_list[depth].instance_name_owned = 1;
-		}
-	}
-	// Mark sprite_initialized=1 so EnterFrame fires next tick. See tagPlaceObject2.
-	if (display_list[depth].char_id != 0
-	    && display_list[depth].char_id < INITIAL_DICTIONARY_CAPACITY
-	    && dictionary[display_list[depth].char_id].type == CHAR_TYPE_SPRITE
-	    && display_list[depth].sprite_initialized == 0) {
-		display_list[depth].sprite_initialized = 1;
-	}
-	// Browser-WASM: queue LOAD on AQ_KIND_LOAD so it drains after sprite
-	// children are populated. See tagPlaceObject2 above.
-	queue_clip_load_events_kind(app_context, depth, AQ_KIND_LOAD);
-#endif
-
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_on_place_object2(app_context, depth, char_id);
 
 	// Queue INIT/CONSTRUCT/REGISTER_CTOR on the unified ActionQueue (same
@@ -13676,9 +13628,6 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	// Phase 2 of CLIP_EVENT_ROUND_DISPATCH: per-placement drain removed.
 	// See tagPlaceObject2 for the rationale.
 
-#else
-	(void)app_context;
-#endif
 }
 
 void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,

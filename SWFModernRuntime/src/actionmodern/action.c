@@ -66121,23 +66121,11 @@ void actionCloneSprite(SWFAppContext* app_context)
 			return;
 		}
 
-		// Browser-WASM only: drain pending LOAD events before cloning so the
-		// clone inherits the source's POST-LOAD position. queue_clip_load_events_kind
-		// queues per-placement LOAD on AQ_KIND_LOAD (deferred until tagShowFrame
-		// so DJ button-LOAD handlers see advance_sprite_frames-populated children);
-		// for a same-frame `placeObject(src) + duplicateMovieClip(src)` sequence
-		// Ruffle fires the source's onClipEvent(load) synchronously at placement,
-		// before the DoAction containing DuplicateSprite. Draining here is the
-		// closest analogue — src's pending LOAD fires now, src.x reflects the
-		// LOAD-applied position, and ng_cloneSprite below copies the updated
-		// position into the clone. (B3 wasm_probes/clone_clip_actions.)
-		// In NO_GRAPHICS/OFFSCREEN_RENDER, queue_clip_load_events uses
-		// AQ_KIND_SCRIPT (drained by actionDrainAllInPriorityOrder before
-		// actionCloneSprite runs), so no entries remain on AQ_KIND_LOAD at
-		// this point and the call would be a no-op — guarded for clarity.
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-		actionDrainActionQueueByKind(app_context, AQ_KIND_LOAD);
-#endif
+		// (s27 browser-eager-init: the browser-only AQ_KIND_LOAD drain that sat
+		// here is gone. Placement LOAD now rides AQ_KIND_SCRIPT in every build,
+		// drained by actionDrainAllInPriorityOrder before this DoAction, as in
+		// CI. AQ_KIND_LOAD only holds duplicateMovieClip onLoads, and draining
+		// those here fired an earlier clone's onLoad at the next clone's call.)
 
 		// Pick the clone primitive: ng_cloneSprite for timeline-placed sources
 		// (it runs the source's frame_0 to populate the clone's display list,
