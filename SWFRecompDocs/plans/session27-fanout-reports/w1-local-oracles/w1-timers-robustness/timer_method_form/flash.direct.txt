@@ -1,0 +1,6 @@
+f1
+ia=1
+inf=2
+t2=3
+arr m len=7
+f2 reached via timer nextFrame

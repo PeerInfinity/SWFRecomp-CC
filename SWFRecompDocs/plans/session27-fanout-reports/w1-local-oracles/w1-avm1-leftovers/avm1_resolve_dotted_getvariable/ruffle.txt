@@ -1,0 +1,18 @@
+  resolve b
+o.b.c = C_b
+  resolve b
+o.b.d.e = E_b
+  resolve b
+o:b.c = C_b
+o.zz = 
+o.real = R
+  resolve prim
+o.prim.c = 
+  resolve w
+  resolve w
+after set o.w.c: o.w = object
+  resolve q
+m.q.c = C_q
+m.zz = 
+  resolve q
+_root.m.q.c = C_q

@@ -1,0 +1,355 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index aea7864b..bab0e67d 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -22315,7 +22315,27 @@ DisplayObject* actionHolderShellList(MovieClip* mc, size_t* out_max);
+ 		size_t _shm = 0; DisplayObject* _shl = actionHolderShellList((m), &_shm); \
+ 		if (_shl != NULL) { cur_sprite_dl = _shl; cur_sprite_max = _shm; } \
+ 	} while (0)
++static MovieClip* resolveSlashPathToMCImpl(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc);
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++extern int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap);
++extern void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap);
++#endif
++// s27 phase 3: a path walked from the ROOT reads the root movie's list even
++// while a loaded movie's list is the active one.
+ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	extern MovieClip root_movieclip;
++	if (start_mc == &root_movieclip) {
++		DisplayObject* _sdl = NULL; size_t _smax = 0, _scap = 0;
++		int _sw = ng_rootDLEnter(&_sdl, &_smax, &_scap);
++		MovieClip* r = resolveSlashPathToMCImpl(app_context, path, path_len, start_mc);
++		ng_rootDLLeave(_sw, _sdl, _smax, _scap);
++		return r;
++	}
++#endif
++	return resolveSlashPathToMCImpl(app_context, path, path_len, start_mc);
++}
++static MovieClip* resolveSlashPathToMCImpl(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
+ 	g_shape_alias_resolution = 0;
+ 	if (path_len == 0 || start_mc == NULL) return NULL;
+ 
+@@ -25804,8 +25824,10 @@ static void constructChildURL(char* dest, size_t dest_size, const char* child_fi
+ 	}
+ }
+ 
++static void actionDrainDeferredShellClears(void);
+ void actionProcessDeferredFailedLoads(void)
+ {
++	actionDrainDeferredShellClears();
+ 	for (int i = 0; i < g_deferred_failed_load_count; i++) {
+ 		DeferredFailedLoad* dfl = &g_deferred_failed_loads[i];
+ 		if (dfl->mc != NULL) {
+@@ -26221,7 +26243,19 @@ typedef struct {
+ 	DisplayObject* dl;
+ 	size_t max, cap;
+ 	int on;
++	int rootdl_tok;
+ } ChildDLSwap;
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++extern int ng_rootDLStashPush(void);
++extern void ng_rootDLStashPop(int token);
++extern int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap);
++extern void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap);
++#define ROOTDL_PUSH() ng_rootDLStashPush()
++#define ROOTDL_POP(t) ng_rootDLStashPop(t)
++#else
++#define ROOTDL_PUSH() 0
++#define ROOTDL_POP(t) ((void)(t))
++#endif
+ 
+ static void childDLSwapIn(DisplayObject* owner, ChildDLSwap* s)
+ {
+@@ -26229,9 +26263,11 @@ static void childDLSwapIn(DisplayObject* owner, ChildDLSwap* s)
+ 	extern size_t max_depth;
+ 	extern size_t display_list_capacity;
+ 	s->on = 0;
++	s->rootdl_tok = 0;
+ 	s->owner = owner;
+ 	if (owner == NULL || owner->sprite_display_list == NULL) return;
+ 	if (display_list == owner->sprite_display_list) return;  // already active (re-entrant goto)
++	s->rootdl_tok = ROOTDL_PUSH();
+ 	s->dl = display_list; s->max = max_depth; s->cap = display_list_capacity;
+ 	display_list = owner->sprite_display_list;
+ 	max_depth = owner->sprite_max_depth;
+@@ -26249,6 +26285,7 @@ static void childDLSwapOut(ChildDLSwap* s)
+ 	s->owner->sprite_max_depth = max_depth;
+ 	s->owner->sprite_dl_capacity = display_list_capacity;
+ 	display_list = s->dl; max_depth = s->max; display_list_capacity = s->cap;
++	ROOTDL_POP(s->rootdl_tok);
+ 	s->on = 0;
+ }
+ 
+@@ -26258,7 +26295,48 @@ static void childDLSwapOut(ChildDLSwap* s)
+ // non-root clip, so the movie's children are gone (and stop rendering) at once.
+ // Removal goes through tagRemoveObject2 on the swapped-in shell, the same loop
+ // the reload path uses, so onUnload fires and cached MovieClips invalidate.
++// s27 w1-per-movie-dl-phase3: the unload is DEFERRED to the end of the tick.
++// Ruffle's loader makes a loaded movie a ROOT clip (loader.rs movie_loader_data:
++// replace_with_movie(.., is_root=true, ..)), so avm1_unload_movie takes its
++// is_root() arm and runs avm1_unload + transform_to_unloaded_state in a spawned
++// future, i.e. at the next update; its own comment records that Flash applies
++// the unloaded state one frame later even for a non-root clip. So `h.a` read
++// in the same script right after h.unloadMovie() is still the movie's child.
++// The playhead unregister stays synchronous (the movie runs no further frame).
++#define MAX_DEFERRED_SHELL_CLEARS 64
++static MovieClip* g_deferred_shell_clear[MAX_DEFERRED_SHELL_CLEARS];
++static int g_deferred_shell_clear_count = 0;
++static SWFAppContext* g_deferred_shell_clear_app = NULL;
++static void actionClearChildMovieShellNow(SWFAppContext* app_context, MovieClip* mc);
+ void actionClearChildMovieShell(SWFAppContext* app_context, MovieClip* mc)
++{
++	if (mc == NULL || mc->loaded_dl_shell == NULL) return;
++	for (int i = 0; i < g_deferred_shell_clear_count; i++)
++		if (g_deferred_shell_clear[i] == mc) return;
++	if (g_deferred_shell_clear_count >= MAX_DEFERRED_SHELL_CLEARS) {
++		actionClearChildMovieShellNow(app_context, mc);
++		return;
++	}
++	g_deferred_shell_clear_app = app_context;
++	g_deferred_shell_clear[g_deferred_shell_clear_count++] = mc;
++}
++// Drained from actionProcessDeferredFailedLoads (end of tick, before the
++// pending direct loads fire, so an unload+reload in one script clears first).
++static void actionDrainDeferredShellClears(void)
++{
++	extern MovieClip* child_mc_cache[];
++	extern int child_mc_count;
++	int n = g_deferred_shell_clear_count;
++	g_deferred_shell_clear_count = 0;
++	for (int i = 0; i < n; i++) {
++		MovieClip* mc = g_deferred_shell_clear[i];
++		int live = 0;
++		for (int c = 0; c < child_mc_count; c++)
++			if (child_mc_cache[c] == mc) { live = 1; break; }
++		if (live) actionClearChildMovieShellNow(g_deferred_shell_clear_app, mc);
++	}
++}
++static void actionClearChildMovieShellNow(SWFAppContext* app_context, MovieClip* mc)
+ {
+ 	if (mc == NULL || mc->loaded_dl_shell == NULL) return;
+ 	DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
+@@ -26480,9 +26558,11 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ 			DisplayObject* _saved_dl = NULL;
+ 			size_t _saved_max = 0, _saved_cap = 0;
+ 			int _did_swap = 0;
++			int _rootdl_tok = 0;
+ 			DisplayObject* dobj = e.mc->display_obj ? (DisplayObject*)e.mc->display_obj
+ 			                                        : actionChildMovieShell(app_context, e.mc, 1);
+ 			if (dobj != NULL && dobj->sprite_display_list != NULL) {
++				if (!isLevelRootMC(e.mc)) _rootdl_tok = ROOTDL_PUSH();
+ 				_saved_dl = display_list;
+ 				_saved_max = max_depth;
+ 				_saved_cap = display_list_capacity;
+@@ -26636,6 +26716,7 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ 				max_depth = _saved_max;
+ 				display_list_capacity = _saved_cap;
+ 			}
++			ROOTDL_POP(_rootdl_tok);
+ 			if (_saved_td != NULL) {
+ 				extern float (*g_active_transform_data)[16];
+ 				g_active_transform_data = _saved_td;
+@@ -27434,7 +27515,9 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 		// on top of that additionally breaks avm1/swf{5_to_6,6_to_5}_cross_call.
+ 		// Both measured. See SWFRecompDocs/status/child-timeline-advance.md.
+ 		DisplayObject* _shell = NULL;
++		int _rootdl_tok = 0;
+ 		if (!loads[i].is_level && (_shell = actionChildMovieShell(app_context, mc, 1)) != NULL) {
++			_rootdl_tok = ROOTDL_PUSH();
+ 			_saved_dl = display_list;
+ 			_saved_max = max_depth;
+ 			_saved_cap = display_list_capacity;
+@@ -27478,6 +27561,21 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 				_did_swap = 1;
+ 			}
+ 		}
++		// s27 phase 3: a TIMELINE-placed holder (it already has a display_obj
++		// with a sprite list) gets its movie's frame 1 in that list too, the
++		// same list actionAdvancePlayingLevels runs frames 2..N in.
++		if (!_did_swap && !loads[i].is_level && mc->display_obj != NULL
++		    && ((DisplayObject*)mc->display_obj)->sprite_display_list != NULL) {
++			DisplayObject* _hd = (DisplayObject*)mc->display_obj;
++			_rootdl_tok = ROOTDL_PUSH();
++			_saved_dl = display_list;
++			_saved_max = max_depth;
++			_saved_cap = display_list_capacity;
++			display_list = _hd->sprite_display_list;
++			max_depth = _hd->sprite_max_depth;
++			display_list_capacity = _hd->sprite_dl_capacity;
++			_did_swap = 1;
++		}
+ 		// Swap transform_data to child's array (for correct ng_cache_transform)
+ 		{
+ 			extern float (*g_active_transform_data)[16];
+@@ -27568,6 +27666,7 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 			max_depth = _saved_max;
+ 			display_list_capacity = _saved_cap;
+ 		}
++		ROOTDL_POP(_rootdl_tok);
+ 		if (_saved_td != NULL) {
+ 			extern float (*g_active_transform_data)[16];
+ 			g_active_transform_data = _saved_td;
+@@ -41374,7 +41473,11 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
+             DisplayObject* _p2_shell = actionChildMovieShell(app_context, loads[i].target, 1);
+             ChildDLSwap _p2_sw;
+             _p2_sw.on = 0;
+-            if (_p2_shell != NULL) {
++            if (_p2_shell == NULL && loads[i].target != NULL && !isLevelRootMC(loads[i].target)
++                && loads[i].target->display_obj != NULL) {
++                // s27 phase 3: timeline-placed holder -> its own sprite list.
++                childDLSwapIn((DisplayObject*)loads[i].target->display_obj, &_p2_sw);
++            } else if (_p2_shell != NULL) {
+                 childDLSwapIn(_p2_shell, &_p2_sw);
+                 if (_p2_sw.on) {
+                     for (size_t _cd = max_depth; _cd >= 1; _cd--) {
+@@ -50870,11 +50973,21 @@ check_special_vars:
+ 			}
+ 
+ 			{
++			// s27 phase 3: a lookup scoped to the ROOT timeline reads the root
++			// movie's list even while a loaded movie's list is active (a
++			// synchronous child-frame -> _root.f() call). Every return below
++			// goes through _GV_RDL_LEAVE.
++			DisplayObject* _gvr_dl = NULL; size_t _gvr_max = 0, _gvr_cap = 0;
++			int _gvr_sw = (g_current_context == NULL || g_current_context == &root_movieclip)
++				? ng_rootDLEnter(&_gvr_dl, &_gvr_max, &_gvr_cap) : 0;
++#define _GV_RDL_LEAVE() ng_rootDLLeave(_gvr_sw, _gvr_dl, _gvr_max, _gvr_cap)
+ 			size_t child_depth = ng_findDisplayEntryByName(name_buf);
++			if (child_depth == SIZE_MAX) _GV_RDL_LEAVE();
+ 			if (child_depth != SIZE_MAX)
+ 			{
+ 				extern MovieClip root_movieclip;
+ 				if (!ng_isScriptableAtDepth(child_depth)) {
++					_GV_RDL_LEAVE();
+ 					// Flash quirk: sh.var = 10 actually sets var on the parent,
+ 					// so a shape/morph/static-text name resolves to the parent
+ 					// MC. Flag so actionCallMethod emulates
+@@ -50890,6 +51003,7 @@ check_special_vars:
+ 					extern Character* dictionary;
+ 					size_t _cid = display_list[child_depth].char_id;
+ 					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
++						_GV_RDL_LEAVE();
+ 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+ 						return;
+ 					}
+@@ -50903,10 +51017,13 @@ check_special_vars:
+ 					size_t _cid = display_list[child_depth].char_id;
+ 					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON)
+ 						child_mc->is_button_mc = 1;
++					_GV_RDL_LEAVE();
+ 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+ 					return;
+ 				}
++				_GV_RDL_LEAVE();
+ 			}
++#undef _GV_RDL_LEAVE
+ 			}
+ #endif
+ 
+@@ -60477,6 +60594,19 @@ static void actionGetMemberImpl(SWFAppContext* app_context);
+ 
+ void actionGetMember(SWFAppContext* app_context)
+ {
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	// s27 phase 3: `_root.x` from a loaded movie's frame reads the ROOT list.
++	extern MovieClip root_movieclip;
++	if (STACK_SECOND_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP
++	    && (MovieClip*)STACK_SECOND_TOP_VALUE == &root_movieclip) {
++		DisplayObject* _sdl = NULL; size_t _smax = 0, _scap = 0;
++		int _sw = ng_rootDLEnter(&_sdl, &_smax, &_scap);
++		actionGetMemberImpl(app_context);
++		ng_rootDLLeave(_sw, _sdl, _smax, _scap);
++		swf5TextFieldRefToClip(app_context);
++		return;
++	}
++#endif
+ 	actionGetMemberImpl(app_context);
+ 	swf5TextFieldRefToClip(app_context);
+ }
+@@ -61948,7 +62078,14 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 			if (mc->display_obj != NULL) {
+ 				DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
+ 				if (parent_dobj->sprite_display_list != NULL) {
+-					for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
++					// s27 phase 3: while this list is the ACTIVE one (a movie loaded
++					// into a timeline holder is running its frame) the stored max is
++					// only written back at swap-out; read the live one.
++					extern DisplayObject* display_list;
++					extern size_t max_depth;
++					size_t _pd_max = (parent_dobj->sprite_display_list == display_list)
++						? max_depth : parent_dobj->sprite_max_depth;
++					for (size_t _cd = 1; _cd <= _pd_max; _cd++) {
+ 						DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
+ 						if (_ch->char_id == 0) continue;
+ 						if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, child_name_buf)) {
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 3bbbe9a8..35e72fe3 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -357,6 +357,54 @@ void ng_unbumpSpriteInitDepth(void) {
+ 	}
+ }
+ 
++// s27 w1-per-movie-dl-phase3: the ROOT movie's list while a loaded movie's
++// list (a clip-target shell or a timeline holder's sprite list) is swapped in
++// as the active display_list. Root-arm name lookups ("the root timeline's
++// child named X") must read this, never the active list: a synchronous
++// cross-movie call (child frame -> _root.f() -> clip.f()) runs root code while
++// the holder's list is active. Engaged only by the clip-target loader/driver
++// swaps (ng_rootDLStashPush), outermost swap wins.
++DisplayObject* g_rootdl_stash = NULL;
++size_t g_rootdl_stash_max = 0;
++size_t g_rootdl_stash_cap = 0;
++int g_rootdl_stash_on = 0;
++int ng_rootDLStashPush(void) {
++	if (g_rootdl_stash_on) return 0;
++	if (g_sprite_init_depth > 0 && g_root_dl_backup != NULL) {
++		g_rootdl_stash = g_root_dl_backup;
++		g_rootdl_stash_max = g_root_dl_max_backup;
++		g_rootdl_stash_cap = g_root_dl_cap_backup;
++	} else {
++		g_rootdl_stash = display_list;
++		g_rootdl_stash_max = max_depth;
++		g_rootdl_stash_cap = display_list_capacity;
++	}
++	g_rootdl_stash_on = 1;
++	return 1;
++}
++void ng_rootDLStashPop(int token) { if (token) g_rootdl_stash_on = 0; }
++// The root movie's list and max depth, whatever list is active.
++DisplayObject* ng_rootDisplayList(size_t* out_max) {
++	if (g_rootdl_stash_on && g_rootdl_stash != NULL) {
++		if (out_max) *out_max = g_rootdl_stash_max;
++		return g_rootdl_stash;
++	}
++	if (out_max) *out_max = max_depth;
++	return display_list;
++}
++// Scoped switch to the root list for a root-arm lookup. Returns 1 if swapped.
++int ng_rootDLEnter(DisplayObject** sdl, size_t* smax, size_t* scap) {
++	if (!g_rootdl_stash_on || g_rootdl_stash == NULL || display_list == g_rootdl_stash) return 0;
++	*sdl = display_list; *smax = max_depth; *scap = display_list_capacity;
++	display_list = g_rootdl_stash; max_depth = g_rootdl_stash_max; display_list_capacity = g_rootdl_stash_cap;
++	return 1;
++}
++void ng_rootDLLeave(int swapped, DisplayObject* sdl, size_t smax, size_t scap) {
++	if (!swapped) return;
++	g_rootdl_stash = display_list; g_rootdl_stash_max = max_depth; g_rootdl_stash_cap = display_list_capacity;
++	display_list = sdl; max_depth = smax; display_list_capacity = scap;
++}
++
+ int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap) {
+ 	if (g_sprite_init_depth <= 0) return 0;
+ 	// Save current (sprite) DL
+@@ -13260,6 +13308,10 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
+ 		g_root_dl_backup = new_base;
+ 		g_root_dl_cap_backup = new_cap;
+ 	}
++	if (g_rootdl_stash == old_base) {
++		g_rootdl_stash = new_base;
++		g_rootdl_stash_cap = new_cap;
++	}
+ #endif
+ 	for (size_t j = 0; j < BTN_STATE_SNAP_MAX; j++) {
+ 		if (g_btn_state_old_sprite_dl[j] == old_base) {

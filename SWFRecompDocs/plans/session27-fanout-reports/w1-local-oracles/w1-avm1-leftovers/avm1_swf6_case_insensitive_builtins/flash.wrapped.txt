@@ -1,0 +1,42 @@
+cf parseint: number 12
+cf PARSEFLOAT: number 1.5
+cf isnan: boolean false
+cf isFINITE: boolean true
+cf ESCAPE: string a%20b
+cf unescape: string a b
+cf string: string 5
+cf NUMBER: number 3
+cf boolean: boolean true
+cf array.length: number 3
+cf OBJECT: string object
+cf asnative: string function
+cf getdepth: number -77824
+cf GETBYTESTOTAL: string number
+cf createemptymovieclip: string movieclip
+cf createtextfield: string object
+cf getswfversion: number 6
+cf swapdepths: number 9
+cm Math.FLOOR: number 1
+cm math.floor: number 2
+cm str.TOUPPERCASE: string ABC
+cm str.charat: string b
+cm str.INDEXOF: number 2
+cm arr.JOIN: string 1-2
+cm String.FROMCHARCODE: string A
+cm num.TOSTRING: string a
+cm Key.ISDOWN: boolean false
+cm _root.GETDEPTH: number -77824
+cm c1.getdepth: number 9
+cm _root.CREATEEMPTYMOVIECLIP: string movieclip
+cm t1.GETTEXTFORMAT: string object
+cm t1.REPLACESEL: string undefined
+gm Math.pi: number 3.14159265358979
+gv MATH: string object
+gm _root._X: number 0
+gm c1._NAME: string c1
+gm t1.TEXT: string q
+gm Stage.WIDTH: number 400
+c1.onenterframe 0
+f2 n=1
+c1.onenterframe 1
+f3 n=2

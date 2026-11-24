@@ -1,0 +1,267 @@
+cf parseint: number 12
+cf PARSEFLOAT: number 1.5
+cf isnan: boolean false
+cf isFINITE: boolean true
+cf ESCAPE: string a%20b
+cf unescape: string a b
+cf string: string 5
+cf NUMBER: number 3
+cf boolean: boolean true
+cf array.length: number 3
+cf OBJECT: string object
+cf asnative: string function
+cf getdepth: number -16384
+cf GETBYTESTOTAL: string number
+cf createemptymovieclip: string movieclip
+cf createtextfield: string object
+cf getswfversion: number 6
+cf swapdepths: number 9
+cm Math.FLOOR: number 1
+cm math.floor: number 2
+cm str.TOUPPERCASE: string ABC
+cm str.charat: string b
+cm str.INDEXOF: number 2
+cm arr.JOIN: string 1-2
+cm String.FROMCHARCODE: string A
+cm num.TOSTRING: string a
+cm Key.ISDOWN: boolean false
+cm _root.GETDEPTH: number -16384
+cm c1.getdepth: number 9
+cm _root.CREATEEMPTYMOVIECLIP: string movieclip
+cm t1.GETTEXTFORMAT: string object
+cm t1.REPLACESEL: string undefined
+gm Math.pi: number 3.14159265358979
+gv MATH: string object
+gm _root._X: number 0
+gm c1._NAME: string c1
+gm t1.TEXT: string q
+gm Stage.WIDTH: number 400
+c1.onenterframe 0
+f2 n=1
+c1.onenterframe 1
+f3 n=2
+c1.onenterframe 2
+c1.onenterframe 3
+c1.onenterframe 4
+c1.onenterframe 5
+c1.onenterframe 6
+c1.onenterframe 7
+c1.onenterframe 8
+c1.onenterframe 9
+c1.onenterframe 10
+c1.onenterframe 11
+c1.onenterframe 12
+c1.onenterframe 13
+c1.onenterframe 14
+c1.onenterframe 15
+c1.onenterframe 16
+c1.onenterframe 17
+c1.onenterframe 18
+c1.onenterframe 19
+c1.onenterframe 20
+c1.onenterframe 21
+c1.onenterframe 22
+c1.onenterframe 23
+c1.onenterframe 24
+c1.onenterframe 25
+c1.onenterframe 26
+c1.onenterframe 27
+c1.onenterframe 28
+c1.onenterframe 29
+c1.onenterframe 30
+c1.onenterframe 31
+c1.onenterframe 32
+c1.onenterframe 33
+c1.onenterframe 34
+c1.onenterframe 35
+c1.onenterframe 36
+c1.onenterframe 37
+c1.onenterframe 38
+c1.onenterframe 39
+c1.onenterframe 40
+c1.onenterframe 41
+c1.onenterframe 42
+c1.onenterframe 43
+c1.onenterframe 44
+c1.onenterframe 45
+c1.onenterframe 46
+c1.onenterframe 47
+c1.onenterframe 48
+c1.onenterframe 49
+c1.onenterframe 50
+c1.onenterframe 51
+c1.onenterframe 52
+c1.onenterframe 53
+c1.onenterframe 54
+c1.onenterframe 55
+c1.onenterframe 56
+c1.onenterframe 57
+c1.onenterframe 58
+c1.onenterframe 59
+c1.onenterframe 60
+c1.onenterframe 61
+c1.onenterframe 62
+c1.onenterframe 63
+c1.onenterframe 64
+c1.onenterframe 65
+c1.onenterframe 66
+c1.onenterframe 67
+c1.onenterframe 68
+c1.onenterframe 69
+c1.onenterframe 70
+c1.onenterframe 71
+c1.onenterframe 72
+c1.onenterframe 73
+c1.onenterframe 74
+c1.onenterframe 75
+c1.onenterframe 76
+c1.onenterframe 77
+c1.onenterframe 78
+c1.onenterframe 79
+c1.onenterframe 80
+c1.onenterframe 81
+c1.onenterframe 82
+c1.onenterframe 83
+c1.onenterframe 84
+c1.onenterframe 85
+c1.onenterframe 86
+c1.onenterframe 87
+c1.onenterframe 88
+c1.onenterframe 89
+c1.onenterframe 90
+c1.onenterframe 91
+c1.onenterframe 92
+c1.onenterframe 93
+c1.onenterframe 94
+c1.onenterframe 95
+c1.onenterframe 96
+c1.onenterframe 97
+c1.onenterframe 98
+c1.onenterframe 99
+c1.onenterframe 100
+c1.onenterframe 101
+c1.onenterframe 102
+c1.onenterframe 103
+c1.onenterframe 104
+c1.onenterframe 105
+c1.onenterframe 106
+c1.onenterframe 107
+c1.onenterframe 108
+c1.onenterframe 109
+c1.onenterframe 110
+c1.onenterframe 111
+c1.onenterframe 112
+c1.onenterframe 113
+c1.onenterframe 114
+c1.onenterframe 115
+c1.onenterframe 116
+c1.onenterframe 117
+c1.onenterframe 118
+c1.onenterframe 119
+c1.onenterframe 120
+c1.onenterframe 121
+c1.onenterframe 122
+c1.onenterframe 123
+c1.onenterframe 124
+c1.onenterframe 125
+c1.onenterframe 126
+c1.onenterframe 127
+c1.onenterframe 128
+c1.onenterframe 129
+c1.onenterframe 130
+c1.onenterframe 131
+c1.onenterframe 132
+c1.onenterframe 133
+c1.onenterframe 134
+c1.onenterframe 135
+c1.onenterframe 136
+c1.onenterframe 137
+c1.onenterframe 138
+c1.onenterframe 139
+c1.onenterframe 140
+c1.onenterframe 141
+c1.onenterframe 142
+c1.onenterframe 143
+c1.onenterframe 144
+c1.onenterframe 145
+c1.onenterframe 146
+c1.onenterframe 147
+c1.onenterframe 148
+c1.onenterframe 149
+c1.onenterframe 150
+c1.onenterframe 151
+c1.onenterframe 152
+c1.onenterframe 153
+c1.onenterframe 154
+c1.onenterframe 155
+c1.onenterframe 156
+c1.onenterframe 157
+c1.onenterframe 158
+c1.onenterframe 159
+c1.onenterframe 160
+c1.onenterframe 161
+c1.onenterframe 162
+c1.onenterframe 163
+c1.onenterframe 164
+c1.onenterframe 165
+c1.onenterframe 166
+c1.onenterframe 167
+c1.onenterframe 168
+c1.onenterframe 169
+c1.onenterframe 170
+c1.onenterframe 171
+c1.onenterframe 172
+c1.onenterframe 173
+c1.onenterframe 174
+c1.onenterframe 175
+c1.onenterframe 176
+c1.onenterframe 177
+c1.onenterframe 178
+c1.onenterframe 179
+c1.onenterframe 180
+c1.onenterframe 181
+c1.onenterframe 182
+c1.onenterframe 183
+c1.onenterframe 184
+c1.onenterframe 185
+c1.onenterframe 186
+c1.onenterframe 187
+c1.onenterframe 188
+c1.onenterframe 189
+c1.onenterframe 190
+c1.onenterframe 191
+c1.onenterframe 192
+c1.onenterframe 193
+c1.onenterframe 194
+c1.onenterframe 195
+c1.onenterframe 196
+c1.onenterframe 197
+c1.onenterframe 198
+c1.onenterframe 199
+c1.onenterframe 200
+c1.onenterframe 201
+c1.onenterframe 202
+c1.onenterframe 203
+c1.onenterframe 204
+c1.onenterframe 205
+c1.onenterframe 206
+c1.onenterframe 207
+c1.onenterframe 208
+c1.onenterframe 209
+c1.onenterframe 210
+c1.onenterframe 211
+c1.onenterframe 212
+c1.onenterframe 213
+c1.onenterframe 214
+c1.onenterframe 215
+c1.onenterframe 216
+c1.onenterframe 217
+c1.onenterframe 218
+c1.onenterframe 219
+c1.onenterframe 220
+c1.onenterframe 221
+c1.onenterframe 222
+c1.onenterframe 223
+c1.onenterframe 224
+c1.onenterframe 225
+c1.onenterframe 226

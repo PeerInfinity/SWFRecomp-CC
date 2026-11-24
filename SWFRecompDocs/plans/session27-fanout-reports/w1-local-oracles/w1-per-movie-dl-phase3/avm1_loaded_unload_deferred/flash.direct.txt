@@ -1,0 +1,5 @@
+a:movieclip
+b:movieclip g:movieclip
+t4 h:undefined g:movieclip
+t5 h:undefined g:movieclip
+t6 h:undefined g:movieclip

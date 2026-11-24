@@ -1,0 +1,5 @@
+init2 f0
+init3 f0
+f1
+f1 after f3
+f3

@@ -1,0 +1,6 @@
+f1: ABCDE caret=3
+f2 after Copy [1,3): ABCDE caret=3
+f3 after Paste at 0: ABCDE caret=0
+f4 after Cut [2,4): ABCDE caret=4
+f5 after caret Cut+Copy: ABCDE caret=3
+f6 after Paste at 0: ABCDE caret=0

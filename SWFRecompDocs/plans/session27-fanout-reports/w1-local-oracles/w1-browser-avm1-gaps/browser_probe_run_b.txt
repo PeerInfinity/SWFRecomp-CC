@@ -1,0 +1,88 @@
+=== avm1_browser_gated_textfield
+127.0.0.1 - - [23/Nov/2026 18:37:42] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [23/Nov/2026 18:37:42] "GET /avm1_browser_gated_textfield.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Nov/2026 18:37:42] "GET /avm1_browser_gated_textfield.wasm HTTP/1.1" 200 -
+--- browser trace ---
+cf typeof r=object tfA=object
+cf tfA x=10 y=20 w=30 h=40
+cf tfA depth=5
+cm tfB=object depth=6
+tfB w=10.05 h=3.95 xs=100
+newfmt color=16711680 size=17
+tfA bounds 10,20,40,60
+WebGPU canvas configured with a different format than is preferred by this device ("rgba8unorm"). This requires an extra copy, which may impact performance.
+
+--- diff vs native oracle (- browser, + native) ---
+--- browser
++++ native
+@@ -5,4 +5,3 @@
+ tfB w=10.05 h=3.95 xs=100
+ newfmt color=16711680 size=17
+ tfA bounds 10,20,40,60
+-WebGPU canvas configured with a different format than is preferred by this device ("rgba8unorm"). This requires an extra copy, which may impact performance.
+=== avm1_browser_gated_depth
+127.0.0.1 - - [23/Nov/2026 18:38:56] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [23/Nov/2026 18:38:56] "GET /avm1_browser_gated_depth.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Nov/2026 18:38:56] "GET /avm1_browser_gated_depth.wasm HTTP/1.1" 200 -
+--- browser trace ---
+cf e1=movieclip depth=3
+cm giad(4)=_level0.e2
+cf giad(3)=_level0.e1
+cm giad(99)=undefined
+dup ret=_level0.e3 e3=movieclip depth=7
+e3 marker=undefined giad(7)=_level0.e3
+e1 w=0 xs=0 ys=0
+WebGPU canvas configured with a different format than is preferred by this device ("rgba8unorm"). This requires an extra copy, which may impact performance.
+
+--- diff vs native oracle (- browser, + native) ---
+--- browser
++++ native
+@@ -5,4 +5,3 @@
+ dup ret=_level0.e3 e3=movieclip depth=7
+ e3 marker=undefined giad(7)=_level0.e3
+ e1 w=0 xs=0 ys=0
+-WebGPU canvas configured with a different format than is preferred by this device ("rgba8unorm"). This requires an extra copy, which may impact performance.
+=== avm1_browser_gated_color
+127.0.0.1 - - [23/Nov/2026 18:40:04] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [23/Nov/2026 18:40:04] "GET /avm1_browser_gated_color.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Nov/2026 18:40:04] "GET /avm1_browser_gated_color.wasm HTTP/1.1" 200 -
+--- browser trace ---
+getRGB=3368601
+cm a=2 d=1 tx=10 ty=5
+ct rm=0 ro=51 go=102 bo=153
+WebGPU canvas configured with a different format than is preferred by this device ("rgba8unorm"). This requires an extra copy, which may impact performance.
+
+--- diff vs native oracle (- browser, + native) ---
+--- browser
++++ native
+@@ -1,4 +1,3 @@
+ getRGB=3368601
+ cm a=2 d=1 tx=10 ty=5
+ ct rm=0 ro=51 go=102 bo=153
+-WebGPU canvas configured with a different format than is preferred by this device ("rgba8unorm"). This requires an extra copy, which may impact performance.
+=== movieclip_getbounds
+-undefined
++50
++-107.3
++164
++-5.3
++
+ // clip.clip.getRect(undefined)
+ undefined
++
+ // clip.clip.getRect(undefined)
+ undefined
++
+ // clip.getRect('')
+ undefined
++
+ // clip.clip.getRect('clip.clip')
+ undefined
++
+ // mc.getRect()
+ 6710886.35
+ 6710886.35
+ 6710886.35
+ 6710886.35
+-WebGPU canvas configured with a different format than is preferred by this device ("rgba8unorm"). This requires an extra copy, which may impact performance.
++

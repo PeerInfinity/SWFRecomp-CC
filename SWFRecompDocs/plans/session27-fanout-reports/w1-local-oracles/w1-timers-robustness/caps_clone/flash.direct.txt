@@ -1,0 +1,3 @@
+c139: movieclip
+after z5 at depth 105: typeof c5 = undefined z=movieclip
+after z135 at depth 235: typeof c135 = undefined z=movieclip
