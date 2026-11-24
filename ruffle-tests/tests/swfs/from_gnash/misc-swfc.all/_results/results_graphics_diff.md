@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b8d3b736aaef` (2026-11-24T03:17:00.837739+00:00)
-**Current:** `cceb5133a189` (2026-11-24T07:25:12.336805+00:00)
+**Previous:** `cceb5133a189` (2026-11-24T07:25:12.336805+00:00)
+**Current:** `78fee9e13f85` (2026-11-24T17:26:56.799096+00:00)
 
 ## Summary
 
@@ -10,12 +10,18 @@
 | Passing | 14 | 14 | 0 |
 | Total | 21 | 21 | 0 |
 | Pass rate | 66.7% | 66.7% | 0% |
-| Mismatched lines | 112 | 79 | -33 |
-|   Decreased | | | -33 |
+| Mismatched lines | 79 | 77 | -2 |
+|   Decreased | | | -3 |
+|   Increased | | | +1 |
 
-## Line Count Changed (2)
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `action_execution_order_test12` | ruffle_matched | output_mismatch | 20/22 | 19/22 |
+
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `movieclip_destruction_test1` | ruffle_matched | 9/52 | 40/52 | -31 |
-| `gotoFrameFromInterval` | ruffle_matched | 3/23 | 5/23 | -2 |
+| `matrix_accuracy_test1` | output_mismatch | 12/18 | 15/18 | -3 |

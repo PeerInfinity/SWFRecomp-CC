@@ -1,28 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `005bea42a286` (2026-11-24T00:12:43.510605+00:00)
-**Current:** `cceb5133a189` (2026-11-24T07:00:45.626468+00:00)
+**Previous:** `cceb5133a189` (2026-11-24T07:00:45.626468+00:00)
+**Current:** `78fee9e13f85` (2026-11-24T16:56:52.985965+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1284 | 1288 | +4 |
-| Total | 1339 | 1343 | +4 |
-| Pass rate | 95.9% | 95.9% | 0% |
-| Mismatched lines | 2426 | 2426 | 0 |
+| Passing | 1288 | 1288 | 0 |
+| Total | 1343 | 1346 | +3 |
+| Pass rate | 95.9% | 95.7% | -0.2% |
+| Mismatched lines | 2426 | 2467 | +41 |
 
-## Added Tests (4)
+## Added Tests (3)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `allow_networking__internal` | pass | 81/81 |
-| `allow_networking__none` | pass | 122/122 |
-| `local_connection_allow_networking__internal` | pass | 30/30 |
-| `local_connection_allow_networking__none` | pass | 30/30 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `allow_networking` | pass | 72/72 | 75/75 | 0 |
+| `goto_framescript_queued_next_prev` | ruffle_matched | 7/20 |
+| `goto_isplaying` | ruffle_matched | 20/28 |
+| `goto_scene_isplaying` | ruffle_matched | 4/24 |

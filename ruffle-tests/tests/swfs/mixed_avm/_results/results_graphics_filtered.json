@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-24T07:25:12.268647+00:00",
-    "git_sha": "cceb5133a189db82d8715e3e9afe9ad500af5908",
-    "duration_seconds": 79.28,
+    "timestamp": "2026-11-24T17:26:56.729138+00:00",
+    "git_sha": "78fee9e13f853501e2dc637877cddb20254a603f",
+    "duration_seconds": 93.74,
     "total_available": 12,
     "shards": 30,
     "expected_shards": 30,
@@ -25,8 +25,8 @@
       "test": "avm1_doabc",
       "phases": {
         "recomp": 0.003,
-        "compile": 1.303,
-        "run": 0.3
+        "compile": 1.25,
+        "run": 0.294
       },
       "num_frames": 1,
       "lines": {
@@ -34,15 +34,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.61,
+      "duration": 1.55,
       "status": "pass"
     },
     {
       "test": "avm1_loads_avm2",
       "phases": {
         "recomp": 0.003,
-        "compile": 1.348,
-        "run": 0.301
+        "compile": 1.356,
+        "run": 0.302
       },
       "num_frames": 2,
       "lines": {
@@ -50,7 +50,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 1.66,
+      "duration": 1.67,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "Created clip\nLoaded AVM2 movie into non-root\nLoaded AVM2 movie into root",
@@ -59,9 +59,9 @@
     {
       "test": "avm1_loads_avm2_doaction",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.864,
-        "run": 0.337
+        "recomp": 0.003,
+        "compile": 1.34,
+        "run": 0.296
       },
       "num_frames": 3,
       "lines": {
@@ -69,15 +69,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 2.21,
+      "duration": 1.64,
       "status": "pass"
     },
     {
       "test": "avm1_sprite_sc_ignored",
       "phases": {
-        "recomp": 0.003,
-        "compile": 17.94,
-        "run": 0.289
+        "recomp": 0.009,
+        "compile": 24.849,
+        "run": 0.397
       },
       "num_frames": 3,
       "lines": {
@@ -85,15 +85,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 18.24,
+      "duration": 25.26,
       "status": "pass"
     },
     {
       "test": "avm2_doaction",
       "phases": {
-        "recomp": 0.004,
-        "compile": 6.516,
-        "run": 0.292
+        "recomp": 0.006,
+        "compile": 8.545,
+        "run": 0.361
       },
       "num_frames": 1,
       "lines": {
@@ -101,15 +101,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 6.82,
+      "duration": 8.92,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1",
       "phases": {
         "recomp": 0.004,
-        "compile": 6.82,
-        "run": 0.303
+        "compile": 6.831,
+        "run": 0.299
       },
       "num_frames": 4,
       "lines": {
@@ -117,15 +117,15 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 7.13,
+      "duration": 7.14,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_doabc",
       "phases": {
         "recomp": 0.004,
-        "compile": 6.841,
-        "run": 0.314
+        "compile": 6.751,
+        "run": 0.311
       },
       "num_frames": 4,
       "lines": {
@@ -133,15 +133,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 7.17,
+      "duration": 7.07,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_events",
       "phases": {
         "recomp": 0.004,
-        "compile": 7.019,
-        "run": 0.31
+        "compile": 7.166,
+        "run": 0.324
       },
       "num_frames": 8,
       "lines": {
@@ -149,7 +149,7 @@
         "expected_lines": 26,
         "matching_lines": 8
       },
-      "duration": 7.34,
+      "duration": 7.5,
       "ruffle_diff_count": 18,
       "ours_diff_count": 18,
       "status": "ruffle_matched",
@@ -158,9 +158,9 @@
     {
       "test": "avm2_loads_avm1_loads_avm2_doabc",
       "phases": {
-        "recomp": 0.003,
-        "compile": 6.661,
-        "run": 0.29
+        "recomp": 0.004,
+        "compile": 6.911,
+        "run": 0.307
       },
       "num_frames": 4,
       "lines": {
@@ -168,15 +168,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 6.96,
+      "duration": 7.23,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_loads_into_root",
       "phases": {
-        "recomp": 0.004,
-        "compile": 2.207,
-        "run": 0.305
+        "recomp": 0.007,
+        "compile": 8.202,
+        "run": 0.345
       },
       "num_frames": 3,
       "lines": {
@@ -184,15 +184,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 2.52,
+      "duration": 8.56,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_v10",
       "phases": {
-        "recomp": 0.005,
-        "compile": 6.686,
-        "run": 0.298
+        "recomp": 0.008,
+        "compile": 9.623,
+        "run": 0.402
       },
       "num_frames": 3,
       "lines": {
@@ -200,15 +200,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 7.0,
+      "duration": 10.04,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_v9",
       "phases": {
-        "recomp": 0.007,
-        "compile": 9.819,
-        "run": 0.422
+        "recomp": 0.006,
+        "compile": 6.465,
+        "run": 0.272
       },
       "num_frames": 3,
       "lines": {
@@ -216,7 +216,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 10.26,
+      "duration": 6.75,
       "status": "pass"
     }
   ]
