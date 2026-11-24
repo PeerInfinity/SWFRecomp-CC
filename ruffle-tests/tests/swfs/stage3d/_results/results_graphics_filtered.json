@@ -1,22 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T23:56:29.043438+00:00",
+    "timestamp": "2026-11-24T00:49:36.313367+00:00",
     "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
-    "duration_seconds": 82.37,
+    "duration_seconds": 95.38,
     "total_available": 8,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 0,
     "filtered": true
   },
-  "total": 7,
-  "pass": 7,
+  "total": 8,
+  "pass": 8,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 7,
+  "effective_pass": 8,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -232,6 +230,56 @@
         "matching_lines": 0
       },
       "duration": 9.13,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 1,
+                "max_outliers": 0,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 1,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "unbound_texture_multiple",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 12.439,
+        "run": 0.349
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 12.97,
       "image_comparisons": {
         "output": {
           "status": "pass",

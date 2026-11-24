@@ -1,21 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T23:56:29.090097+00:00",
+    "timestamp": "2026-11-24T00:49:36.346802+00:00",
     "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
-    "duration_seconds": 296.71,
+    "duration_seconds": 299.21,
     "total_available": 21,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 20,
-  "pass": 13,
+  "total": 21,
+  "pass": 14,
   "ruffle_matched": 6,
   "fail": 1,
-  "pass_rate": 65.0,
-  "effective_pass": 19,
-  "effective_pass_rate": 95.0,
+  "pass_rate": 66.7,
+  "effective_pass": 20,
+  "effective_pass_rate": 95.2,
   "breakdown": {
     "output_mismatch": 1
   },
@@ -142,6 +140,22 @@
         "matching_lines": 6
       },
       "duration": 19.14,
+      "status": "pass"
+    },
+    {
+      "test": "hello",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.185,
+        "run": 0.264
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 2.46,
       "status": "pass"
     },
     {

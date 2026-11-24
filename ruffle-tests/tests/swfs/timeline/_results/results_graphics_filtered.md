@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-23 23:56 UTC
+**Date**: 2026-11-24 00:49 UTC
 
 **Git SHA**: `005bea42a2`
 
-**Run Duration**: 5m 28s
+**Run Duration**: 5m 39s
 
 **Filtered**: 0 tests ignored out of 17 available
 
@@ -12,18 +12,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 16 |
-| Passing | **13** (81.2%) |
+| Total tests | 17 |
+| Passing | **14** (82.4%) |
 | Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **16** (100.0%) |
+| Effective pass | **17** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 337 |
-| Matching lines | 331 (98.2%) |
+| Total expected lines | 371 |
+| Matching lines | 365 (98.4%) |
 | Mismatched lines | 6 |
 
 ## Passing Tests
 
-**13 tests passing**
+**14 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -33,13 +33,14 @@
 | 4 | `frame_script_cleanup2` | 32 | 24.8s |  |
 | 5 | `frame_script_cleanup3` | 30 | 31.9s |  |
 | 6 | `frame_script_cleanup_goto` | 30 | 24.6s |  |
-| 7 | `frame_script_construct` | 25 | 31.6s |  |
-| 8 | `missing_frame_scripts` | 22 | 24.7s |  |
-| 9 | `scene_count_oom` | 1 | 1.6s |  |
-| 10 | `swf_9_frame_script_button_order` | 15 | 7.3s |  |
-| 11 | `swf_9_frame_script_cleanup_goto` | 30 | 7.2s |  |
-| 12 | `swf_9_frame_script_cleanup_goto2` | 34 | 24.5s |  |
-| 13 | `swf_9_frame_script_dynamic_goto_2` | 33 | 24.0s |  |
+| 7 | `frame_script_cleanup_goto2` | 34 | 10.5s |  |
+| 8 | `frame_script_construct` | 25 | 31.6s |  |
+| 9 | `missing_frame_scripts` | 22 | 24.7s |  |
+| 10 | `scene_count_oom` | 1 | 1.6s |  |
+| 11 | `swf_9_frame_script_button_order` | 15 | 7.3s |  |
+| 12 | `swf_9_frame_script_cleanup_goto` | 30 | 7.2s |  |
+| 13 | `swf_9_frame_script_cleanup_goto2` | 34 | 24.5s |  |
+| 14 | `swf_9_frame_script_dynamic_goto_2` | 33 | 24.0s |  |
 
 ## Ruffle-Matched Tests
 

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-23 23:56 UTC
+**Date**: 2026-11-24 00:49 UTC
 
 **Git SHA**: `005bea42a2`
 
-**Run Duration**: 2m 52s
+**Run Duration**: 3m 2s
 
 **Filtered**: 0 tests ignored out of 9 available
 
@@ -12,10 +12,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 8 |
-| Passing | **7** (87.5%) |
+| Total tests | 9 |
+| Passing | **8** (88.9%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **8** (100.0%) |
+| Effective pass | **9** (100.0%) |
 | Failing | 0 |
 | Total expected lines | 377 |
 | Matching lines | 363 (96.3%) |
@@ -23,7 +23,7 @@
 
 ## Passing Tests
 
-**7 tests passing**
+**8 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -33,7 +33,8 @@
 | 4 | `device_font_name_case` | 13 | 1.5s |  |
 | 5 | `embed_matching/fallback_preferences` | 0 | 33.4s |  |
 | 6 | `embed_matching/match_style` | 0 | 7.3s |  |
-| 7 | `embed_name_lookup` | 242 | 24.3s |  |
+| 7 | `embed_matching/no_font_found` | 0 | 10.1s |  |
+| 8 | `embed_name_lookup` | 242 | 24.3s |  |
 
 ## Ruffle-Matched Tests
 

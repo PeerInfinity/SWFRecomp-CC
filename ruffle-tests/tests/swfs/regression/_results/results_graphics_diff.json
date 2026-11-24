@@ -1,25 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T22:39:55.420275+00:00",
-    "old_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
-    "new_timestamp": "2026-11-23T23:56:29.047485+00:00",
+    "old_timestamp": "2026-11-23T23:56:29.047485+00:00",
+    "old_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "new_timestamp": "2026-11-24T00:49:36.315980+00:00",
     "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 171,
+    "old_pass": 165,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 171,
-    "old_total": 171,
+    "old_effective_pass": 165,
+    "old_total": 165,
     "old_pass_rate": 100.0,
-    "new_pass": 165,
+    "new_pass": 171,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 165,
-    "new_total": 165,
+    "new_effective_pass": 171,
+    "new_total": 171,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -29,82 +26,81 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 165,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 6
+    "added": 6,
+    "removed": 0
   },
   "changes": [
     {
       "test": "avm1_long_text_layout",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1_many_chars_registry",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 4
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1_many_defs_registry",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 13,
         "expected_lines": 13,
         "matching_lines": 13
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1_many_functions_registry",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 3
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1_mc_resolve",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 5,
         "expected_lines": 5,
         "matching_lines": 5
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1_mcl_holder_totalframes",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 5,
         "expected_lines": 5,
         "matching_lines": 5
-      },
-      "new_lines": null
+      }
     }
   ]
 }

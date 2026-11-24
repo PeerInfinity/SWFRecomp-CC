@@ -1,17 +1,17 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-23 23:56 UTC
+**Date**: 2026-11-24 00:49 UTC
 
 **Git SHA**: `005bea42a2`
 
-**Run Duration**: 1m 22s
+**Run Duration**: 1m 35s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 7 |
-| Passing | **7** (100.0%) |
+| Total tests | 8 |
+| Passing | **8** (100.0%) |
 | Failing | 0 |
 | Total expected lines | 216 |
 | Matching lines | 216 (100.0%) |
@@ -19,7 +19,7 @@
 
 ## Passing Tests
 
-**7 tests passing**
+**8 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -30,6 +30,7 @@
 | 5 | `scissor_rectangle` | 0 | 9.1s |  |
 | 6 | `scissor_rectangle_invalid` | 1 | 11.9s |  |
 | 7 | `unbound_texture` | 0 | 9.1s |  |
+| 8 | `unbound_texture_multiple` | 0 | 13.0s |  |
 
 ## Near-Passing Tests
 

@@ -1,26 +1,24 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T23:56:29.084557+00:00",
+    "timestamp": "2026-11-24T00:49:36.342803+00:00",
     "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
-    "duration_seconds": 1873.29,
+    "duration_seconds": 1933.53,
     "total_available": 111,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 1,
     "filtered": true
   },
-  "total": 106,
-  "pass": 68,
-  "ruffle_matched": 32,
-  "fail": 6,
-  "pass_rate": 64.2,
-  "effective_pass": 100,
-  "effective_pass_rate": 94.3,
+  "total": 110,
+  "pass": 70,
+  "ruffle_matched": 33,
+  "fail": 7,
+  "pass_rate": 63.6,
+  "effective_pass": 103,
+  "effective_pass_rate": 93.6,
   "breakdown": {
-    "output_mismatch": 6,
-    "ruffle_matched": 32
+    "output_mismatch": 7,
+    "ruffle_matched": 33
   },
   "tests": [
     {
@@ -665,6 +663,76 @@
       "detail": "25 line(s) differ (actual=28, expected=32)",
       "actual_output": "... (2 lines before) ...\nas in frame2 of root\nPASSED: typeOf(_root.mc_red)  ==  'movieclip' [action_execution_order_extend_test.c:144]\nPASSED: typeOf(_root.mc_red.func)  ==  'undefined' [action_execution_order_extend_test.c:145]\nPASSED: typeOf(_root.mc_red.mc_blu)  ==  'movieclip' [action_execution_order_extend_test.c:146]\nmc_red clip load executed\nas in frame1 of mc_red\nas in frame1 of mc_blu\nmc_blu enterFrame executed\nmc_red enterFrame executed\nas in frame2 of mc_red\nas in frame3 of root\nPASSED: typeOf(_root.mc_red.func)  ==  'function' [action_execution_order_extend_test.c:154]\nas in frame2 of mc_blu\nas in frame4 of root\nPASSED: _root.x1  ==  'as_in_mc_blu' [action_execution_order_extend_test.c:163]\nFAILED: expected: 'as_in_root' obtained: as_in_mc_blu [action_execution_order_extend_test.c:165] \nFAILED: expected: 'mc_red onLoad called' obtained:  [action_execution_order_extend_test.c:169] \nPASSED: _root.y1bis  ==  'mc_red onClipLoad called' [action_execution_order_extend_test.c:170]\nPASSED: _root.y2  ==  'as_in_root' [action_execution_order_extend_test.c:172]\nPASSED: _root.y3  ==  'mc_red onUnload called' [action_execution_order_extend_test.c:178]\nPASSED: _root.y4  ==  undefined [action_execution_order_extend_test.c:180]\nPASSED: _root.y5  ==  'as_in_root' [action_execution_order_extend_test.c:182]\nFAILED: expected: 'mc_blu onUnload called' obtained: as_in_root [action_execution_order_extend_test.c:184] \n#passed: 11\n#failed: 3\n#total tests run: 14",
       "expected_output": "... (2 lines before) ...\nas in frame2 of root\nPASSED: typeOf(_root.mc_red)  ==  'movieclip' [action_execution_order_extend_test.c:144]\nPASSED: typeOf(_root.mc_red.func)  ==  'undefined' [action_execution_order_extend_test.c:145]\nPASSED: typeOf(_root.mc_red.mc_blu)  ==  'movieclip' [action_execution_order_extend_test.c:146]\nmc_red clip load executed\nmc_red load executed\nas in frame1 of mc_red\nas in frame1 of mc_blu\nmc_blu enterFrame executed\nas in frame2 of mc_blu\nmc_red enterFrame executed\nas in frame2 of mc_red\nas in frame3 of root\nPASSED: typeOf(_root.mc_red.func)  ==  'function' [action_execution_order_extend_test.c:154]\nmc_blu enterFrame executed\nas in frame4 of root\nPASSED: _root.x1  ==  'as_in_mc_blu' [action_execution_order_extend_test.c:163]\nPASSED: _root.x2  ==  'as_in_root' [action_execution_order_extend_test.c:165]\nmc_blu user-defined UNLOAD executed\nmc_red unload executed\nPASSED: _root.y1  ==  'mc_red onLoad called' [action_execution_order_extend_test.c:169]\nPASSED: _root.y1bis  ==  'mc_red onClipLoad called' [action_execution_order_extend_test.c:170]\nPASSED: _root.y2  ==  'as_in_root' [action_execution_order_extend_test.c:172]\nPASSED: _root.y3  ==  'mc_red onUnload called' [action_execution_order_extend_test.c:178]\nPASSED: _root.y4  ==  undefined [action_execution_order_extend_test.c:180]\nFAILED: expected: 'as_in_root' obtained: mc_blu onEnterFrame called [action_execution_order_extend_test.c:182] \nPASSED: _root.y6  ==  'mc_blu onUnload called' [action_execution_order_extend_test.c:184]\n#passed: 13\n#failed: 1\n#total tests run: 14"
+    },
+    {
+      "test": "action_order/action_execution_order_test",
+      "phases": {
+        "recomp": 0.022,
+        "compile": 3.59,
+        "run": 0.339
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 19,
+        "matching_lines": 7
+      },
+      "duration": 3.96,
+      "ruffle_diff_count": 12,
+      "ours_diff_count": 12,
+      "status": "ruffle_matched",
+      "detail": "diffs 12 \u2286 ruffle 12"
+    },
+    {
+      "test": "action_order/action_execution_order_test1",
+      "phases": {
+        "recomp": 0.02,
+        "compile": 25.312,
+        "run": 0.333
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 25.67,
+      "status": "pass"
+    },
+    {
+      "test": "action_order/action_execution_order_test11",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 26.533,
+        "run": 0.412
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 32,
+        "matching_lines": 26
+      },
+      "duration": 26.98,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=32, expected=32)",
+      "actual_output": "... (2 lines before) ...\nmc2 onEnterFrame called\nmc1 onEnterFrame called\nmc11 onLoad called\nmc11 onEnterFrame called\nmc2 onEnterFrame called\nmc1 onEnterFrame called\nmc21 onLoad called\nmc21 onEnterFrame called\nmc11 onEnterFrame called\nmc2 onEnterFrame called\nmc1 onEnterFrame called\nmc12 onLoad called\nmc12 onEnterFrame called\nmc21 onEnterFrame called\nmc11 onEnterFrame called\nmc2 onEnterFrame called\nmc1 onEnterFrame called\nmc11 onUnload called\nmc12 onUnload called\nmc1 onUnload called\nmc21 onUnload called\nmc2 onUnload called\nPASSED: _root.loadOrder  ==  '0+1+2+3+4+5+' [action_execution_order_test11.c:235]\nPASSED: _root.enterFrameOrder  ==  '0+2+1+3+2+1+4+3+2+1+5+4+3+2+1+' [action_execution_order_test11.c:236]\nPASSED: _root.unloadOrder  ==  '0+1+2+3+4+5+' [action_execution_order_test11.c:237]\nFAILED: expected: '0+1+2+3+4+5+' obtained: 0+2+1+3+4+5+ [action_execution_order_test11.c:238] \nFAILED: expected: '0+1+2+3+4+5+6+3+8+4+10+6+3+4+14+15+25+10+26+6+27+3+28+4+29+20+21+22+23+24+' obtained: 0+1+2+3+4+5+6+3+4+8+10+6+3+4+14+26+25+27+15+10+6+3+4+28+29+20+21+22+23+24+ [action_execution_order_test11.c:239] \n#passed: 3\n#failed: 2\n#total tests run: 5",
+      "expected_output": "... (2 lines before) ...\nmc2 onEnterFrame called\nmc1 onEnterFrame called\nmc11 onLoad called\nmc11 onEnterFrame called\nmc2 onEnterFrame called\nmc21 onLoad called\nmc1 onEnterFrame called\nmc21 onEnterFrame called\nmc11 onEnterFrame called\nmc2 onEnterFrame called\nmc1 onEnterFrame called\nmc12 onLoad called\nmc12 onEnterFrame called\nmc21 onEnterFrame called\nmc11 onEnterFrame called\nmc2 onEnterFrame called\nmc1 onEnterFrame called\nmc11 onUnload called\nmc12 onUnload called\nmc1 onUnload called\nmc21 onUnload called\nmc2 onUnload called\nPASSED: _root.loadOrder  ==  '0+1+2+3+4+5+' [action_execution_order_test11.c:235]\nPASSED: _root.enterFrameOrder  ==  '0+2+1+3+2+1+4+3+2+1+5+4+3+2+1+' [action_execution_order_test11.c:236]\nPASSED: _root.unloadOrder  ==  '0+1+2+3+4+5+' [action_execution_order_test11.c:237]\nPASSED: _root.doActionOrder  ==  '0+1+2+3+4+5+' [action_execution_order_test11.c:238]\nPASSED: _root.asOrder  ==  '0+1+2+3+4+5+6+3+8+4+10+6+3+4+14+15+25+10+26+6+27+3+28+4+29+20+21+22+23+24+' [action_execution_order_test11.c:239]\n#passed: 5\n#failed: 0\n#total tests run: 5"
+    },
+    {
+      "test": "action_order/action_execution_order_test2",
+      "phases": {
+        "recomp": 0.021,
+        "compile": 3.098,
+        "run": 0.33
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 3.46,
+      "status": "pass"
     },
     {
       "test": "action_order/action_execution_order_test3",

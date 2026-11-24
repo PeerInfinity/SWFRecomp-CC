@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-23 23:56 UTC
+**Date**: 2026-11-24 00:49 UTC
 
 **Git SHA**: `005bea42a2`
 
-**Run Duration**: 1m 54s
+**Run Duration**: 1m 59s
 
 **Filtered**: 0 tests ignored out of 9 available
 
@@ -12,14 +12,14 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 8 |
-| Passing | **7** (87.5%) |
-| Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **8** (100.0%) |
+| Total tests | 9 |
+| Passing | **7** (77.8%) |
+| Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **9** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 163 |
-| Matching lines | 162 (99.4%) |
-| Mismatched lines | 1 |
+| Total expected lines | 231 |
+| Matching lines | 211 (91.3%) |
+| Mismatched lines | 20 |
 
 ## Passing Tests
 
@@ -37,11 +37,12 @@
 
 ## Ruffle-Matched Tests
 
-**1 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**2 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `TextFieldTest` | 1 | 1 | 18.7s |  |
+| 2 | `levels` | 19 | 21 | 5.2s |  |
 
 ## Near-Passing Tests
 
