@@ -1,0 +1,17 @@
+num_ticks = 1
+
+# s27 w2-avm1-text-layout. A scaled timeline EditText scales its glyph run
+# (TextFieldGlyphInfo has_matrix / m_a..m_ty; tag.c textfield_glyph_render_cb
+# composes world * layout_to_local * line origin * glyph with whole-twip
+# rounding) and its embedded-font box takes Ruffle's EditTextPixelSnapping
+# (textfield_render_cb). Golden = FLASH Player 32 (s27 coordinator capture,
+# w1-local-oracles/w1-text-glyph-fidelity/avm1_edittext_scaled_glyphs/
+# flash.png). The 9 allowed outlier CHANNELS are the 3 bottom-right border
+# corner pixels (one per box): Flash 15/111/111, ours 64 (corner class of
+# avm1_edittext_placed_cxform). Glyphs and every edge: 0 px.
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 9
+
+[player_options]
+with_renderer = { optional = false }

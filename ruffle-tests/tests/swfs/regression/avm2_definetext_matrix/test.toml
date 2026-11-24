@@ -1,0 +1,8 @@
+# Golden: analytic, == FLASH Player 32 draw() capture at 0 px (s27).
+num_ticks = 1
+
+[image_comparisons.output]
+tolerance = 2
+
+[player_options]
+with_renderer = { optional = false }

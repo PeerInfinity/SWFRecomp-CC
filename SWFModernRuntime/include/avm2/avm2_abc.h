@@ -506,8 +506,8 @@ typedef struct Avm2FontData
 
 // A DefineFont4 (tag 91, EMBEDDED_CFF) face, as far as flash.text.engine
 // TextLine metrics need it: the OpenType OS/2 typo ascender/descender and the
-// head unitsPerEm (font units; descender is negative). Glyph outlines are not
-// carried. Main movie only (avm2_generated_cff4_fonts below).
+// head unitsPerEm (font units; descender is negative). Glyph outlines ride the
+// trailing `outlines` field. Main movie only (avm2_generated_cff4_fonts below).
 typedef struct Avm2Cff4FontData
 {
 	const char* name;   // DefineFont4 FontName (UTF-8)
@@ -521,6 +521,13 @@ typedef struct Avm2Cff4FontData
 	// face carries no usable cmap/hmtx (TextLine bounds then stay empty).
 	const uint32_t* adv;
 	uint32_t adv_count;
+	// Trailing (s27 w2-avm2-text-tail): the face's CFF glyph outlines, decoded
+	// from the FontData blob at recompile time (abc_devicefont.cpp
+	// emitCff4OutlineFont) in the standard Avm2FontData outline layout (codes,
+	// advances, flattened contours; font units, y down). It is NOT a row of
+	// any font table, so no lookup sees it. NULL when the face has no
+	// FontData or no ink. Consumer: the FTE TextLine glyph draw (arc).
+	const Avm2FontData* outlines;
 } Avm2Cff4FontData;
 
 // One rendered glyph of a TextField, as collected by
@@ -561,6 +568,15 @@ typedef struct Avm2StaticTextData
 	uint16_t char_id;
 	uint32_t glyph_start;   // index into avm2_generated_static_glyphs
 	uint32_t glyph_count;
+	// Trailing (s27 w2-avm2-text-tail): the DefineText TextMatrix, emitted only
+	// when its linear part is non-identity. has_matrix == 0 (zero-initialised,
+	// the translation-only case) keeps the legacy contract: the glyphs' x/y
+	// already include T.t. has_matrix == 1: the glyphs' x/y are the pen in TEXT
+	// space and the renderer composes world * T (Ruffle text.rs render_self
+	// pushes text_transform before each glyph's {height/em, pen} matrix).
+	uint32_t has_matrix;
+	float m_a, m_b, m_c, m_d;
+	int32_t m_tx, m_ty;     // twips
 } Avm2StaticTextData;
 
 // DefineSceneAndFrameLabelData (root timeline only).

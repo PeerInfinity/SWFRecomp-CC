@@ -353,12 +353,22 @@ std::string cEsc(const std::string& s)
 }
 
 // Loads one declared face. Returns false when the TTF is missing/unparsable.
+bool loadFaceData(const std::vector<uint8_t>& data, DeviceFaceDef& fd,
+                  const std::vector<uint16_t>* only_codes);
+
 bool loadFace(const std::string& path, DeviceFaceDef& fd,
               const std::vector<uint16_t>* only_codes = NULL)
 {
 	std::vector<uint8_t> data;
 	if (!readFile(path, data)) return false;
+	return loadFaceData(data, fd, only_codes);
+}
 
+// The in-memory body of loadFace: an OpenType/TrueType file already read into
+// `data` (a test.toml device face, or a DefineFont4 FontData blob).
+bool loadFaceData(const std::vector<uint8_t>& data, DeviceFaceDef& fd,
+                  const std::vector<uint16_t>* only_codes)
+{
 	int font_start = stbtt_GetFontOffsetForIndex(data.data(), 0);
 	if (font_start < 0) return false;
 	stbtt_fontinfo info;
@@ -850,6 +860,53 @@ bool emitAvm1DeviceFonts(std::ostream& out)
 		    << n << "_advances, " << fd.codes.size() << ");\n";
 	}
 	out << "}\n";
+	return true;
+}
+
+// DefineFont4 (EMBEDDED_CFF) glyph outlines (s27 w2-avm2-text-tail). The
+// FontData blob is a whole OpenType file (CFF outlines, `OTTO`); stb_truetype
+// decodes its charstrings (STBTT_vcubic) and the device-face path above
+// flattens them exactly like a test.toml CFF face. Emitted as a standalone
+// `static const Avm2FontData <sym>` that NO font lookup can reach (it is not a
+// row of avm2_generated_fonts / _device_fonts): the only reference is the
+// trailing `outlines` field of its Avm2Cff4FontData row, so no layout, metric
+// or enumeration result changes. It is the glyph source for the FTE TextLine
+// render arc.
+bool emitCff4OutlineFont(std::ostream& out, const std::vector<uint8_t>& data,
+                         const std::string& sym, uint16_t font_id,
+                         const std::string& name, bool bold, bool italic)
+{
+	DeviceFaceDef fd;
+	fd.family = name;
+	fd.bold = bold;
+	fd.italic = italic;
+	if (!loadFaceData(data, fd, NULL)) return false;
+	if (fd.glyph_pts.empty()) return false;
+	out << "static const uint16_t " << sym << "_codes[] = { ";
+	for (auto c : fd.codes) out << c << ", ";
+	out << "};\n";
+	out << "static const int32_t " << sym << "_advances[] = { ";
+	for (auto a : fd.advances) out << a << ", ";
+	out << "};\n";
+	out << "static const float " << sym << "_pts[] = { ";
+	glyphEmitPts(out, fd.glyph_pts);
+	out << "};\n";
+	out << "static const uint32_t " << sym << "_pt_start[] = { ";
+	for (auto v : fd.glyph_pt_start) out << v << ", ";
+	out << "};\n";
+	out << "static const uint32_t " << sym << "_contour_ends[] = { ";
+	for (auto v : fd.glyph_contour_ends) out << v << ", ";
+	out << "};\n";
+	out << "static const uint32_t " << sym << "_contour_start[] = { ";
+	for (auto v : fd.glyph_contour_start) out << v << ", ";
+	out << "};\n";
+	out << "static const Avm2FontData " << sym << " = { " << font_id << ", \""
+	    << cEsc(name) << "\", " << (bold ? 1 : 0) << ", " << (italic ? 1 : 0)
+	    << ", 1, " << fd.em_square << ", " << fd.ascent << ", " << fd.descent
+	    << ", " << fd.leading << ", " << fd.codes.size() << ", " << sym
+	    << "_codes, " << sym << "_advances, " << sym << "_pts, " << sym
+	    << "_pt_start, " << sym << "_contour_ends, " << sym
+	    << "_contour_start, NULL, NULL, NULL, 0, NULL, 0 };\n";
 	return true;
 }
 

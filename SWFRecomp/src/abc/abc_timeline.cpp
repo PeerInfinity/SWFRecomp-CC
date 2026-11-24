@@ -813,6 +813,11 @@ struct StaticTextDef
 {
 	uint16_t char_id = 0;
 	std::vector<StaticGlyphDef> glyphs;
+	// Non-identity TextMatrix linear part: glyph x/y are then text-space pen
+	// and the runtime composes world * matrix (Avm2StaticTextData.has_matrix).
+	bool has_matrix = false;
+	float m_a = 1, m_b = 0, m_c = 0, m_d = 1;
+	int32_t m_tx = 0, m_ty = 0;
 };
 
 // LSB-first SWF bit reader for glyph SHAPE records.
@@ -962,7 +967,10 @@ struct Scanner
 	// DefineFont4 (CFF / EMBEDDED_CFF) faces: name, style and the OpenType
 	// OS/2 typo ascender/descender + head unitsPerEm, for flash.text.engine
 	// TextLine metrics (s24 w2-avm2-small-natives). Glyphs are not decoded.
-	struct Cff4Def { std::string name; bool bold, italic; int asc, desc, upem; std::vector<std::pair<uint32_t, uint32_t>> adv; };
+	struct Cff4Def { std::string name; bool bold, italic; int asc, desc, upem; std::vector<std::pair<uint32_t, uint32_t>> adv;
+		// s27: the FontData blob and FontID, for the glyph outlines
+		// (abc_devicefont.cpp emitCff4OutlineFont -> Avm2Cff4FontData.outlines).
+		uint16_t font_id = 0; std::vector<uint8_t> data; };
 	std::vector<Cff4Def> cff4;
 	std::vector<StaticTextDef> statictexts;
 	std::vector<BitmapAsset> bitmaps;
@@ -1166,6 +1174,22 @@ struct Scanner
 
 		Matrix m = parseMatrix(body);
 		int32_t base_tx = m.tx, base_ty = m.ty;
+		// A scaled/rotated TextMatrix: keep the pen in text space and hand the
+		// whole matrix to the runtime (glyph = T * {height/em, pen}, Ruffle
+		// text.rs render_self). The translation-only case keeps the legacy
+		// baked-in T.t, so its generated tables are byte-identical.
+		if (m.a != 1.0f || m.b != 0.0f || m.c != 0.0f || m.d != 1.0f)
+		{
+			st.has_matrix = true;
+			st.m_a = m.a;
+			st.m_b = m.b;
+			st.m_c = m.c;
+			st.m_d = m.d;
+			st.m_tx = m.tx;
+			st.m_ty = m.ty;
+			base_tx = 0;
+			base_ty = 0;
+		}
 		uint8_t glyph_bits = body.u8();
 		uint8_t advance_bits = body.u8();
 
@@ -1452,7 +1476,7 @@ struct Scanner
 				// unitsPerEm (offset 18). A face without font data or
 				// without a head table is skipped (runtime keeps 12 / 3).
 				Scanner::Cff4Def cd;
-				body.u16();
+				cd.font_id = body.u16();
 				uint8_t fl = body.u8();
 				cd.italic = (fl & 0x02) != 0;
 				cd.bold = (fl & 0x01) != 0;
@@ -1537,6 +1561,7 @@ struct Scanner
 					}
 					std::sort(cd.adv.begin(), cd.adv.end());
 				}
+				if (fl & 0x04) cd.data.assign(f, f + flen);
 				if (cd.upem > 0) cff4.push_back(cd);
 				break;
 			}
@@ -2375,6 +2400,15 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			}
 			out << "\n};\n";
 		}
+		std::vector<bool> cff4_has_outlines(sc.cff4.size(), false);
+		for (size_t ci = 0; ci < sc.cff4.size(); ci++)
+		{
+			auto& c = sc.cff4[ci];
+			if (c.data.empty()) continue;
+			cff4_has_outlines[ci] = emitCff4OutlineFont(
+				out, c.data, "avm2_cff4_outline_" + std::to_string(ci),
+				c.font_id, c.name, c.bold, c.italic);
+		}
 		out << "const Avm2Cff4FontData avm2_generated_cff4_fonts[] = {";
 		for (size_t ci = 0; ci < sc.cff4.size(); ci++)
 		{
@@ -2393,8 +2427,10 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			}
 			out << "\", " << (int) c.bold << ", " << (int) c.italic << ", " << c.asc << ", "
 			    << c.desc << ", " << c.upem << ", ";
-			if (c.adv.empty()) out << "0, 0 },";
-			else out << "avm2_cff4_adv_" << ci << ", " << c.adv.size() << " },";
+			if (c.adv.empty()) out << "0, 0";
+			else out << "avm2_cff4_adv_" << ci << ", " << c.adv.size();
+			if (cff4_has_outlines[ci]) out << ", &avm2_cff4_outline_" << ci;
+			out << " },";
 		}
 		if (sc.cff4.empty()) out << " { 0, 0, 0, 0, 0, 0 }";
 		out << " };\nconst uint32_t avm2_generated_cff4_font_count = " << sc.cff4.size() << ";\n";
@@ -2453,8 +2489,15 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			out << "const Avm2StaticTextData avm2_generated_statictexts[] = {\n";
 			for (size_t i = 0; i < sc.statictexts.size(); i++)
 			{
-				out << "\t{ " << sc.statictexts[i].char_id << ", "
-				    << st_start[i] << ", " << st_count[i] << " },\n";
+				const StaticTextDef& sd = sc.statictexts[i];
+				out << "\t{ " << sd.char_id << ", "
+				    << st_start[i] << ", " << st_count[i];
+				if (sd.has_matrix)
+					out << ", 1u, " << fmtFloat(sd.m_a) << ", "
+					    << fmtFloat(sd.m_b) << ", " << fmtFloat(sd.m_c) << ", "
+					    << fmtFloat(sd.m_d) << ", " << sd.m_tx << ", "
+					    << sd.m_ty;
+				out << " },\n";
 			}
 			out << "};\n";
 		}

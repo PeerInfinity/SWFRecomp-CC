@@ -1,0 +1,391 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index be73f4a6..54c0bb3b 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -940,7 +940,12 @@ void actionTextFieldCxSetApp(SWFAppContext* app_context);
+ #define TF_WINDOW_ALL      0   // no filtering (default)
+ #define TF_WINDOW_AT_DEPTH 1   // only root-timeline fields at exactly this depth
+ #define TF_WINDOW_REST     2   // everything the root walk could not place
++#define TF_WINDOW_ANCHOR   3   // only fields anchored to one attached-pass clip
+ void actionSetTextFieldDepthWindow(int mode, int swf_depth, int swf_max_depth);
++// s27 w2-holder-drawing-full: attached-pass text anchors (action.c).
++void actionTextFieldAnchorsBuild(void** units, int n);
++int actionTextFieldAnchorHas(void* unit);
++void actionSetTextFieldAnchorWindow(void* unit);
+ void actionBeginTextFieldDepthPass(int swf_max_depth);
+ int actionHasTextFieldAtDepth(int swf_depth);
+ 
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index c8ee2128..be0e98b9 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -31117,12 +31117,144 @@ static int tf_nested_anchor_depth(MovieClip* mc, int swf_max_depth)
+ 	if (a->parent != &root_movieclip) return -1;
+ 	if (a->depth < TF_TIMELINE_DEPTH_BASE || a->depth > TF_TIMELINE_DEPTH_BASE + swf_max_depth) return -1;
+ 	int d = a->depth - TF_TIMELINE_DEPTH_BASE + 1;
+-	return (d > swf_max_depth) ? -1 : d;
++	// s27 w2-holder-drawing-full: an ancestor at the LAST root depth anchors
++	// at swf_max_depth + 1, the window the root loops flush right after the
++	// timeline walk and before the attached pass (tf_draw_at_root_depth).
++	// It used to fall to the REST pass and so painted over every attached
++	// clip and script drawing (from_gnash BeginBitmapFill: the depth-1
++	// xtrace sprite's field over mc1..mc9).
++	return (d > swf_max_depth + 1) ? -1 : d;
++}
++
++// s27 w2-holder-drawing-full: text fields owned by an ATTACHED-pass clip.
++// Ruffle/Flash paint an EditText from render_self, inside its parent's child
++// walk; ours painted every createTextField field and every field inside an
++// attached clip in the REST pass, after ALL attached clips and the late
++// Drawing-API pass. The root render loops now hand this module the clips
++// their attached pass will draw (actionTextFieldAnchorsBuild, in render
++// order) and flush each clip's fields right after it
++// (actionSetTextFieldAnchorWindow). The anchor of a field is the nearest
++// ancestor-or-self in that set; root-timeline fields and fields nested in a
++// root-timeline sprite keep their depth windows above. Empty set (every
++// caller that does not build one) = the historical REST behaviour.
++#define TF_ANCHOR_MAX 1024
++typedef struct { MovieClip* field; MovieClip* unit; } TfAnchor;
++static TfAnchor g_tf_anchor[TF_ANCHOR_MAX];        // sorted by field
++static MovieClip* g_tf_anchor_units[TF_ANCHOR_MAX]; // sorted, unique
++static int g_tf_anchor_n = 0;
++static int g_tf_anchor_units_n = 0;
++static MovieClip* g_tf_window_unit = NULL;
++static MovieClip* g_tf_unit_fields[TF_ANCHOR_MAX];  // the window unit's fields
++static int g_tf_unit_fields_n = 0;
++static int g_tf_pass_swf_max = -1;
++static void** g_tf_units_sorted = NULL;
++static int g_tf_units_sorted_cap = 0;
++
++static int tf_ptr_cmp(const void* a, const void* b)
++{
++	uintptr_t x = (uintptr_t) *(void* const*) a, y = (uintptr_t) *(void* const*) b;
++	return x < y ? -1 : (x > y ? 1 : 0);
++}
++static int tf_anchor_cmp(const void* a, const void* b)
++{
++	return tf_ptr_cmp(&((const TfAnchor*) a)->field, &((const TfAnchor*) b)->field);
++}
++
++static MovieClip* tf_anchor_of(const MovieClip* mc)
++{
++	if (g_tf_anchor_n == 0) return NULL;
++	TfAnchor key = { (MovieClip*) mc, NULL };
++	const TfAnchor* hit = (const TfAnchor*) bsearch(&key, g_tf_anchor,
++		(size_t) g_tf_anchor_n, sizeof(TfAnchor), tf_anchor_cmp);
++	return hit != NULL ? hit->unit : NULL;
++}
++
++void actionTextFieldAnchorsBuild(void** units, int n)
++{
++	extern MovieClip root_movieclip;
++	g_tf_anchor_n = 0;
++	g_tf_anchor_units_n = 0;
++	g_tf_window_unit = NULL;
++	g_tf_unit_fields_n = 0;
++	if (units == NULL || n <= 0 || g_tf_pass_swf_max < 0) return;
++	int have_fields = 0;
++	for (int i = 0; i < child_mc_count && !have_fields; i++) {
++		MovieClip* mc = child_mc_cache[i];
++		if (mc != NULL && mc->depth != INT_MIN && MC_IS_TEXTFIELD(mc)) have_fields = 1;
++	}
++	if (!have_fields) return;
++	if (n > g_tf_units_sorted_cap) {
++		int cap = n + 256;
++		void** u = (void**) realloc(g_tf_units_sorted, (size_t) cap * sizeof(void*));
++		if (u == NULL) return;   // REST pass keeps every field
++		g_tf_units_sorted = u;
++		g_tf_units_sorted_cap = cap;
++	}
++	memcpy(g_tf_units_sorted, units, (size_t) n * sizeof(void*));
++	qsort(g_tf_units_sorted, (size_t) n, sizeof(void*), tf_ptr_cmp);
++	for (int i = 0; i < child_mc_count && g_tf_anchor_n < TF_ANCHOR_MAX; i++) {
++		MovieClip* mc = child_mc_cache[i];
++		if (mc == NULL || mc->depth == INT_MIN) continue;
++		if (!MC_IS_TEXTFIELD(mc)) continue;
++		if (tf_nested_anchor_depth(mc, g_tf_pass_swf_max) >= 0) continue;
++		if (mc->parent == &root_movieclip
++		    && mc->depth >= TF_TIMELINE_DEPTH_BASE
++		    && mc->depth <= TF_TIMELINE_DEPTH_BASE + g_tf_pass_swf_max)
++			continue;   // root-timeline field: its own depth window
++		MovieClip* a = mc;
++		int guard = 0;
++		while (a != NULL && a != &root_movieclip && guard++ < 256) {
++			void* key = a;
++			if (bsearch(&key, g_tf_units_sorted, (size_t) n, sizeof(void*), tf_ptr_cmp) != NULL) {
++				g_tf_anchor[g_tf_anchor_n].field = mc;
++				g_tf_anchor[g_tf_anchor_n].unit = a;
++				g_tf_anchor_units[g_tf_anchor_n] = a;
++				g_tf_anchor_n++;
++				break;
++			}
++			a = a->parent;
++		}
++	}
++	qsort(g_tf_anchor, (size_t) g_tf_anchor_n, sizeof(TfAnchor), tf_anchor_cmp);
++	qsort(g_tf_anchor_units, (size_t) g_tf_anchor_n, sizeof(MovieClip*), tf_ptr_cmp);
++	int u = 0;
++	for (int i = 0; i < g_tf_anchor_n; i++)
++		if (u == 0 || g_tf_anchor_units[u - 1] != g_tf_anchor_units[i])
++			g_tf_anchor_units[u++] = g_tf_anchor_units[i];
++	g_tf_anchor_units_n = u;
++}
++
++int actionTextFieldAnchorHas(void* unit)
++{
++	if (g_tf_anchor_units_n == 0) return 0;
++	return bsearch(&unit, g_tf_anchor_units, (size_t) g_tf_anchor_units_n,
++		sizeof(MovieClip*), tf_ptr_cmp) != NULL;
++}
++
++void actionSetTextFieldAnchorWindow(void* unit)
++{
++	g_tf_window_mode = TF_WINDOW_ANCHOR;
++	g_tf_window_unit = (MovieClip*) unit;
++	g_tf_unit_fields_n = 0;
++	for (int i = 0; i < g_tf_anchor_n; i++)
++		if (g_tf_anchor[i].unit == (MovieClip*) unit)
++			g_tf_unit_fields[g_tf_unit_fields_n++] = g_tf_anchor[i].field;
++}
++
++static int tf_in_window_unit(const MovieClip* mc)
++{
++	for (int i = 0; i < g_tf_unit_fields_n; i++)
++		if (g_tf_unit_fields[i] == mc) return 1;
++	return 0;
+ }
+ 
+ static int tf_window_skip(MovieClip* mc)
+ {
+ 	if (g_tf_window_mode == TF_WINDOW_ALL) return 0;
++	if (g_tf_window_mode == TF_WINDOW_ANCHOR)
++		return !tf_in_window_unit(mc);
++	if (g_tf_window_mode == TF_WINDOW_REST && tf_anchor_of(mc) != NULL)
++		return 1;   // painted after its attached-pass clip
+ 	{
+ 		int nd = tf_nested_anchor_depth(mc, g_tf_window_max_depth);
+ 		if (nd >= 0) {
+@@ -31150,17 +31282,24 @@ static int tf_window_skip(MovieClip* mc)
+ void actionBeginTextFieldDepthPass(int swf_max_depth)
+ {
+ 	g_tf_depth_present_max = -1;
++	g_tf_anchor_n = 0;         // rebuilt by the attached pass, if any
++	g_tf_anchor_units_n = 0;
++	g_tf_window_unit = NULL;
++	g_tf_unit_fields_n = 0;
++	g_tf_pass_swf_max = swf_max_depth;
+ 	if (swf_max_depth < 0) return;
+-	if (swf_max_depth + 1 > g_tf_depth_present_cap) {
+-		int ncap = swf_max_depth + 1;
++	// +2: depths 0..swf_max_depth plus the post-walk window swf_max_depth + 1
++	// (tf_nested_anchor_depth).
++	if (swf_max_depth + 2 > g_tf_depth_present_cap) {
++		int ncap = swf_max_depth + 2;
+ 		unsigned char* nb = (unsigned char*) realloc(g_tf_depth_present,
+ 			(size_t) ncap);
+ 		if (nb == NULL) return;
+ 		g_tf_depth_present = nb;
+ 		g_tf_depth_present_cap = ncap;
+ 	}
+-	memset(g_tf_depth_present, 0, (size_t)(swf_max_depth + 1));
+-	g_tf_depth_present_max = swf_max_depth;
++	memset(g_tf_depth_present, 0, (size_t)(swf_max_depth + 2));
++	g_tf_depth_present_max = swf_max_depth + 1;
+ 	for (int i = 0; i < child_mc_count; i++) {
+ 		MovieClip* mc = child_mc_cache[i];
+ 		if (mc == NULL || mc->depth == INT_MIN) continue;
+@@ -34512,17 +34651,11 @@ int actionRenderHolderDrawingsInline(void* mc_v, DrawingRenderCallback cb, void*
+ 	if (mc == NULL || mc->drawing_state == NULL) return 0;
+ 	if (mc->display_obj != NULL || mc->loaded_dl_shell != NULL) return 0;
+ 	if (g_avm1_runtime_filter_mcs > 0 && dynFilterRootOf(mc) != NULL) return 0;
+-	// Narrow variant: only a holder WITH live attached children moves. A
+-	// childless empty clip keeps the global (late) pass, because text inside
+-	// timeline sprites is still drawn by the late TF_WINDOW_REST pass; moving
+-	// a childless clip's drawing earlier puts such text over it
+-	// (from_gnash BeginBitmapFill: xtrace sprite text over mc1..mc9, 939->1188).
+-	int has_child = 0;
+-	for (int i = 0; i < child_mc_count && !has_child; i++) {
+-		MovieClip* c = child_mc_cache[i];
+-		if (c != NULL && c->depth != INT_MIN && c->parent == mc) has_child = 1;
+-	}
+-	if (!has_child) return 0;
++	// s27 w2-holder-drawing-full: every drawing-only clip the attached pass
++	// visits paints here, at its sorted position (the s27 narrow variant gated
++	// this on live attached children because sprite-nested text was still
++	// drawn by the late REST pass; that text now has its own windows --
++	// tf_nested_anchor_depth's post-walk window and the attached-pass anchors).
+ 	return actionRenderMCDrawingsInline(mc, cb, user_data);
+ }
+ 
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index e742e9d0..0ebaf5a2 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -8272,6 +8272,20 @@ static void tf_draw_at_root_depth(SWFAppContext* app_context, int depth,
+ 	actionSetTextFieldDepthWindow(TF_WINDOW_ALL, 0, 0);
+ }
+ 
++// s27 w2-holder-drawing-full: paint the text fields anchored to one clip of
++// the post-loop attached pass right after that clip (Ruffle paints an EditText
++// from render_self, inside its parent's child walk), instead of in the REST
++// pass after every attached clip and every script drawing. The anchor set is
++// the pass's render list (actionTextFieldAnchorsBuild).
++static void tf_draw_for_attached_unit(SWFAppContext* app_context, MovieClip* mc)
++{
++	if (!actionTextFieldAnchorHas(mc)) return;
++	actionSetTextFieldAnchorWindow(mc);
++	actionIterateTextFields(textfield_render_cb, NULL);
++	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
++	actionSetTextFieldDepthWindow(TF_WINDOW_ALL, 0, 0);
++}
++
+ // 1 when root display-list entry `obj` is an EditText that the root loops send
+ // through render_filtered_object (see g_tf_filter_obj). The root loops then
+ // skip tf_draw_at_root_depth at its depth and the orphan walk skips it, so the
+@@ -8886,6 +8900,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 	}
+ 	if (active_clip_depth > 0)
+ 		renderer_end_clip(context);
++	// s27 w2-holder-drawing-full: fields nested in the LAST root-depth sprite
++	// (tf_nested_anchor_depth's post-walk window), under all attached content.
++	tf_draw_at_root_depth(app_context, (int) max_depth + 1, (int) max_depth);
+ 
+ 	// Root-attached MovieClips (see comment in tagShowFrame for rationale —
+ 	// these live in child_mc_cache, not display_list, and need their own
+@@ -8904,12 +8921,17 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			if (order != NULL) order[order_n++] = mc;
+ 		}
+ 		if (order != NULL) attached_sort_render_order(order, order_n);
++		if (order != NULL) actionTextFieldAnchorsBuild((void**) order, order_n);
+ 		int pass_n = (order != NULL) ? order_n : child_mc_count;
+ 		for (int i = 0; i < pass_n; i++) {
+ 			MovieClip* mc = (order != NULL) ? order[i] : child_mc_cache[i];
+ 			if (mc == NULL) continue;
+ 			if (mc->depth == INT_MIN) continue;
+ 			if (!offscreen_attached_pass_member(mc)) continue;
++			// s27 w2-holder-drawing-full: the clip's body runs inside a
++			// do/while(0) so each `continue` below ends the body only, and the
++			// clip's anchored text fields are flushed after it either way.
++			do {
+ 			if (mc->display_obj == NULL && mc->loaded_dl_shell == NULL) {
+ 				// s27 prototype: drawing-only holder, as render_attached_child.
+ 				actionRenderHolderDrawingsInline(mc, drawing_render_cb, NULL);
+@@ -8961,6 +8983,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 				att_has_cx ? att_cx_slot : 0);
+ 			render_display_list(app_context, d->sprite_display_list,
+ 				d->sprite_max_depth);
++			} while (0);
++			tf_draw_for_attached_unit(app_context, mc);
+ 		}
+ 	}
+ 
+@@ -10007,6 +10031,9 @@ void tagShowFrame(SWFAppContext* app_context)
+ 	{
+ 		renderer_end_clip(context);
+ 	}
++	// s27 w2-holder-drawing-full: fields nested in the LAST root-depth sprite
++	// (tf_nested_anchor_depth's post-walk window), under all attached content.
++	tf_draw_at_root_depth(app_context, (int) max_depth + 1, (int) max_depth);
+ 
+ 	// --- Render root-attached MovieClips (attachMovie with parent=_root) ---
+ 	// These live in child_mc_cache, not display_list — the dense, pointer-
+@@ -10044,8 +10071,13 @@ void tagShowFrame(SWFAppContext* app_context)
+ 		}
+ 		if (order != NULL) {
+ 			attached_sort_render_order(order, order_n);
+-			for (int i = 0; i < order_n; i++)
++			// s27 w2-holder-drawing-full: each clip's anchored text fields
++			// follow it (tf_draw_for_attached_unit).
++			actionTextFieldAnchorsBuild((void**) order, order_n);
++			for (int i = 0; i < order_n; i++) {
+ 				render_attached_child(app_context, order[i]);
++				tf_draw_for_attached_unit(app_context, order[i]);
++			}
+ 		}
+ 	}
+ 
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 8a13378e..be69cffd 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -736,3 +736,8 @@ regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased
+ # s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
+ # tier=1
+ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp
++# s27 w2-holder-drawing-full: drawing-only empty clips draw at their sorted attached position; the
++# last-root-depth sprite's nested text gets the post-walk window; attached-pass text anchors.
++# tier=1
++regression/avm1_empty_clip_drawing_depth_order        # empty-clip drawing under t@6 (Flash)  1 cmp
++from_gnash/misc-ming.all/BeginBitmapFill               # xtrace sprite text under mc1..mc9      1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/create_test_swf.py
+new file mode 100644
+index 00000000..f9782cab
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/create_test_swf.py
+@@ -0,0 +1,16 @@
++#!/usr/bin/env python3
++"""avm1_empty_clip_drawing_depth_order: an empty clip's Drawing-API content
++layers at its own AS depth among attached siblings (s27 w1-render-bitmap-leads
++lead 1, case B + control C of ../avm1_holder_drawing_under_children's script):
++d = createEmptyMovieClip("d", 5) draws green; _root.attachMovie("sq","t",6)
++must paint red OVER it. Fixed by s27 w2-holder-drawing-full (drawing-only
++clips paint at their sorted attached position; the late sprite-text pass no
++longer depends on the global Drawing-API pass running after it).
++Golden: real Flash Player 32 (coordinator oracle, s27
++w1-local-oracles/w1-render-bitmap-leads/.../flash.png).
++Usage: create_test_swf.py <out.swf>
++"""
++import os, runpy, sys
++here = os.path.dirname(os.path.abspath(__file__))
++sys.argv = [sys.argv[0], sys.argv[1], 'BC']
++runpy.run_path(os.path.join(here, '..', 'avm1_holder_drawing_under_children', 'create_test_swf.py'), run_name='__main__')
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..24b9694528fe01f5a2be407b4a5e9056b495dd0f
+GIT binary patch
+literal 1236
+zcmeAS@N?(olHy`uVBq!ia0y~yV4MKNIvi|3k+<8Q9%5i%neFM~7*a9k?On$#Wk&(m
+zgX<Q)uYdX_Oq%<5pwCvHBaE~91#F5!v(uh2HN^iauVP@B@9Dtc!NStuLMHXZ&X%EK
+z!d5^12UpL$WX<16rZMDNk5k{f%ghXQS+T`chyHK%<F7c+%H*J=z@Wl3JgB1iatt;n
+zfC2t~?PcbQr%a3rf&vUei~~*WEUzz!&Hk?b@cfKyKmQ*YkDphIh;uM>HZV-!AfGz<
+z&HUp0Je!;UG)_xj|FAJ;_(UW1Qsnn{{O3$}+wZ(-W!oTr{{Mc4`-P1Z1v)6sa_WWu
+lemo|9hrxOW<=J{4gO8DTv`ypl6kut^;OXk;vd$@?2>^IF=6nDE
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/output.txt b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/output.txt
+new file mode 100644
+index 00000000..1a41164e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/output.txt
+@@ -0,0 +1 @@
++drawn
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/test.swf b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..439e6543a96b63b4d49899bcd18e9445b6ea02c3
+GIT binary patch
+literal 980
+zcmb7?F-`(O7=_=m!hj-bV#Go$webi>Nl-eYK@&?scB7jtEaHMvn9z8It%<FTg`F3$
+zv+)q#VtxO>x~Rn9WV4g}^Ua%?_rLP#ar)f^T38qWFMX^V*joZeDG`R@0}NEL)8}U(
+zWOXsS`S<~KguC2R6@_9Vi?@tP>OPe)I2FmLoB<QpSJ*Whln(NM1(oEA%n6y#+MefQ
+zEm#5SZM){%`;C_0JMg-WU2>fkDusYMEfN{Rw@}O6bU0q?K@D^*2_-iR(ohBqdea<m
+zZeKXfvg5j_<bzo<9Qr4qzJsWzfri($PrPyJmFQ2(b(%3{iPm(K9Q&u102A*OpU4Xf
+z71?1ot>|5=P$^mQA$BWT7F#<H)O^2IztpbE`?xHgj~v}5s~wGMbo5!*sHzX_Osm?7
+zRcF`(ts2#+I_w=&U_;SxJ^v#GcC5Y?sYf-c58uHQNIb=AodN--N`ZhAQy@+L>fDHm
+od%{HN6ii3SqyN+r;Cl*wofxG+7TChE6mX-}uH7`Tp-`mICzOz`ssI20
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/test.toml b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/test.toml
+new file mode 100644
+index 00000000..f1a32aa4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_empty_clip_drawing_depth_order/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 1
++
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 0

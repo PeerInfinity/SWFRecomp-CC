@@ -31050,6 +31050,29 @@ static int tf_transform_positive_scale_only(float a, float b, float c, float d)
 	    && a > 0.0f && d > 0.0f;
 }
 
+// s27 w2-avm1-text-layout: fill TextFieldGlyphInfo's world-matrix fields.
+// Returns 0 when the field must not draw glyphs (device font under a
+// rotated / sheared / reflected transform, the box iterator's cull). An
+// identity linear part leaves has_matrix = 0 and the historical
+// translation-only geometry untouched (byte-identical by construction).
+static int tf_glyph_set_matrix(TextFieldGlyphInfo* info,
+	float a, float b, float c, float d, float tx, float ty,
+	int device, float local_x_px, float local_y_px)
+{
+	info->has_matrix = 0;
+	info->device_xform = device ? 1 : 0;
+	info->m_a = 1.0f; info->m_b = 0.0f; info->m_c = 0.0f; info->m_d = 1.0f;
+	info->m_tx = 0.0f; info->m_ty = 0.0f;
+	if (device && !tf_transform_positive_scale_only(a, b, c, d)) return 0;
+	if (a == 1.0f && b == 0.0f && c == 0.0f && d == 1.0f) return 1;
+	info->has_matrix = 1;
+	info->m_a = a; info->m_b = b; info->m_c = c; info->m_d = d;
+	info->m_tx = tx; info->m_ty = ty;
+	info->x = local_x_px;
+	info->y = local_y_px;
+	return 1;
+}
+
 // --- EditText z-order window (s17 w2-gfx-edittext-bg) ----------------------
 // Ruffle draws an EditText's background/border AND its glyphs from
 // `EditText::render_self` (core/src/display_object/edit_text.rs:2698), i.e. at
@@ -31117,12 +31140,144 @@ static int tf_nested_anchor_depth(MovieClip* mc, int swf_max_depth)
 	if (a->parent != &root_movieclip) return -1;
 	if (a->depth < TF_TIMELINE_DEPTH_BASE || a->depth > TF_TIMELINE_DEPTH_BASE + swf_max_depth) return -1;
 	int d = a->depth - TF_TIMELINE_DEPTH_BASE + 1;
-	return (d > swf_max_depth) ? -1 : d;
+	// s27 w2-holder-drawing-full: an ancestor at the LAST root depth anchors
+	// at swf_max_depth + 1, the window the root loops flush right after the
+	// timeline walk and before the attached pass (tf_draw_at_root_depth).
+	// It used to fall to the REST pass and so painted over every attached
+	// clip and script drawing (from_gnash BeginBitmapFill: the depth-1
+	// xtrace sprite's field over mc1..mc9).
+	return (d > swf_max_depth + 1) ? -1 : d;
+}
+
+// s27 w2-holder-drawing-full: text fields owned by an ATTACHED-pass clip.
+// Ruffle/Flash paint an EditText from render_self, inside its parent's child
+// walk; ours painted every createTextField field and every field inside an
+// attached clip in the REST pass, after ALL attached clips and the late
+// Drawing-API pass. The root render loops now hand this module the clips
+// their attached pass will draw (actionTextFieldAnchorsBuild, in render
+// order) and flush each clip's fields right after it
+// (actionSetTextFieldAnchorWindow). The anchor of a field is the nearest
+// ancestor-or-self in that set; root-timeline fields and fields nested in a
+// root-timeline sprite keep their depth windows above. Empty set (every
+// caller that does not build one) = the historical REST behaviour.
+#define TF_ANCHOR_MAX 1024
+typedef struct { MovieClip* field; MovieClip* unit; } TfAnchor;
+static TfAnchor g_tf_anchor[TF_ANCHOR_MAX];        // sorted by field
+static MovieClip* g_tf_anchor_units[TF_ANCHOR_MAX]; // sorted, unique
+static int g_tf_anchor_n = 0;
+static int g_tf_anchor_units_n = 0;
+static MovieClip* g_tf_window_unit = NULL;
+static MovieClip* g_tf_unit_fields[TF_ANCHOR_MAX];  // the window unit's fields
+static int g_tf_unit_fields_n = 0;
+static int g_tf_pass_swf_max = -1;
+static void** g_tf_units_sorted = NULL;
+static int g_tf_units_sorted_cap = 0;
+
+static int tf_ptr_cmp(const void* a, const void* b)
+{
+	uintptr_t x = (uintptr_t) *(void* const*) a, y = (uintptr_t) *(void* const*) b;
+	return x < y ? -1 : (x > y ? 1 : 0);
+}
+static int tf_anchor_cmp(const void* a, const void* b)
+{
+	return tf_ptr_cmp(&((const TfAnchor*) a)->field, &((const TfAnchor*) b)->field);
+}
+
+static MovieClip* tf_anchor_of(const MovieClip* mc)
+{
+	if (g_tf_anchor_n == 0) return NULL;
+	TfAnchor key = { (MovieClip*) mc, NULL };
+	const TfAnchor* hit = (const TfAnchor*) bsearch(&key, g_tf_anchor,
+		(size_t) g_tf_anchor_n, sizeof(TfAnchor), tf_anchor_cmp);
+	return hit != NULL ? hit->unit : NULL;
+}
+
+void actionTextFieldAnchorsBuild(void** units, int n)
+{
+	extern MovieClip root_movieclip;
+	g_tf_anchor_n = 0;
+	g_tf_anchor_units_n = 0;
+	g_tf_window_unit = NULL;
+	g_tf_unit_fields_n = 0;
+	if (units == NULL || n <= 0 || g_tf_pass_swf_max < 0) return;
+	int have_fields = 0;
+	for (int i = 0; i < child_mc_count && !have_fields; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc != NULL && mc->depth != INT_MIN && MC_IS_TEXTFIELD(mc)) have_fields = 1;
+	}
+	if (!have_fields) return;
+	if (n > g_tf_units_sorted_cap) {
+		int cap = n + 256;
+		void** u = (void**) realloc(g_tf_units_sorted, (size_t) cap * sizeof(void*));
+		if (u == NULL) return;   // REST pass keeps every field
+		g_tf_units_sorted = u;
+		g_tf_units_sorted_cap = cap;
+	}
+	memcpy(g_tf_units_sorted, units, (size_t) n * sizeof(void*));
+	qsort(g_tf_units_sorted, (size_t) n, sizeof(void*), tf_ptr_cmp);
+	for (int i = 0; i < child_mc_count && g_tf_anchor_n < TF_ANCHOR_MAX; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!MC_IS_TEXTFIELD(mc)) continue;
+		if (tf_nested_anchor_depth(mc, g_tf_pass_swf_max) >= 0) continue;
+		if (mc->parent == &root_movieclip
+		    && mc->depth >= TF_TIMELINE_DEPTH_BASE
+		    && mc->depth <= TF_TIMELINE_DEPTH_BASE + g_tf_pass_swf_max)
+			continue;   // root-timeline field: its own depth window
+		MovieClip* a = mc;
+		int guard = 0;
+		while (a != NULL && a != &root_movieclip && guard++ < 256) {
+			void* key = a;
+			if (bsearch(&key, g_tf_units_sorted, (size_t) n, sizeof(void*), tf_ptr_cmp) != NULL) {
+				g_tf_anchor[g_tf_anchor_n].field = mc;
+				g_tf_anchor[g_tf_anchor_n].unit = a;
+				g_tf_anchor_units[g_tf_anchor_n] = a;
+				g_tf_anchor_n++;
+				break;
+			}
+			a = a->parent;
+		}
+	}
+	qsort(g_tf_anchor, (size_t) g_tf_anchor_n, sizeof(TfAnchor), tf_anchor_cmp);
+	qsort(g_tf_anchor_units, (size_t) g_tf_anchor_n, sizeof(MovieClip*), tf_ptr_cmp);
+	int u = 0;
+	for (int i = 0; i < g_tf_anchor_n; i++)
+		if (u == 0 || g_tf_anchor_units[u - 1] != g_tf_anchor_units[i])
+			g_tf_anchor_units[u++] = g_tf_anchor_units[i];
+	g_tf_anchor_units_n = u;
+}
+
+int actionTextFieldAnchorHas(void* unit)
+{
+	if (g_tf_anchor_units_n == 0) return 0;
+	return bsearch(&unit, g_tf_anchor_units, (size_t) g_tf_anchor_units_n,
+		sizeof(MovieClip*), tf_ptr_cmp) != NULL;
+}
+
+void actionSetTextFieldAnchorWindow(void* unit)
+{
+	g_tf_window_mode = TF_WINDOW_ANCHOR;
+	g_tf_window_unit = (MovieClip*) unit;
+	g_tf_unit_fields_n = 0;
+	for (int i = 0; i < g_tf_anchor_n; i++)
+		if (g_tf_anchor[i].unit == (MovieClip*) unit)
+			g_tf_unit_fields[g_tf_unit_fields_n++] = g_tf_anchor[i].field;
+}
+
+static int tf_in_window_unit(const MovieClip* mc)
+{
+	for (int i = 0; i < g_tf_unit_fields_n; i++)
+		if (g_tf_unit_fields[i] == mc) return 1;
+	return 0;
 }
 
 static int tf_window_skip(MovieClip* mc)
 {
 	if (g_tf_window_mode == TF_WINDOW_ALL) return 0;
+	if (g_tf_window_mode == TF_WINDOW_ANCHOR)
+		return !tf_in_window_unit(mc);
+	if (g_tf_window_mode == TF_WINDOW_REST && tf_anchor_of(mc) != NULL)
+		return 1;   // painted after its attached-pass clip
 	{
 		int nd = tf_nested_anchor_depth(mc, g_tf_window_max_depth);
 		if (nd >= 0) {
@@ -31150,17 +31305,24 @@ static int tf_window_skip(MovieClip* mc)
 void actionBeginTextFieldDepthPass(int swf_max_depth)
 {
 	g_tf_depth_present_max = -1;
+	g_tf_anchor_n = 0;         // rebuilt by the attached pass, if any
+	g_tf_anchor_units_n = 0;
+	g_tf_window_unit = NULL;
+	g_tf_unit_fields_n = 0;
+	g_tf_pass_swf_max = swf_max_depth;
 	if (swf_max_depth < 0) return;
-	if (swf_max_depth + 1 > g_tf_depth_present_cap) {
-		int ncap = swf_max_depth + 1;
+	// +2: depths 0..swf_max_depth plus the post-walk window swf_max_depth + 1
+	// (tf_nested_anchor_depth).
+	if (swf_max_depth + 2 > g_tf_depth_present_cap) {
+		int ncap = swf_max_depth + 2;
 		unsigned char* nb = (unsigned char*) realloc(g_tf_depth_present,
 			(size_t) ncap);
 		if (nb == NULL) return;
 		g_tf_depth_present = nb;
 		g_tf_depth_present_cap = ncap;
 	}
-	memset(g_tf_depth_present, 0, (size_t)(swf_max_depth + 1));
-	g_tf_depth_present_max = swf_max_depth;
+	memset(g_tf_depth_present, 0, (size_t)(swf_max_depth + 2));
+	g_tf_depth_present_max = swf_max_depth + 1;
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->depth == INT_MIN) continue;
@@ -32059,6 +32221,27 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		info.mc = (void*)mc;
 		info.device_font = (mc->ng_textfield_idx >= 0
 		    && !(ng_getTextFieldFlags(mc->ng_textfield_idx) & 0x0080)) ? 1 : 0;
+		{
+			// s27 w1-text-wordwrap (landed s27 w2-avm1-text-layout): the same `wordWrap` read the
+			// metric path uses (actionTextFieldMetric's word_wrap).
+			ActionVar* _ww = getProperty(props, "wordWrap", 8);
+			info.word_wrap = (_ww != NULL && _ww->type == ACTION_STACK_VALUE_BOOLEAN
+			                  && _ww->data.numeric_value) ? 1 : 0;
+		}
+		// s27 w2-avm1-text-layout: the field's full world matrix (the box
+		// iterator's tf_world_matrix). A non-identity linear part switches
+		// the painter to field-local coordinates through that matrix; a
+		// rotated/sheared/reflected DEVICE-font field draws no glyphs (Ruffle
+		// edit_text.rs render_self ~2720, the box iterator's cull).
+		{
+			float _wa, _wb, _wc, _wd, _wtx, _wty;
+			tf_world_matrix(mc, &_wa, &_wb, &_wc, &_wd, &_wtx, &_wty);
+			ActionVar* _ef = getProperty(props, "embedFonts", 10);
+			int _dev = !(_ef && varToDoubleSimple(_ef) != 0.0);
+			if (!tf_glyph_set_matrix(&info, _wa, _wb, _wc, _wd, _wtx, _wty, _dev,
+			                         vis_off_x, vis_off_y))
+				continue;
+		}
 		// Caret + selection range for the keyboard-focused field. Mirrors
 		// Ruffle's `EditText::visible_selection` (edit_text.rs:1059):
 		//
@@ -32210,6 +32393,25 @@ static int otf_resolve_var_path(SWFAppContext* app_context, const char* path,
 		}
 		p = dot + 1;
 	}
+}
+
+// s27 w2-avm1-text-layout: running WORLD matrix of the orphan walk (a, b, c,
+// d, tx, ty; tx/ty in twips). g_otf_parent_m is the current sprite's world
+// matrix, saved/restored around each recursion; g_otf_field_m is the matrix
+// of the field otf_emit_textfield is about to emit. The walk's pixel
+// translation arguments stay the source of the translation-only geometry.
+static float g_otf_parent_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+static float g_otf_field_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+static void otf_compose_entry_m(float out[6], const float par[6], const float* l16)
+{
+	float la = l16[0], lb = l16[1], lc = l16[4], ld = l16[5];
+	float ltx = l16[12], lty = l16[13];
+	out[0] = par[0] * la + par[2] * lb;
+	out[1] = par[1] * la + par[3] * lb;
+	out[2] = par[0] * lc + par[2] * ld;
+	out[3] = par[1] * lc + par[3] * ld;
+	out[4] = rintf(par[0] * ltx + par[2] * lty) + par[4];
+	out[5] = rintf(par[1] * ltx + par[3] * lty) + par[5];
 }
 
 // Build TextFieldGlyphInfo + TextFieldRenderInfo for an orphan placement and
@@ -32396,8 +32598,17 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.caret_char = -1;  // orphan/static path: never the focused editable field
 	info.mc = NULL;
 	info.device_font = !(ng_getTextFieldFlags(tf_idx) & 0x0080);
+	info.word_wrap = (ng_getTextFieldFlags(tf_idx) & 0x0001) ? 1 : 0; // s27 w1-text-wordwrap
 	info.sel_begin = -1;
 	info.sel_end = -1;
+	// s27 w2-avm1-text-layout: scale / rotation of the placement and its
+	// ancestors (g_otf_field_m, set by the walk). Timeline fields are
+	// device-font exactly when the tag lacks UseOutlines.
+	if (!tf_glyph_set_matrix(&info, g_otf_field_m[0], g_otf_field_m[1],
+	                         g_otf_field_m[2], g_otf_field_m[3],
+	                         g_otf_field_m[4], g_otf_field_m[5],
+	                         info.device_font, 0.0f, 0.0f))
+		return;
 	glyph_cb(&info, user_data);
 }
 
@@ -32441,6 +32652,8 @@ static void otf_walk_dl(SWFAppContext* app_context,
 		float local_ty = otd[tid][13] / 20.0f;
 		float world_x = parent_tx_px + local_tx;
 		float world_y = parent_ty_px + local_ty;
+		float entry_m[6];   // s27 w2-avm1-text-layout: full world matrix
+		otf_compose_entry_m(entry_m, g_otf_parent_m, otd[tid]);
 
 		int tf_idx = ng_find_textfield(obj->char_id);
 		if (tf_idx >= 0) {
@@ -32452,6 +32665,7 @@ static void otf_walk_dl(SWFAppContext* app_context,
 			if (tf_mc == NULL || !MC_IS_TEXTFIELD(tf_mc)) {
 				OTF_CX_SAVE();
 				tf_cx_push_entry(obj);
+				memcpy(g_otf_field_m, entry_m, sizeof g_otf_field_m);
 				otf_emit_textfield(app_context, tf_idx, obj,
 					world_x, world_y, render_cb, glyph_cb, user_data);
 				OTF_CX_RESTORE();
@@ -32479,10 +32693,14 @@ static void otf_walk_dl(SWFAppContext* app_context,
 			MovieClip* child_mc = otf_find_child_mc(parent_mc, obj->instance_name);
 			OTF_CX_SAVE();
 			tf_cx_push_entry(obj);
+			float saved_pm[6];
+			memcpy(saved_pm, g_otf_parent_m, sizeof saved_pm);
+			memcpy(g_otf_parent_m, entry_m, sizeof g_otf_parent_m);
 			otf_walk_dl(app_context,
 				obj->sprite_display_list, obj->sprite_max_depth,
 				child_mc, world_x, world_y,
 				render_cb, glyph_cb, user_data, count);
+			memcpy(g_otf_parent_m, saved_pm, sizeof g_otf_parent_m);
 			OTF_CX_RESTORE();
 		}
 	}
@@ -32497,6 +32715,8 @@ int actionIterateOrphanTextFields(SWFAppContext* app_context,
 	extern MovieClip root_movieclip;
 	int count = 0;
 	tf_cx_reset();
+	static const float ident_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+	memcpy(g_otf_parent_m, ident_m, sizeof g_otf_parent_m);
 	otf_walk_dl(app_context, display_list, max_depth, &root_movieclip,
 		0.0f, 0.0f, render_cb, glyph_cb, user_data, &count);
 	tf_cx_reset();
@@ -32526,6 +32746,10 @@ int actionEmitOrphanRootTextField(SWFAppContext* app_context, int depth,
 	float (*otd)[16] = ng_entryTransformData(obj);
 	tf_cx_reset();
 	tf_cx_push_entry(obj);
+	{
+		static const float ident_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		otf_compose_entry_m(g_otf_field_m, ident_m, otd[tid]);
+	}
 	otf_emit_textfield(app_context, tf_idx, obj,
 		otd[tid][12] / 20.0f, otd[tid][13] / 20.0f,
 		render_cb, glyph_cb, user_data);
@@ -34512,17 +34736,11 @@ int actionRenderHolderDrawingsInline(void* mc_v, DrawingRenderCallback cb, void*
 	if (mc == NULL || mc->drawing_state == NULL) return 0;
 	if (mc->display_obj != NULL || mc->loaded_dl_shell != NULL) return 0;
 	if (g_avm1_runtime_filter_mcs > 0 && dynFilterRootOf(mc) != NULL) return 0;
-	// Narrow variant: only a holder WITH live attached children moves. A
-	// childless empty clip keeps the global (late) pass, because text inside
-	// timeline sprites is still drawn by the late TF_WINDOW_REST pass; moving
-	// a childless clip's drawing earlier puts such text over it
-	// (from_gnash BeginBitmapFill: xtrace sprite text over mc1..mc9, 939->1188).
-	int has_child = 0;
-	for (int i = 0; i < child_mc_count && !has_child; i++) {
-		MovieClip* c = child_mc_cache[i];
-		if (c != NULL && c->depth != INT_MIN && c->parent == mc) has_child = 1;
-	}
-	if (!has_child) return 0;
+	// s27 w2-holder-drawing-full: every drawing-only clip the attached pass
+	// visits paints here, at its sorted position (the s27 narrow variant gated
+	// this on live attached children because sprite-nested text was still
+	// drawn by the late REST pass; that text now has its own windows --
+	// tf_nested_anchor_depth's post-walk window and the attached-pass anchors).
 	return actionRenderMCDrawingsInline(mc, cb, user_data);
 }
 

@@ -20094,8 +20094,19 @@ static void avm2_render_statictext(Avm2Context* ctx, Avm2Object* obj,
 		if (gl != NULL) heap_free(ctx->app, gl);
 		return;
 	}
+	// A scaled/rotated DefineText TextMatrix (has_matrix): the placements are
+	// text-space pen, so the glyph slot is world * T (Ruffle text.rs
+	// render_self pushes text_transform under the node's world matrix).
+	const Avm2StaticTextData* st = ext->statictext;
+	Mat tw = *world;
+	if (st->has_matrix)
+	{
+		Mat t = { st->m_a, st->m_b, st->m_c, st->m_d,
+		          (double) st->m_tx, (double) st->m_ty };
+		tw = mat_mul(world, &t);
+	}
 	uint32_t xid = 0, cxid = 0;
-	avm2_text_slots(world, alpha, &xid, &cxid);
+	avm2_text_slots(&tw, alpha, &xid, &cxid);
 	avm2_render_glyphs(ctx, gl, n, xid, cxid);
 	heap_free(ctx->app, gl);
 }

@@ -940,7 +940,12 @@ void actionTextFieldCxSetApp(SWFAppContext* app_context);
 #define TF_WINDOW_ALL      0   // no filtering (default)
 #define TF_WINDOW_AT_DEPTH 1   // only root-timeline fields at exactly this depth
 #define TF_WINDOW_REST     2   // everything the root walk could not place
+#define TF_WINDOW_ANCHOR   3   // only fields anchored to one attached-pass clip
 void actionSetTextFieldDepthWindow(int mode, int swf_depth, int swf_max_depth);
+// s27 w2-holder-drawing-full: attached-pass text anchors (action.c).
+void actionTextFieldAnchorsBuild(void** units, int n);
+int actionTextFieldAnchorHas(void* unit);
+void actionSetTextFieldAnchorWindow(void* unit);
 void actionBeginTextFieldDepthPass(int swf_max_depth);
 int actionHasTextFieldAtDepth(int swf_depth);
 
@@ -1007,6 +1012,28 @@ typedef struct TextFieldGlyphInfo {
     // Ruffle rounds each device-font glyph advance to a whole pixel
     // (font_like.rs FontLike::evaluate, FontType::Device). 0 otherwise.
     int device_font;
+    // s27 w1-text-wordwrap (landed s27 w2-avm1-text-layout): 1 when the field has wordWrap set (the
+    // AS `wordWrap` property, or DefineEditText WordWrap for orphan fields).
+    // The painter then soft-wraps each hard line (tag.c tf_soft_wrap_breaks,
+    // Ruffle html/layout.rs lay_out_span + line_wrapping.rs wrap_line).
+    int word_wrap;
+    // s27 w2-avm1-text-layout: the field's WORLD matrix, when its linear part
+    // is not the identity (scale / rotation / shear on the field or on any
+    // ancestor). has_matrix == 0 keeps the historical translation-only
+    // contract (x/y = world translation in pixels, glyphs drawn in stage
+    // twips). has_matrix != 0: x/y are FIELD-LOCAL pixels (the createTextField
+    // visual offset, 0 for timeline fields), m_tx/m_ty are the world
+    // translation in TWIPS, and the painter composes every glyph, the mask,
+    // the selection and the caret through this matrix (Ruffle edit_text.rs
+    // render_self: world * layout_to_local * lbox origin * glyph, each
+    // Matrix*Matrix rounding its translation to whole twips).
+    // device_xform: Ruffle's device-font rules apply (embedFonts false):
+    // layout_to_local gains scale(d/a, 1) (device_font_scale_x); the
+    // producers cull a rotated/sheared/reflected device field outright.
+    int has_matrix;
+    int device_xform;
+    float m_a, m_b, m_c, m_d;
+    float m_tx, m_ty;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);

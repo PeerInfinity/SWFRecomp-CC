@@ -742,3 +742,15 @@ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch 
 # group alpha in render_webgpu.c (root composite_blend + nested end_child_layer).
 regression/layer_group_alpha_transparency          # AVM1, Flash golden (tol 1)        1 cmp
 regression/avm2_layer_group_alpha_transparency     # AVM2 twin, Flash golden (tol 1)   1 cmp
+# s27 w2-avm1-text-layout: AVM1 EditText glyphs under a scaled world matrix (+ embedded box pixel snap); AVM1 soft wrap.
+# tier=1
+regression/avm1_edittext_scaled_glyphs                 # scale 2 / 0.5 / (1.5,1), Flash golden  1 cmp
+regression/avm1_edittext_wordwrap_render               # soft wrap + whole-line cull            1 cmp
+# s27 w2-holder-drawing-full: drawing-only empty clips draw at their sorted attached position; the
+# last-root-depth sprite's nested text gets the post-walk window; attached-pass text anchors.
+# tier=1
+regression/avm1_empty_clip_drawing_depth_order        # empty-clip drawing under t@6 (Flash)  1 cmp
+from_gnash/misc-ming.all/BeginBitmapFill               # xtrace sprite text under mc1..mc9      1 cmp
+# s27 w2-avm2-text-tail: AVM2 DefineText scaled/rotated TextMatrix (world * T; Flash draw() golden, 0 px).
+# tier=1
+regression/avm2_definetext_matrix                    # AVM2 TextMatrix scale(2,1) + rot 90  1 cmp

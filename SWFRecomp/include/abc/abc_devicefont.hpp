@@ -16,6 +16,8 @@
 
 #include <ostream>
 #include <string>
+#include <vector>
+#include <cstdint>
 
 namespace SWFRecomp
 {
@@ -34,6 +36,16 @@ namespace abc
 	// no-op in ng_shared.c). Returns false, writing nothing, when the test
 	// declares no named device face — the generated C is then unchanged.
 	bool emitAvm1DeviceFonts(std::ostream& out);
+
+	// DefineFont4 FontData (an OpenType/CFF file) -> `static const
+	// Avm2FontData <sym>` plus its side tables, outlines flattened through the
+	// device-face path. Returns false, writing nothing, when the blob does not
+	// load or has no ink. The row is reachable only through the caller's
+	// Avm2Cff4FontData.outlines pointer.
+	bool emitCff4OutlineFont(std::ostream& out, const std::vector<uint8_t>& data,
+	                         const std::string& sym, uint16_t font_id,
+	                         const std::string& name, bool bold, bool italic);
+
 
 	// The TTF path Ruffle's test harness would render a device font `name`
 	// with, resolved through `./test.toml`: a `[fonts.*]` family match, else

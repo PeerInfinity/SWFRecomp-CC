@@ -2268,6 +2268,22 @@ void avm2_cpu_raster_statictext(uint32_t* buf, int W, int H, int transparent,
 		if (gl != NULL) heap_free(ctx->app, gl);
 		return;
 	}
+	// A scaled/rotated DefineText TextMatrix (has_matrix): placements are
+	// text-space pen; compose world * T here (the GPU twin, avm2_display.c
+	// avm2_render_statictext, does the same through mat_mul; the translation
+	// is rounded to whole twips in f32, ties-even, like Ruffle's Matrix mul).
+	const Avm2StaticTextData* st = ext->statictext;
+	if (st->has_matrix)
+	{
+		double ta = st->m_a, tb = st->m_b, tc = st->m_c, td = st->m_d;
+		float ftx = (float) wa * (float) st->m_tx + (float) wc * (float) st->m_ty;
+		float fty = (float) wb * (float) st->m_tx + (float) wd * (float) st->m_ty;
+		double na = wa * ta + wc * tb, nb = wb * ta + wd * tb;
+		double nc = wa * tc + wc * td, nd = wb * tc + wd * td;
+		wtx += isfinite(ftx) ? (double) nearbyintf(ftx) : 0.0;
+		wty += isfinite(fty) ? (double) nearbyintf(fty) : 0.0;
+		wa = na; wb = nb; wc = nc; wd = nd;
+	}
 	glyph_raster_core(ctx, buf, W, H, transparent, gl, n, /*clip=*/NULL,
 	                  wa, wb, wc, wd, wtx / 20.0, wty / 20.0,
 	                  /*has_cxform=*/0, 256, 256, 256, 256, 0, 0, 0, 0,

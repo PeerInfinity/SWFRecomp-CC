@@ -1,0 +1,9 @@
+num_ticks = 1
+
+# Golden: FLASH (LOCAL ORACLE REQUEST, s27 w2-avm2-text-tail item 3). Until
+# then this directory is a request, not a landed fixture.
+[image_comparisons.output]
+tolerance = 2
+
+[player_options]
+with_renderer = { optional = false }

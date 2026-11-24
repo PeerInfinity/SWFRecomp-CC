@@ -1,0 +1,1203 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index be73f4a6..99bb5632 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -1007,6 +1007,28 @@ typedef struct TextFieldGlyphInfo {
+     // Ruffle rounds each device-font glyph advance to a whole pixel
+     // (font_like.rs FontLike::evaluate, FontType::Device). 0 otherwise.
+     int device_font;
++    // s27 w1-text-wordwrap (landed s27 w2-avm1-text-layout): 1 when the field has wordWrap set (the
++    // AS `wordWrap` property, or DefineEditText WordWrap for orphan fields).
++    // The painter then soft-wraps each hard line (tag.c tf_soft_wrap_breaks,
++    // Ruffle html/layout.rs lay_out_span + line_wrapping.rs wrap_line).
++    int word_wrap;
++    // s27 w2-avm1-text-layout: the field's WORLD matrix, when its linear part
++    // is not the identity (scale / rotation / shear on the field or on any
++    // ancestor). has_matrix == 0 keeps the historical translation-only
++    // contract (x/y = world translation in pixels, glyphs drawn in stage
++    // twips). has_matrix != 0: x/y are FIELD-LOCAL pixels (the createTextField
++    // visual offset, 0 for timeline fields), m_tx/m_ty are the world
++    // translation in TWIPS, and the painter composes every glyph, the mask,
++    // the selection and the caret through this matrix (Ruffle edit_text.rs
++    // render_self: world * layout_to_local * lbox origin * glyph, each
++    // Matrix*Matrix rounding its translation to whole twips).
++    // device_xform: Ruffle's device-font rules apply (embedFonts false):
++    // layout_to_local gains scale(d/a, 1) (device_font_scale_x); the
++    // producers cull a rotated/sheared/reflected device field outright.
++    int has_matrix;
++    int device_xform;
++    float m_a, m_b, m_c, m_d;
++    float m_tx, m_ty;
+ } TextFieldGlyphInfo;
+ 
+ typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index c8ee2128..2b7199f5 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -31050,6 +31050,29 @@ static int tf_transform_positive_scale_only(float a, float b, float c, float d)
+ 	    && a > 0.0f && d > 0.0f;
+ }
+ 
++// s27 w2-avm1-text-layout: fill TextFieldGlyphInfo's world-matrix fields.
++// Returns 0 when the field must not draw glyphs (device font under a
++// rotated / sheared / reflected transform, the box iterator's cull). An
++// identity linear part leaves has_matrix = 0 and the historical
++// translation-only geometry untouched (byte-identical by construction).
++static int tf_glyph_set_matrix(TextFieldGlyphInfo* info,
++	float a, float b, float c, float d, float tx, float ty,
++	int device, float local_x_px, float local_y_px)
++{
++	info->has_matrix = 0;
++	info->device_xform = device ? 1 : 0;
++	info->m_a = 1.0f; info->m_b = 0.0f; info->m_c = 0.0f; info->m_d = 1.0f;
++	info->m_tx = 0.0f; info->m_ty = 0.0f;
++	if (device && !tf_transform_positive_scale_only(a, b, c, d)) return 0;
++	if (a == 1.0f && b == 0.0f && c == 0.0f && d == 1.0f) return 1;
++	info->has_matrix = 1;
++	info->m_a = a; info->m_b = b; info->m_c = c; info->m_d = d;
++	info->m_tx = tx; info->m_ty = ty;
++	info->x = local_x_px;
++	info->y = local_y_px;
++	return 1;
++}
++
+ // --- EditText z-order window (s17 w2-gfx-edittext-bg) ----------------------
+ // Ruffle draws an EditText's background/border AND its glyphs from
+ // `EditText::render_self` (core/src/display_object/edit_text.rs:2698), i.e. at
+@@ -32059,6 +32082,27 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 		info.mc = (void*)mc;
+ 		info.device_font = (mc->ng_textfield_idx >= 0
+ 		    && !(ng_getTextFieldFlags(mc->ng_textfield_idx) & 0x0080)) ? 1 : 0;
++		{
++			// s27 w1-text-wordwrap (landed s27 w2-avm1-text-layout): the same `wordWrap` read the
++			// metric path uses (actionTextFieldMetric's word_wrap).
++			ActionVar* _ww = getProperty(props, "wordWrap", 8);
++			info.word_wrap = (_ww != NULL && _ww->type == ACTION_STACK_VALUE_BOOLEAN
++			                  && _ww->data.numeric_value) ? 1 : 0;
++		}
++		// s27 w2-avm1-text-layout: the field's full world matrix (the box
++		// iterator's tf_world_matrix). A non-identity linear part switches
++		// the painter to field-local coordinates through that matrix; a
++		// rotated/sheared/reflected DEVICE-font field draws no glyphs (Ruffle
++		// edit_text.rs render_self ~2720, the box iterator's cull).
++		{
++			float _wa, _wb, _wc, _wd, _wtx, _wty;
++			tf_world_matrix(mc, &_wa, &_wb, &_wc, &_wd, &_wtx, &_wty);
++			ActionVar* _ef = getProperty(props, "embedFonts", 10);
++			int _dev = !(_ef && varToDoubleSimple(_ef) != 0.0);
++			if (!tf_glyph_set_matrix(&info, _wa, _wb, _wc, _wd, _wtx, _wty, _dev,
++			                         vis_off_x, vis_off_y))
++				continue;
++		}
+ 		// Caret + selection range for the keyboard-focused field. Mirrors
+ 		// Ruffle's `EditText::visible_selection` (edit_text.rs:1059):
+ 		//
+@@ -32212,6 +32256,25 @@ static int otf_resolve_var_path(SWFAppContext* app_context, const char* path,
+ 	}
+ }
+ 
++// s27 w2-avm1-text-layout: running WORLD matrix of the orphan walk (a, b, c,
++// d, tx, ty; tx/ty in twips). g_otf_parent_m is the current sprite's world
++// matrix, saved/restored around each recursion; g_otf_field_m is the matrix
++// of the field otf_emit_textfield is about to emit. The walk's pixel
++// translation arguments stay the source of the translation-only geometry.
++static float g_otf_parent_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
++static float g_otf_field_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
++static void otf_compose_entry_m(float out[6], const float par[6], const float* l16)
++{
++	float la = l16[0], lb = l16[1], lc = l16[4], ld = l16[5];
++	float ltx = l16[12], lty = l16[13];
++	out[0] = par[0] * la + par[2] * lb;
++	out[1] = par[1] * la + par[3] * lb;
++	out[2] = par[0] * lc + par[2] * ld;
++	out[3] = par[1] * lc + par[3] * ld;
++	out[4] = rintf(par[0] * ltx + par[2] * lty) + par[4];
++	out[5] = rintf(par[1] * ltx + par[3] * lty) + par[5];
++}
++
+ // Build TextFieldGlyphInfo + TextFieldRenderInfo for an orphan placement and
+ // invoke the supplied callbacks.
+ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+@@ -32396,8 +32459,17 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 	info.caret_char = -1;  // orphan/static path: never the focused editable field
+ 	info.mc = NULL;
+ 	info.device_font = !(ng_getTextFieldFlags(tf_idx) & 0x0080);
++	info.word_wrap = (ng_getTextFieldFlags(tf_idx) & 0x0001) ? 1 : 0; // s27 w1-text-wordwrap
+ 	info.sel_begin = -1;
+ 	info.sel_end = -1;
++	// s27 w2-avm1-text-layout: scale / rotation of the placement and its
++	// ancestors (g_otf_field_m, set by the walk). Timeline fields are
++	// device-font exactly when the tag lacks UseOutlines.
++	if (!tf_glyph_set_matrix(&info, g_otf_field_m[0], g_otf_field_m[1],
++	                         g_otf_field_m[2], g_otf_field_m[3],
++	                         g_otf_field_m[4], g_otf_field_m[5],
++	                         info.device_font, 0.0f, 0.0f))
++		return;
+ 	glyph_cb(&info, user_data);
+ }
+ 
+@@ -32441,6 +32513,8 @@ static void otf_walk_dl(SWFAppContext* app_context,
+ 		float local_ty = otd[tid][13] / 20.0f;
+ 		float world_x = parent_tx_px + local_tx;
+ 		float world_y = parent_ty_px + local_ty;
++		float entry_m[6];   // s27 w2-avm1-text-layout: full world matrix
++		otf_compose_entry_m(entry_m, g_otf_parent_m, otd[tid]);
+ 
+ 		int tf_idx = ng_find_textfield(obj->char_id);
+ 		if (tf_idx >= 0) {
+@@ -32452,6 +32526,7 @@ static void otf_walk_dl(SWFAppContext* app_context,
+ 			if (tf_mc == NULL || !MC_IS_TEXTFIELD(tf_mc)) {
+ 				OTF_CX_SAVE();
+ 				tf_cx_push_entry(obj);
++				memcpy(g_otf_field_m, entry_m, sizeof g_otf_field_m);
+ 				otf_emit_textfield(app_context, tf_idx, obj,
+ 					world_x, world_y, render_cb, glyph_cb, user_data);
+ 				OTF_CX_RESTORE();
+@@ -32479,10 +32554,14 @@ static void otf_walk_dl(SWFAppContext* app_context,
+ 			MovieClip* child_mc = otf_find_child_mc(parent_mc, obj->instance_name);
+ 			OTF_CX_SAVE();
+ 			tf_cx_push_entry(obj);
++			float saved_pm[6];
++			memcpy(saved_pm, g_otf_parent_m, sizeof saved_pm);
++			memcpy(g_otf_parent_m, entry_m, sizeof g_otf_parent_m);
+ 			otf_walk_dl(app_context,
+ 				obj->sprite_display_list, obj->sprite_max_depth,
+ 				child_mc, world_x, world_y,
+ 				render_cb, glyph_cb, user_data, count);
++			memcpy(g_otf_parent_m, saved_pm, sizeof g_otf_parent_m);
+ 			OTF_CX_RESTORE();
+ 		}
+ 	}
+@@ -32497,6 +32576,8 @@ int actionIterateOrphanTextFields(SWFAppContext* app_context,
+ 	extern MovieClip root_movieclip;
+ 	int count = 0;
+ 	tf_cx_reset();
++	static const float ident_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
++	memcpy(g_otf_parent_m, ident_m, sizeof g_otf_parent_m);
+ 	otf_walk_dl(app_context, display_list, max_depth, &root_movieclip,
+ 		0.0f, 0.0f, render_cb, glyph_cb, user_data, &count);
+ 	tf_cx_reset();
+@@ -32526,6 +32607,10 @@ int actionEmitOrphanRootTextField(SWFAppContext* app_context, int depth,
+ 	float (*otd)[16] = ng_entryTransformData(obj);
+ 	tf_cx_reset();
+ 	tf_cx_push_entry(obj);
++	{
++		static const float ident_m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
++		otf_compose_entry_m(g_otf_field_m, ident_m, otd[tid]);
++	}
+ 	otf_emit_textfield(app_context, tf_idx, obj,
+ 		otd[tid][12] / 20.0f, otd[tid][13] / 20.0f,
+ 		render_cb, glyph_cb, user_data);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index e742e9d0..48bbbad9 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -7096,6 +7096,35 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
+ {
+ 	(void)user_data;
+ 
++	// s27 w2-avm1-text-layout: Ruffle's EditTextPixelSnapping (edit_text.rs,
++	// quality >= medium) for an EMBEDDED-font box under an axis-aligned,
++	// positive, non-unit scale: box = W * create_box(w, h, x_min, y_min)
++	// (translation rounded to whole twips by Matrix*Matrix), then tx/ty =
++	// trunc_to_pixel(t + 2 twips) and each scale = round_ties_even(s - 0.35)
++	// in pixels. Flash draws the same whole-pixel box (s27 Flash oracle of
++	// regression/avm1_edittext_scaled_glyphs: the 0.5x field's 27.5 px tall
++	// box puts its bottom border solid on row 37, where the unsnapped box
++	// straddled rows 37/38 at half coverage). The snapped box is a stage-
++	// twip box, so it continues below as an identity-matrix field.
++	TextFieldRenderInfo tf_snapped;
++	if (info->has_matrix && !info->device_font
++	    && info->m_b == 0.0f && info->m_c == 0.0f
++	    && info->m_a > 0.0f && info->m_d > 0.0f
++	    && !(info->m_a == 1.0f && info->m_d == 1.0f)) {
++		float stx = info->m_tx + rintf(info->m_a * info->x * 20.0f);
++		float sty = info->m_ty + rintf(info->m_d * info->y * 20.0f);
++		stx = truncf((stx + 2.0f) / 20.0f) * 20.0f;
++		sty = truncf((sty + 2.0f) / 20.0f) * 20.0f;
++		tf_snapped = *info;
++		tf_snapped.x = stx / 20.0f;
++		tf_snapped.y = sty / 20.0f;
++		tf_snapped.w = rintf(info->m_a * info->w - 0.35f);
++		tf_snapped.h = rintf(info->m_d * info->h - 0.35f);
++		tf_snapped.m_a = 1.0f; tf_snapped.m_d = 1.0f;
++		tf_snapped.m_tx = 0.0f; tf_snapped.m_ty = 0.0f;
++		info = &tf_snapped;
++	}
++
+ 	// Convert pixel coordinates to twips.
+ 	float x = info->x * 20.0f;
+ 	float y = info->y * 20.0f;
+@@ -7390,6 +7419,195 @@ static inline float tf_line_pitch_twips(s16 ascent, s16 descent, int em_square,
+ 	return (float)((s32)((float)ascent * s) + (s32)((float)descent * s)) + (float)leading_twips;
+ }
+ 
++// ---------------------------------------------------------------------------
++// s27 w1-text-wordwrap (landed s27 w2-avm1-text-layout): soft line breaks for a wordWrap field.
++//
++// The painter below lays text out one line per HARD paragraph (\n, \r and the
++// 0xFE/0xFF sentinels) and never soft-wrapped, so a word-wrapped field drew
++// each paragraph as one clipped line. This helper computes the byte offsets
++// at which Ruffle starts a new SOFT line, so the measure and draw passes can
++// treat them exactly like a newline that consumes no character.
++//
++// Port of Ruffle html/layout.rs `lay_out_span` (the is_word_wrap loop and
++// `wrap_dimensions`) over html/line_wrapping.rs `wrap_line` /
++// `find_allowed_breaks`, with the painter's own per-glyph advance
++// (tf_glyph_advance_twips + kerning, per-run face and size) as `measure`, so
++// a line that wraps is measured with the advances that draw it.
++//  * width  = field width - 2*GUTTER - right margin (max_bounds - right_margin)
++//  * offset = left margin (+ indent on a paragraph's first line, + 36 px for a
++//             bullet) + the pen x already used on this line
++//  * spans  = runs of the field's run table (Ruffle wraps per span, so a span
++//             start is a break opportunity mid-word)
++// Not ported: the CJK break rule (swf_is_cjk_like), tab stops inside a line.
++// Returns the break count; *out is malloc'd (caller frees) or NULL.
++// ---------------------------------------------------------------------------
++static float tf_ww_sum(const float* adv, int a, int b)
++{
++	float w = 0.0f;
++	for (int i = a; i < b; i++) w += adv[i];
++	return w;
++}
++
++// Ruffle line_wrapping.rs wrap_line over chars [0, n): -1 = None (no break).
++static int tf_ww_wrap_line(const u16* cp, const float* adv, int n,
++                           float width, float offset, int is_start, int swf8)
++{
++	if (n <= 0) return -1;
++	float remaining = width - offset;
++	// SWF8+: if even the first char does not fit, write one anyway; SWF7-:
++	// give up wrapping (Ruffle wrap_line).
++	if (remaining < 0.0f) return swf8 ? 1 : -1;
++	int line_end = 0, last_stop = 0;
++	for (int k = 1; k <= n; k++) {
++		if (k < n) {
++			u16 prev = cp[k - 1], curr = cp[k];
++			int brk;
++			if (swf8 && curr == ' ') brk = 0;
++			else if (prev == ' ') brk = 1;
++			else if (prev == '-' || (!swf8 && curr == '-')) brk = 1;
++			else brk = 0;
++			if (!brk) continue;
++		}
++		int word_start = last_stop, word_end = k, te = k;
++		if (swf8) { while (te > word_start && cp[te - 1] == ' ') te--; }
++		else if (te > word_start && cp[te - 1] == ' ') te--;
++		last_stop = te;
++		float m = tf_ww_sum(adv, word_start, te);
++		if (m <= remaining) {
++			line_end = word_end;
++			is_start = 0;
++			remaining -= m;
++		} else {
++			if (is_start) {
++				// Failsafe: a word wider than the field, break on the last
++				// fitting char (char_indices: prefixes [..0] .. [..len-1]).
++				int lfe = 0;
++				for (int f = 0; f < te - word_start; f++) {
++					if (tf_ww_sum(adv, word_start, word_start + f) > remaining) break;
++					lfe = f;
++				}
++				line_end = lfe;
++				if (swf8) { if (line_end < 1) line_end = 1; }
++				else if (line_end <= 1) return -1;
++			}
++			return line_end;
++		}
++	}
++	return -1;
++}
++
++static int tf_soft_wrap_breaks(const TextFieldGlyphInfo* info, size_t** out)
++{
++	*out = NULL;
++	if (!info->word_wrap || info->text_len == 0) return 0;
++	extern int g_swf_version;
++	const int swf8 = g_swf_version >= 8;
++	const unsigned char* t = (const unsigned char*)info->text_utf8;
++	size_t len = info->text_len;
++	u16* cps = (u16*)malloc(len * sizeof(u16));
++	float* adv = (float*)malloc(len * sizeof(float));
++	size_t* boff = (size_t*)malloc(len * sizeof(size_t));
++	short* rix = (short*)malloc(len * sizeof(short));
++	size_t* brk = (size_t*)malloc(len * sizeof(size_t));
++	if (!cps || !adv || !boff || !rix || !brk) {
++		free(cps); free(adv); free(boff); free(rix); free(brk); return 0;
++	}
++	int base_fi = ng_find_font_with_metrics(info->font_id);
++	// Decode + per-char advance (same arithmetic as the draw pass).
++	int n = 0, run_idx = 0;
++	size_t pos = 0;
++	while (pos < len) {
++		u16 fh = info->font_height, fid = 0;
++		int ri = -1;
++		if (info->runs && info->run_count > 0) {
++			while (run_idx < info->run_count &&
++			       pos >= (size_t)(info->runs[run_idx].byte_start + info->runs[run_idx].byte_length))
++				run_idx++;
++			if (run_idx < info->run_count && pos >= (size_t)info->runs[run_idx].byte_start) {
++				ri = run_idx;
++				if (info->runs[run_idx].font_height > 0) fh = info->runs[run_idx].font_height;
++				fid = info->runs[run_idx].font_id;
++			}
++		}
++		size_t start = pos;
++		unsigned char c0 = t[pos];
++		u16 cp;
++		if (c0 == 0xFE || c0 == 0xFF) { cp = '\n'; pos += 1; }
++		else if (c0 >= 0xC0 && c0 < 0xE0 && pos + 1 < len) {
++			cp = ((c0 & 0x1F) << 6) | (t[pos + 1] & 0x3F); pos += 2;
++		} else if (c0 >= 0xE0 && c0 < 0xF0 && pos + 2 < len) {
++			cp = ((c0 & 0x0F) << 12) | ((t[pos + 1] & 0x3F) << 6) | (t[pos + 2] & 0x3F); pos += 3;
++		} else { cp = c0; pos += 1; }
++		float a = 0.0f;
++		if (cp != '\n' && cp != '\r') {
++			int fi = base_fi;
++			if (fid) { int f2 = ng_find_font_with_metrics(fid); if (f2 >= 0) fi = f2; }
++			s16 asc, dsc; int em = 1024;
++			if (fi >= 0 && ng_font_get_metrics(fi, &asc, &dsc, &em) && em) {
++				int gi = ng_font_find_glyph(fi, cp);
++				if (gi >= 0) {
++					s32 ad = ng_font_glyph_advance_by_idx(fi, gi);
++					if (ad >= 0) {
++						ad += tf_kern_units(info, run_idx, fi, cp, pos);
++						a = tf_glyph_advance_twips(ad, (float)fh / (float)em, info->device_font);
++					}
++				}
++			}
++		}
++		cps[n] = cp; adv[n] = a; boff[n] = start; rix[n] = (short)ri;
++		n++;
++	}
++	const float max_bounds = info->w * 20.0f - 80.0f;   // content width (2*GUTTER)
++	const float width = max_bounds - (float)(info->right_margin_twips > 0 ? info->right_margin_twips : 0);
++	int nb = 0;
++	int i = 0;
++	while (i < n) {
++		// One hard line [i, he).
++		int he = i;
++		while (he < n && cps[he] != '\n' && cps[he] != '\r') he++;
++		float cursor = 0.0f;
++		int first = 1, start_of_line = 1;
++		int ss = i;
++		while (ss < he) {
++			int se = ss + 1;
++			while (se < he && rix[se] == rix[ss]) se++;
++			int bullet = (rix[ss] >= 0 && info->runs[rix[ss]].bullet) ? 1 : 0;
++#define TF_WW_OFFSET() ((float)(((first ? info->left_margin_twips + info->indent_twips \
++		: info->left_margin_twips) > 0) ? (first ? info->left_margin_twips + info->indent_twips \
++		: info->left_margin_twips) : 0) + (bullet ? 720.0f : 0.0f) + cursor)
++			int seg_n = se - ss, last = 0;
++			for (;;) {
++				int bp = tf_ww_wrap_line(cps + ss + last, adv + ss + last, seg_n - last,
++				                         width, TF_WW_OFFSET(), start_of_line, swf8);
++				if (bp < 0) break;
++				if (bp == 0) {
++					brk[nb++] = boff[ss + last];
++					cursor = 0.0f; first = 0; start_of_line = 1;
++					if (last >= seg_n) break;
++					continue;
++				}
++				cursor += tf_ww_sum(adv, ss + last, ss + last + bp);
++				start_of_line = 0;
++				last += bp;
++				if (last >= seg_n) break;
++				brk[nb++] = boff[ss + last];
++				cursor = 0.0f; first = 0; start_of_line = 1;
++			}
++#undef TF_WW_OFFSET
++			if (last < seg_n) {
++				cursor += tf_ww_sum(adv, ss + last, se);
++				start_of_line = 0;
++			}
++			ss = se;
++		}
++		i = he + 1;
++	}
++	free(cps); free(adv); free(boff); free(rix);
++	if (nb == 0) { free(brk); return 0; }
++	*out = brk;
++	return nb;
++}
++
+ // Callback for actionIterateTextFieldGlyphs: render text field glyph shapes.
+ // Reads glyph vertices from shape_data, applies CPU-side transform, renders via draw_tris.
+ // When info->runs is non-NULL, per-byte color and font_height are looked up
+@@ -7408,6 +7626,9 @@ typedef struct {
+ 	u8 align;        // 0=left, 1=right, 2=center, 3=justify
+ 	u8 bullet;
+ 	u16 first_fh;    // font_height of first run covering this paragraph
++	u8 cont;         // s27 w1-text-wordwrap: a soft-wrapped continuation line (no indent)
++	u8 soft_end;     // s27 w1-text-wordwrap: the line ends at a soft break
++	float trail_w;   // width of the trailing spaces (twips)
+ } TfParagraph;
+ #define TF_PARS_INLINE 32
+ 
+@@ -7431,6 +7652,24 @@ static int tf_pars_room(TfParagraph** pars, float** par_x, int* cap,
+ 	return 1;
+ }
+ 
++// s27 w2-avm1-text-layout: write a dynamic transform slot holding the 2x3
++// matrix m (a, b, c, d, tx, ty; tx/ty in stage twips). Returns 0 (the
++// identity slot) when the pool is exhausted.
++static u32 tf_glyph_xform_slot(const float m[6])
++{
++	u32 slot = g_next_dynamic_xform_slot;
++	if (slot >= g_xform_slot_capacity) return 0;
++	g_next_dynamic_xform_slot++;
++	float xf[16] = {
++		m[0], m[1], 0.0f, 0.0f,
++		m[2], m[3], 0.0f, 0.0f,
++		0.0f, 0.0f, 1.0f, 0.0f,
++		m[4], m[5], 0.0f, 1.0f,
++	};
++	renderer_write_transform(context, slot, xf);
++	return slot;
++}
++
+ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
+ {
+ 	GEN_EXTERN_SHAPE_DATA;
+@@ -7499,11 +7738,36 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	// would be cut off at the field's right edge (~x=192 in text_field_mask)
+ 	// instead of running the full width of the text.
+ 	int has_clip = (mask_w > 0.0f && mask_h > 0.0f) && !g_clip_mask_capture;
++
++	// s27 w2-avm1-text-layout: a scaled / rotated field (has_matrix) is laid
++	// out in FIELD-LOCAL twips and composed through its world matrix W, the
++	// way Ruffle's render_self does: the mask is `W * bounds` (local), the
++	// text is `W * layout_to_local * lbox origin * glyph`. Device-font text
++	// keeps its aspect ratio: layout_to_local gains scale(d/a, 1)
++	// (device_font_scale_x) and the layout width shrinks by the same factor
++	// (local_width_to_layout_width). Otherwise (identity linear part)
++	// everything below is the historical stage-twip path, unchanged.
++	const int tf_mm = info->has_matrix;
++	float tf_w[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
++	float tf_sx = 1.0f;
++	TextFieldGlyphInfo tf_layout_info;
++	if (tf_mm) {
++		tf_w[0] = info->m_a; tf_w[1] = info->m_b; tf_w[2] = info->m_c; tf_w[3] = info->m_d;
++		tf_w[4] = info->m_tx; tf_w[5] = info->m_ty;
++		if (info->device_xform && info->m_a != 0.0f) tf_sx = info->m_d / info->m_a;
++		if (!(tf_sx > 0.0f) || !isfinite(tf_sx)) tf_sx = 1.0f;
++	}
+ 	if (has_clip) {
++		u32 mslot = tf_mm ? tf_glyph_xform_slot(tf_w) : 0;
+ 		renderer_begin_clip_mask(context);
+-		renderer_draw_rect(context, mask_x, mask_y, mask_w, mask_h, 1.0f, 1.0f, 1.0f, 1.0f, 0, 0);
++		renderer_draw_rect(context, mask_x, mask_y, mask_w, mask_h, 1.0f, 1.0f, 1.0f, 1.0f, mslot, 0);
+ 		renderer_end_clip_mask(context);
+ 	}
++	if (tf_mm && tf_sx != 1.0f) {
++		tf_layout_info = *info;
++		tf_layout_info.w = info->w / tf_sx;
++		info = &tf_layout_info;
++	}
+ 
+ 	// Baseline = ascent at the largest font_height present (Flash text layout
+ 	// aligns mixed-size glyphs to a shared baseline that fits the tallest run).
+@@ -7538,6 +7802,10 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			y_pos -= (float)hidden_lines * tf_line_pitch_twips(ascent, descent, em_square,
+ 			                                                   info->font_height, info->leading_twips);
+ 	}
++	// s27 w2-avm1-text-layout: line 0's baseline and its ascent, so a glyph's
++	// pen position splits into Ruffle's three composed translations.
++	const float tf_y0_base = y_pos;
++	const float tf_asc0 = (float)(s32)((float)ascent * baseline_scale);
+ 
+ 	// Per-glyph vertex buffer. SWF glyphs are stored as triangulated fills in
+ 	// shape_data, and complex glyphs can hold many vertices (e.g. Bitstream
+@@ -7559,6 +7827,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	// w2-robustness-land; it was a fixed 32, so paragraph 33+ of a long field
+ 	// lost its align / bullet / indent offset and drew left-aligned). Local,
+ 	// not static, so a nested render of another field cannot clobber it.
++	size_t* sb = NULL;
++	int sb_n = tf_soft_wrap_breaks(info, &sb);   // s27 w1-text-wordwrap
+ 	TfParagraph pars_inline[TF_PARS_INLINE];
+ 	float par_x_inline[TF_PARS_INLINE];
+ 	TfParagraph* pars = pars_inline;
+@@ -7575,9 +7845,35 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		pars[0].align = 0;
+ 		pars[0].bullet = 0;
+ 		pars[0].first_fh = info->font_height;
++		pars[0].cont = 0; pars[0].soft_end = 0; pars[0].trail_w = 0.0f;
+ 		int par_has_run = 0;
++		int sb_mi = 0;
++		float trail = 0.0f;
+ 
+ 		while (pos < text_len) {
++			// s27 w1-text-wordwrap: a soft break closes the line here without
++			// consuming a character; the next line is a continuation line.
++			if (sb_mi < sb_n && pos == sb[sb_mi]) {
++				sb_mi++;
++				if (MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
++					pars[cur_par].end_byte = pos;
++					pars[cur_par].soft_end = 1;
++					pars[cur_par].trail_w = trail;
++					u8 a = pars[cur_par].align, b = pars[cur_par].bullet; u16 f = pars[cur_par].first_fh;
++					cur_par++;
++					if (MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
++						pars[cur_par].start_byte = pos;
++						pars[cur_par].width = 0.0f;
++						pars[cur_par].align = a;
++						pars[cur_par].bullet = b;
++						pars[cur_par].first_fh = f;
++						pars[cur_par].cont = 1; pars[cur_par].soft_end = 0; pars[cur_par].trail_w = 0.0f;
++					}
++				}
++				trail = 0.0f;
++				par_has_run = 0;
++				continue;
++			}
+ 			u16 cur_fh = info->font_height;
+ 			u8 cur_align = 0;
+ 			u8 cur_bullet = 0;
+@@ -7631,7 +7927,9 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 					pars[cur_par].align = 0;
+ 					pars[cur_par].bullet = 0;
+ 					pars[cur_par].first_fh = info->font_height;
++					pars[cur_par].cont = 0; pars[cur_par].soft_end = 0; pars[cur_par].trail_w = 0.0f;
+ 				}
++				trail = 0.0f;
+ 				par_has_run = 0;
+ 				continue;
+ 			}
+@@ -7643,7 +7941,9 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			if (adv >= 0 && MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
+ 				float scale = (float)cur_fh / (float)run_em;
+ 				adv += tf_kern_units(info, run_idx, run_font_idx, cp, pos);
+-				pars[cur_par].width += tf_glyph_advance_twips(adv, scale, info->device_font);
++				float _aw = tf_glyph_advance_twips(adv, scale, info->device_font);
++				pars[cur_par].width += _aw;
++				trail = (cp == ' ') ? trail + _aw : 0.0f;
+ 			}
+ 		}
+ 		if (par_has_run && MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
+@@ -7664,6 +7964,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			pars[0].align = (info->runs && info->run_count > 0) ? info->runs[0].align : 0;
+ 			pars[0].bullet = 0;
+ 			pars[0].first_fh = info->font_height;
++			pars[0].cont = 0; pars[0].soft_end = 0; pars[0].trail_w = 0.0f;
+ 			par_count = 1;
+ 		}
+ 	}
+@@ -7688,9 +7989,20 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	float usable_line_width = line_width - (float)first_line_left_off - right_off;
+ 	if (usable_line_width < 0.0f) usable_line_width = 0.0f;
+ 	memset(par_x_offset, 0, (size_t) pars_cap * sizeof(float));
++	s32 cont_left_off = info->left_margin_twips > 0 ? info->left_margin_twips : 0;
+ 	for (int p = 0; p < par_count; p++) {
+ 		float bul = pars[p].bullet ? 720.0f : 0.0f;
+-		float remaining = usable_line_width - bul - pars[p].width;
++		// s27 w1-text-wordwrap: a continuation line has no first-line indent
++		// (Ruffle left_alignment_offset, is_first_line = false), and from
++		// SWF8 a non-left line is aligned without its trailing spaces
++		// (fixup_line `text.trim_end()`); applied to soft-ended lines only.
++		s32 lo = pars[p].cont ? cont_left_off : first_line_left_off;
++		float ulw = pars[p].cont ? (line_width - (float)lo - right_off) : usable_line_width;
++		if (ulw < 0.0f) ulw = 0.0f;
++		float pw = pars[p].width;
++		{ extern int g_swf_version;
++		  if (pars[p].soft_end && g_swf_version >= 8 && pars[p].align != 0) pw -= pars[p].trail_w; }
++		float remaining = ulw - bul - pw;
+ 		float offset = 0.0f;
+ 		if (pars[p].align == 1) offset = remaining;            // right
+ 		else if (pars[p].align == 2) {                          // center
+@@ -7703,7 +8015,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		}
+ 		// justify: fall back to left for single-glyph paragraphs
+ 		if (offset < 0.0f) offset = 0.0f;
+-		par_x_offset[p] = (float)first_line_left_off + bul + offset;
++		par_x_offset[p] = (float)lo + bul + offset;
+ 	}
+ 
+ 	// Draw pass: same walk as measure, but pull per-paragraph x_offset at
+@@ -7732,7 +8044,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			unsigned char c = (unsigned char)text[i];
+ 			if (c == '\n' || c == '\r' || c == 0xFE || c == 0xFF) { multiline = 1; break; }
+ 		}
+-		if (!multiline) {
++		// s27 w1-text-wordwrap: a soft-wrapped field is multi-line too.
++		if (!multiline && sb_n == 0) {
+ 			// Caret pixel offset from the text origin (paragraph offset + the
+ 			// glyph advances up to the caret).
+ 			float caret_off = (par_count > 0 ? par_x_offset[0] : 0.0f);
+@@ -7780,6 +8093,26 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	int at_par_start = 1;
+ 	(void)at_par_start;
+ 
++	// s27 w2-avm1-text-layout: matrix mode. tf_l = layout_to_local's
++	// translation (bounds min + GUTTER - scroll, local twips); M1 = W * T(L)
++	// with Ruffle's whole-twip rounding of the pushed translation, M2 = M1 *
++	// scale(sx, 1). Rects in LAYOUT space (selection, caret) are drawn
++	// relative to L through a slot holding M2.
++	float tf_lx = 0.0f, tf_ly = 0.0f;
++	float tf_m2[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
++	u32 tf_rect_slot = 0;
++	float tf_rdx = 0.0f, tf_rdy = 0.0f;
++	if (tf_mm) {
++		tf_lx = base_x;
++		tf_ly = tf_y0_base - tf_asc0;
++		tf_m2[0] = tf_w[0] * tf_sx; tf_m2[1] = tf_w[1] * tf_sx;
++		tf_m2[2] = tf_w[2];         tf_m2[3] = tf_w[3];
++		tf_m2[4] = tf_w[4] + rintf(tf_w[0] * tf_lx + tf_w[2] * tf_ly);
++		tf_m2[5] = tf_w[5] + rintf(tf_w[1] * tf_lx + tf_w[3] * tf_ly);
++		tf_rdx = tf_lx; tf_rdy = tf_ly;
++	}
++#define TF_RECT_SLOT() (tf_mm ? (tf_rect_slot ? tf_rect_slot : (tf_rect_slot = tf_glyph_xform_slot(tf_m2))) : 0u)
++
+ 	// Selection highlight (single-line, focused field): Ruffle edit_text.rs
+ 	// render_selection_background_for_line draws a BLACK box (GRAY when the
+ 	// field is unfocused but alwaysShowSelection — our producer only reports a
+@@ -7804,7 +8137,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			unsigned char c = (unsigned char)text[i];
+ 			if (c == '\n' || c == '\r' || c == 0xFE || c == 0xFF) { sel_multiline = 1; break; }
+ 		}
+-		if (!sel_multiline) {
++		if (!sel_multiline && sb_n == 0) {   // s27 w1-text-wordwrap
+ 			float sscale = (float)info->font_height / (float)em_square;
+ 			float xx = base_x + (par_count > 0 ? par_x_offset[0] : 0.0f);
+ 			float x_lo = -1.0f, x_hi = -1.0f;
+@@ -7833,8 +8166,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 				float sb_scale = (float)baseline_fh / (float)em_square;
+ 				float sel_top = y_pos - (float)(s32)((float)ascent * sb_scale);
+ 				float sel_h = (float)(ascent + descent) * sb_scale;
+-				renderer_draw_rect(context, x_lo, sel_top, x_hi - x_lo, sel_h,
+-					0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
++				renderer_draw_rect(context, x_lo - tf_rdx, sel_top - tf_rdy, x_hi - x_lo, sel_h,
++					0.0f, 0.0f, 0.0f, 1.0f, TF_RECT_SLOT(), 0);
+ 				sel_invert_lo = sel_lo;
+ 				sel_invert_hi = sel_hi;
+ 			}
+@@ -7863,7 +8196,36 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	float caret_baseline = y_pos;
+ #endif
+ 
++	int sb_di = 0;
++	// s27 w1-text-wordwrap: Flash whole-line culling. Ruffle edit_text.rs
++	// render_layout_box documents it ("[KJ] FP always displays the first
++	// visible line ..., culls any other line which is not fully visible";
++	// Ruffle itself only culls lines whose TOP is below the box, which is why
++	// avm1/edittext_tag_indent is known_failure there). A line other than the
++	// first visible one is drawn only when its bottom (top + ascent +
++	// descent) is inside height - 2*GUTTER. SCOPE: soft-wrapped
++	// fields only (sb_n > 0), so hard-line-only fields keep today's render.
++	int cull_from = INT_MAX;
++	if (sb_n > 0) {
++		float pitch = tf_line_pitch_twips(ascent, descent, em_square, info->font_height, info->leading_twips);
++		float s_fh = (float)info->font_height / (float)em_square;
++		float asc_desc = (float)((s32)((float)ascent * s_fh) + (s32)((float)descent * s_fh));
++		float target = info->h * 20.0f - 2.0f * gutter_twips;
++		for (int k = 1; pitch > 0.0f && k < 100000; k++) {
++			if ((float)k * pitch + asc_desc > target) { cull_from = hidden_lines + k; break; }
++		}
++	}
+ 	while (pos < text_len) {
++		// s27 w1-text-wordwrap: soft line break (consumes no character).
++		if (sb_di < sb_n && pos == sb[sb_di]) {
++			sb_di++;
++			par_idx++;
++			x_pos = base_x + (par_idx < par_count ? par_x_offset[par_idx] : 0.0f);
++			y_pos += tf_line_pitch_twips(ascent, descent, em_square,
++			                             info->font_height, info->leading_twips);
++			line_no++;
++			continue;
++		}
+ 		// Resolve run covering this byte position (runs are in order, monotonic).
+ 		u32 cur_color = info->text_color;
+ 		u16 cur_fh = info->font_height;
+@@ -7956,7 +8318,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		//    global (the OFFSCREEN_RENDER layout turns that OOB into a SIGABRT).
+ 		// Bound-check against the actual glyph_data length (4 u32 per glyph).
+ 		// The pen still advances below for layout either way.
+-		if (line_no >= hidden_lines
++		if (line_no >= hidden_lines && line_no < cull_from
+ 		    && !ng_font_is_builtin(run_font_idx) && (4 * global_idx + 1) < glyph_data_entries) {
+ 		// glyph_base is already a COMBINED glyph index (tagDefineFontGlyphBase
+ 		// re-bases it), and the generated `glyph_data` / `shape_data` symbols
+@@ -7973,6 +8335,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 
+ 		if (g_size > 0 && g_size <= TF_GLYPH_MAX_VERTS) {
+ 			// Transform glyph vertices: scale from EM space + translate to position
++			if (!tf_mm) {
+ 			for (size_t v = 0; v < g_size; v++) {
+ 				union { u32 u; float f; } vx, vy;
+ 				vx.u = _sd[g_offset + v][0];
+@@ -7980,6 +8343,27 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 				xy_buf[2 * v]     = vx.f * scale + x_pos;
+ 				xy_buf[2 * v + 1] = vy.f * scale + y_pos;
+ 			}
++			} else {
++				// s27 w2-avm1-text-layout: stage = M2 * T(lbox origin) *
++				// glyph{a=d=scale, tx=pen, ty=ascent}; each push rounds its
++				// translation to whole twips (render/src/matrix.rs `Mul`,
++				// f32 round-ties-even), the tag_text_glyph_compose rule.
++				float ox = (par_idx < par_count) ? par_x_offset[par_idx] : 0.0f;
++				float oy = y_pos - tf_y0_base;
++				float gx = x_pos - tf_lx - ox;
++				float gy = tf_asc0;
++				const float* m = tf_m2;
++				float gtx = m[4] + rintf(m[0] * ox + m[2] * oy) + rintf(m[0] * gx + m[2] * gy);
++				float gty = m[5] + rintf(m[1] * ox + m[3] * oy) + rintf(m[1] * gx + m[3] * gy);
++				float ga = m[0] * scale, gb = m[1] * scale, gc = m[2] * scale, gd = m[3] * scale;
++				for (size_t v = 0; v < g_size; v++) {
++					union { u32 u; float f; } vx, vy;
++					vx.u = _sd[g_offset + v][0];
++					vy.u = _sd[g_offset + v][1];
++					xy_buf[2 * v]     = ga * vx.f + gc * vy.f + gtx;
++					xy_buf[2 * v + 1] = gb * vx.f + gd * vy.f + gty;
++				}
++			}
+ 			renderer_draw_tris(context, xy_buf, (u32)g_size, r, g, b, 1.0f, 0, 0);
+ 		}
+ 		} // end glyph-outline-available guard
+@@ -8031,17 +8415,28 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		float caret_top = caret_baseline - (float)(s32)((float)ascent * scale_b);
+ 		float caret_h = (float)(ascent + descent) * scale_b;
+ 		float caret_w = 20.0f; // 1px, independent of zoom (Ruffle draws a line)
+-		caret_x   = floorf((caret_x + 2.0f) / 20.0f) * 20.0f;
+-		caret_top = floorf((caret_top + 2.0f) / 20.0f) * 20.0f;
+ 		float cr = ((info->text_color >> 16) & 0xFF) / 255.0f;
+ 		float cg = ((info->text_color >> 8) & 0xFF) / 255.0f;
+ 		float cb = (info->text_color & 0xFF) / 255.0f;
++		if (!tf_mm) {
++		caret_x   = floorf((caret_x + 2.0f) / 20.0f) * 20.0f;
++		caret_top = floorf((caret_top + 2.0f) / 20.0f) * 20.0f;
+ 		renderer_draw_rect(context, caret_x, caret_top, caret_w, caret_h,
+ 			cr, cg, cb, 1.0f, 0, 0);
++		} else {
++			// s27 w2-avm1-text-layout: through the layout matrix, 1 device
++			// pixel wide along x (no pixel snap under a rotation).
++			float ax = sqrtf(tf_m2[0] * tf_m2[0] + tf_m2[1] * tf_m2[1]);
++			if (ax > 0.0f) caret_w = 20.0f / ax;
++			renderer_draw_rect(context, caret_x - tf_rdx, caret_top - tf_rdy, caret_w, caret_h,
++				cr, cg, cb, 1.0f, TF_RECT_SLOT(), 0);
++		}
+ 	}
+ #endif
++#undef TF_RECT_SLOT
+ 	if (pars != pars_inline) free(pars);
+ 	if (par_x_offset != par_x_inline) free(par_x_offset);
++	free(sb);
+ }
+ 
+ // Helper: render a single drawing path (fill + stroke), handling gradients
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 8a13378e..cb145857 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -736,3 +736,7 @@ regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased
+ # s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
+ # tier=1
+ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp
++# s27 w2-avm1-text-layout: AVM1 EditText glyphs under a scaled world matrix (+ embedded box pixel snap); AVM1 soft wrap.
++# tier=1
++regression/avm1_edittext_scaled_glyphs                 # scale 2 / 0.5 / (1.5,1), Flash golden  1 cmp
++regression/avm1_edittext_wordwrap_render               # soft wrap + whole-line cull            1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/create_test_swf.py
+new file mode 100644
+index 00000000..ba1f1653
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/create_test_swf.py
+@@ -0,0 +1,44 @@
++#!/usr/bin/env python3
++"""avm1_edittext_scaled_glyphs: a scaled/rotated timeline EditText scales its glyph run.
++
++s27 w1-text-glyph-fidelity item 1. actionIterateTextFieldGlyphs (action.c)
++composes only parent TRANSLATIONS ("scale/rotation composition is deferred"),
++and TextFieldGlyphInfo carries no matrix, so tag.c textfield_glyph_render_cb
++draws the glyphs of a scaled field at scale 1 while the box (TextFieldRenderInfo
++m_a..m_ty) is scaled: the text spills out of / shrinks inside its border.
++Ruffle: world * layout_to_local * translate(lbox origin) * glyph(a=d=height/em),
++each Matrix*Matrix rounding the rhs translation to whole twips.
++
++Square-glyph DefineFont2 of ../avm1_edittext_placed_cxform (one 'I' = x 100..400,
++y -700..0 em units, FontHeight 1024 twips = 1 em unit per twip), black "II",
++bordered, at three placements:
++  depth 1  scale 2       at (200, 200)
++  depth 2  scale 0.5     at (3000, 200)
++  depth 3  scale (1.5, 1) at (200, 2600)
++Golden: FLASH Player 32 capture (s27; Flash ~= Ruffle exporter up to the
++border-corner pixels). Landed by s27 w2-avm1-text-layout.
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++REPO = HERE.parent / "avm1_edittext_placed_cxform"
++sys.path.insert(0, str(REPO))
++import create_test_swf as base   # noqa  (font2, edittext, tag, BW, nbits_s, rect)
++
++def matrix(sx, sy, tx, ty):
++    w = base.BW(); w.u(1, 1)
++    a, d = int(round(sx * 65536)), int(round(sy * 65536))
++    nb = base.nbits_s(a, d); w.u(nb, 5); w.sb(a, nb); w.sb(d, nb)
++    w.u(0, 1)
++    nb = base.nbits_s(tx, ty); w.u(nb, 5); w.sb(tx, nb); w.sb(ty, nb)
++    return w.bytes()
++
++def place(depth, cid, m):
++    return base.tag(26, bytes([0x06]) + struct.pack('<HH', depth, cid) + m)
++
++tags = [base.tag(9, b'\xff\xff\xff'), base.font2(1), base.edittext(5, 1, (0, 0, 0), 'II'),
++        place(1, 5, matrix(2, 2, 200, 200)),
++        place(2, 5, matrix(0.5, 0.5, 3000, 200)),
++        place(3, 5, matrix(1.5, 1, 200, 2600)),
++        base.tag(1, b''), base.tag(0, b'')]
++body = base.rect(0, 4000, 0, 4000) + struct.pack('<HH', 30 << 8, 1) + b''.join(tags)
++(HERE / 'test.swf').write_bytes(b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(body)) + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..df1f1ea7364260cdf47abb26b0ceac2e5aa116b5
+GIT binary patch
+literal 840
+zcmeAS@N?(olHy`uVBq!ia0vp^CqS5k4M?tyST~P>ftlaa#WAE}&f7bVeTy6z90Ic*
+z?OXq(*QQD4>}<o;kv>NM8k}C=c(0lh)zkWRI+sFn<g`?#e=o1EW@mWsqaeV-<cLZ<
+z+){Sb@Yux14bHYz2T#0mm{%!SH_!0c?V7lGKa0$dHf_k{XX@W^H}CS>vfaOb*qmSe
+z@7wX8HS^9r|9tszRBB}A;Z+~5KYv=aSMRdP-Pm`w|L+y;jgyx<9kwh2(=MRZeEY9F
+z2@Pk|w~p8Nu6g^Q**8?zB<g7QE8G2&e(Y~)^Goyg$Jl#s&0qHS9hGBga!}xa62FrQ
+zXO!=ZeS7`-^~2{yIod0yAKr7`;AoSA00&d!z!L>lzgVZGTK-bqcXW9U`|TUe4gwr3
+zjpPzHO45Px6ZrVS;TXN?;rxl>tC<U5`_?H1>tK3z!!MVGn_v8AS1<X#^<|K7{=e$a
+zs@v>QRPJUsI{(?^m_<tEvB2b6&nxGf_iaz%M^6-JX@o59u}wOsSBV~<5w`AB_Ye8E
+z=TV{%5t&fdoNa4tj#*^Mym?Txb59kAe0r(EI-#fPMucMZgS7P-TlvZR)V&yhz|+;w
+JWt~$(69Aqj0-yi@
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/output.txt b/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/test.swf b/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..162b47d8353b80ddb80e67b59d1f145a16f95ee5
+GIT binary patch
+literal 161
+zcmZ<@59V0Nz`&5fAn(Ayeu05Oj*-Ec>Hq)#`aFyb4U9~|g^Ua=3?d8yqKT6hRS2C6
+ztvr}jbj5+eQ-S#eP}>*Ah!i7H0U(PZfs>UXfkFEKgHl4PB_jh+7X!n8kOTyHdNTB}
+zu`x2RGMr^#P+(w+<Y@r%nSlJG3=9nnrsWJL`q|i+f&7yV3=RyuY))N3ih%(D0D~W@
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/test.toml b/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/test.toml
+new file mode 100644
+index 00000000..c12dcf44
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_scaled_glyphs/test.toml
+@@ -0,0 +1,17 @@
++num_ticks = 1
++
++# s27 w2-avm1-text-layout. A scaled timeline EditText scales its glyph run
++# (TextFieldGlyphInfo has_matrix / m_a..m_ty; tag.c textfield_glyph_render_cb
++# composes world * layout_to_local * line origin * glyph with whole-twip
++# rounding) and its embedded-font box takes Ruffle's EditTextPixelSnapping
++# (textfield_render_cb). Golden = FLASH Player 32 (s27 coordinator capture,
++# w1-local-oracles/w1-text-glyph-fidelity/avm1_edittext_scaled_glyphs/
++# flash.png). The 9 allowed outlier CHANNELS are the 3 bottom-right border
++# corner pixels (one per box): Flash 15/111/111, ours 64 (corner class of
++# avm1_edittext_placed_cxform). Glyphs and every edge: 0 px.
++[image_comparisons.output]
++tolerance = 2
++max_outliers = 9
++
++[player_options]
++with_renderer = { optional = false }
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/create_test_swf.py
+new file mode 100644
+index 00000000..05ab6166
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/create_test_swf.py
+@@ -0,0 +1,207 @@
++#!/usr/bin/env python3
++"""avm1_edittext_wordwrap_render: the AVM1 EditText painter soft-wraps wordWrap fields.
++
++Pins (s27 w1-text-wordwrap): tag.c textfield_glyph_render_cb laid text out one
++line per HARD paragraph only (\\n, \\r, <p>/<br> sentinels), so a wordWrap field
++drew each paragraph as one line clipped at the field edge, while the trace-side
++metrics (ng_shared.c ng_wrap_count_lines: maxscroll/bottomScroll/textHeight)
++already wrapped. The AVM2 painter (avm2_text.c) has always wrapped.
++
++    DefineFont2 "F": 'A' = 400x600-unit square, ' ' and '-' empty; advance 512
++    (em 1024), so at 10 px every glyph advances exactly 5 px (100 twips).
++    Five SWF8 DefineEditText fields with WordWrap + Multiline, 10 px, black on
++    white with a border:
++      w  left   "AA AAA AAAA AA A AAA"        60 px wide: plain word wrap
++      c  centre "AA AAA AAAA AA A AAA"        centre, trailing-space trim (SWF8)
++      i  left   indent 20 px, leftMargin 5    continuation lines lose the indent
++      l  left   "AAAAAAAAAAAAAAAAAAAA"        one word wider than the field
++      h  left   "AA AAA\\rAAAA AA AAA-AAAA"  hard \\r + soft wraps + '-' break
++    Frame script traces maxscroll / bottomScroll / textHeight of each, so the
++    trace axis pins the metric layout the render must agree with.
++
++s27 w2-avm1-text-layout: FONT REBUILT so that Flash can use it. The w1
++font drew NO glyph in Flash Player 32 and every field measured one line
++(w1-local-oracles/avm1_edittext_wordwrap_render/flash.txt), while Ruffle and we
++drew it. Diffed against avm1_edittext_scaled_glyphs' font (which Flash draws):
++  1. CodeTable order. w1 listed 'A', ' ', '-' (65, 32, 45): NOT ascending.
++     Flash looks a character up by binary search over the code table, so
++     65 is never found (mid = 32 < 65, then 45 < 65) while ' ' and '-' are:
++     no 'A' glyph and zero 'A' advance, i.e. nothing drawn and no wrap,
++     exactly the Flash capture (one line per field; 'h' 2 lines from \r).
++     Now ' ', '-', 'A' ascending, glyph/advance/bounds tables in that order.
++  2. Fill side. The 'A' square used FillStyle0 (left of a clockwise
++     contour = OUTSIDE); every Flash-authored glyph (and the scaled_glyphs
++     font) fills with FillStyle1 (inside). Now FillStyle1.
++  3. LanguageCode 1 (Latin), as scaled_glyphs. The rest already matched
++     (HasLayout, UseOutlines | HasFont | HasLayout on the EditText).
++Layout metrics are unchanged (advance 512, ascent 900, descent 200), so the
++expected wrap is unchanged: w/c 2 lines, i 3, l 2, h 3 (output.txt).
++
++Expected: output.txt = Ruffle exporter 0ddd12b6a on the w1 SWF (render-
++equivalent: same advances, same square, Ruffle ignores code-table order and
++fills either side). output.expected.png = the same exporter render (interim;
++FLASH golden is a LOCAL ORACLE REQUEST of s27 w2-avm1-text-layout).
++"""
++# ---- shared fixture helpers (s26 w2-robustness-land) ----
++import pathlib, struct, sys, zlib
++HERE = pathlib.Path(sys.argv[0]).resolve().parent
++
++def tag(code, body, force_long=False):
++    if len(body) < 0x3F and not force_long:
++        return struct.pack("<H", (code << 6) | len(body)) + body
++    return struct.pack("<HI", (code << 6) | 0x3F, len(body)) + body
++
++class BW:
++    def __init__(s): s.bits = []
++    def u(s, v, n):
++        for i in range(n - 1, -1, -1): s.bits.append((v >> i) & 1)
++    def sb(s, v, n): s.u(v & ((1 << n) - 1), n)
++    def bytes(s):
++        b = s.bits + [0] * ((-len(s.bits)) % 8)
++        return bytes(int("".join(map(str, b[i:i + 8])), 2) for i in range(0, len(b), 8))
++
++def rect(x0, x1, y0, y1, nb=16):
++    w = BW(); w.u(nb, 5)
++    for v in (x0, x1, y0, y1): w.sb(v, nb)
++    return w.bytes()
++
++def matrix_t(tx, ty):            # translate-only MATRIX (twips)
++    w = BW(); w.u(0, 1); w.u(0, 1); w.u(16, 5); w.sb(tx, 16); w.sb(ty, 16)
++    return w.bytes()
++
++def cxform_mult(rm, gm, bm):     # CXFORM (no alpha) with mult terms only, 8.8
++    w = BW(); w.u(0, 1); w.u(1, 1); w.u(10, 4)
++    for v in (rm, gm, bm): w.sb(v, 10)
++    return w.bytes()
++
++def s(x): return x.encode() + b"\0"
++
++def push(*items):
++    b = b""
++    for it in items:
++        if it is None: b += b"\x03"
++        elif isinstance(it, bool): b += b"\x05" + bytes([1 if it else 0])
++        elif isinstance(it, str): b += b"\x00" + s(it)
++        elif isinstance(it, int): b += b"\x07" + struct.pack("<i", it)
++    return b"\x96" + struct.pack("<H", len(b)) + b
++
++GETVAR, SETVAR, GETMEM, SETMEM, ADD2, TRACE, STOP, PLAY, POP = (
++    b"\x1c", b"\x1d", b"\x4e", b"\x4f", b"\x47", b"\x26", b"\x07", b"\x06", b"\x17")
++CALLM, CALLF, NEWOBJ, TYPEOF, RETURN = b"\x52", b"\x3d", b"\x40", b"\x44", b"\x3e"
++SHOW = tag(1, b"")
++def doaction(a): return tag(12, a + b"\0")
++def v(n): return push(n) + GETVAR
++def g(code, prop): return code + push(prop) + GETMEM
++def callm(obj_code, meth, *args):
++    return push(*reversed(args), len(args)) + obj_code + push(meth) + CALLM
++def callf(name, *args):
++    return push(*reversed(args), len(args), name) + CALLF
++def line(*parts):
++    c = push(parts[0]) if isinstance(parts[0], str) else parts[0]
++    for p in parts[1:]:
++        c += (push(p) if isinstance(p, str) else p) + ADD2
++    return c + TRACE
++
++def square_records(W, H, fillbits=1, x0=0, y0=0):
++    w = BW(); w.u(fillbits, 4); w.u(0, 4)
++    nb = 16
++    w.u(0, 1); w.u(0, 1); w.u(0, 1); w.u(0, 1); w.u(1, 1); w.u(1, 1)  # fs1, moveto
++    w.u(nb, 5); w.sb(x0, nb); w.sb(y0, nb)
++    w.u(1, fillbits)
++    def edge(dx, dy):
++        w.u(1, 1); w.u(1, 1); w.u(nb - 2, 4)
++        if dy == 0: w.u(0, 1); w.u(0, 1); w.sb(dx, nb)
++        else: w.u(0, 1); w.u(1, 1); w.sb(dy, nb)
++    edge(W, 0); edge(0, H); edge(-W, 0); edge(0, -H)
++    w.u(0, 6)
++    return w.bytes()
++
++def shape_rect(sid, wpx, hpx, rgb):
++    W, H = wpx * 20, hpx * 20
++    b = struct.pack("<H", sid) + rect(0, W, 0, H)
++    b += bytes([1, 0x00]) + bytes(rgb) + b"\x00"   # 1 solid fill, 0 line styles
++    b += square_records(W, H, 1)
++    return tag(2, b)
++
++def sprite(sid, frames):
++    return tag(39, struct.pack("<HH", sid, len(frames)) + b"".join(f + SHOW for f in frames) + tag(0, b""), force_long=True)
++
++def write_swf(defs_and_frames, nframes, w=200, h=150, version=8, bg=b"\xff\xff\xff"):
++    body = tag(69, struct.pack("<I", 0)) + tag(9, bg) + defs_and_frames + tag(0, b"")
++    hdr = rect(0, w * 20, 0, h * 20) + struct.pack("<HH", 30 << 8, nframes)
++    out = sys.argv[1] if len(sys.argv) > 1 else str(HERE / "test.swf")
++    open(out, "wb").write(b"FWS" + bytes([version]) + struct.pack("<I", 8 + len(hdr) + len(body)) + hdr + body)
++
++def cxformwa_mult(rm, gm, bm, am):   # CXFORMWITHALPHA, mult terms only (8.8)
++    w = BW(); w.u(0, 1); w.u(1, 1); w.u(10, 4)
++    for x in (rm, gm, bm, am): w.sb(x, 10)
++    return w.bytes()
++
++def place2(flags, depth, cid=None, mat=None, cx=None, name=None):
++    b = bytes([flags]) + struct.pack("<H", depth)
++    if cid is not None: b += struct.pack("<H", cid)
++    if mat is not None: b += mat
++    if cx is not None: b += cx
++    if name is not None: b += s(name)
++    return tag(26, b)
++
++# ---- fixture ----
++def glyph_square_fs1(W, H, x0, y0):
++    """Glyph SHAPE: one W x H square at (x0, y0), filled on its RIGHT side
++    (FillStyle1) along the clockwise (y-down) contour, the Flash convention."""
++    w = BW(); w.u(1, 4); w.u(0, 4)
++    nb = 16
++    w.u(0, 1); w.u(0, 1); w.u(0, 1); w.u(1, 1); w.u(0, 1); w.u(1, 1)  # fs1, moveto
++    w.u(nb, 5); w.sb(x0, nb); w.sb(y0, nb)
++    w.u(1, 1)                                          # FillStyle1 = 1
++    def edge(dx, dy):
++        w.u(1, 1); w.u(1, 1); w.u(nb - 2, 4)
++        if dy == 0: w.u(0, 1); w.u(0, 1); w.sb(dx, nb)
++        else: w.u(0, 1); w.u(1, 1); w.sb(dy, nb)
++    edge(W, 0); edge(0, H); edge(-W, 0); edge(0, -H)
++    w.u(0, 6)
++    return w.bytes()
++
++def font2(fid, name):
++    glyph = glyph_square_fs1(400, 600, 0, -600)        # 'A'
++    empty = bytes([0x10, 0x00])                        # numFill=1 numLine=0, EndShape
++    glyphs = [empty, empty, glyph]                     # ' ', '-', 'A' (ascending codes)
++    off = 2 * (len(glyphs) + 1)
++    offs = []
++    for gl in glyphs:
++        offs.append(off); off += len(gl)
++    table = b"".join(struct.pack("<H", o) for o in offs) + struct.pack("<H", off)
++    b = struct.pack("<HBB", fid, 0x80 | 0x04, 1) + bytes([len(name)]) + name.encode()
++    b += struct.pack("<H", len(glyphs)) + table + b"".join(glyphs)
++    b += struct.pack("<HHH", 32, 45, 65)                       # code table, ASCENDING
++    b += struct.pack("<hhh", 900, 200, 0) + struct.pack("<hhh", 512, 512, 512)
++    b += rect(0, 0, 0, 0) + rect(0, 0, 0, 0) + rect(0, 400, -600, 0) + struct.pack("<H", 0)
++    return tag(48, b, force_long=True)
++
++def edittext(cid, fid, w, h, text, align=0, lm=0, indent=0):
++    b = struct.pack("<H", cid) + rect(0, w * 20, 0, h * 20)
++    # text, WORDWRAP, multiline, ro, color, font | layout, noselect, border, outlines
++    b += bytes([0x80 | 0x40 | 0x20 | 0x08 | 0x04 | 0x01, 0x20 | 0x10 | 0x08 | 0x01])
++    b += struct.pack("<HH", fid, 200)                    # 10 px
++    b += bytes([0, 0, 0, 255])                           # black
++    b += bytes([align]) + struct.pack("<HHhh", lm * 20, 0, indent * 20, 0)
++    b += s("") + s(text)
++    return tag(37, b, force_long=True)
++
++T = "AA AAA AAAA AA A AAA"
++defs = font2(1, "F")
++defs += edittext(2, 1, 60, 60, T)
++defs += edittext(3, 1, 60, 60, T, align=2)
++defs += edittext(4, 1, 60, 60, T, lm=5, indent=20)
++defs += edittext(5, 1, 60, 60, "A" * 20)
++defs += edittext(6, 1, 60, 60, "AA AAA\rAAAA AA AAA-AAAA")
++f1 = b""
++for i, (cid, nm, x, y) in enumerate([(2, "w", 10, 10), (3, "c", 80, 10), (4, "i", 150, 10),
++                                      (5, "l", 10, 80), (6, "h", 80, 80)]):
++    f1 += place2(0x02 | 0x04 | 0x20, i + 1, cid=cid, mat=matrix_t(x * 20, y * 20), name=nm)
++probe = b""
++for nm in ("w", "c", "i", "l", "h"):
++    probe += line(nm + ": maxscroll=", g(v(nm), "maxscroll"), " bottomScroll=", g(v(nm), "bottomScroll"),
++                  " textHeight=", g(v(nm), "textHeight"))
++f1 += doaction(probe + STOP)
++write_swf(defs + f1 + SHOW, 1, w=220, h=150)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff505ae8cc086c1ff5f74a906f25f1d230d02dd0
+GIT binary patch
+literal 3510
+zcmcgveN0nV6fdCTV^Iv5beT>*tc!6=nrs=1uAx}Upqe?Sk_JCuA12M#Ru&sJ%76z1
+z$7*Ll5-_IPBFWUyNf#SnEG6A0Y-St2eFQov30wbYjfk-;G#1*voqOLaeZZqE3oa>#
+zbM8Io^xpIFJGZ)n2MRZ&Jd?uX@ixecq=(@D1pKupJpr`mqFWE^H8SbmBb9N}-z0Ph
+zO4`5oQXf4ycl+mSr}w|xt#<Y@pZ7j9w(qkTUwkS1LEyu__p7cpy{a6sjOWNtRE!Yo
+z8_eBb-?OKDTP!~@TXyEpE_3&sMe@N&u{<Qt`s!YnIc(l^ykex7Doz5uE^600Y_>UK
+zroUTJ>ZxdH6bQ1CWkr&-*0o{1dn~>^ww>U*G;s~x(q{zMmRow)V?20Li`tjn(x?vG
+z5!uoD<uJtuVwa}%1}F&-K6g-w9r&_597G*oio?mnp^eYOLg^-!Mlz2j=m-lLxJ2#+
+zwLwqy9nZtvCf{z9kw=%vz*eIv#%8WZlZ(R)7N%Q1AS}zpo5*t}WZI>Hb?h0P4i>97
+zQoqYk{@2yvTCio}Qiwy!k~AI`yyemum31WCRyyBPX7KpOEunEpepC?kIcldJ?gB5`
+zVTAqxztWyVPWP0}_XL_}j#_4q+R#dBl%-l7RW}?iq@nHLVgna!qsoDFaB3M&7+8g+
+zp2K>YkEb2A>e8oJg3+n8`<1>7-dK(>UiOEZdJ;%kcCs@_WC7VPc-ue;fe>+AZFc2v
+z%M6OR=odxJsKU!)gE+3KGbN_k5|J1uCjnGy(z#jca1F`>t-q2fN#f$j1DB>DZkG5Q
+z)yiM>xl`6${i>`7ipQg=>>%g9AaPYNYyf-&wr;y?1vigU8&n2<y+E~Hmw5A>VB75+
+zvN=jyD>I!%u6mU(qX1gtLeY0QRGLiGq851bdbPDtdVVlr?6tJilLmg9K;;vjZ&VvI
+zB6<sZo<h*rf|lt`+<o@C7{GQt_<W6DK|m>4#q(C}o7G4Vo+ZQgNq0YMCot*43a3n=
+zG1IV~7HDn8l-?n(Ei=_FvSAB>H<-xys58u^mVyT7*$?&u7{7y&EFm;n9!lqCsh_f(
+z?t;wam8gR+3!<PeWP~~_gTTi}fSqF=TsaMMV5oMguU7BzAG6OM6ZK8b-I#PyPoH$!
+zk`{^_xn6Ra^-HD(hx30kZ2niXHvX@utGDYYAx0wpP)srIrWy~(l>d5FVW&fT*@57D
+zO^4~=l<m&c!_Laf4(+pRJEH;j!L@CpJY?W5GIRKK&PPKVj5(&gBW;Tt7Iix3f_pN5
+zaZ^V$-CZlaOXyPh(f%7o=85IAggrjAr<Q{`+ay?6g)pCi`OZp~K&zR<^8DUmeO_d|
+zV+<<;AcNR&PWoNcK5h(O(^YCS8s1HbfXs6*tjf|)gypbr4*wvbFUOf2gvg81=bl6_
+z929~GurFW?jrwRgsAz3ech9{NtL;&c5Y%es?~`Gb(WxN(3g1NTyj2WugfZ9>^{s@o
+zMAJ$;3~tjHTudo5Iq`AD(lv+kanYyFAOPfMMPhC+=3bSDn(OG{7)8xUedB2tooJC|
+zxA?3;r5Uj&b3G@Rh{Avn50=Ad@J_H0+qRP>F!0@v=La04ap^JeBw8g&G3G_A+&*rz
+z>$Xo(&u@_h3H)fJpOXvX@!9fER0jOhCq70HIeV8mI+Y~!54}97He2EM7*AGkK-w*N
+GtKlE{Ff3^R
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/output.txt b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/output.txt
+new file mode 100644
+index 00000000..63c81ee5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/output.txt
+@@ -0,0 +1,5 @@
++w: maxscroll=1 bottomScroll=2 textHeight=21
++c: maxscroll=1 bottomScroll=2 textHeight=21
++i: maxscroll=1 bottomScroll=3 textHeight=32
++l: maxscroll=1 bottomScroll=2 textHeight=21
++h: maxscroll=1 bottomScroll=3 textHeight=32
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/test.swf b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..8a79dcacdb7eee16083226bbd67cc2877413b000
+GIT binary patch
+literal 1150
+zcma)*ze~eF6vw}pq_t|abx{Pdx3pU~K@>_Gl-9|mLnjA~#RO6+8fYiYP!OTeOj-Ra
+z+#UTJ{0E%+H^leS9~Kj8-f_o!@4jE|a|hRGw{lM!-~q2RuRd@naJ~bIGbIeen%<^V
+zU?@aGMGhO#AyMG53l!gr-hSRMjmO{lw=a)&DljlqKiRMF@Hpe}qIH_+FOxc#&+A9D
+zD!f;U=Hx^m@`lu(g<(izIysS1HFK&-PGxSy3a6Ij#4TBULCXqfCegWcCc*v*qCF--
+z_CF`zbBn#vJq@G6IY!yCpf{4j7k-~B1uCTO3E$*Og$B8IFMOLT4H;JIp2Jm!&LpMo
+zS*WQadYB*&^iO5?dhlpI^c<&(K&1{2f=yu2#bq-n0P?2iy1i~|rfklo+raV;tEna3
+z&cMCs*mss&#X_qCzkO1cnZS$@nCS^vnwEgIi3E0xz)nxV(zFDuO(bw)1WtMamZl|O
+YZ6bjcBe2pFurw_JYhwg!sMDAD0ZES#?*IS*
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/test.toml b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/test.toml
+new file mode 100644
+index 00000000..88a7d714
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_wordwrap_render/test.toml
+@@ -0,0 +1,16 @@
++num_frames = 1
++
++# s27 w2-avm1-text-layout. AVM1 EditText soft wrap in the native painter
++# (tag.c textfield_glyph_render_cb + tf_soft_wrap_breaks). Font rebuilt so
++# Flash can use it (see create_test_swf.py). Goldens (INTERIM, Ruffle):
++# output.txt + output.expected.png = Ruffle exporter 0ddd12b6a (vulkan) on
++# the render-equivalent w1 SWF. The 45 allowed outlier CHANNELS are the 15
++# TL/TR/BL border-corner pixels of the 5 boxes the exporter draws 3/4-covered
++# (64 vs our solid 0; the avm1_edittext_placed_cxform class). Glyphs: 0 px.
++# A FLASH capture of this SWF (trace + image) replaces both when it lands.
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 45
++
++[player_options]
++with_renderer = { optional = false }
