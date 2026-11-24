@@ -226,6 +226,85 @@ extern int catch_up_backward;
 extern size_t catch_up_target;
 #include <actionmodern/action_queue.h>
 
+// s27 w2-timers-land: the per-tick root goto retry loop, factored out of
+// tagMain so it can run a second time after the event pumps (timers, LoadVars,
+// LocalConnection, ...). A root goto issued by such a callback through the
+// method form (`_root.gotoAndStop(3)` -> actionCallMethod ->
+// ng_executeGotoTagsOnly) runs only the skipped frames' tags and leaves the
+// target frame to this loop; when the callback fires after the loop has run,
+// the request survived only as next_frame, and a STOPPED root (gotoAndStop,
+// nextFrame) never ran the target frame's DoAction at all (the interval that
+// was meant to be cleared there repeated forever). Flash (and Ruffle) run the
+// goto inside the callback and the target frame's actions right after it.
+// Key tests: regression/avm1_timer_root_goto_stopped_{gs,nf}.
+static void ng_runPendingRootGoto(SWFAppContext* app_context)
+{
+	frame_func* frame_funcs = app_context->frame_funcs;
+	{
+		int _goto_retry_limit = 16;
+		while (goto_from_action && manual_next_frame && _goto_retry_limit-- > 0)
+		{
+			size_t original_frame = current_frame;
+			size_t target = next_frame;
+			manual_next_frame = 0;
+			goto_from_action = 0;
+
+			ng_display_clear_after(app_context, target);
+
+			catch_up_mode = 1;
+			tagGotoInitCapture(1);
+			if (target <= original_frame)
+			{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+				actionRewindCleanup(app_context);  // defined only in the CI arms (browser twin: see the main-loop goto)
+#endif
+				catch_up_backward = 1;
+				catch_up_target = target;
+				for (size_t f = 0; f < target && f < g_frame_count; f++)
+				{
+					current_frame = f;
+					if (frame_funcs[f]) frame_funcs[f](app_context);
+				}
+				catch_up_mode = 0;
+				tagGotoInitCapture(0);
+				tagDrainGotoInitActions(app_context, 0);
+				if (target < g_frame_count)
+				{
+					current_frame = target;
+					if (frame_funcs[target]) frame_funcs[target](app_context);
+				}
+				catch_up_backward = 0;
+				ng_display_cleanup_unplaced_after(app_context, target);
+			}
+			else
+			{
+				for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
+				{
+					current_frame = f;
+					if (frame_funcs[f]) frame_funcs[f](app_context);
+				}
+				catch_up_mode = 0;
+				tagGotoInitCapture(0);
+				tagDrainGotoInitActions(app_context, 0);
+				if (target < g_frame_count)
+				{
+					current_frame = target;
+					if (frame_funcs[target]) frame_funcs[target](app_context);
+				}
+			}
+			current_frame = target;
+			g_deferred_root_goto = 0;
+		}
+	}
+}
+
+// Event-callback entry (timer.c processTimers, after each batch of timers due
+// at the same instant): see ng_runPendingRootGoto.
+void ng_runPendingRootGotoFromEvent(SWFAppContext* app_context)
+{
+	ng_runPendingRootGoto(app_context);
+}
+
 void ng_executeGotoCatchUp(SWFAppContext* app_context)
 {
 	if (!goto_from_action || !manual_next_frame) return;
@@ -274,6 +353,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	g_defer_sprite_init = 1;
 	catch_up_mode = 1;
 	actionGotoCatchupEnter();
+	tagGotoInitCapture(1);
 	if (target <= original_frame)
 	{
 		actionRewindCleanup(app_context);
@@ -296,8 +376,10 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 		}
 	}
 	actionGotoCatchupLeave();
+	tagGotoInitCapture(0);
 	catch_up_mode = 0;
 	g_tag_skip_mode = saved_tag_skip;
+	tagDrainGotoInitActions(app_context, 0);
 	(void)saved_defer_sprite;
 	current_frame = target;
 
@@ -346,6 +428,7 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
 	g_tag_skip_mode = 0;
 	g_defer_sprite_init = 1;
 	catch_up_mode = 1;
+	tagGotoInitCapture(1);
 	if (target <= original_frame)
 	{
 		actionRewindCleanup(app_context);
@@ -368,7 +451,9 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
 		}
 	}
 	catch_up_mode = 0;
+	tagGotoInitCapture(0);
 	g_tag_skip_mode = saved_tag_skip;
+	tagDrainGotoInitActions(app_context, 0);
 	g_defer_sprite_init = saved_defer_sprite;
 
 	current_frame = original_frame;
@@ -1257,55 +1342,7 @@ void tagMain(SWFAppContext* app_context)
 			}
 		}
 #endif
-		{
-			int _goto_retry_limit = 16;
-			while (goto_from_action && manual_next_frame && _goto_retry_limit-- > 0)
-			{
-				size_t original_frame = current_frame;
-				size_t target = next_frame;
-				manual_next_frame = 0;
-				goto_from_action = 0;
-
-				ng_display_clear_after(app_context, target);
-
-				catch_up_mode = 1;
-				if (target <= original_frame)
-				{
-					actionRewindCleanup(app_context);
-					catch_up_backward = 1;
-					catch_up_target = target;
-					for (size_t f = 0; f < target && f < g_frame_count; f++)
-					{
-						current_frame = f;
-						if (frame_funcs[f]) frame_funcs[f](app_context);
-					}
-					catch_up_mode = 0;
-					if (target < g_frame_count)
-					{
-						current_frame = target;
-						if (frame_funcs[target]) frame_funcs[target](app_context);
-					}
-					catch_up_backward = 0;
-					ng_display_cleanup_unplaced_after(app_context, target);
-				}
-				else
-				{
-					for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
-					{
-						current_frame = f;
-						if (frame_funcs[f]) frame_funcs[f](app_context);
-					}
-					catch_up_mode = 0;
-					if (target < g_frame_count)
-					{
-						current_frame = target;
-						if (frame_funcs[target]) frame_funcs[target](app_context);
-					}
-				}
-				current_frame = target;
-				g_deferred_root_goto = 0;
-			}
-		}
+		ng_runPendingRootGoto(app_context);
 
 		// Process deferred failed-load state and direct loadMovie inits
 		// queued by this tick's frame/sprite scripts. Mirrors swf_core.c
@@ -1365,6 +1402,10 @@ void tagMain(SWFAppContext* app_context)
 			processLocalConnectionMessages(app_context);
 			actionFlushPendingOnLoads(app_context);
 		}
+		// s27 w2-timers-land: a root goto issued by one of the callbacks above
+		// (timer, LoadVars onData, LocalConnection, ...) runs its target frame
+		// now, as Flash does, instead of being dropped when the root is stopped.
+		ng_runPendingRootGoto(app_context);
 
 		// Drain MCL pending loads queued during frame scripts / timers /
 		// onLoadInit chains. Mirrors swf_core.c lines ~1336-1345.

@@ -208,6 +208,8 @@ if [ "$GRAPHICS_FLAG" = true ]; then
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c" "${BUILD_DIR}/"  # AVM1 draw() timeline arm
+    cp "${SWFMODERN_SRC}/actionmodern/avm1_filter_kernels.c" "${BUILD_DIR}/"  # AVM1 applyFilter (s27)
+    cp "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${BUILD_DIR}/avm2_bitmap_kernels.inc"  # its kernel source, not globbed
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/graphics_stubs.c" "${BUILD_DIR}/"
@@ -229,6 +231,8 @@ else
     cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c" "${BUILD_DIR}/"  # AVM1 draw() timeline arm
+    cp "${SWFMODERN_SRC}/actionmodern/avm1_filter_kernels.c" "${BUILD_DIR}/"  # AVM1 applyFilter (s27)
+    cp "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${BUILD_DIR}/avm2_bitmap_kernels.inc"  # its kernel source, not globbed
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
 fi
 

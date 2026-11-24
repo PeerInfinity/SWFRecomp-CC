@@ -51,6 +51,9 @@ set(CORE_SOURCES
     # AVM1 BitmapData.draw()'s timeline arm uses the CPU shape rasterizer
     # (s26 w2-tail-bitmap-draw); it is self-contained (generated tables only).
     ${PROJECT_SOURCE_DIR}/src/avm2/avm2_cpu_raster.c
+    # AVM1 BitmapData.applyFilter (s27 w2-applyfilter-cm): re-compiles
+    # avm2_bitmap.c's kernel block (AVM2_BITMAP_KERNELS_ONLY).
+    ${PROJECT_SOURCE_DIR}/src/actionmodern/avm1_filter_kernels.c
 
     # Compile hashmap file directly to avoid undefined symbols on Linux
     ${PROJECT_SOURCE_DIR}/lib/c-hashmap/map.c

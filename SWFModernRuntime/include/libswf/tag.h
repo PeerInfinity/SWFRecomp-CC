@@ -125,31 +125,6 @@ void tagSetCacheAsBitmap(SWFAppContext* app_context, size_t depth, u8 on);
 void tagSetVisible(SWFAppContext* app_context, size_t depth, u8 visible);
 void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
     double r, double g, double b, double a);
-void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20);
-void tagSetFilterConvolution(SWFAppContext* app_context, size_t depth,
-    u8 matrixX, u8 matrixY, const float* matrix, float divisor, float bias,
-    u8 preserve_alpha, u8 clamp, u8 def_r, u8 def_g, u8 def_b, u8 def_a);
-void tagSetFilterGradient(SWFAppContext* app_context, size_t depth,
-    u8 type, u8 count, const u32* colors, const float* alphas, const u8* ratios,
-    float blur_x, float blur_y, float angle, float distance, float strength,
-    u8 quality, u8 flags);
-// Extended filter data accessor (returns pointer to static data or NULL)
-typedef struct ExtFilterData {
-    u8 type;          // 5=convolution, 6=colormatrix, 7=gradientglow, 8=gradientbevel
-    float cm_matrix[20];
-    u8 conv_mx, conv_my;
-    float conv_matrix[25];
-    float conv_divisor, conv_bias;
-    u8 conv_preserve_alpha, conv_clamp;
-    u8 conv_color_r, conv_color_g, conv_color_b, conv_color_a;
-    u8 grad_count;
-    u32 grad_colors[16];
-    float grad_alphas[16];
-    u8 grad_ratios[16];
-    float blur_x, blur_y, angle, distance, strength;
-    u8 quality, flags;
-} ExtFilterData;
-const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth);
 
 // Multi-filter list: stores ALL SWF-authored filters per display entry
 typedef struct FilterListEntry {
@@ -200,6 +175,7 @@ void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
     u8 quality, u8 flags);
 void tagEndFilterList(SWFAppContext* app_context, size_t depth);
 void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth);
+void tagSetColorMatrixFolded(SWFAppContext* app_context, size_t depth, u32 plain_cxform_id);
 const FilterListData* ng_getFilterListDataByDepth(size_t depth);
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
@@ -259,6 +235,11 @@ void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const 
 // Run a DoInitAction script, guarded by once-per-character-id.
 // Used for DoInitAction tags inside DefineSprite definitions.
 void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_func action);
+void tagDoInitActionFrame(SWFAppContext* app_context, size_t char_id, frame_func action);
+void tagDoInitActionFrameLate(SWFAppContext* app_context, size_t char_id, frame_func action, size_t def_frame);
+void tagDrainGotoInitActions(SWFAppContext* app_context, int force);
+void tagGotoInitCapture(int enter);
+void tagGotoInitTimerPass(int enter);
 
 // Forward declaration (defined in actionmodern/action.h)
 typedef struct MovieClip MovieClip;

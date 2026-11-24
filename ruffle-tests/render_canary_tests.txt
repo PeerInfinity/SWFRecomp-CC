@@ -754,3 +754,13 @@ from_gnash/misc-ming.all/BeginBitmapFill               # xtrace sprite text unde
 # s27 w2-avm2-text-tail: AVM2 DefineText scaled/rotated TextMatrix (world * T; Flash draw() golden, 0 px).
 # tier=1
 regression/avm2_definetext_matrix                    # AVM2 TextMatrix scale(2,1) + rot 90  1 cmp
+# s27 w2-flash-filter-kernels: applyFilter blur/glow output growth = ceil(PASS_SCALES[q-1]*blur/2)
+# (Flash capture: every non-text cell max diff 1); also sees the Flash integer glow model.
+# tier=1
+avm2/bitmapdata_applyfilter_blur                       # Flash growth rule (vs Ruffle golden) 1 cmp
+# s27 w2-applyfilter-cm: PlaceObject3 ColorMatrix vs FLASH (FP32 goldens): cx after a live CM chain, alpha-bias CM
+# live with empty texels kept empty and no blit snap, folded CM dropped by `filters = []`.
+# tier=1
+regression/avm1_po3_cm_live_under_cxform               # cx-after pass on a live CM chain       1 cmp
+regression/avm1_po3_cm_alpha_bias_edge                 # keep-empty bias, unsnapped AA rim      1 cmp
+regression/avm1_po3_cm_folded_clear                    # tagSetColorMatrixFolded restore        1 cmp

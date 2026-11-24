@@ -3684,9 +3684,32 @@ static inline int obj_filter_routed(const DisplayObject* obj)
 	    || (obj->cm_live && obj->filter_chain != NULL);
 }
 
+// s27 w2-applyfilter-cm: a LIVE ColorMatrix-only entry (no type 1-4 filter,
+// no cacheAsBitmap) whose chain carries an alpha bias > 0. FP32 does NOT snap
+// it: regression/avm1_po3_cm_alpha_bias_edge's rect at x 110.5 reads
+// half-coverage (255,127,127) at x = 110 and y = 80 (A' = 0.5 * 0.5 + 64/255),
+// where Ruffle snaps to whole pixels 111..169. Scoped to the alpha-bias case,
+// the only CM-only row with a Flash golden; the other live CMs
+// (avm1_po3_color_matrix_live, Ruffle-exporter golden) keep Ruffle's snap
+// until a Flash capture decides them.
+static int obj_live_cm_abias_only(const DisplayObject* obj)
+{
+	if (!obj->cm_live || obj->filter_type != 0 || obj->cache_as_bitmap) return 0;
+	const FilterListData* fl = (const FilterListData*) obj->filter_chain;
+	if (fl == NULL) return 0;
+	int abias = 0;
+	for (u8 i = 0; i < fl->count; i++)
+	{
+		if (fl->entries[i].type != 6) return 0;
+		if (fl->entries[i].cm_matrix[19] > 0.0f) abias = 1;
+	}
+	return abias;
+}
+
 // Entries Ruffle bitmap-caches: explicit cacheAsBitmap, or any filter list.
 static inline int cab_snaps(const DisplayObject* obj)
 {
+	if (obj_live_cm_abias_only(obj)) return 0;
 	return obj->cache_as_bitmap || obj_filter_routed(obj);
 }
 
@@ -5165,8 +5188,37 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		else if (filter_capture_needs_pad(app_context, obj, &reach))
 			renderer_set_filter_pad(context, reach);
 	}
+	// s27 w2-applyfilter-cm: a LIVE ColorMatrix-only chain on a shape leaf
+	// with a CPU-readable colour transform runs in the Flash/Ruffle order:
+	// source drawn with an IDENTITY cx, the CMs, then the cx as one more
+	// per-texel pass (Ruffle render_base draws the cache with the object's
+	// colour transform at the blit). FP32 capture of
+	// regression/avm1_po3_cm_live_under_cxform: grey 200, [CM x2, CM x0.5],
+	// cx 0.5 -> 63 (ours before: cx first, 100). A sprite's children carry
+	// its cx in their own composed slots, so sprites keep the old order (the
+	// recompiler folds those: swf.cpp PlaceCmCompose::live).
+	int cm_cx_after = 0;
+	// Baked placement cx only (!cx_overridden): an AS override may sit in a
+	// slot composed with an ancestor's tint, which an identity draw would drop.
+	if (src == NULL && obj->cm_live && have_obj_cx && !obj->cx_overridden
+	    && !cx_is_identity(obj_cx)
+	    && (dictionary[obj->char_id].type == CHAR_TYPE_SHAPE
+	        || dictionary[obj->char_id].type == CHAR_TYPE_MORPH_SHAPE))
+	{
+		cm_cx_after = 1;
+		for (int i = 0; i < chain_n; i++)
+			if (chain[i]->type != 6) { cm_cx_after = 0; break; }
+	}
 	renderer_begin_offscreen_pass(context);
-	filtered_draw_source(app_context, obj, src);
+	if (cm_cx_after)
+	{
+		u32 saved_cx = obj->cxform_id;
+		obj->cxform_id = 0;
+		filtered_draw_source(app_context, obj, src);
+		obj->cxform_id = saved_cx;
+	}
+	else
+		filtered_draw_source(app_context, obj, src);
 	renderer_end_offscreen_pass(context);
 	// Unchained: the snapshot IS the source, so take it now. Chained: the
 	// snapshot must be the layer entering the LAST filter, so it is taken
@@ -5214,6 +5266,10 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		// avm2_display.c avm2_render_filtered.
 		if (f->type == 6)
 		{
+			// s27 w2-applyfilter-cm: an alpha bias leaves a = 0 texels of the
+			// stage-sized layer empty (the object's cache in Flash/Ruffle
+			// holds only its bounds); see render_webgpu_set_cm_keep_empty.
+			if (f->cm_matrix[19] > 0.0f) renderer_set_cm_keep_empty(context, 1);
 			renderer_run_color_matrix(context, f->cm_matrix);
 			continue;
 		}
@@ -5246,6 +5302,20 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 			fr, fg, fb, fa, 0);
 		if (to_layer)
 			compose_chain_entry_to_layer(app_context, f, have_obj_cx, obj_cx);
+	}
+
+	if (cm_cx_after)
+	{
+		// The 20-float cxform (column-major 4x4, add / 255) as a 4x5 CM row
+		// matrix with the bias in 0..255.
+		float m20[20];
+		for (int r = 0; r < 4; r++)
+		{
+			for (int c = 0; c < 4; c++) m20[r * 5 + c] = obj_cx[c * 4 + r];
+			m20[r * 5 + 4] = obj_cx[16 + r] * 255.0f;
+		}
+		if (m20[19] > 0.0f) renderer_set_cm_keep_empty(context, 1);
+		renderer_run_color_matrix(context, m20);
 	}
 
 	renderer_resume_pass(context);
@@ -9873,8 +9943,14 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
 	}
 }
 
+size_t g_s27_root_frames_shown = 0; // s27 w1-timers-robustness prototype (tagDoInitActionFrameLate)
 void tagShowFrame(SWFAppContext* app_context)
 {
+	{
+		extern size_t current_frame;
+		if (g_current_movie_id == 0 && current_frame + 1 > g_s27_root_frames_shown)
+			g_s27_root_frames_shown = current_frame + 1;
+	}
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 	if (g_in_action_call) return;
@@ -12722,6 +12798,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// inheriting the previous occupant's list.
 	display_list[depth].filter_chain = NULL;
 	display_list[depth].cm_live = 0;
+	display_list[depth].cm_folded = 0;
 	display_list[depth].depth_swapped = 0;
 	display_list[depth].attach_registration = 0;
 	// Restore persistent button state if the same character is being re-placed
@@ -13322,6 +13399,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	// inheriting the previous occupant's list.
 	display_list[depth].filter_chain = NULL;
 	display_list[depth].cm_live = 0;
+	display_list[depth].cm_folded = 0;
 	display_list[depth].depth_swapped = 0;
 	display_list[depth].attach_registration = 0;
 	// Restore persistent button state if the same character is being re-placed
@@ -14795,6 +14873,126 @@ void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_fu
 	action(app_context);
 }
 
+// s27 w1-timers-robustness (landed w2-timers-land): DoInitAction blocks on frames a root
+// goto passes over. The recompiler used to gate every root-frame init call on
+// `!catch_up_mode || g_tag_skip_mode`, so a forward goto that skipped a frame
+// never ran its init actions (from a frame script AND from a timer). Flash
+// runs them (gnash misc-ming InitActionTest2 `mc6`, misc-swfc
+// movieclip_destruction_test1 `initaction mc3 in root frame4`,
+// gotoFrameFromInterval `x0xx1x234`). While a root goto catch-up is active
+// the call is queued (in frame order) and drained when the catch-up ends,
+// before the target frame's own scripts; inside a timer pass the drain waits
+// for the end of the batch of timers due at the same instant (Flash order in
+// gotoFrameFromInterval: both callbacks, then the init actions).
+// Other catch-up passes (loaded-movie / clone first passes) keep skipping.
+typedef struct { u8 movie; u16 id; frame_func fn; } PendingGotoInit;
+static PendingGotoInit* g_pending_goto_inits = NULL;
+static size_t g_pending_goto_inits_n = 0, g_pending_goto_inits_cap = 0;
+static int g_goto_init_capture = 0;
+static int g_goto_init_timer_pass = 0;
+
+void tagGotoInitCapture(int enter) { g_goto_init_capture += enter ? 1 : -1; }
+void tagGotoInitTimerPass(int enter) { g_goto_init_timer_pass += enter ? 1 : -1; }
+
+void tagDoInitActionFrame(SWFAppContext* app_context, size_t char_id, frame_func action)
+{
+	if (!catch_up_mode || g_tag_skip_mode) {
+		tagDoInitActionGuarded(app_context, char_id, action);
+		return;
+	}
+	if (g_goto_init_capture <= 0) return;
+	u8 movie = g_current_movie_id;
+	size_t id = char_id & 0xFFFF;
+	u8* row = g_init_action_done[movie];
+	if (row != NULL && (row[id >> 3] & (1u << (id & 7)))) return;
+	for (size_t i = 0; i < g_pending_goto_inits_n; i++)
+		if (g_pending_goto_inits[i].movie == movie && g_pending_goto_inits[i].id == id) return;
+	if (g_pending_goto_inits_n >= g_pending_goto_inits_cap
+	    && !ng_table_grow((void**)&g_pending_goto_inits, &g_pending_goto_inits_cap,
+	                      sizeof(*g_pending_goto_inits), 16)) return;
+	g_pending_goto_inits[g_pending_goto_inits_n].movie = movie;
+	g_pending_goto_inits[g_pending_goto_inits_n].id = (u16) id;
+	g_pending_goto_inits[g_pending_goto_inits_n].fn = action;
+	g_pending_goto_inits_n++;
+}
+
+// The init's sprite is defined later in the tag stream, in root frame
+// def_frame ((size_t)-1: never): run only once the playhead has shown that
+// frame (Flash ignores an init action whose character is not defined yet).
+void tagDoInitActionFrameLate(SWFAppContext* app_context, size_t char_id, frame_func action, size_t def_frame)
+{
+	extern size_t g_s27_root_frames_shown;
+	if (def_frame == (size_t) -1 || g_s27_root_frames_shown <= def_frame) return;
+	tagDoInitActionFrame(app_context, char_id, action);
+}
+
+// force=0: the end of a goto (deferred while a timer pass is running);
+// force=1: the timer pass's batch boundary / end.
+static int g_goto_init_aq_scheduled = 0;
+static void tagDrainGotoInitActionsAQ(SWFAppContext* app_context, void* user)
+{
+	(void) user;
+	g_goto_init_aq_scheduled = 0;
+	tagDrainGotoInitActions(app_context, 1);
+}
+
+void tagDrainGotoInitActions(SWFAppContext* app_context, int force)
+{
+	if (!force) {
+		// End of a goto: Flash runs the init actions after the script that
+		// issued the goto, before the target frame's scripts (gnash
+		// action_execution_order_test12 `0+1+2+3+4+`): one SCRIPT-kind queue
+		// entry at the highest priority. Inside a timer pass processTimers
+		// drains them itself.
+		if (g_goto_init_timer_pass > 0 || g_pending_goto_inits_n == 0
+		    || g_goto_init_aq_scheduled) return;
+		g_goto_init_aq_scheduled = 1;
+		actionQueueCallbackEx(app_context, tagDrainGotoInitActionsAQ, NULL,
+		                      AQ_PRIORITY_INITIALIZE, NULL, 0, AQ_KIND_SCRIPT);
+		return;
+	}
+	size_t i = 0;
+	while (i < g_pending_goto_inits_n) {
+		PendingGotoInit p = g_pending_goto_inits[i++];
+		// Init actions run in the root timeline's context, never in the
+		// (possibly just-removed) clip whose script issued the goto.
+		// Same context save/clear/restore as action_queue.c's sprite-script
+		// dispatch (SetTarget state must not leak in from the caller).
+		extern MovieClip root_movieclip;
+		extern void actionSetCurrentContext(MovieClip* mc);
+		extern void actionSetBaseClip(MovieClip* mc);
+		extern MovieClip* actionGetBaseClip(void);
+		extern int g_settarget_explicit_root, g_settarget_invalid, g_settarget_none,
+		           g_settarget_context_changed;
+		extern MovieClip* g_settarget_saved_context;
+		u8 saved_movie = g_current_movie_id;
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* saved_base = actionGetBaseClip();
+		DisplayObject* saved_obj = g_current_sprite_obj;
+		int s_er = g_settarget_explicit_root, s_inv = g_settarget_invalid,
+		    s_none = g_settarget_none, s_cc = g_settarget_context_changed;
+		MovieClip* s_sc = g_settarget_saved_context;
+		g_settarget_explicit_root = g_settarget_invalid = g_settarget_none =
+			g_settarget_context_changed = 0;
+		g_settarget_saved_context = NULL;
+		g_current_movie_id = p.movie;
+		if (p.movie == 0) {
+			actionSetCurrentContext(&root_movieclip);
+			actionSetBaseClip(&root_movieclip);
+			g_current_sprite_obj = NULL;
+		}
+		tagDoInitActionGuarded(app_context, p.id, p.fn);
+		actionSetCurrentContext(saved_ctx);
+		actionSetBaseClip(saved_base);
+		g_current_sprite_obj = saved_obj;
+		g_settarget_explicit_root = s_er; g_settarget_invalid = s_inv;
+		g_settarget_none = s_none; g_settarget_context_changed = s_cc;
+		g_settarget_saved_context = s_sc;
+		g_current_movie_id = saved_movie;
+	}
+	g_pending_goto_inits_n = 0;
+}
+
 // Per-sprite frame label storage (separate from Character union)
 // Growable (was a fixed 256: gotoAndStop("label") on the 257th labelled
 // sprite found no label and stayed on frame 1).
@@ -15206,107 +15404,6 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 	}
 }
 
-// Extended filter data side table (for ColorMatrix, Convolution, Gradient
-// filters), keyed by root depth. Growable (s26 w2-robustness-land): it was a
-// fixed 32-entry table, so the 33rd+ filtered root depth silently lost its
-// filter. Entries are individually allocated (pointer-stable): callers hold
-// the ExtFilterData* that getOrCreateExtFilter / ng_getExtFilterDataByDepth
-// hand out, so the backing table may move but an entry never does.
-static ExtFilterData** g_ext_filters;
-static size_t g_ext_filter_cap;
-static int g_ext_filter_count = 0;
-
-// Parallel depth array for the ext filter side table
-static size_t* g_ext_filter_depths;
-static size_t g_ext_filter_depths_cap;
-
-static ExtFilterData* getOrCreateExtFilter(size_t depth)
-{
-	for (int i = 0; i < g_ext_filter_count; i++) {
-		if (g_ext_filter_depths[i] == depth) return g_ext_filters[i];
-	}
-	if ((size_t) g_ext_filter_count >= g_ext_filter_cap
-		&& !ng_table_grow((void**) &g_ext_filters, &g_ext_filter_cap, sizeof(*g_ext_filters), 32))
-		return NULL;
-	if ((size_t) g_ext_filter_count >= g_ext_filter_depths_cap
-		&& !ng_table_grow((void**) &g_ext_filter_depths, &g_ext_filter_depths_cap, sizeof(*g_ext_filter_depths), 32))
-		return NULL;
-	ExtFilterData* ef = (ExtFilterData*) calloc(1, sizeof(ExtFilterData));
-	if (ef == NULL) return NULL;
-	int idx = g_ext_filter_count++;
-	g_ext_filters[idx] = ef;
-	g_ext_filter_depths[idx] = depth;
-	return ef;
-}
-
-void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20)
-{
-	(void)app_context;
-	if (depth > max_depth) return;
-	ExtFilterData* ef = getOrCreateExtFilter(depth);
-	if (!ef) return;
-	ef->type = 6; // colormatrix
-	memcpy(ef->cm_matrix, matrix20, 20 * sizeof(float));
-}
-
-void tagSetFilterConvolution(SWFAppContext* app_context, size_t depth,
-    u8 matrixX, u8 matrixY, const float* matrix, float divisor, float bias,
-    u8 preserve_alpha, u8 clamp, u8 def_r, u8 def_g, u8 def_b, u8 def_a)
-{
-	(void)app_context;
-	if (depth > max_depth) return;
-	ExtFilterData* ef = getOrCreateExtFilter(depth);
-	if (!ef) return;
-	ef->type = 5; // convolution
-	ef->conv_mx = matrixX;
-	ef->conv_my = matrixY;
-	int n = matrixX * matrixY;
-	if (n > 25) n = 25;
-	memcpy(ef->conv_matrix, matrix, n * sizeof(float));
-	ef->conv_divisor = divisor;
-	ef->conv_bias = bias;
-	ef->conv_preserve_alpha = preserve_alpha;
-	ef->conv_clamp = clamp;
-	ef->conv_color_r = def_r;
-	ef->conv_color_g = def_g;
-	ef->conv_color_b = def_b;
-	ef->conv_color_a = def_a;
-}
-
-void tagSetFilterGradient(SWFAppContext* app_context, size_t depth,
-    u8 type, u8 count, const u32* colors, const float* alphas, const u8* ratios,
-    float blur_x, float blur_y, float angle, float distance, float strength,
-    u8 quality, u8 flags)
-{
-	(void)app_context;
-	if (depth > max_depth) return;
-	ExtFilterData* ef = getOrCreateExtFilter(depth);
-	if (!ef) return;
-	ef->type = type; // 7=gradientglow, 8=gradientbevel
-	if (count > 16) count = 16;
-	ef->grad_count = count;
-	memcpy(ef->grad_colors, colors, count * sizeof(u32));
-	memcpy(ef->grad_alphas, alphas, count * sizeof(float));
-	memcpy(ef->grad_ratios, ratios, count);
-	ef->blur_x = blur_x;
-	ef->blur_y = blur_y;
-	ef->angle = angle;
-	ef->distance = distance;
-	ef->strength = strength;
-	ef->quality = quality;
-	ef->flags = flags;
-}
-
-const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth)
-{
-	if (depth == (size_t)-1) return NULL;
-	for (int i = 0; i < g_ext_filter_count; i++) {
-		if (g_ext_filter_depths[i] == depth) return g_ext_filters[i];
-	}
-	return NULL;
-}
-
-
 // Multi-filter list storage, keyed by root depth. Growable (s26
 // w2-robustness-land; was a fixed 32, so the 33rd+ filtered root depth lost its
 // filter list). Pointer-stable: display_list[depth].filter_chain and
@@ -15469,6 +15566,25 @@ void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth)
 #endif
 	if (depth <= max_depth)
 		display_list[depth].cm_live = 1;
+}
+
+// s27 w2-applyfilter-cm: emitted after the filter list of a placement whose
+// ColorMatrixFilters the recompiler FOLDED into its cxform; `plain_cxform_id`
+// is the placement's cxform without them (0 = none). Flash/Ruffle
+// `filters = []` drops the authored CMs, so the entry must fall back to it
+// (action.c avm1ApplyRuntimeFiltersToEntry; FP32 capture of
+// regression/avm1_po3_cm_folded_clear).
+void tagSetColorMatrixFolded(SWFAppContext* app_context, size_t depth, u32 plain_cxform_id)
+{
+	(void)app_context;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (g_script_only_mode || g_tag_skip_mode) return;
+#endif
+	if (depth <= max_depth)
+	{
+		display_list[depth].cm_folded = 1;
+		display_list[depth].cm_plain_cxform_id = ng_rebaseCxformId(plain_cxform_id);
+	}
 }
 
 const FilterListData* ng_getFilterListDataByDepth(size_t depth)

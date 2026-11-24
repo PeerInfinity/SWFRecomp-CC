@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef AVM2_BITMAP_KERNELS_ONLY
 #include <zlib.h>
 
 #include "stb_image.h"
@@ -39,6 +40,7 @@
 #pragma GCC diagnostic pop
 #endif
 
+#endif // AVM2_BITMAP_KERNELS_ONLY
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
@@ -121,6 +123,7 @@ static uint32_t with_alpha(uint32_t c, uint32_t a)
 	return (c & 0x00FFFFFF) | ((a & 0xFF) << 24);
 }
 
+#ifndef AVM2_BITMAP_KERNELS_ONLY
 // blend_over (bitmap_data.rs): self = dest, source on top; both premultiplied.
 //
 // The inverse-alpha factor is `256 - sa` scaled by a >>8, NOT `(255 - sa)/255`.
@@ -482,6 +485,8 @@ static void check_valid(Avm2Context* ctx, Avm2BitmapDataExt* bd)
 	}
 }
 
+#endif // AVM2_BITMAP_KERNELS_ONLY
+
 static uint32_t bd_get_raw(Avm2BitmapDataExt* bd, uint32_t x, uint32_t y)
 {
 	return bd->pixels[x + y * bd->width];
@@ -491,6 +496,7 @@ static void bd_set_raw(Avm2BitmapDataExt* bd, uint32_t x, uint32_t y, uint32_t c
 	bd->pixels[x + y * bd->width] = c;
 }
 
+#ifndef AVM2_BITMAP_KERNELS_ONLY
 // ---------------------------------------------------------------------------
 // Arg + geometry helpers
 // ---------------------------------------------------------------------------
@@ -620,6 +626,7 @@ static void read_point_i32(Avm2Context* ctx, Avm2Value pt, int32_t* px, int32_t*
 	*py = avm2_coerce_to_i32(ctx, avm2_get_public_property(ctx, pt, "y", 1, NULL));
 }
 
+#endif // AVM2_BITMAP_KERNELS_ONLY
 // ---------------------------------------------------------------------------
 // PixelRegion (render/src/bitmap.rs) — exact rectangle clipping
 // ---------------------------------------------------------------------------
@@ -727,6 +734,7 @@ static void pr_clamp_intersection(PixelRegion* self, int32_t sp_x, int32_t sp_y,
 	other->y_max = clamp_u32_i32(r2res[3]);
 }
 
+#ifndef AVM2_BITMAP_KERNELS_ONLY
 // ---------------------------------------------------------------------------
 // Rectangle construction (for the .rect getter etc.)
 // ---------------------------------------------------------------------------
@@ -2613,16 +2621,42 @@ static int bd_node_has_cm(const Avm2DisplayObjectExt* ext)
 	return 0;
 }
 
-static uint32_t* bd_blur_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
-                                       const PixelRegion* region,
-                                       const Avm2FilterVal* f);
+// The ruffle-port kernels are no longer reached since s27 (draw() runs the
+// fb_* Flash model); kept as the documented ruffle reference.
 static uint32_t* bd_glowlike_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
                                            const PixelRegion* region,
-                                           const Avm2FilterVal* f);
+                                           const Avm2FilterVal* f)
+	__attribute__((unused));
 static uint32_t* bd_convolve_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
                                            const PixelRegion* region,
                                            const Avm2FilterVal* f, int grow,
                                            int ext[4]);
+static uint32_t* fb_blur_region(Avm2BitmapDataExt* src, const PixelRegion* region,
+                                const Avm2FilterVal* f, int* ex, int* ey);
+static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* region,
+                                    const Avm2FilterVal* f, int g[4]);
+static void fb_write_grid(Avm2BitmapDataExt* dst, const uint32_t* grid, int w, int h,
+                          int64_t x0, int64_t y0);
+
+// The bounding box of the layer's non-transparent pixels (0 if none).
+static int bd_layer_bounds(const uint32_t* px, uint32_t w, uint32_t h, PixelRegion* out)
+{
+	uint32_t x0 = w, y0 = h, x1 = 0, y1 = 0;
+	for (uint32_t y = 0; y < h; y++)
+	{
+		for (uint32_t x = 0; x < w; x++)
+		{
+			if (CA(px[(size_t) y * w + x]) == 0) continue;
+			if (x < x0) x0 = x;
+			if (x >= x1) x1 = x + 1;
+			if (y < y0) y0 = y;
+			if (y >= y1) y1 = y + 1;
+		}
+	}
+	if (x1 <= x0 || y1 <= y0) return 0;
+	out->x_min = x0; out->y_min = y0; out->x_max = x1; out->y_max = y1;
+	return 1;
+}
 
 static void bd_draw_cm_filtered(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                                 Avm2Object* obj, Avm2DisplayObjectExt* ext,
@@ -2649,21 +2683,39 @@ static void bd_draw_cm_filtered(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 				layer[i] = premul(color_matrix_pixel(unmul(layer[i]), f->cm), 1);
 			continue;
 		}
-		// The layer is the whole target, so the kernel's region is the whole
-		// layer and its region-sized output replaces it in place.
+		// s27 w2-flash-filter-kernels: the FLASH model (the same fb_* kernels
+		// as applyFilter), over the drawn object's own pixel bounds. Flash
+		// filters the object's bitmap, so a clamped Convolution replicates the
+		// object's edge and grows by the kernel reach (avm2_bitmapdata_draw_
+		// filtered: `convolution` is ffff0000 over 9..20, not ffaa0000 over
+		// 10..19), and the blur-based kernels write their grown rect.
+		PixelRegion box;
+		if (!bd_layer_bounds(layer, dst->width, dst->height, &box)) continue;
 		ldst.pixels = layer;
-		PixelRegion whole = pr_whole(dst->width, dst->height);
-		uint32_t* res = NULL;
-		int cext[4];
+		uint32_t* grid = NULL;
+		int g[4] = { 0, 0, 0, 0 };
+		int heap = 0;
 		if (f->kind == AVM2_FILTER_BLUR)
-			res = bd_blur_source_region(ctx, &ldst, &whole, f);
+		{
+			int ex, ey;
+			grid = fb_blur_region(&ldst, &box, f, &ex, &ey);
+			g[0] = g[2] = ex; g[1] = g[3] = ey;
+		}
 		else if (f->kind == AVM2_FILTER_CONVOLUTION)
-			res = bd_convolve_source_region(ctx, &ldst, &whole, f, 0, cext);
+		{
+			grid = bd_convolve_source_region(ctx, &ldst, &box, f, 1, g);
+			heap = 1;
+		}
 		else
-			res = bd_glowlike_source_region(ctx, &ldst, &whole, f);
-		if (res == NULL) continue;
-		memcpy(layer, res, n * sizeof(uint32_t));
-		heap_free(ctx->app, res);
+		{
+			grid = fb_glowlike_region(&ldst, &box, f, g);
+		}
+		if (grid == NULL) continue;
+		int gw = (int) pr_w(&box) + g[0] + g[2], gh = (int) pr_h(&box) + g[1] + g[3];
+		memset(layer, 0, n * sizeof(uint32_t));
+		fb_write_grid(&ldst, grid, gw, gh, (int64_t) box.x_min - g[0],
+		              (int64_t) box.y_min - g[1]);
+		if (heap) heap_free(ctx->app, grid); else free(grid);
 	}
 	int opaque_dst = !dst->transparency;
 	for (size_t i = 0; i < n; i++)
@@ -3268,6 +3320,8 @@ static Avm2Value bd_noop(Avm2Activation* act)
 	(void) act;
 	return avm2_undefined();
 }
+
+#endif // AVM2_BITMAP_KERNELS_ONLY
 
 // ---------------------------------------------------------------------------
 // applyFilter / generateFilterRect (filters arc F2)
@@ -3923,8 +3977,8 @@ static void bd_apply_convolution(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 // disagrees with blur_fractional's on the IDENTICAL filter (BlurFilter(n,1,1)
 // on the same image; +1 on ~95% of channels, compounding per pass), so no
 // single model fits both. Where it departs from the ruffle port above
-// (bd_blur_source_region / bd_glowlike_source_region, which stay in use for
-// draw()'s filter layer):
+// (bd_blur_source_region / bd_glowlike_source_region; since s27 draw()'s
+// filter layer runs this model too):
 //   * the blur runs over the WHOLE source bitmap, transparent only outside
 //     the bitmap itself (filter_sourcerect: real pixels beyond a sub-rect
 //     sourceRect bleed into the edge), and the OUTPUT is the sourceRect GROWN
@@ -4018,17 +4072,37 @@ static void fb_axis_pass(const uint32_t* in, uint32_t* out, int w, int h,
 	}
 }
 
-// The blur reach of `f` per axis (0 on an axis with no pass); returns 0 when
-// no pass runs at all (quality 0 or both axes <= 1 px).
+// Flash's per-quality blur scale (ruffle swf/src/types/blur_filter.rs
+// PASS_SCALES, its display-object dest-rect table).
+static const double FB_PASS_SCALES[15] = {
+	1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0,
+};
+
+// The OUTPUT growth of `f` per axis; returns 0 when no pass runs at all
+// (quality 0 or both axes <= 1 px), which leaves the target untouched.
+//
+// s27 w2-flash-filter-kernels: the growth is ceil(PASS_SCALES[q - 1] * blur
+// / 2) per side, NOT the pass reach q * (m + 1). Measured on the
+// avm2/bitmapdata_applyfilter_blur Flash capture (sourceRect 10..209 of a
+// source coloured to its edge, so the grown band shows real blurred pixels):
+// BlurFilter(4,4,1) grows 2, (3,3,4) 5, (5,5,3) 7, and even an axis with no
+// pass grows -- (1,10,1) by 1 in x, (10,1,15) by 4 in y. The pass reach
+// gives 2, 4, 6, 0, 0; this formula gives all five. Where the two agree
+// (every blur of the s26 fixtures: destpoint_edges, filter_sourcerect,
+// blur_fractional, the glow_kernels rows) nothing moves.
 static int fb_reach(const Avm2FilterVal* f, FlashBlurK* kx, FlashBlurK* ky,
                     int* has_x, int* has_y, int* ex, int* ey)
 {
 	int q = f->quality;
 	*has_x = q > 0 && fb_kernel((double) f->blur_x / 65536.0, kx);
 	*has_y = q > 0 && fb_kernel((double) f->blur_y / 65536.0, ky);
-	*ex = *has_x ? q * (kx->m + 1) : 0;
-	*ey = *has_y ? q * (ky->m + 1) : 0;
-	return *has_x || *has_y;
+	*ex = *ey = 0;
+	if (!(*has_x || *has_y)) return 0;
+	double sc = FB_PASS_SCALES[(q > 15 ? 15 : q) - 1];
+	double bx = (double) f->blur_x / 65536.0, by = (double) f->blur_y / 65536.0;
+	*ex = bx > 0.0 ? (int) ceil(sc * bx / 2.0 - 1e-9) : 0;
+	*ey = by > 0.0 ? (int) ceil(sc * by / 2.0 - 1e-9) : 0;
+	return 1;
 }
 
 // Blur the WHOLE source bitmap (transparent only outside the bitmap itself:
@@ -4036,14 +4110,25 @@ static int fb_reach(const Avm2FilterVal* f, FlashBlurK* kx, FlashBlurK* ky,
 // sub-rect sourceRect into the grown edge) and return the calloc'd window
 // `region` grown by (gx, gy) on each side. With no pass, the window is a
 // plain copy. NULL on allocation failure.
-static uint32_t* fb_blur_window(Avm2BitmapDataExt* src, const PixelRegion* region,
-                                const Avm2FilterVal* f, int gx, int gy)
+//
+// `invert` (s27 w2-flash-filter-kernels, inner Glow / DropShadow): blur the
+// INVERTED alpha instead (255 - a, and 255 outside the bitmap), one floored
+// level per pass on the inverted value. Flash's inner glow reads this, not
+// 1 - blur(a): the two differ by the per-pass floor, ~1 level x strength,
+// and the inverted form reproduces the glow_kernels Flash rows (the green
+// channel of `glow inner` y=10 is 2 * blur(255 - a) exactly: 0x5c, 0x2e).
+// Only the alpha channel of an inverted window is meaningful.
+static uint32_t* fb_blur_window_ex(Avm2BitmapDataExt* src, const PixelRegion* region,
+                                   const Avm2FilterVal* f, int gx, int gy, int invert)
 {
 	int rw = (int) pr_w(region), rh = (int) pr_h(region);
 	FlashBlurK kx, ky;
 	int has_x, has_y, ex, ey;
 	int any = fb_reach(f, &kx, &ky, &has_x, &has_y, &ex, &ey);
 	int q = f->quality;
+	// The pass reach (not the output growth fb_reach reports).
+	ex = has_x ? q * (kx.m + 1) : 0;
+	ey = has_y ? q * (ky.m + 1) : 0;
 	// Input window: the output window plus the reach of every pass.
 	int ix = gx + ex, iy = gy + ey;
 	int w = rw + 2 * ix, h = rh + 2 * iy;
@@ -4056,16 +4141,28 @@ static uint32_t* fb_blur_window(Avm2BitmapDataExt* src, const PixelRegion* regio
 		return NULL;
 	}
 	int64_t x0 = (int64_t) region->x_min - ix, y0 = (int64_t) region->y_min - iy;
+	if (invert)
+	{
+		for (size_t i = 0; i < n; i++) cur[i] = 0xFF000000u;
+	}
 	for (int y = 0; y < h; y++)
 	{
 		int64_t sy = y0 + y;
 		if (sy < 0 || sy >= (int64_t) src->height) continue;
 		int64_t a = x0 < 0 ? 0 : x0;
 		int64_t b = x0 + w > (int64_t) src->width ? (int64_t) src->width : x0 + w;
-		if (b > a)
-			memcpy(cur + (size_t) y * (size_t) w + (size_t) (a - x0),
-			       src->pixels + (size_t) sy * src->width + (size_t) a,
-			       (size_t) (b - a) * sizeof(uint32_t));
+		if (b <= a) continue;
+		uint32_t* drow = cur + (size_t) y * (size_t) w + (size_t) (a - x0);
+		const uint32_t* srow = src->pixels + (size_t) sy * src->width + (size_t) a;
+		if (invert)
+		{
+			for (int64_t i = 0; i < b - a; i++)
+				drow[i] = (uint32_t) (255u - CA(srow[i])) << 24;
+		}
+		else
+		{
+			memcpy(drow, srow, (size_t) (b - a) * sizeof(uint32_t));
+		}
 	}
 	for (int axis = 0; axis < 2; axis++)
 	{
@@ -4092,6 +4189,12 @@ static uint32_t* fb_blur_window(Avm2BitmapDataExt* src, const PixelRegion* regio
 	return out;
 }
 
+static uint32_t* fb_blur_window(Avm2BitmapDataExt* src, const PixelRegion* region,
+                                const Avm2FilterVal* f, int gx, int gy)
+{
+	return fb_blur_window_ex(src, region, f, gx, gy, 0);
+}
+
 // applyFilter's BlurFilter: the rect grown by the reach. NULL when no pass
 // runs (ruffle leaves the target untouched there too) or on no memory.
 static uint32_t* fb_blur_region(Avm2BitmapDataExt* src, const PixelRegion* region,
@@ -4106,8 +4209,8 @@ static uint32_t* fb_blur_region(Avm2BitmapDataExt* src, const PixelRegion* regio
 }
 
 // Bilinear sample of the blurred grid's alpha at grid position (px, py),
-// zero outside, floored to a whole level, as 0..1.
-static float fb_alpha_at(const uint32_t* g, int w, int h, double px, double py)
+// zero outside, floored to a whole 0..255 level.
+static int fb_alpha_level(const uint32_t* g, int w, int h, double px, double py)
 {
 	double x0f = floor(px), y0f = floor(py);
 	double tx = px - x0f, ty = py - y0f;
@@ -4125,7 +4228,69 @@ static float fb_alpha_at(const uint32_t* g, int w, int h, double px, double py)
 	double v = (a[0] * (1.0 - tx) + a[1] * tx) * (1.0 - ty) + (a[2] * (1.0 - tx) + a[3] * tx) * ty;
 	v = floor(v + 1e-6);
 	if (v < 0.0) v = 0.0; else if (v > 255.0) v = 255.0;
-	return (float) v / 255.0f;
+	return (int) v;
+}
+
+static float fb_alpha_at(const uint32_t* g, int w, int h, double px, double py)
+{
+	return (float) fb_alpha_level(g, w, h, px, py) / 255.0f;
+}
+
+// x * a / 255, rounded (the 8-bit multiply of the Flash glow composite).
+static uint32_t fb_mul8(uint32_t x, uint32_t a)
+{
+	return (x * a + 127u) / 255u;
+}
+
+// Glow / DropShadow pixel, FLASH integer model (s27 w2-flash-filter-kernels,
+// fitted to the glow_kernels Flash rows: 37 -> 10 channel-pixels off, every
+// outer-glow row exact). `level` is the floored blur sample (of the INVERTED
+// alpha for an inner glow); the glow amount is floor(min(255, level *
+// strength) * alpha) with the colour alpha UNquantised -- (a + 1) / 256
+// recovers 0.5 and 0.75 from their truncated bytes 127 / 191, which the
+// `glow quality3 alpha.5` row needs (24 * 1.5 * 0.5 = 12, not 11.95 -> 11).
+// The colour and the composite are 8-bit multiplies on the premultiplied
+// source `dr`; inner = source-atop, outer = under the source.
+static uint32_t fb_glow_pixel(const Avm2FilterVal* f, int level, uint32_t dr,
+                              int composite)
+{
+	double al = f->alpha == 0 ? 0.0 : ((double) f->alpha + 1.0) / 256.0;
+	double st = (double) f->strength / 256.0;
+	double raw = (double) level * st;
+	if (raw > 255.0) raw = 255.0;
+	if (raw < 0.0) raw = 0.0;
+	uint32_t ga = (uint32_t) floor(raw * al + 1e-9);
+	if (ga > 255u) ga = 255u;
+	uint32_t cc[3] = { CR(f->color), CG(f->color), CB(f->color) };
+	uint32_t d[4] = { CA(dr), CR(dr), CG(dr), CB(dr) };
+	uint32_t o[4];
+	if (f->inner)
+	{
+		uint32_t gA = fb_mul8(ga, d[0]);
+		o[0] = gA;
+		for (int i = 0; i < 3; i++) o[i + 1] = fb_mul8(cc[i], gA);
+		if (!f->knockout && composite)
+		{
+			uint32_t inv = 255u - ga;
+			for (int i = 0; i < 4; i++) o[i] += fb_mul8(d[i], inv);
+		}
+	}
+	else
+	{
+		o[0] = ga;
+		for (int i = 0; i < 3; i++) o[i + 1] = fb_mul8(cc[i], ga);
+		if (composite || f->knockout)
+		{
+			uint32_t inv = 255u - d[0];
+			for (int i = 0; i < 4; i++)
+			{
+				o[i] = fb_mul8(o[i], inv);
+				if (!f->knockout) o[i] += d[i];
+			}
+		}
+	}
+	for (int i = 0; i < 4; i++) if (o[i] > 255u) o[i] = 255u;
+	return CMK(o[1], o[2], o[3], o[0]);
 }
 
 // Glow / DropShadow / Bevel over `region`, Flash model. Returns a calloc'd
@@ -4169,7 +4334,8 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 	// offset plus one texel.
 	int mx = (g[0] > g[2] ? g[0] : g[2]) + (int) ceilf(fabsf(cx_off)) + 1;
 	int my = (g[1] > g[3] ? g[1] : g[3]) + (int) ceilf(fabsf(cy_off)) + 1;
-	uint32_t* bl = fb_blur_window(src, region, f, mx, my);
+	int inner_glow = f->kind != AVM2_FILTER_BEVEL && f->inner;
+	uint32_t* bl = fb_blur_window_ex(src, region, f, mx, my, inner_glow);
 	if (bl == NULL) return NULL;
 	int bw = rw + 2 * mx, bh = rh + 2 * my;
 	uint32_t* out = (uint32_t*) calloc((size_t) ow * (size_t) oh, sizeof(uint32_t));
@@ -4228,26 +4394,11 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 			else
 			{
 				// The shadow lands at +offset, so it samples the blur at -offset.
-				float blur = fb_alpha_at(bl, bw, bh, bx - (double) cx_off, by - (double) cy_off);
-				float col[4] = { gc[0], gc[1], gc[2], 1.0f };
-				if (f->inner)
-				{
-					float a = gc[3] * fk_sat((1.0f - blur) * strength);
-					for (int i = 0; i < 4; i++)
-						c[i] = (!knockout && composite)
-						       ? col[i] * a * d[3] + d[i] * (1.0f - a)
-						       : col[i] * a * d[3];
-				}
-				else
-				{
-					float a = gc[3] * fk_sat(blur * strength);
-					for (int i = 0; i < 4; i++)
-					{
-						if (knockout) c[i] = col[i] * a * (1.0f - d[3]);
-						else if (composite) c[i] = col[i] * a * (1.0f - d[3]) + d[i];
-						else c[i] = col[i] * a;
-					}
-				}
+				int level = fb_alpha_level(bl, bw, bh, bx - (double) cx_off,
+				                           by - (double) cy_off);
+				out[(size_t) oy * (size_t) ow + (size_t) ox] =
+					fb_glow_pixel(f, level, dr, composite);
+				continue;
 			}
 			out[(size_t) oy * (size_t) ow + (size_t) ox] = fk_store(c);
 		}
@@ -4308,6 +4459,11 @@ static int fb_apply_grown(Avm2BitmapDataExt* dst, Avm2BitmapDataExt* src,
 	return 1;
 }
 
+// s27 w2-applyfilter-cm: everything above this line from "applyFilter /
+// generateFilterRect" on is the pixel-kernel block that
+// actionmodern/avm1_filter_kernels.c re-compiles (AVM2_BITMAP_KERNELS_ONLY) for
+// AVM1 BitmapData.applyFilter; the rest of the file is AVM2-only.
+#ifndef AVM2_BITMAP_KERNELS_ONLY
 static Avm2Value bd_apply_filter(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -4386,6 +4542,19 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	{
 		bd_apply_convolution(ctx, dst, src, sx, sy, sw, sh, dx, dy, &f);
 		avm2_filter_release(ctx, &f);
+		return avm2_undefined();
+	}
+	// Flash Player 32 throws Error #2077 for a Glow / DropShadow / Bevel onto
+	// an OPAQUE target (avm2_applyfilter_glow_kernels `glow to opaque`: the
+	// trace stops there with "Error: Error #2077: This filter operation
+	// cannot be performed with the specified input parameters."; ruffle
+	// writes the pixels). The target is left untouched.
+	if (is_glow && !dst->transparency)
+	{
+		avm2_filter_release(ctx, &f);
+		avm2_throw_error(ctx, ctx->builtins.error_class,
+		                 "Error #2077: This filter operation cannot be performed "
+		                 "with the specified input parameters.");
 		return avm2_undefined();
 	}
 	if (is_blur || is_glow)
@@ -5244,3 +5413,4 @@ void avm2_register_bitmap(Avm2Context* ctx)
 		jpg->instance_init.debug_name = "JPEGEncoderOptions";
 	}
 }
+#endif // AVM2_BITMAP_KERNELS_ONLY

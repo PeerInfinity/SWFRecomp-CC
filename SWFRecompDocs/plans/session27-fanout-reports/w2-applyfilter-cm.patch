@@ -1,0 +1,1521 @@
+diff --git a/SWFModernRuntime/CMakeLists.txt b/SWFModernRuntime/CMakeLists.txt
+index 8d1e72af..24fdf543 100644
+--- a/SWFModernRuntime/CMakeLists.txt
++++ b/SWFModernRuntime/CMakeLists.txt
+@@ -51,6 +51,9 @@ set(CORE_SOURCES
+     # AVM1 BitmapData.draw()'s timeline arm uses the CPU shape rasterizer
+     # (s26 w2-tail-bitmap-draw); it is self-contained (generated tables only).
+     ${PROJECT_SOURCE_DIR}/src/avm2/avm2_cpu_raster.c
++    # AVM1 BitmapData.applyFilter (s27 w2-applyfilter-cm): re-compiles
++    # avm2_bitmap.c's kernel block (AVM2_BITMAP_KERNELS_ONLY).
++    ${PROJECT_SOURCE_DIR}/src/actionmodern/avm1_filter_kernels.c
+ 
+     # Compile hashmap file directly to avoid undefined symbols on Linux
+     ${PROJECT_SOURCE_DIR}/lib/c-hashmap/map.c
+diff --git a/SWFModernRuntime/include/actionmodern/avm1_filter_kernels.h b/SWFModernRuntime/include/actionmodern/avm1_filter_kernels.h
+new file mode 100644
+index 00000000..cf5e9b43
+--- /dev/null
++++ b/SWFModernRuntime/include/actionmodern/avm1_filter_kernels.h
+@@ -0,0 +1,46 @@
++#ifndef AVM1_FILTER_KERNELS_H
++#define AVM1_FILTER_KERNELS_H
++
++// AVM1 BitmapData.applyFilter -> the AVM2 CPU filter kernels (s27
++// w2-applyfilter-cm; src/actionmodern/avm1_filter_kernels.c). Kept free of
++// AVM2 headers so action.c does not pull the AVM2 type tree in: the bridge
++// converts this to an Avm2FilterVal.
++
++#include <stdint.h>
++
++typedef struct SWFAppContext SWFAppContext;
++
++// The quantized native filter in swf::Filter's units, exactly as
++// avm2_filters.c avm2_filter_from_object produces them (Ruffle
++// bitmap_filter.rs avm1_to_filter quantizes the AVM1 fields the same way).
++typedef struct Avm1FilterKernelParams
++{
++	uint8_t kind;                       // Avm2FilterKind: 1 blur, 2 drop shadow,
++	                                    // 3 glow, 4 bevel, 5 convolution,
++	                                    // 7 gradient glow, 8 gradient bevel
++	int32_t blur_x, blur_y;             // Fixed16
++	int32_t angle, distance;            // Fixed16 (radians / pixels)
++	int16_t strength;                   // Fixed8
++	uint8_t quality;                    // 0..15
++	uint8_t inner, knockout, on_top, hide_object;
++	uint32_t color;  uint8_t alpha;     // shadow / glow / convolution / bevel shadow
++	uint32_t color2; uint8_t alpha2;    // bevel highlight
++	uint8_t conv_cols, conv_rows;
++	const float* conv_matrix; uint32_t conv_len;
++	float divisor, bias;
++	uint8_t preserve_alpha, clamp;
++	uint8_t grad_count;                 // <= 16
++	uint32_t grad_colors[16];
++	uint8_t grad_alphas[16];
++	uint8_t grad_ratios[16];
++} Avm1FilterKernelParams;
++
++// Pixels are premultiplied 0xAARRGGBB, row-major (BitmapDataNative storage).
++// Returns 1 when the kind was handled (the target is written), 0 otherwise.
++int avm1_filter_kernels_apply(SWFAppContext* app,
++                              uint32_t* dst_px, uint32_t dst_w, uint32_t dst_h, int dst_transparent,
++                              uint32_t* src_px, uint32_t src_w, uint32_t src_h, int src_transparent,
++                              int32_t sx, int32_t sy, int32_t sw, int32_t sh,
++                              int32_t dx, int32_t dy, const Avm1FilterKernelParams* p);
++
++#endif
+diff --git a/SWFModernRuntime/include/libswf/swf.h b/SWFModernRuntime/include/libswf/swf.h
+index c18d2d2f..6acc81d9 100644
+--- a/SWFModernRuntime/include/libswf/swf.h
++++ b/SWFModernRuntime/include/libswf/swf.h
+@@ -360,6 +360,15 @@ typedef struct DisplayObject
+ 	// its cxform (tagSetColorMatrixLive; tag.c obj_filter_routed). Placement-
+ 	// scoped like filter_chain, and cleared with it.
+ 	u8 cm_live;
++
++	// s27 w2-applyfilter-cm: 1 when the recompiler FOLDED this placement's
++	// ColorMatrixFilters into cxform_id (tagSetColorMatrixFolded), with the
++	// placement's own (unfolded) cxform id in cm_plain_cxform_id. AS replacing
++	// the filter list (`mc.filters = ...`) drops the authored CMs, so
++	// action.c avm1ApplyRuntimeFiltersToEntry restores the plain id. Cleared
++	// with cm_live.
++	u8 cm_folded;
++	u32 cm_plain_cxform_id;
+ } DisplayObject;
+ 
+ typedef struct KeyState {
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index 0d613787..a60dfc0b 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -200,6 +200,7 @@ void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
+     u8 quality, u8 flags);
+ void tagEndFilterList(SWFAppContext* app_context, size_t depth);
+ void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth);
++void tagSetColorMatrixFolded(SWFAppContext* app_context, size_t depth, u32 plain_cxform_id);
+ const FilterListData* ng_getFilterListDataByDepth(size_t depth);
+ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
+ void tagRemoveObject(SWFAppContext* app_context, size_t depth);
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index f8b8a51a..dceeccab 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -541,6 +541,7 @@ void render_webgpu_run_displacement(WebGPURenderContext* context,
+ // premultiply). m20 is the AS3 ColorMatrixFilter.matrix, row-major 4x5,
+ // bias column in 0..255 units.
+ void render_webgpu_run_color_matrix(WebGPURenderContext* context, const float* m20);
++void render_webgpu_set_cm_keep_empty(WebGPURenderContext* context, int on);
+ // Blend-mode layer compositing: 1 when this mode must be rendered to its own
+ // layer and composited once, 0 when the caller should keep the legacy per-draw
+ // pipeline (nested layers, or a backdrop we cannot sample).
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index f55c154f..f3b2ef41 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -74,6 +74,7 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_run_displacement(ctx, mp, mw, mh, rx, ry, rw, rh, px, py, sx, sy, vs, cx, cy, md, cr, cg, cb, ca) \
+ 	render_webgpu_run_displacement(ctx, mp, mw, mh, rx, ry, rw, rh, px, py, sx, sy, vs, cx, cy, md, cr, cg, cb, ca)
+ #define renderer_run_color_matrix(ctx, m20)            render_webgpu_run_color_matrix(ctx, m20)
++#define renderer_set_cm_keep_empty(ctx, on)           render_webgpu_set_cm_keep_empty(ctx, on)
+ #define renderer_blend_mode_is_layered(ctx, m)         render_webgpu_blend_mode_is_layered(ctx, m)
+ #define renderer_capture_backdrop(ctx, m)              render_webgpu_capture_backdrop(ctx, m)
+ #define renderer_composite_blend(ctx, m, sr)           render_webgpu_composite_blend(ctx, m, sr)
+@@ -145,6 +146,7 @@ typedef FlashbangContext RenderContext;
+ #define renderer_composite_alpha_mask(ctx)             ((void)0)
+ #define renderer_run_displacement(ctx, mp, mw, mh, rx, ry, rw, rh, px, py, sx, sy, vs, cx, cy, md, cr, cg, cb, ca) ((void)0)
+ #define renderer_run_color_matrix(ctx, m20)            ((void)0)
++#define renderer_set_cm_keep_empty(ctx, on)           ((void)0)
+ #define renderer_blend_mode_is_layered(ctx, m)         (0)
+ #define renderer_capture_backdrop(ctx, m)              ((void)0)
+ #define renderer_composite_blend(ctx, m, sr)           ((void)0)
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index c8ee2128..7bb8495f 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -14581,6 +14581,11 @@ static uint32_t applyColorMatrixPixel(uint32_t argb_premul, const float matrix[2
+ }
+ 
+ static int avm1FilterTypeOf(ASObject* o);   // defined with the runtime-filters lowering
++#include <actionmodern/avm1_filter_kernels.h>
++// s27 w2-applyfilter-cm: AVM1 filter object -> the kernels' native form
++// (defined with the runtime-filters lowering).
++static int avm1FilterKernelParams(ASObject* o, int t, Avm1FilterKernelParams* p,
++                                  float* conv_buf, u32 conv_cap);
+ 
+ // BitmapData.applyFilter(sourceBitmap, sourceRect, destPoint, filter)
+ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+@@ -14632,7 +14637,28 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
+     // -1 for a non-filter object such as a bare {matrix: [...]}.
+     int filter_type = avm1FilterTypeOf(filter_obj);
+     if (filter_type == 0) { r = makeF64(-1); return r; }
+-    if (filter_type != 6) { r = makeF64(0); return r; }   // non-CM kinds: not yet wired
++    if (filter_type != 6)
++    {
++        // s27 w2-applyfilter-cm: Blur / DropShadow / Glow / Bevel / Convolution
++        // / GradientGlow / GradientBevel run the AVM2 CPU kernels (Flash's
++        // blur + glow model, Flash convolution; the gradient kinds are the
++        // kernels' copy pass-through), as Ruffle runs one apply_filter for
++        // both VMs. Same sourceRect / destPoint reads as the CM arm below.
++        static float conv_buf[256 * 4];
++        Avm1FilterKernelParams kp;
++        if (avm1FilterKernelParams(filter_obj, filter_type, &kp, conv_buf,
++                                   (u32)(sizeof(conv_buf) / sizeof(conv_buf[0]))))
++        {
++            avm1_filter_kernels_apply(app_context,
++                dest_bmp->pixels, (uint32_t) dest_bmp->width, (uint32_t) dest_bmp->height,
++                dest_bmp->transparent,
++                src_bmp->pixels, (uint32_t) src_bmp->width, (uint32_t) src_bmp->height,
++                src_bmp->transparent,
++                rx, ry, rw, rh, dx, dy, &kp);
++        }
++        r = makeF64(0);
++        return r;
++    }
+     ActionVar* matrix_var = getProperty(filter_obj, "matrix", 6);
+     if (!matrix_var || matrix_var->type != ACTION_STACK_VALUE_ARRAY) { r = makeF64(0); return r; }
+     ASArray* matrix_arr = (ASArray*)(u64)matrix_var->data.numeric_value;
+@@ -46784,6 +46810,144 @@ static int avm1LowerFilterObject(ASObject* o, FilterListEntry* e)
+ 	}
+ }
+ 
++// s27 w2-applyfilter-cm: an AVM1 filter object in the AVM2 kernels' native
++// form (Avm1FilterKernelParams = avm2_filters.c avm2_filter_from_object's
++// units), for BitmapData.applyFilter. Same property reads and clamps as
++// avm1LowerFilterObject; the quantization is Ruffle bitmap_filter.rs
++// avm1_to_filter's (Fixed16 blur / angle / distance, Fixed8 strength, alpha
++// as `(a * 255) as u8`, quality clamped 0..15). Returns 0 for a kind the
++// kernels do not take (ColorMatrix has its own arm; DisplacementMap is not
++// an AVM1 filter type here).
++static int32_t avm1FkFixed16(double n)
++{
++	double v = n * 65536.0;
++	if (isnan(v)) return 0;
++	if (v >= 2147483647.0) return 2147483647;
++	if (v <= -2147483648.0) return (int32_t) -2147483648LL;
++	return (int32_t) v;
++}
++static int16_t avm1FkFixed8(double n)
++{
++	double v = n * 256.0;
++	if (isnan(v)) return 0;
++	if (v >= 32767.0) return 32767;
++	if (v <= -32768.0) return -32768;
++	return (int16_t) v;
++}
++static uint8_t avm1FkAlpha(double a)
++{
++	double v = a * 255.0;
++	if (isnan(v) || v <= 0.0) return 0;
++	if (v >= 255.0) return 255;
++	return (uint8_t) v;
++}
++static ASArray* avm1FkArray(ASObject* o, const char* name)
++{
++	ActionVar* v = getProperty(o, name, (u32) strlen(name));
++	return (v && v->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) v->data.numeric_value : NULL;
++}
++// "inner" / "outer" / anything else ("full") -> inner / on_top.
++static void avm1FkType(ASObject* o, Avm1FilterKernelParams* p)
++{
++	ActionVar* tv = getProperty(o, "type", 4);
++	if (tv == NULL || tv->type != ACTION_STACK_VALUE_STRING) { p->on_top = 1; return; }
++	char tbuf[16];
++	int tl = u16_to_utf8((const uint16_t*)(uintptr_t) tv->data.numeric_value,
++	                     tv->str_size, tbuf, sizeof(tbuf));
++	if (tl == 5 && memcmp(tbuf, "inner", 5) == 0) p->inner = 1;
++	else if (!(tl == 5 && memcmp(tbuf, "outer", 5) == 0)) p->on_top = 1;
++}
++static int avm1FilterKernelParams(ASObject* o, int t, Avm1FilterKernelParams* p,
++                                  float* conv_buf, u32 conv_cap)
++{
++	memset(p, 0, sizeof(*p));
++	double pi = 3.14159265358979323846;
++	double dblur = (t == 3) ? 6.0 : 4.0;
++	p->kind = (uint8_t) t;
++	p->blur_x = avm1FkFixed16(avm1FiltClamp(avm1FiltNum(o, "blurX", dblur), 0.0, 255.0));
++	p->blur_y = avm1FkFixed16(avm1FiltClamp(avm1FiltNum(o, "blurY", dblur), 0.0, 255.0));
++	p->quality = (uint8_t) avm1FiltClamp(avm1FiltNum(o, "quality", 1.0), 0.0, 15.0);
++	p->knockout = avm1FiltNum(o, "knockout", 0.0) != 0.0;
++	switch (t)
++	{
++		case 1: // BlurFilter
++			return 1;
++		case 2: // DropShadowFilter
++		case 3: // GlowFilter
++			p->color = (u32)(s64) avm1FiltNum(o, "color", t == 2 ? 0.0 : 16711680.0) & 0xFFFFFFu;
++			p->alpha = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "alpha", 1.0), 0.0, 1.0));
++			p->strength = avm1FkFixed8(avm1FiltClamp(avm1FiltNum(o, "strength", t == 2 ? 1.0 : 2.0), 0.0, 255.0));
++			p->inner = avm1FiltNum(o, "inner", 0.0) != 0.0;
++			if (t == 2)
++			{
++				p->hide_object = avm1FiltNum(o, "hideObject", 0.0) != 0.0;
++				p->distance = avm1FkFixed16(avm1FiltNum(o, "distance", 4.0));
++				p->angle = avm1FkFixed16(avm1FiltNum(o, "angle", 45.0) * pi / 180.0);
++			}
++			return 1;
++		case 4: // BevelFilter
++		case 7: // GradientGlowFilter
++		case 8: // GradientBevelFilter
++		{
++			p->strength = avm1FkFixed8(avm1FiltClamp(avm1FiltNum(o, "strength", 1.0), 0.0, 255.0));
++			p->distance = avm1FkFixed16(avm1FiltNum(o, "distance", 4.0));
++			p->angle = avm1FkFixed16(avm1FiltNum(o, "angle", 45.0) * pi / 180.0);
++			avm1FkType(o, p);
++			if (t == 4)
++			{
++				p->color = (u32)(s64) avm1FiltNum(o, "shadowColor", 0.0) & 0xFFFFFFu;
++				p->alpha = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "shadowAlpha", 1.0), 0.0, 1.0));
++				p->color2 = (u32)(s64) avm1FiltNum(o, "highlightColor", 16777215.0) & 0xFFFFFFu;
++				p->alpha2 = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "highlightAlpha", 1.0), 0.0, 1.0));
++				return 1;
++			}
++			// Gradient stops: min(colors, ratios) entries, a short alphas
++			// array padded with 1.0 (avm2_filters.c gradient_from_object).
++			ASArray* ca = avm1FkArray(o, "colors");
++			ASArray* aa = avm1FkArray(o, "alphas");
++			ASArray* ra = avm1FkArray(o, "ratios");
++			if (ca == NULL || ra == NULL) return 1;
++			u32 n = ca->length < ra->length ? ca->length : ra->length;
++			if (n > 16) n = 16;
++			p->grad_count = (uint8_t) n;
++			for (u32 i = 0; i < n; i++)
++			{
++				p->grad_colors[i] = (u32)(s64) varToDoubleSimple(&ca->elements[i]) & 0xFFFFFFu;
++				double a = (aa != NULL && i < aa->length) ? varToDoubleSimple(&aa->elements[i]) : 1.0;
++				p->grad_alphas[i] = avm1FkAlpha(avm1FiltClamp(a, 0.0, 1.0));
++				p->grad_ratios[i] = (uint8_t) avm1FiltClamp(varToDoubleSimple(&ra->elements[i]), 0.0, 255.0);
++			}
++			return 1;
++		}
++		case 5: // ConvolutionFilter
++		{
++			double mx = avm1FiltClamp(avm1FiltNum(o, "matrixX", 0.0), 0.0, 15.0);
++			double my = avm1FiltClamp(avm1FiltNum(o, "matrixY", 0.0), 0.0, 15.0);
++			p->conv_cols = (uint8_t) mx;
++			p->conv_rows = (uint8_t) my;
++			u32 want = (u32) p->conv_cols * (u32) p->conv_rows;
++			if (want > conv_cap) want = 0;
++			ASArray* ma = avm1FkArray(o, "matrix");
++			for (u32 i = 0; i < want; i++)
++			{
++				double v = (ma != NULL && i < ma->length) ? varToDoubleSimple(&ma->elements[i]) : 0.0;
++				conv_buf[i] = isnan(v) ? 0.0f : (float) v;
++			}
++			p->conv_matrix = want ? conv_buf : NULL;
++			p->conv_len = want;
++			p->divisor = (float) avm1FiltNum(o, "divisor", 1.0);
++			p->bias = (float) avm1FiltNum(o, "bias", 0.0);
++			p->preserve_alpha = avm1FiltNum(o, "preserveAlpha", 1.0) != 0.0;
++			p->clamp = avm1FiltNum(o, "clamp", 1.0) != 0.0;
++			p->color = (u32)(s64) avm1FiltNum(o, "color", 0.0) & 0xFFFFFFu;
++			p->alpha = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "alpha", 0.0), 0.0, 1.0));
++			return 1;
++		}
++		default:
++			return 0;
++	}
++}
++
+ // Number of live MovieClips (placed or dynamic) whose runtime filter list is
+ // non-empty; lets the Drawing-API walk skip its filter-root checks entirely in
+ // the (overwhelmingly common) movie that never assigns `filters`.
+@@ -46825,6 +46989,16 @@ static void avm1ApplyRuntimeFiltersToEntry(DisplayObject* d, const FilterListDat
+ 	// (tagSetColorMatrixLive) go with it; a runtime CM keeps the fold
+ 	// (tag.c obj_runtime_cm), so leaving cm_live set would run it twice.
+ 	d->cm_live = 0;
++	// s27 w2-applyfilter-cm: authored CMs FOLDED into the placement cxform go
++	// too (Ruffle set_filters / FP32: `g.filters = []` on a folded R<->B swap
++	// renders the clip in its own colour). Back to the unfolded cxform; a
++	// runtime CM in the new list is folded on top of it by tag.c
++	// obj_runtime_cm.
++	if (d->cm_folded)
++	{
++		d->cxform_id = d->cm_plain_cxform_id;
++		d->cm_folded = 0;
++	}
+ 	if (fl == NULL || fl->count == 0)
+ 	{
+ 		d->filter_type = 0;
+diff --git a/SWFModernRuntime/src/actionmodern/avm1_filter_kernels.c b/SWFModernRuntime/src/actionmodern/avm1_filter_kernels.c
+new file mode 100644
+index 00000000..3570c7ee
+--- /dev/null
++++ b/SWFModernRuntime/src/actionmodern/avm1_filter_kernels.c
+@@ -0,0 +1,148 @@
++// AVM1 BitmapData.applyFilter for the non-ColorMatrix kinds (s27
++// w2-applyfilter-cm): a bridge onto the AVM2 CPU filter kernels.
++//
++// AVM1 builds never link the AVM2 tree (verify_output.py: "AVM1 tests never
++// compile src/avm2", avm2_cpu_raster.c excepted), and avm2_bitmap.c's kernels
++// are file-static. So this TU RE-COMPILES avm2_bitmap.c with
++// AVM2_BITMAP_KERNELS_ONLY defined: only the colour helpers, bd_get_raw /
++// bd_set_raw, the PixelRegion helpers and the "applyFilter /
++// generateFilterRect" kernel block survive (every AVM2 API function is
++// #ifndef'd out), each with static linkage, so it links next to the full
++// avm2_bitmap.c in a hybrid build without a clash. Whatever the kernels do
++// for AVM2 (Flash's blur / glow / drop-shadow / bevel model, Flash
++// convolution semantics) AVM1 gets byte-for-byte, with no second copy to
++// drift. Ruffle runs one apply_filter for both VMs too
++// (core/src/bitmap/operations.rs, reached from avm1 bitmap_data.rs).
++//
++// Pixel form: AVM1 BitmapDataNative.pixels are premultiplied 0xAARRGGBB
++// (setPixel32 stores premultiplyAlpha(colour), getPixel32 unpremultiplies),
++// the same storage as Avm2BitmapDataExt, so the buffers are wrapped as-is.
++//
++// The kernels allocate through avm2_alloc(ctx, n) / heap_free(ctx->app, p);
++// avm2_alloc is renamed for this TU (it lives in avm2_main.c, which an AVM1
++// build lacks) and a private context carries only `app`.
++
++#include <actionmodern/avm1_filter_kernels.h>
++
++#define AVM2_BITMAP_KERNELS_ONLY 1
++#define avm2_alloc avm1_fk_alloc
++
++#if defined(__GNUC__) || defined(__clang__)
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wunused-function"
++#pragma GCC diagnostic ignored "-Wunused-variable"
++#endif
++
++// Flat build directories (verify_output.py, build_test.sh) carry a copy of
++// avm2_bitmap.c under a non-.c name so their *.c glob does not compile the
++// whole AVM2 TU into an AVM1 build; the source tree (CMake, the wasm scripts)
++// reaches it by its relative path.
++#if defined(__has_include)
++#  if __has_include("avm2_bitmap_kernels.inc")
++#    include "avm2_bitmap_kernels.inc"
++#  else
++#    include "../avm2/avm2_bitmap.c"
++#  endif
++#else
++#  include "../avm2/avm2_bitmap.c"
++#endif
++
++#if defined(__GNUC__) || defined(__clang__)
++#pragma GCC diagnostic pop
++#endif
++
++
++void* avm1_fk_alloc(Avm2Context* ctx, uint32_t size)
++{
++	return heap_alloc(ctx->app, size > 0 ? size : 1);
++}
++
++int avm1_filter_kernels_apply(SWFAppContext* app,
++                              uint32_t* dst_px, uint32_t dst_w, uint32_t dst_h, int dst_transparent,
++                              uint32_t* src_px, uint32_t src_w, uint32_t src_h, int src_transparent,
++                              int32_t sx, int32_t sy, int32_t sw, int32_t sh,
++                              int32_t dx, int32_t dy, const Avm1FilterKernelParams* p)
++{
++	if (dst_px == NULL || src_px == NULL || p == NULL) return 0;
++	Avm2FilterVal fv;
++	memset(&fv, 0, sizeof(fv));
++	fv.kind = p->kind;
++	fv.blur_x = p->blur_x; fv.blur_y = p->blur_y;
++	fv.angle = p->angle; fv.distance = p->distance;
++	fv.strength = p->strength; fv.quality = p->quality;
++	fv.inner = p->inner; fv.knockout = p->knockout;
++	fv.on_top = p->on_top; fv.hide_object = p->hide_object;
++	fv.color = p->color & 0xFFFFFF; fv.alpha = p->alpha;
++	fv.color2 = p->color2 & 0xFFFFFF; fv.alpha2 = p->alpha2;
++	fv.conv_cols = p->conv_cols; fv.conv_rows = p->conv_rows;
++	fv.conv_matrix = (float*) p->conv_matrix; fv.conv_len = p->conv_len;
++	fv.divisor = p->divisor; fv.bias = p->bias;
++	fv.preserve_alpha = p->preserve_alpha; fv.clamp = p->clamp;
++	fv.grad_count = p->grad_count > AVM2_FILTER_MAX_GRAD ? AVM2_FILTER_MAX_GRAD : p->grad_count;
++	for (int i = 0; i < fv.grad_count; i++)
++	{
++		fv.grad_colors[i] = p->grad_colors[i];
++		fv.grad_alphas[i] = p->grad_alphas[i];
++		fv.grad_ratios[i] = p->grad_ratios[i];
++	}
++	const Avm2FilterVal* f = &fv;
++	static Avm2Context kctx;   // the kernels read only ctx->app
++	kctx.app = app;
++
++	Avm2BitmapDataExt dst = { 0 }, src = { 0 };
++	dst.width = dst_w; dst.height = dst_h; dst.transparency = dst_transparent ? 1 : 0;
++	dst.pixels = dst_px;
++	src.width = src_w; src.height = src_h; src.transparency = src_transparent ? 1 : 0;
++	// applyFilter(bmp, ...) onto itself: every kernel reads the whole source
++	// before writing, except the pass-through copy below; snapshot it so an
++	// overlapping destPoint reads the ORIGINAL pixels (Ruffle copies too).
++	uint32_t* snap = NULL;
++	if (src_px == dst_px)
++	{
++		size_t n = (size_t) src_w * src_h;
++		snap = (uint32_t*) malloc((n ? n : 1) * sizeof(uint32_t));
++		if (snap == NULL) return 0;
++		memcpy(snap, src_px, n * sizeof(uint32_t));
++		src.pixels = snap;
++	}
++	else
++		src.pixels = src_px;
++
++	int handled = 1;
++	int is_conv = (f->kind == AVM2_FILTER_CONVOLUTION
++	               && f->conv_cols != 0 && f->conv_rows != 0 && f->conv_matrix != NULL);
++	if (f->kind == AVM2_FILTER_BLUR || fk_is_glowlike(f->kind))
++	{
++		fb_apply_grown(&dst, &src, sx, sy, sw, sh, dx, dy, f);
++	}
++	else if (is_conv)
++	{
++		bd_apply_convolution(&kctx, &dst, &src, sx, sy, sw, sh, dx, dy, f);
++	}
++	else if (f->kind == AVM2_FILTER_GRADIENT_GLOW || f->kind == AVM2_FILTER_GRADIENT_BEVEL
++	         || f->kind == AVM2_FILTER_CONVOLUTION)
++	{
++		// bd_apply_filter's pass-through (Ruffle is_filter_supported false:
++		// "treat this like a copy"): the clipped source rect, unpremultiplied
++		// and re-premultiplied for the target's transparency.
++		PixelRegion src_region = pr_for_region_i32(sx, sy, sw, sh);
++		pr_clamp(&src_region, src.width, src.height);
++		PixelRegion dst_region = pr_whole(dst.width, dst.height);
++		pr_clamp_intersection(&dst_region, dx, dy, (int32_t) src_region.x_min,
++		                      (int32_t) src_region.y_min, (int32_t) pr_w(&src_region),
++		                      (int32_t) pr_h(&src_region), &src_region);
++		uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
++		for (uint32_t y = 0; y < rh; y++)
++			for (uint32_t x = 0; x < rw; x++)
++			{
++				uint32_t raw = bd_get_raw(&src, src_region.x_min + x, src_region.y_min + y);
++				uint32_t straight = src.transparency ? unmul(raw) : raw;
++				bd_set_raw(&dst, dst_region.x_min + x, dst_region.y_min + y,
++				           premul(straight, dst.transparency));
++			}
++	}
++	else
++		handled = 0;
++	free(snap);
++	return handled;
++}
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 9fed1c7c..28fdf2e9 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -20,6 +20,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++#ifndef AVM2_BITMAP_KERNELS_ONLY
+ #include <zlib.h>
+ 
+ #include "stb_image.h"
+@@ -39,6 +40,7 @@
+ #pragma GCC diagnostic pop
+ #endif
+ 
++#endif // AVM2_BITMAP_KERNELS_ONLY
+ #include <avm2/avm2_class.h>
+ #include <avm2/avm2_cpu_raster.h>
+ #include <avm2/avm2_error.h>
+@@ -121,6 +123,7 @@ static uint32_t with_alpha(uint32_t c, uint32_t a)
+ 	return (c & 0x00FFFFFF) | ((a & 0xFF) << 24);
+ }
+ 
++#ifndef AVM2_BITMAP_KERNELS_ONLY
+ // blend_over (bitmap_data.rs): self = dest, source on top; both premultiplied.
+ //
+ // The inverse-alpha factor is `256 - sa` scaled by a >>8, NOT `(255 - sa)/255`.
+@@ -482,6 +485,8 @@ static void check_valid(Avm2Context* ctx, Avm2BitmapDataExt* bd)
+ 	}
+ }
+ 
++#endif // AVM2_BITMAP_KERNELS_ONLY
++
+ static uint32_t bd_get_raw(Avm2BitmapDataExt* bd, uint32_t x, uint32_t y)
+ {
+ 	return bd->pixels[x + y * bd->width];
+@@ -491,6 +496,7 @@ static void bd_set_raw(Avm2BitmapDataExt* bd, uint32_t x, uint32_t y, uint32_t c
+ 	bd->pixels[x + y * bd->width] = c;
+ }
+ 
++#ifndef AVM2_BITMAP_KERNELS_ONLY
+ // ---------------------------------------------------------------------------
+ // Arg + geometry helpers
+ // ---------------------------------------------------------------------------
+@@ -620,6 +626,7 @@ static void read_point_i32(Avm2Context* ctx, Avm2Value pt, int32_t* px, int32_t*
+ 	*py = avm2_coerce_to_i32(ctx, avm2_get_public_property(ctx, pt, "y", 1, NULL));
+ }
+ 
++#endif // AVM2_BITMAP_KERNELS_ONLY
+ // ---------------------------------------------------------------------------
+ // PixelRegion (render/src/bitmap.rs) — exact rectangle clipping
+ // ---------------------------------------------------------------------------
+@@ -727,6 +734,7 @@ static void pr_clamp_intersection(PixelRegion* self, int32_t sp_x, int32_t sp_y,
+ 	other->y_max = clamp_u32_i32(r2res[3]);
+ }
+ 
++#ifndef AVM2_BITMAP_KERNELS_ONLY
+ // ---------------------------------------------------------------------------
+ // Rectangle construction (for the .rect getter etc.)
+ // ---------------------------------------------------------------------------
+@@ -3253,6 +3261,8 @@ static Avm2Value bd_noop(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++#endif // AVM2_BITMAP_KERNELS_ONLY
++
+ // ---------------------------------------------------------------------------
+ // applyFilter / generateFilterRect (filters arc F2)
+ // ---------------------------------------------------------------------------
+@@ -4292,6 +4302,11 @@ static int fb_apply_grown(Avm2BitmapDataExt* dst, Avm2BitmapDataExt* src,
+ 	return 1;
+ }
+ 
++// s27 w2-applyfilter-cm: everything above this line from "applyFilter /
++// generateFilterRect" on is the pixel-kernel block that
++// actionmodern/avm1_filter_kernels.c re-compiles (AVM2_BITMAP_KERNELS_ONLY) for
++// AVM1 BitmapData.applyFilter; the rest of the file is AVM2-only.
++#ifndef AVM2_BITMAP_KERNELS_ONLY
+ static Avm2Value bd_apply_filter(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -5228,3 +5243,4 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 		jpg->instance_init.debug_name = "JPEGEncoderOptions";
+ 	}
+ }
++#endif // AVM2_BITMAP_KERNELS_ONLY
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index e742e9d0..7962a72f 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3656,9 +3656,32 @@ static inline int obj_filter_routed(const DisplayObject* obj)
+ 	    || (obj->cm_live && obj->filter_chain != NULL);
+ }
+ 
++// s27 w2-applyfilter-cm: a LIVE ColorMatrix-only entry (no type 1-4 filter,
++// no cacheAsBitmap) whose chain carries an alpha bias > 0. FP32 does NOT snap
++// it: regression/avm1_po3_cm_alpha_bias_edge's rect at x 110.5 reads
++// half-coverage (255,127,127) at x = 110 and y = 80 (A' = 0.5 * 0.5 + 64/255),
++// where Ruffle snaps to whole pixels 111..169. Scoped to the alpha-bias case,
++// the only CM-only row with a Flash golden; the other live CMs
++// (avm1_po3_color_matrix_live, Ruffle-exporter golden) keep Ruffle's snap
++// until a Flash capture decides them.
++static int obj_live_cm_abias_only(const DisplayObject* obj)
++{
++	if (!obj->cm_live || obj->filter_type != 0 || obj->cache_as_bitmap) return 0;
++	const FilterListData* fl = (const FilterListData*) obj->filter_chain;
++	if (fl == NULL) return 0;
++	int abias = 0;
++	for (u8 i = 0; i < fl->count; i++)
++	{
++		if (fl->entries[i].type != 6) return 0;
++		if (fl->entries[i].cm_matrix[19] > 0.0f) abias = 1;
++	}
++	return abias;
++}
++
+ // Entries Ruffle bitmap-caches: explicit cacheAsBitmap, or any filter list.
+ static inline int cab_snaps(const DisplayObject* obj)
+ {
++	if (obj_live_cm_abias_only(obj)) return 0;
+ 	return obj->cache_as_bitmap || obj_filter_routed(obj);
+ }
+ 
+@@ -5040,8 +5063,37 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+ 		else if (filter_capture_needs_pad(app_context, obj, &reach))
+ 			renderer_set_filter_pad(context, reach);
+ 	}
++	// s27 w2-applyfilter-cm: a LIVE ColorMatrix-only chain on a shape leaf
++	// with a CPU-readable colour transform runs in the Flash/Ruffle order:
++	// source drawn with an IDENTITY cx, the CMs, then the cx as one more
++	// per-texel pass (Ruffle render_base draws the cache with the object's
++	// colour transform at the blit). FP32 capture of
++	// regression/avm1_po3_cm_live_under_cxform: grey 200, [CM x2, CM x0.5],
++	// cx 0.5 -> 63 (ours before: cx first, 100). A sprite's children carry
++	// its cx in their own composed slots, so sprites keep the old order (the
++	// recompiler folds those: swf.cpp PlaceCmCompose::live).
++	int cm_cx_after = 0;
++	// Baked placement cx only (!cx_overridden): an AS override may sit in a
++	// slot composed with an ancestor's tint, which an identity draw would drop.
++	if (src == NULL && obj->cm_live && have_obj_cx && !obj->cx_overridden
++	    && !cx_is_identity(obj_cx)
++	    && (dictionary[obj->char_id].type == CHAR_TYPE_SHAPE
++	        || dictionary[obj->char_id].type == CHAR_TYPE_MORPH_SHAPE))
++	{
++		cm_cx_after = 1;
++		for (int i = 0; i < chain_n; i++)
++			if (chain[i]->type != 6) { cm_cx_after = 0; break; }
++	}
+ 	renderer_begin_offscreen_pass(context);
+-	filtered_draw_source(app_context, obj, src);
++	if (cm_cx_after)
++	{
++		u32 saved_cx = obj->cxform_id;
++		obj->cxform_id = 0;
++		filtered_draw_source(app_context, obj, src);
++		obj->cxform_id = saved_cx;
++	}
++	else
++		filtered_draw_source(app_context, obj, src);
+ 	renderer_end_offscreen_pass(context);
+ 	// Unchained: the snapshot IS the source, so take it now. Chained: the
+ 	// snapshot must be the layer entering the LAST filter, so it is taken
+@@ -5089,6 +5141,10 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+ 		// avm2_display.c avm2_render_filtered.
+ 		if (f->type == 6)
+ 		{
++			// s27 w2-applyfilter-cm: an alpha bias leaves a = 0 texels of the
++			// stage-sized layer empty (the object's cache in Flash/Ruffle
++			// holds only its bounds); see render_webgpu_set_cm_keep_empty.
++			if (f->cm_matrix[19] > 0.0f) renderer_set_cm_keep_empty(context, 1);
+ 			renderer_run_color_matrix(context, f->cm_matrix);
+ 			continue;
+ 		}
+@@ -5123,6 +5179,20 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+ 			compose_chain_entry_to_layer(app_context, f, have_obj_cx, obj_cx);
+ 	}
+ 
++	if (cm_cx_after)
++	{
++		// The 20-float cxform (column-major 4x4, add / 255) as a 4x5 CM row
++		// matrix with the bias in 0..255.
++		float m20[20];
++		for (int r = 0; r < 4; r++)
++		{
++			for (int c = 0; c < 4; c++) m20[r * 5 + c] = obj_cx[c * 4 + r];
++			m20[r * 5 + 4] = obj_cx[16 + r] * 255.0f;
++		}
++		if (m20[19] > 0.0f) renderer_set_cm_keep_empty(context, 1);
++		renderer_run_color_matrix(context, m20);
++	}
++
+ 	renderer_resume_pass(context);
+ 
+ 	if (group)
+@@ -12141,6 +12211,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
+ 	// inheriting the previous occupant's list.
+ 	display_list[depth].filter_chain = NULL;
+ 	display_list[depth].cm_live = 0;
++	display_list[depth].cm_folded = 0;
+ 	display_list[depth].depth_swapped = 0;
+ 	display_list[depth].attach_registration = 0;
+ 	// Restore persistent button state if the same character is being re-placed
+@@ -12741,6 +12812,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
+ 	// inheriting the previous occupant's list.
+ 	display_list[depth].filter_chain = NULL;
+ 	display_list[depth].cm_live = 0;
++	display_list[depth].cm_folded = 0;
+ 	display_list[depth].depth_swapped = 0;
+ 	display_list[depth].attach_registration = 0;
+ 	// Restore persistent button state if the same character is being re-placed
+@@ -14887,6 +14959,25 @@ void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth)
+ 		display_list[depth].cm_live = 1;
+ }
+ 
++// s27 w2-applyfilter-cm: emitted after the filter list of a placement whose
++// ColorMatrixFilters the recompiler FOLDED into its cxform; `plain_cxform_id`
++// is the placement's cxform without them (0 = none). Flash/Ruffle
++// `filters = []` drops the authored CMs, so the entry must fall back to it
++// (action.c avm1ApplyRuntimeFiltersToEntry; FP32 capture of
++// regression/avm1_po3_cm_folded_clear).
++void tagSetColorMatrixFolded(SWFAppContext* app_context, size_t depth, u32 plain_cxform_id)
++{
++	(void)app_context;
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	if (g_script_only_mode || g_tag_skip_mode) return;
++#endif
++	if (depth <= max_depth)
++	{
++		display_list[depth].cm_folded = 1;
++		display_list[depth].cm_plain_cxform_id = ng_rebaseCxformId(plain_cxform_id);
++	}
++}
++
+ const FilterListData* ng_getFilterListDataByDepth(size_t depth)
+ {
+ 	if (depth == (size_t)-1) return NULL;
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index df612c5f..32463a7c 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -7091,10 +7091,13 @@ static const char* color_matrix_wgsl =
+ 	"}\n"
+ 	"@fragment fn fs_main(@builtin(position) fp: vec4f) -> @location(0) vec4f {\n"
+ 	"  let src = textureLoad(src_tex, vec2i(i32(fp.x), i32(fp.y)), 0);\n"
++	"  if (p.bias.w > 32768.0 && src.a <= 0.0) { return vec4f(0.0); }\n"
+ 	"  var s = vec4f(0.0, 0.0, 0.0, src.a);\n"
+ 	"  if (src.a > 0.0) { s = vec4f(src.rgb / src.a, src.a); }\n"
++	"  var bias = p.bias;\n"
++	"  if (bias.w > 32768.0) { bias.w = bias.w - 65536.0; }\n"
+ 	"  let c = clamp(vec4f(dot(p.r, s), dot(p.g, s), dot(p.b, s), dot(p.a, s))\n"
+-	"                + p.bias / 255.0, vec4f(0.0), vec4f(1.0));\n"
++	"                + bias / 255.0, vec4f(0.0), vec4f(1.0));\n"
+ 	"  return vec4f(c.rgb * c.a, c.a);\n"
+ 	"}\n";
+ 
+@@ -7175,8 +7178,26 @@ static void ensure_color_matrix_resources(WebGPURenderContext* ctx)
+ 	wgpuShaderModuleRelease(sm);
+ }
+ 
++// s27 w2-applyfilter-cm: one-shot "keep empty texels empty" for the NEXT
++// run_color_matrix. A matrix with an alpha bias > 0 would otherwise give every
++// a = 0 texel of the stage-sized layer alpha = bias (our pass pins the
++// unpremultiplied colour of an empty texel to 0) and paint the bias over the
++// whole stage. Flash and Ruffle run the pass on a cache bounded to the
++// object, and Ruffle's unguarded divide leaves a = 0 texels empty (exporter);
++// with the flag set, a = 0 texels stay (0,0,0,0). Signalled to the shader by
++// lifting the alpha bias by 65536 (a real bias is far below 32768), so the
++// pipeline and its uniform layout are unchanged.
++static int g_cm_keep_empty = 0;
++void render_webgpu_set_cm_keep_empty(WebGPURenderContext* ctx, int on)
++{
++	(void)ctx;
++	g_cm_keep_empty = on ? 1 : 0;
++}
++
+ void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
+ {
++	int keep_empty = g_cm_keep_empty;
++	g_cm_keep_empty = 0;
+ 	if (!ctx->renderer_ok || m20 == NULL) return;
+ 	render_webgpu_ensure_filter_resources(ctx);
+ 	ensure_color_matrix_resources(ctx);
+@@ -7189,6 +7210,7 @@ void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
+ 		for (int col = 0; col < 4; col++) params[row * 4 + col] = m20[row * 5 + col];
+ 		params[16 + row] = m20[row * 5 + 4];
+ 	}
++	if (keep_empty) params[19] += 65536.0f;
+ 	u32 params_offset = filter_uniform_push(ctx, params, 80);
+ 
+ 	WGPUBindGroupEntry bg_entries[2] = {0};
+diff --git a/SWFRecomp/scripts/build_graphics_host.sh b/SWFRecomp/scripts/build_graphics_host.sh
+index 9fede128..89db81a2 100755
+--- a/SWFRecomp/scripts/build_graphics_host.sh
++++ b/SWFRecomp/scripts/build_graphics_host.sh
+@@ -65,12 +65,13 @@ RUNTIME_C=(
+     libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
+     libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c
+     libswf/stb_image_impl.c
+-    avm2/avm2_cpu_raster.c
++    avm2/avm2_cpu_raster.c actionmodern/avm1_filter_kernels.c
+     audio/audio.c audio/audio_output_web.c
+     rendering/render_webgpu.c
+     memory/heap.c
+ )
+ for f in "${RUNTIME_C[@]}"; do cp -p "${SWFMODERN_SRC}/${f}" "${SRC}/"; done
++cp -p "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${SRC}/avm2_bitmap_kernels.inc"  # avm1_filter_kernels.c (s27)
+ cp -p "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${SRC}/"
+ cp -p "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${SWFMODERN_ROOT}/lib/c-hashmap/map.h" "${SRC}/"
+ cp -p "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${SRC}/"
+diff --git a/SWFRecomp/scripts/build_test.sh b/SWFRecomp/scripts/build_test.sh
+index a9c5d357..9d1049e3 100755
+--- a/SWFRecomp/scripts/build_test.sh
++++ b/SWFRecomp/scripts/build_test.sh
+@@ -208,6 +208,8 @@ if [ "$GRAPHICS_FLAG" = true ]; then
+     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
+     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
+     cp "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c" "${BUILD_DIR}/"  # AVM1 draw() timeline arm
++    cp "${SWFMODERN_SRC}/actionmodern/avm1_filter_kernels.c" "${BUILD_DIR}/"  # AVM1 applyFilter (s27)
++    cp "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${BUILD_DIR}/avm2_bitmap_kernels.inc"  # its kernel source, not globbed
+     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
+     cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
+     cp "${SWFMODERN_SRC}/libswf/graphics_stubs.c" "${BUILD_DIR}/"
+@@ -229,6 +231,8 @@ else
+     cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
+     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
+     cp "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c" "${BUILD_DIR}/"  # AVM1 draw() timeline arm
++    cp "${SWFMODERN_SRC}/actionmodern/avm1_filter_kernels.c" "${BUILD_DIR}/"  # AVM1 applyFilter (s27)
++    cp "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${BUILD_DIR}/avm2_bitmap_kernels.inc"  # its kernel source, not globbed
+     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
+ fi
+ 
+diff --git a/SWFRecomp/scripts/build_wasm_runtime_lib.sh b/SWFRecomp/scripts/build_wasm_runtime_lib.sh
+index dcc102a4..31910ffe 100755
+--- a/SWFRecomp/scripts/build_wasm_runtime_lib.sh
++++ b/SWFRecomp/scripts/build_wasm_runtime_lib.sh
+@@ -64,6 +64,7 @@ SOURCES=(
+     "${SWFMODERN_SRC}/libswf/tag_stubs.c"
+     "${SWFMODERN_SRC}/libswf/hit_test.c"
+     "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c"
++    "${SWFMODERN_SRC}/actionmodern/avm1_filter_kernels.c"   # includes ../avm2/avm2_bitmap.c (kernels only)
+     "${SWFMODERN_SRC}/memory/heap.c"
+     "${SWFMODERN_ROOT}/lib/c-hashmap/map.c"
+     "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c"
+diff --git a/SWFRecomp/scripts/profile_game_native.sh b/SWFRecomp/scripts/profile_game_native.sh
+index 160e1309..4a39f3da 100755
+--- a/SWFRecomp/scripts/profile_game_native.sh
++++ b/SWFRecomp/scripts/profile_game_native.sh
+@@ -100,10 +100,11 @@ if [ "$RUN_ONLY" != true ]; then
+         utils.c amf_packet.c
+         libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
+         libswf/ng_shared.c libswf/hit_test.c libswf/stb_image_impl.c
+-        avm2/avm2_cpu_raster.c
++        avm2/avm2_cpu_raster.c actionmodern/avm1_filter_kernels.c
+         memory/heap.c
+     )
+     for s in "${COMMON_SRCS[@]}"; do cp "${SWFMODERN_SRC}/${s}" "${BUILD_DIR}/"; done
++    cp "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${BUILD_DIR}/avm2_bitmap_kernels.inc"  # avm1_filter_kernels.c (s27)
+     # Runtime-local header included by action.c with quotes.
+     cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
+ 
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 68acb9bd..83fad221 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -217,10 +217,13 @@ struct PlaceCmCompose
+ 	//    the fold sees the fragment's straight colour before coverage, so the
+ 	//    two differ by k on every edge (A' = 0.5 R: Ruffle a = 0.5 k, the
+ 	//    fold 0.5 k^2).
+-	//  - abias: an alpha bias > 0. Kept FOLDED on purpose: our CM pass runs on
+-	//    a stage-sized layer and would paint the bias over the whole stage,
+-	//    where Ruffle's a = 0 texels divide by zero and stay empty (exporter:
+-	//    the gap of w1 probe cm_offdiag stays white).
++	//  - abias: an alpha bias > 0. s27 w2-applyfilter-cm: goes LIVE. Flash
++	//    adds the bias per cache texel to the COVERAGE alpha (FP32 capture of
++	//    regression/avm1_po3_cm_alpha_bias_edge: A' = 0.5 A + 64 reads 127 on
++	//    a half-coverage edge, where the fold gives cov * (0.5 + 64/255)). The
++	//    runtime's CM pass leaves a = 0 texels empty for such a matrix (tag.c
++	//    render_filtered_core, renderer_set_cm_keep_empty), so the bias no
++	//    longer paints the stage-sized layer.
+ 	int count = 0;
+ 	bool clamp_bites = false, edge_inexact = false, abias = false;
+ 	bool cumulative_in_range() const
+@@ -239,11 +242,17 @@ struct PlaceCmCompose
+ 	}
+ 	// The CMs go LIVE (filter passes, tagSetColorMatrixLive) instead of being
+ 	// folded when the fold is inexact and the placement cx is the identity.
+-	// With a placement cx the runtime would apply cx BEFORE the pass (it draws
+-	// the source with its cxform), so the fold stays the better approximation.
+-	bool live(const s32 mult[4], const s32 add[4]) const
++	// s27 w2-applyfilter-cm: a placement cx no longer blocks it when the
++	// placed character is a SHAPE (`shape_leaf`): the runtime then draws the
++	// shape with an identity cx and applies the cx as a last pass after the
++	// CMs (tag.c render_filtered_core), the Flash/Ruffle order (FP32 capture
++	// of regression/avm1_po3_cm_live_under_cxform: 63 = 200 -> x2 clamp ->
++	// x0.5 -> cx 0.5; the fold gave 100). A sprite's children carry its cx in
++	// their composed slots, so a sprite with a cx keeps the fold.
++	bool live(const s32 mult[4], const s32 add[4], bool shape_leaf = false) const
+ 	{
+-		if (!any || abias || !(clamp_bites || edge_inexact)) return false;
++		if (!any || !(clamp_bites || edge_inexact || abias)) return false;
++		if (shape_leaf) return true;
+ 		for (int r = 0; r < 4; r++)
+ 			if (mult[r] != 256 || add[r] != 0) return false;
+ 		return true;
+@@ -5086,7 +5095,13 @@ namespace SWFRecomp
+ 				// ColorMatrixFilters: one cxform = placement cx ∘ CM_n ∘ … ∘ CM_1,
+ 				// unless the fold is inexact (PlaceCmCompose::live): then the
+ 				// list's type-6 members render as filter passes.
+-				bool cm_live = has_color_matrix && po_cm.live(po_cx_mult, po_cx_add);
++				bool cm_live = has_color_matrix && po_cm.live(po_cx_mult, po_cx_add,
++					context.shape_char_ids.count(char_id) > 0);
++				// s27 w2-applyfilter-cm: the cxform the placement has WITHOUT the
++				// fold, restored when AS replaces the filter list
++				// (tagSetColorMatrixFolded; action.c avm1ApplyRuntimeFiltersToEntry).
++				u32 po_plain_cxform_id = cxform_id;
++				bool cm_folded = has_color_matrix && !cm_live;
+ 				if (has_color_matrix && !cm_live)
+ 				{
+ 					po_cm.emit(cxform_data, po_cx_mult, po_cx_add);
+@@ -5507,6 +5522,9 @@ namespace SWFRecomp
+ 					context.tag_main << "\ttagEndFilterList(app_context, " << to_string(depth) << ");" << endl;
+ 					if (cm_live)
+ 						context.tag_main << "\ttagSetColorMatrixLive(app_context, " << to_string(depth) << ");" << endl;
++					if (cm_folded)
++						context.tag_main << "\ttagSetColorMatrixFolded(app_context, " << to_string(depth)
++						                 << ", " << to_string(po_plain_cxform_id) << ");" << endl;
+ 				}
+ 
+ 				break;
+@@ -6575,7 +6593,10 @@ namespace SWFRecomp
+ 									}
+ 								}
+ 							}
+-							bool sp_cm_live = sp_cm.live(sp_cx_mult, sp_cx_add);
++							bool sp_cm_live = sp_cm.live(sp_cx_mult, sp_cx_add,
++								context.shape_char_ids.count(char_id) > 0);
++							u32 sp_plain_cxform_id = cxform_id;
++							bool sp_cm_folded = sp_cm.any && !sp_cm_live;
+ 							if (sp_cm.any && !sp_cm_live)
+ 							{
+ 								sp_cm.emit(cxform_data, sp_cx_mult, sp_cx_add);
+@@ -6917,6 +6938,10 @@ namespace SWFRecomp
+ 								if (sp_cm_live)
+ 									sprite_definitions << "\ttagSetColorMatrixLive(app_context, "
+ 									                   << to_string(depth) << ");" << endl;
++								if (sp_cm_folded)
++									sprite_definitions << "\ttagSetColorMatrixFolded(app_context, "
++									                   << to_string(depth) << ", "
++									                   << to_string(sp_plain_cxform_id) << ");" << endl;
+ 							}
+ 
+ 							{
+diff --git a/SWFRecomp/wasm_wrappers/bundle/build.sh b/SWFRecomp/wasm_wrappers/bundle/build.sh
+index 4be23c9d..40826d00 100644
+--- a/SWFRecomp/wasm_wrappers/bundle/build.sh
++++ b/SWFRecomp/wasm_wrappers/bundle/build.sh
+@@ -52,12 +52,13 @@ RUNTIME_C=(
+     libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
+     libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c
+     libswf/stb_image_impl.c
+-    avm2/avm2_cpu_raster.c
++    avm2/avm2_cpu_raster.c actionmodern/avm1_filter_kernels.c
+     audio/audio.c audio/audio_output_web.c
+     rendering/render_webgpu.c
+     memory/heap.c
+ )
+ for f in "${RUNTIME_C[@]}"; do cp -p "${RT}/src/${f}" "${SRC}/"; done
++cp -p "${RT}/src/avm2/avm2_bitmap.c" "${SRC}/avm2_bitmap_kernels.inc"  # avm1_filter_kernels.c (s27)
+ cp -p "${RT}/src/actionmodern/unicode_case_tables.h" "${SRC}/"
+ cp -p "${RT}/lib/c-hashmap/map.c" "${RT}/lib/c-hashmap/map.h" "${SRC}/"
+ cp -p "${RT}/lib/o1heap/o1heap.c" "${RT}/lib/o1heap/o1heap.h" "${SRC}/"
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 8a13378e..85512af1 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -736,3 +736,9 @@ regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased
+ # s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
+ # tier=1
+ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp
++# s27 w2-applyfilter-cm: PlaceObject3 ColorMatrix vs FLASH (FP32 goldens): cx after a live CM chain, alpha-bias CM
++# live with empty texels kept empty and no blit snap, folded CM dropped by `filters = []`.
++# tier=1
++regression/avm1_po3_cm_live_under_cxform               # cx-after pass on a live CM chain       1 cmp
++regression/avm1_po3_cm_alpha_bias_edge                 # keep-empty bias, unsnapped AA rim      1 cmp
++regression/avm1_po3_cm_folded_clear                    # tagSetColorMatrixFolded restore        1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 43a90c3e..60099aae 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -168,3 +168,7 @@ arms cannot be reached any other way.
+ | `avm1_button_pick_order` | **One topmost button across the root and attached walks, and rollOut before rollOver** (s26 `w2-attached-holder-render`): attached clip over a timeline button wins; of two overlapping attached clips the higher depth wins (not `child_mc_cache` order); X→Y hand-off between root timeline buttons fires X rollOut first. `tag.c` `ng_update_button_states` PICK/LEAVE/ENTER phases. `input.json`. Oracle: predicted from Ruffle `player.rs`, PENDING Ruffle test runner |
+ | `avm1_button_textfield_path_binding` | **Path variables of EditTexts inside a button resolve from the first non-button ancestor** (s26 `w2-attached-holder-render`): `_parent.pv` binds `_root.pv`, not `s.pv` (`action.c` `actionTryBindTextFieldVariable` path branch, `tag_stubs.c` `ng_on_place_object2` seeding). Oracle: predicted from Ruffle `edit_text.rs`, PENDING exporter trace |
+ | `avm1_edittext_placed_cxform` | **EditText box/border/text take the placement colour transform** (s26 `w2-text-cx-jpeg3`; landed by `w2-edittext-border-cx`). Golden = Ruffle exporter render; `max_outliers = 19` budgets 9 border-corner pixels drawn by the oracle machine's Dx12-only line-as-rect path (see test.toml) |
++| `avm1_po3_cm_folded_clear` | **`mc.filters = []` drops an authored ColorMatrix the recompiler FOLDED into the placement cxform** (s27 `w2-applyfilter-cm`; `tagSetColorMatrixFolded` + `avm1ApplyRuntimeFiltersToEntry`). Golden = **Flash Player 32** capture (== Ruffle exporter). Generator `create_test_swf.py` builds all three `avm1_po3_cm_*` fixtures |
++| `avm1_po3_cm_live_under_cxform` | **A live ColorMatrix chain on a shape runs BEFORE the placement cxform** (s27 `w2-applyfilter-cm`; `PlaceCmCompose::live(shape_leaf)`, `render_filtered_core` cx-after pass): grey 200, `[CM x2, CM x0.5]`, cx 0.5 -> Flash 63. Golden = **Flash Player 32** capture |
++| `avm1_po3_cm_alpha_bias_edge` | **An alpha-bias ColorMatrix runs per cache texel on the coverage alpha, unsnapped** (s27 `w2-applyfilter-cm`): A' = 0.5 A + 64 on a rect at a .5 offset gives Flash's half-coverage (255,127,127) rim. Golden = **Flash Player 32** capture (Ruffle snaps it crisp) |
++| `avm1_applyfilter_kernels` | **AVM1 `BitmapData.applyFilter` runs Blur / Glow / DropShadow / Convolution** through the AVM2 CPU kernels (s27 `w2-applyfilter-cm`; `actionmodern/avm1_filter_kernels.c`). Trace-only, every probe analytic (uniform interior, empty far corner, shadow side, 1x1 convolution bias) |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/create_test_swf.py
+new file mode 100644
+index 00000000..9e23b207
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/create_test_swf.py
+@@ -0,0 +1,165 @@
++"""avm1_applyfilter_kernels (s27 w2-applyfilter-cm).
++
++AVM1 BitmapData.applyFilter ran only ColorMatrixFilter; every other kind
++returned 0 and left the target untouched. It now runs the AVM2 CPU kernels
++(actionmodern/avm1_filter_kernels.c -> avm2_bitmap.c fb_apply_grown /
++bd_apply_convolution), as Ruffle runs one apply_filter for both VMs.
++
++Every probe is ANALYTIC (independent of the kernels' exact blur arithmetic):
++  blur   opaque uniform 0xFF336699 source: an interior pixel keeps the colour,
++         an edge pixel loses alpha (Flash blurs against transparent outside
++         the bitmap).
++  glow   outer glow of an opaque red square: the interior stays red, a far
++         corner stays empty, the pixel next to the square gets glow alpha.
++  shadow DropShadow(distance 4, 45 deg, blur 0): interior red, shadow below
++         right of the square, nothing above left.
++  conv   1x1 ConvolutionFilter [1], divisor 1, bias 16, preserveAlpha: every
++         channel + 16 -> 0xFF4376A9.
++  self   b.applyFilter(b, ...) with a blur: the uniform interior is unchanged.
++Regenerate byte-identically: python3 create_test_swf.py
++"""
++import struct, sys, os
++
++def s(x): return b'\x00' + x.encode() + b'\x00'
++def i(x): return b'\x07' + struct.pack('<i', x)
++def d(x): return b'\x06' + struct.pack('<d', x)[4:] + struct.pack('<d', x)[:4]
++TRUE = b'\x05\x01'
++NULL = b'\x02'
++def push(*items):
++    body = b''.join(items); return b'\x96' + struct.pack('<H', len(body)) + body
++GETVAR=b'\x1c'; SETVAR=b'\x1d'; SETMEM=b'\x4f'; GETMEM=b'\x4e'; CALLM=b'\x52'; POP=b'\x17'
++NEWM=b'\x53'; INITARR=b'\x42'; TRACE=b'\x26'
++def path(names):
++    out = push(s(names[0])) + GETVAR
++    for n in names[1:]:
++        out += push(i(n) if isinstance(n, int) else s(n)) + GETMEM
++    return out
++def call(objpath, method, args):
++    out = push(*[a for a in reversed(args)]) + push(i(len(args)))
++    out += path(objpath) + push(s(method)) + CALLM + POP
++    return out
++def setp(objpath, prop, valcode):
++    return path(objpath) + push(s(prop)) + valcode + SETMEM
++def newfilter(cls, args):
++    # new flash.filters.<cls>(args...)  -> leaves the object on the stack
++    out = push(*[a for a in reversed(args)]) + push(i(len(args)))
++    out += push(s('flash')) + GETVAR + push(s('filters')) + GETMEM + push(s(cls)) + NEWM
++    return out
++def arr(*elem_codes):
++    # [e0, e1, ...]: InitArray pops count then elements (first popped = e0)
++    out = b''.join(reversed(elem_codes)) + push(i(len(elem_codes))) + INITARR
++    return out
++def trace(code): return code + TRACE
++def rect(p, x, y, w, h, color):
++    o = call(p, 'beginFill', [i(color), i(100)])
++    o += call(p, 'moveTo', [i(x), i(y)])
++    for (px, py) in [(x+w, y), (x+w, y+h), (x, y+h), (x, y)]: o += call(p, 'lineTo', [i(px), i(py)])
++    o += call(p, 'endFill', [])
++    return o
++
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def sb(s, v, n): s.u(v, n)
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.sb(v, n)
++    return b.bytes()
++def matrix(tx, ty):
++    b = Bits(); b.u(0, 1); b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.sb(tx, n); b.sb(ty, n)
++    return b.bytes()
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++def shape(cid, w, h, rgb):
++    W, H = w * 20, h * 20
++    body = struct.pack('<H', cid) + rectrec(0, W, 0, H)
++    body += b'\x01\x00' + bytes(rgb) + b'\x00'      # 1 solid fill, 0 lines
++    b = Bits(); b.u(1, 4); b.u(0, 4)                # NumFillBits=1, NumLineBits=0
++    # style change: moveTo(0,0), fill0 = 1
++    b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1, 1); b.u(1, 1)
++    n = nbits(0, 0); b.u(n, 5); b.sb(0, n); b.sb(0, n); b.u(1, 1)
++    for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++        n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++        if dx == 0: b.u(0, 1); b.u(1, 1); b.sb(dy, n)
++        else: b.u(0, 1); b.u(0, 1); b.sb(dx, n)
++    b.u(0, 6)
++    return tag(2, body + b.bytes())
++def place(depth, cid, tx, ty, name):
++    body = bytes([0x20 | 0x04 | 0x02]) + struct.pack('<HH', depth, cid) + matrix(tx * 20, ty * 20) + s(name)[1:]
++    return tag(26, body)
++def sprite(sid, inner_cid):
++    inner = tag(26, bytes([0x02 | 0x04]) + struct.pack('<HH', 1, inner_cid) + matrix(0, 0)) + tag(1, b'') + tag(0, b'')
++    return tag(39, struct.pack('<HH', sid, 1) + inner)
++
++def new(pkg, cls, args):
++    # each arg: a push ITEM (from s/i/d/...) or full action CODE (tuple ('code', bytes))
++    out = b''.join(a[1] if isinstance(a, tuple) else push(a) for a in reversed(args)) + push(i(len(args)))
++    out += push(s('flash')) + GETVAR + push(s(pkg)) + GETMEM + push(s(cls)) + NEWM
++    return out
++def newglobal(cls, args):
++    return push(*[a for a in reversed(args)]) + push(i(len(args)), s(cls)) + b'\x40'  # NewObject
++def callv(objpath, method, args):   # call, keep result on stack
++    return push(*[a for a in reversed(args)]) + push(i(len(args))) + path(objpath) + push(s(method)) + CALLM
++
++ADD2=b'\x47'; LESS2=b'\x48'; BITAND=b'\x60'; BITRSHIFT=b'\x64'; NOT=b'\x12'
++def tracecat(label, code): return trace(push(s(label)) + code + ADD2)
++def alpha_of(code):  # (px >> 24) & 255
++    return code + push(i(24)) + BITRSHIFT + push(i(255)) + BITAND
++def bmd(name, w, h, transparent, color):
++    return push(s(name)) + new('display', 'BitmapData', [i(w), i(h), TRUE if transparent else b'\x05\x00', d(float(color))]) + SETVAR
++def fillrect(bname, x, y, w, h, color):
++    return (push(d(float(color))) + new('geom', 'Rectangle', [i(x), i(y), i(w), i(h)]) + push(i(2))
++            + path([bname]) + push(s('fillRect')) + CALLM + POP)
++def apply(label, dname, sname, filtcode, dx=0, dy=0):
++    o = filtcode
++    o += new('geom', 'Point', [i(dx), i(dy)])
++    o += path([sname, 'rectangle'])
++    o += path([sname])
++    o += push(i(4)) + path([dname]) + push(s('applyFilter')) + CALLM
++    return push(s('r')) + o + SETVAR + tracecat(label + ' ret ', push(s('r')) + GETVAR)
++def px(label, bname, x, y):
++    return tracecat(label + ' ', callv([bname], 'getPixel32', [i(x), i(y)]))
++def alpha_lt(label, bname, x, y, lim):   # trace(label + (alpha < lim))
++    return tracecat(label + ' ', alpha_of(callv([bname], 'getPixel32', [i(x), i(y)])) + push(i(lim)) + LESS2)
++def alpha_gt0(label, bname, x, y):       # trace(label + (0 < alpha))
++    return tracecat(label + ' ', push(i(0)) + alpha_of(callv([bname], 'getPixel32', [i(x), i(y)])) + LESS2)
++FALSE = b'\x05\x00'
++def red_square(name):
++    return bmd(name, 20, 20, True, 0) + fillrect(name, 5, 5, 10, 10, 0xFFFF0000)
++
++a = trace(push(s('start')))
++# blur
++a += bmd('b', 20, 20, False, 0xFF336699) + bmd('d', 20, 20, True, 0)
++a += apply('blur', 'd', 'b', new('filters', 'BlurFilter', [d(2.0), d(2.0), i(1)]))
++a += px('blur c', 'd', 10, 10) + alpha_lt('blur edge a<255', 'd', 0, 10, 255)
++# glow (outer, green)
++a += red_square('g') + bmd('gd', 20, 20, True, 0)
++a += apply('glow', 'gd', 'g', new('filters', 'GlowFilter', [i(0x00FF00), d(1.0), d(4.0), d(4.0), d(2.0), i(1), FALSE, FALSE]))
++a += px('glow c', 'gd', 10, 10) + px('glow far', 'gd', 0, 0) + alpha_gt0('glow halo a>0', 'gd', 4, 10)
++# drop shadow, blur 0
++a += red_square('h') + bmd('hd', 20, 20, True, 0)
++a += apply('shadow', 'hd', 'h', new('filters', 'DropShadowFilter', [d(4.0), d(45.0), i(0), d(1.0), d(0.0), d(0.0), d(1.0), i(1), FALSE, FALSE, FALSE]))
++a += px('shadow c', 'hd', 10, 10) + alpha_gt0('shadow br a>0', 'hd', 16, 16) + px('shadow tl', 'hd', 2, 2)
++# convolution 1x1 + bias
++a += bmd('c', 8, 8, False, 0xFF336699) + bmd('cd', 8, 8, True, 0)
++a += apply('conv', 'cd', 'c', new('filters', 'ConvolutionFilter', [i(1), i(1), ('code', arr(push(d(1.0)))), d(1.0), d(16.0), TRUE, TRUE]))
++a += px('conv c', 'cd', 4, 4)
++# in place
++a += bmd('e', 20, 20, False, 0xFF336699)
++a += apply('self', 'e', 'e', new('filters', 'BlurFilter', [d(2.0), d(2.0), i(1)]))
++a += px('self c', 'e', 10, 10)
++a += trace(push(s('done')))
++doaction = tag(12, a + b'\x00')
++swf = rectrec(0, 200*20, 0, 150*20) + struct.pack('<HH', 30 << 8, 1)
++swf += tag(9, b'\xff\xff\xff') + doaction + tag(1, b'') + tag(0, b'')
++out = b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(swf)) + swf
++open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test.swf'), 'wb').write(out)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/output.txt b/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/output.txt
+new file mode 100644
+index 00000000..8c220a65
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/output.txt
+@@ -0,0 +1,17 @@
++start
++blur ret 0
++blur c -13408615
++blur edge a<255 true
++glow ret 0
++glow c -65536
++glow far 0
++glow halo a>0 true
++shadow ret 0
++shadow c -65536
++shadow br a>0 true
++shadow tl 0
++conv ret 0
++conv c -12355927
++self ret 0
++self c -13408615
++done
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/test.swf b/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..63259b63cbd13c10a0928358e0e73ae45990fd56
+GIT binary patch
+literal 3091
+zcmdT`!EVz)5S^rilmb#kk>HSmPdQgby`k2mRmurf$$=}IWaC8I#*yO!z3~<PF|Hgq
+zaixC{-i&t}C$@u%0uniRH{+eRvv1yvxBb4mz4wS{L@#}+eIt5Nq0{PoK0n#Ic}SGh
+ziDt2iVrnK^L_JC#(0%jc=NlsLYf_~eB{ix)C9KSh_xL|Nhepjt)PN5S#<QtW*YqyI
+zX0362sitQtR@B{R+=1Z2OMZ-7$>KTuJL5(YRt2aWHwK?KSehej1h5+JaBN~7&1|^l
+zDr$>?x*V2ZWX9@>KQ;<<cnN1Ly$HvX7=FTDBLSz8?#F5p7>xzi3NSgFP|-*p6RGLc
+zT-!}M`|Q?36keobkJu}s#(9&86>}fP9jfmj5P5Kv5|sr6=Yftd#-Fu$bx0j}KCzy9
+z5NJ=mK0G?gK)3_0f#4mUW8Hu!b4)(C$y=af+rZJxV6>r>B8lJUEIuG&Up{Yktl9r=
+zT-D1WG2pXvn+8d$J8J;F0v7@>yn;H<62Jt1QK3>ru9S+ky6fX)meB0{=0xnEf{+8I
+zVw=}3m)??=&rSGg6Iy1P@>*sqf)L(Q)=I=2AdCVri@8+H4l%E0L?W(36?sw#Ov`PZ
+zN@~lUcdheCnb1?m2S8v#nMhYtav&JjA+ghPMc7Ih{il_{ojYF%qkmEf`EsyQPun;r
+zXPH&8XUf67|I+psYi;QuQ4madnV>hGMd7qNQiIJD3p1H77PcZ3(H0&cwy0R}Etp9l
+ztK|Yf`(j<e2x`7ypn2=ui}ISsTdMPe<8zuXLMqlgwzJ@|@uY|tBL(^mVEXOoOKx-5
+z4C!qEaHBA{-0Rj{GqAc}qFo2*#=8N_*Es#a$;Cyac;Ms6R-#$yE+opGzQqJe%g>D5
+zdP-aP9?@wy`52n3cpOeP(aHOT;$$mg5++jSio^*G_7TmhG;u8vvlS+Tq)0$?azZW|
+zd>34~mw-%NoPBo*bmN~S$+4Vv5g&26E|Sji9s!iIk9b=fx(w<<+S%%87b;3vpJ_8J
+ZU|r0X^}@>_<L61oy=V|lG&PB7_yz3dS5W`}
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/test.toml b/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/test.toml
+new file mode 100644
+index 00000000..dbee897f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_applyfilter_kernels/test.toml
+@@ -0,0 +1 @@
++num_frames = 1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..307aa8a044c6fd3ff5b7f72cf7e3ed064d35c3c4
+GIT binary patch
+literal 527
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnVPZ!6KiaBrZI`T3(3NRdO
+zRY+N?z?$jdc*-)8XF}bF9j!}F9XPXm^3SuWYqzp}xLEp~>BDIjCPxK<p-trN7JuM<
+z{<*~Qjn&=7XDp9B-k7?@;osH5o{v>;?>&<F{(IX+KOGLHMg;-d5c}@@TWz_$uHN?Q
+noZD{k*P^m-m;5NCnvMCnj)E`mJ6=2pjA#Z=S3j3^P6<r_B$9SR
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/output.txt b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/test.swf b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..9de4eb116815f49f18f47ae3cd11953cca2987de
+GIT binary patch
+literal 167
+zcmZ<@59V6Vz`&5fAn(AydWV5Qj*-Dd5GcUl%=G{Ne|ZiTh6Gks16GL*j12!7fJlI6
+zRro@6%ZPN>O-1J&81@Us0@boHGBU6*NOd+VFfg()Ff`bM48R1WiZcMsX>f7?8Uz5S
+CITi{4
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/test.toml b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/test.toml
+new file mode 100644
+index 00000000..f1a32aa4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_alpha_bias_edge/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 1
++
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 0
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/create_test_swf.py
+new file mode 100644
+index 00000000..ba3f6f22
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/create_test_swf.py
+@@ -0,0 +1,139 @@
++"""s27 w1-applyfilter-tail item 5: ColorMatrix leftovers (three PlaceObject3 fixtures).
++
++Generates all three sibling regression dirs (this one, avm1_po3_cm_live_under_cxform,
++avm1_po3_cm_alpha_bias_edge). Goldens: Flash Player 32 captures (coordinator,
++w1-local-oracles/w1-applyfilter-tail/<fixture>/flash.png). Fixed in s27
++w2-applyfilter-cm: swf.cpp PlaceCmCompose::live + tagSetColorMatrixFolded,
++tag.c render_filtered_core (cx after a live CM chain; keep-empty alpha bias;
++no snap for an alpha-bias CM-only entry), action.c avm1ApplyRuntimeFiltersToEntry.
++
++Library copied verbatim from regression/avm1_po3_color_matrix_live/create_test_swf.py.
++
++avm1_po3_cm_live_under_cxform (SWF 10, no script): grey 200 60x40 at (10,10) with
++  filters [CM x2, CM x0.5] AND a placement cxform rgb mult 0.5 (128/256).
++  - cxform applied AFTER the filter passes (Ruffle: the cache is drawn with the
++    object's colour transform at the blit): 200 -> 255 -> 128 -> 64.
++  - cxform folded/applied BEFORE (ours today, PlaceCmCompose keeps the fold when
++    the placement cx is not identity): 200*.5*2*.5 = 100.
++  Control at (110,10): the same chain without a cxform (live today): 128.
++avm1_po3_cm_alpha_bias_edge (SWF 10): red 59x39 at a .5 offset, CM alpha
++  A' = 0.5*A + 64 (alpha bias > 0 stays FOLDED today). Ruffle caches + snaps a
++  filtered object and computes A' per unpremultiplied texel: crisp (255,64,64)
++  over white; the fold gives the same interior with a half-coverage AA rim.
++avm1_po3_cm_folded_clear (SWF 8): sprite g (red) with one exact CM (R<->B swap,
++  folded into the cxform at recompile time); frame 1 runs g.filters = [].
++  Ruffle set_filters drops the authored list: g renders RED. h keeps it: BLUE.
++"""
++import struct, pathlib
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def blur(bx, by, passes=1):
++    return bytes([1]) + struct.pack('<II', int(bx * 65536), int(by * 65536)) + bytes([(passes << 3)])
++def colormatrix(m20):
++    return bytes([6]) + struct.pack('<20f', *m20)
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++RED = (255, 0, 0, 255); GREY = (200, 200, 200, 255)
++SWAP_RB = [0,0,1,0,0, 0,1,0,0,0, 1,0,0,0,0, 0,0,0,1,0]
++ABIAS   = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,255, 0,0,0,1,128]
++TWICE   = [2,0,0,0,0, 0,2,0,0,0, 0,0,2,0,0, 0,0,0,1,0]
++HALF    = [.5,0,0,0,0, 0,.5,0,0,0, 0,0,.5,0,0, 0,0,0,1,0]
++AFROMR  = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, .5,0,0,0,0]
++SHAPES = [shape(1, [(0, 0, 60, 40)], RED),
++          shape(2, [(0, 0, 20, 40), (40, 0, 20, 40)], RED),
++          shape(3, [(0, 0, 60, 40)], GREY),
++          shape(4, [(0.5, 0.5, 59, 39)], RED)]
++PLACES = [place3(1, 1, 10, 10, filters=[colormatrix(SWAP_RB)]),
++          place3(2, 2, 110, 10, filters=[colormatrix(ABIAS)]),
++          place3(3, 3, 10, 80, filters=[colormatrix(TWICE), colormatrix(HALF)]),
++          place3(4, 4, 110, 80, filters=[colormatrix(AFROMR)])]
++
++# ---- AVM1 (frame-1 `g.filters = []`) ----
++def s_(x): return b'\x00' + x.encode() + b'\x00'
++def i_(x): return b'\x07' + struct.pack('<i', x)
++def push(*items):
++    body = b''.join(items); return b'\x96' + struct.pack('<H', len(body)) + body
++CLEAR_G = (push(s_('g')) + b'\x1c' + push(s_('filters')) + push(i_(0)) + b'\x42' + b'\x4f'
++           + push(s_('done')) + b'\x26' + b'\x00')
++
++
++CXHALF = cxform_alpha(mult=(128, 128, 128, 256))
++AHALFB = [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,.5,64]
++if __name__ == '__main__':
++    here = pathlib.Path(__file__).resolve().parent.parent
++    (here / 'avm1_po3_cm_live_under_cxform' / 'test.swf').write_bytes(movie(
++        [shape(3, [(0, 0, 60, 40)], GREY),
++         place3(1, 3, 10, 10, cx=CXHALF, filters=[colormatrix(TWICE), colormatrix(HALF)]),
++         place3(2, 3, 110, 10, filters=[colormatrix(TWICE), colormatrix(HALF)])]))
++    (here / 'avm1_po3_cm_alpha_bias_edge' / 'test.swf').write_bytes(movie(
++        [shape(4, [(0.5, 0.5, 59, 39)], RED), place3(1, 4, 110, 80, filters=[colormatrix(AHALFB)])]))
++    (here / 'avm1_po3_cm_folded_clear' / 'test.swf').write_bytes(movie(
++        [shape(1, [(0, 0, 60, 40)], RED), sprite(10, [place3(1, 1)]),
++         place3(1, 10, 10, 10, filters=[colormatrix(SWAP_RB)], name='g'),
++         place3(2, 10, 110, 10, filters=[colormatrix(SWAP_RB)], name='h'),
++         tag(12, CLEAR_G)], ver=8))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..b938926572cee3faaba42ff599789adfda6ba0ff
+GIT binary patch
+literal 490
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnmPZ!6KiaBrZ8gd;m;9)pu
+zap(X3H8l!4*HsD)gLezeaP2*qo%W0&Z*Dw4gS9XROQVATD)HlQZP8lx<2Nom<L8Mv
+zZk;2*!PKZgOCme%GylPd&St32Ky%fw<+gCwit?&1UHpy%7>5j=u6{1-oD!M<vP)?0
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/output.txt b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/output.txt
+new file mode 100644
+index 00000000..19f86f49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/output.txt
+@@ -0,0 +1 @@
++done
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/test.swf b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..feb640dce0f6fba52423375b31b4736b3de3b28b
+GIT binary patch
+literal 330
+zcmZ<@59aV<WMIf(kau8Uy~DsD$H?F!$N&V+O#lD?m*Ze$NMKNHV31^BWcbejL;^hO
+z3w10b*<Du@onv6Q#K{Ge=n!NBl8g*Y3=Tkz`vv2Gq#7e50~dqPi4=x(21YiZ02DOX
+z!&nfS5Fb@F0|P|;e!+O4gc>6g&<?52h7_Rtsc(q}^E74#pz~#>aWXKZW#*Km78Ns0
+YV`X3mxyi|Y8qilM`FW`fYG7{z0AvItn*aa+
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/test.toml b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/test.toml
+new file mode 100644
+index 00000000..f1a32aa4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_folded_clear/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 1
++
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 0
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..362ee1ccd345fb8e8a50fbe0585631b6049362c9
+GIT binary patch
+literal 503
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2OE%_edo9&0|VnePZ!6KiaBquZsa}WAmHlQ
+zqj6?#<hwI-b$J)43t6xmfAsu5dHLP6G`R!r=dUt9ILE@|s33qw#ND^M^ZjqT@w?}{
+z)?F38R5@?8`k$+XGT#469ThlOnjC0I<QN;Tc0Uli6T?ktP8_D(d-7TQs{0+bY6Byb
+N!PC{xWt~$(6987%Vsiih
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/output.txt b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/test.swf b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..a61dfe67e03214b826523cc8a7f8c34f1b21705b
+GIT binary patch
+literal 432
+zcmZ<@59Zpy$iR@nAn(AydWV5Qj*-DdkO2ssng0L(FUP^mkiekYz#z%M$Z+DsiT?}&
+zJn9Q|EF;-nR}`INVAwCX8K{(xk&%I!LFhyZLq>xF2MYre8&J>zh_L|&Y=S^B9O4c3
+nAoU;v!3+=w4Ui}fF>t@&I-oIZj7&g>OLaD+3<Wnk09_0Kkl!52
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/test.toml b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/test.toml
+new file mode 100644
+index 00000000..f1a32aa4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_po3_cm_live_under_cxform/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 1
++
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 0
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 69953404..0a6b3d85 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -2730,6 +2730,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
+         # AVM1 BitmapData.draw() rasterizes timeline shapes/text through the CPU
+         # shape rasterizer (s26 w2-tail-bitmap-draw), so it is base, not AVM2-only.
+         "src/avm2/avm2_cpu_raster.c",
++        # AVM1 BitmapData.applyFilter's non-ColorMatrix kinds re-compile
++        # avm2_bitmap.c's kernel block (s27 w2-applyfilter-cm); the .inc copy
++        # below keeps the *.c glob from building the whole AVM2 TU.
++        "src/actionmodern/avm1_filter_kernels.c",
+         "src/libswf/tag_stubs.c",
+         "src/libswf/shape_hit_test.c",
+         "src/libswf/ng_shared.c",
+@@ -2758,6 +2762,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
+         copy_avm2_third_party(build_dir)
+     for src in core_sources:
+         shutil.copy2(SWFMODERN / src, build_dir)
++    shutil.copy2(SWFMODERN / "src/avm2/avm2_bitmap.c", build_dir / "avm2_bitmap_kernels.inc")
+ 
+     # Archipelago Rando class. Two opt-in backends, both define -DWITH_AP so
+     # rando.c references the seam; only the backend differs:
+@@ -3330,6 +3335,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
+         "src/libswf/swf_core.c",
+         "src/libswf/tag_stubs.c",
+         "src/libswf/shape_hit_test.c",
++        "src/actionmodern/avm1_filter_kernels.c",   # AVM1 applyFilter (s27)
+     ]
+ 
+     # AVM2 (AS3) test — same trigger and same module tree as compile_native.
+@@ -3343,6 +3349,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
+ 
+     for src in core_sources:
+         shutil.copy2(SWFMODERN / src, build_dir)
++    shutil.copy2(SWFMODERN / "src/avm2/avm2_bitmap.c", build_dir / "avm2_bitmap_kernels.inc")
+ 
+     # Archipelago Rando (opt-in via WITH_AP=1). WASM uses the EM_JS impl
+     # (rando_ap_wasm.c → archipelago.js), NOT the native APCpp shim. See

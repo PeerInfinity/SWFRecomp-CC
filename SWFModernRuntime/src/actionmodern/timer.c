@@ -7,6 +7,7 @@
 // non-graphics modes.
 
 #include <limits.h>
+#include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -16,6 +17,12 @@
 #include <actionmodern/action.h>            // processTimers/hasActiveTimers ABI, actionFlushPendingOnLoads, g_execution_halted
 #include <actionmodern/action_internal.h>
 #include <actionmodern/actiontimer.h>
+// tag.c (s27 w1-timers-robustness, landed w2-timers-land): goto-skipped DoInitAction queue.
+extern void tagGotoInitTimerPass(int enter);
+extern void tagDrainGotoInitActions(SWFAppContext* app_context, int force);
+// s27 w2-timers-land: swf.c / swf_core.c (one per build) — run a root goto a
+// callback issued (method form, left for the frame loop) right after it.
+extern void ng_runPendingRootGotoFromEvent(SWFAppContext* app_context);
 
 // ==================================================================
 // Timer state
@@ -44,7 +51,30 @@ typedef struct {
 	int extra_arg_count;
 } TimerEntry;
 
-static TimerEntry g_timers[MAX_TIMERS];
+// s27 w1-timers-robustness (landed w2-timers-land): growable (was a fixed 64: the 65th
+// live setInterval/setTimeout returned undefined and never fired). Starts on
+// a static block of MAX_TIMERS; past that it doubles on the heap. A callback
+// can create timers while processTimers / fireTimerCallback hold a pointer
+// into the table (and pass t->extra_args to the callee), so a replaced block
+// is never freed (bounded: the abandoned blocks sum to < the live one), and
+// processTimers re-derives its entry by index after each callback.
+static TimerEntry g_timers_static[MAX_TIMERS];
+static TimerEntry* g_timers = g_timers_static;
+static int g_timers_cap = MAX_TIMERS;
+
+static int timerFreeSlot(void)
+{
+	for (int i = 0; i < g_timers_cap; i++)
+		if (!g_timers[i].active) return i;
+	int ncap = g_timers_cap * 2;
+	TimerEntry* nt = (TimerEntry*) calloc((size_t) ncap, sizeof(TimerEntry));
+	if (nt == NULL) return -1;
+	memcpy(nt, g_timers, (size_t) g_timers_cap * sizeof(TimerEntry));
+	int slot = g_timers_cap;
+	g_timers = nt;            // old block deliberately kept (see above)
+	g_timers_cap = ncap;
+	return slot;
+}
 static int g_next_timer_id = 1;
 
 // Timer clock (s26 w2-timer-semantics). A port of Ruffle's Timers
@@ -139,8 +169,11 @@ static int timerIsCallable(ActionVar* v)
 
 static int timerIsObject(ActionVar* v)
 {
+	// Ruffle create_timer: any non-function Object takes the method form —
+	// an Array included (s27 w1-timers-robustness, landed w2-timers-land).
 	return v->type == ACTION_STACK_VALUE_OBJECT ||
-	       v->type == ACTION_STACK_VALUE_MOVIECLIP;
+	       v->type == ACTION_STACK_VALUE_MOVIECLIP ||
+	       v->type == ACTION_STACK_VALUE_ARRAY;
 }
 
 // ==================================================================
@@ -230,11 +263,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
 		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[2]));
 
 		// Find empty slot
-		int slot = -1;
-		for (int i = 0; i < MAX_TIMERS; i++)
-		{
-			if (!g_timers[i].active) { slot = i; break; }
-		}
+		int slot = timerFreeSlot();
 		if (slot == -1)
 		{
 			if (args != NULL) FREE(args);
@@ -289,11 +318,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
 		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[1]));
 
 		// Find empty slot
-		int slot = -1;
-		for (int i = 0; i < MAX_TIMERS; i++)
-		{
-			if (!g_timers[i].active) { slot = i; break; }
-		}
+		int slot = timerFreeSlot();
 		if (slot == -1)
 		{
 			if (args != NULL) FREE(args);
@@ -336,11 +361,15 @@ void actionTimerClearInterval(SWFAppContext* app_context, ActionVar* args, u32 n
 	}
 
 	// Get timer ID from first arg
-	double id_d = timerCoerceToNumber(app_context, &args[0]);
+	// Ruffle clear_interval: coerce_to_i32 (ECMA ToInt32). `(int)double`
+	// was UB for NaN / out-of-range ids (x86: INT_MIN), so
+	// clearInterval(id + 4294967296) did not clear timer `id`
+	// (s27 w1-timers-robustness, landed w2-timers-land).
+	double id_d = timerDelayToInt32(timerCoerceToNumber(app_context, &args[0]));
 	int id = (int)id_d;
 
 	// Find and deactivate the timer
-	for (int i = 0; i < MAX_TIMERS; i++)
+	for (int i = 0; i < g_timers_cap; i++)
 	{
 		if (g_timers[i].active && g_timers[i].id == id)
 		{
@@ -392,7 +421,35 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 			}
 		}
 
-		if (method_func == NULL) return; // method not found, skip silently
+		if (method_func == NULL)
+		{
+			// s27 w1-timers-robustness (landed w2-timers-land): Ruffle's Avm1Method arm is
+			// `this.call_method(name, params)` — a full member lookup, so a
+			// native method (setInterval(mc, "nextFrame", ms), `play`, ...)
+			// and a non-ASObject receiver (an Array) are called too. The
+			// dynamic-property lookup above only sees user-assigned
+			// functions; fall back to the CallMethod opcode path for the
+			// rest (AVM1 stack layout: args last..first, count, obj, name).
+			if (t->object.type != ACTION_STACK_VALUE_OBJECT &&
+			    t->object.type != ACTION_STACK_VALUE_MOVIECLIP &&
+			    t->object.type != ACTION_STACK_VALUE_ARRAY) return;
+			if (t->object.data.numeric_value == 0) return;
+			for (int i = t->extra_arg_count - 1; i >= 0; i--)
+				pushVar(app_context, &t->extra_args[i]);
+			ActionVar n_var = {0};
+			n_var.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &n_var.data.numeric_value) = (double) t->extra_arg_count;
+			pushVar(app_context, &n_var);
+			pushVar(app_context, &t->object);
+			PUSH_STR(t->method_name, strlen(t->method_name));
+			char _tm_sb[17];
+			g_call_depth++;
+			actionCallMethod(app_context, _tm_sb);
+			g_call_depth--;
+			ActionVar _tm_r;
+			popVar(app_context, &_tm_r);
+			return;
+		}
 
 		// INV_VERSION_SWITCH: run the callback under its defining movie's SWF
 		// version (and the matching version-group _global) — timers fire from
@@ -510,7 +567,7 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 	// again (Ruffle cancels them when they come due, below); drop them now
 	// as before so they do not keep hasActiveTimers() — the headless exit
 	// condition — true until their due time.
-	for (int i = 0; i < MAX_TIMERS; i++)
+	for (int i = 0; i < g_timers_cap; i++)
 	{
 		if (!g_timers[i].active || !g_timers[i].is_method ||
 		    g_timers[i].object.type != ACTION_STACK_VALUE_MOVIECLIP) continue;
@@ -519,11 +576,17 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 	}
 
 	int tick_count = 0;
+	// s27 w1-timers-robustness (landed w2-timers-land): init actions queued by a goto in a
+	// callback run after the batch of timers due at the same instant
+	// (tagDrainGotoInitActions; gnash gotoFrameFromInterval `x0xx1x234`).
+	tagGotoInitTimerPass(1);
+	int have_batch = 0;
+	uint64_t batch_tick = 0;
 	for (;;)
 	{
 		// Earliest due active timer (ties: lowest id = creation order).
 		int best = -1;
-		for (int i = 0; i < MAX_TIMERS; i++)
+		for (int i = 0; i < g_timers_cap; i++)
 		{
 			if (!g_timers[i].active) continue;
 			if (best < 0 || g_timers[i].tick_us < g_timers[best].tick_us ||
@@ -533,6 +596,13 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 		if (best < 0 || !(g_timers[best].tick_us < g_timer_cur_us)) break;
 
 		TimerEntry* t = &g_timers[best];
+		if (have_batch && t->tick_us != batch_tick)
+		{
+			tagDrainGotoInitActions(app_context, 1);
+			ng_runPendingRootGotoFromEvent(app_context);
+			have_batch = 0;
+			continue; // the init actions / target frame may have cleared or created timers
+		}
 		if (++tick_count > TIMER_MAX_TICKS)
 		{
 			g_timer_cur_us = t->tick_us - 100;
@@ -549,6 +619,7 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 		}
 
 		int expected_id = t->id;
+		if (!have_batch) { have_batch = 1; batch_tick = t->tick_us; }
 		if (!cancel)
 		{
 			fireTimerCallback(app_context, t);
@@ -561,7 +632,9 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 		}
 
 		// The callback may have cleared this timer (or cleared it and a new
-		// one reused the slot): only reschedule the entry it fired.
+		// one reused the slot): only reschedule the entry it fired. Re-derive
+		// the pointer: the callback may have grown (moved) the table.
+		t = &g_timers[best];
 		if (t->active && t->id == expected_id)
 		{
 			if (!t->is_interval || cancel)
@@ -571,12 +644,15 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 		}
 		if (g_execution_halted) break;
 	}
+	tagGotoInitTimerPass(0);
+	tagDrainGotoInitActions(app_context, 1);
+	ng_runPendingRootGotoFromEvent(app_context);
 }
 
 // Check if any timers are active
 int hasActiveTimers(void)
 {
-	for (int i = 0; i < MAX_TIMERS; i++)
+	for (int i = 0; i < g_timers_cap; i++)
 	{
 		if (g_timers[i].active) return 1;
 	}
@@ -650,7 +726,7 @@ ASFunction* actionTimerGetClearTimeout(void)  { initTimerFunctions(); return &g_
 // static but not necessarily in function_registry).
 void timerGcMarkRoots(void)
 {
-	for (int i = 0; i < MAX_TIMERS; i++) {
+	for (int i = 0; i < g_timers_cap; i++) {
 		if (!g_timers[i].active) continue;
 		swfGcMarkVar(&g_timers[i].func);
 		swfGcMarkVar(&g_timers[i].object);
@@ -670,7 +746,7 @@ void timerGcMarkRoots(void)
 // time before; firing with UNDEFINED is a deterministic no-op instead.
 void timerGcScrubStashes(const void* p)
 {
-	for (int i = 0; i < MAX_TIMERS; i++) {
+	for (int i = 0; i < g_timers_cap; i++) {
 		if (!g_timers[i].active) continue;
 		ActionVar* vars[10];
 		int n = 0;

@@ -130,6 +130,101 @@ int g_skip_inline_target_script = 0;
 
 // Execute goto catch-up inline (called from actionGotoFrame)
 // Processes intermediate frame tags and target frame tags immediately
+// s27 w2-timers-land: the per-tick root goto catch-up loop, factored out of
+// swfStart so it can run a second time after the event pumps (timers,
+// LoadVars, LocalConnection, ...). A root goto issued by such a callback is
+// left for this loop (ng_executeGotoTagsOnly / g_deferred_root_goto); when
+// the callback fires after the loop has run, the target frame's DoAction
+// never ran (stopped root) or ran a tick late. Flash runs the goto inside
+// the callback and the target frame's actions right after it. Mirrors the
+// swf.c twin. Key tests: regression/avm1_timer_root_goto_stopped_{gs,nf},
+// regression/avm1_goto_skipped_init_timer (no-graphics).
+static void ng_runPendingRootGoto(SWFAppContext* app_context, frame_func* funcs)
+{
+	while (goto_from_action && manual_next_frame)
+	{
+		size_t original_frame = current_frame;
+		size_t target = next_frame;
+		manual_next_frame = 0;
+		goto_from_action = 0;
+
+		// Remove display list entries placed after the target frame
+		ng_display_clear_after(app_context, target);
+
+		catch_up_mode = 1;
+		tagGotoInitCapture(1);
+		if (target <= original_frame)
+		{
+			// Backward goto: replay tags from frame 0 to target.
+			// Intermediate frames (0..target-1) suppress scripts.
+			// Target frame runs normally (scripts included).
+			// Backward protection stays on through target frame so
+			// RemoveObject2 doesn't remove entries placed during rebuild.
+#ifdef NO_GRAPHICS
+			// Clean up dynamic MCs and reset swapped depths before replay
+			{
+				extern void actionRewindCleanup(SWFAppContext* app_context);
+				actionRewindCleanup(app_context);
+			}
+#endif
+			catch_up_backward = 1;
+			catch_up_target = target;
+			for (size_t f = 0; f < target && f < g_frame_count; f++)
+			{
+				current_frame = f;
+				if (funcs[f]) funcs[f](app_context);
+			}
+			catch_up_mode = 0;
+			tagGotoInitCapture(0);
+			tagDrainGotoInitActions(app_context, 0);
+			// Execute target frame with scripts enabled but
+			// backward protection still active
+			if (target < g_frame_count)
+			{
+				current_frame = target;
+				if (funcs[target]) funcs[target](app_context);
+			}
+			catch_up_backward = 0;
+			{
+				extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+				ng_display_cleanup_unplaced_after(app_context, target);
+			}
+		}
+		else
+		{
+			// Forward goto: process intermediate frames (current+1..target-1)
+			// with scripts suppressed, then target frame normally.
+			for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
+			{
+				current_frame = f;
+				if (funcs[f]) funcs[f](app_context);
+			}
+			catch_up_mode = 0;
+			tagGotoInitCapture(0);
+			tagDrainGotoInitActions(app_context, 0);
+			// Execute target frame with scripts enabled
+			if (target < g_frame_count)
+			{
+				current_frame = target;
+				if (funcs[target]) funcs[target](app_context);
+			}
+		}
+		current_frame = target;
+
+		g_deferred_root_goto = 0;
+
+		// After catch-up, the goto's advance is consumed; fall through
+		// to the normal advance logic below.
+	}
+}
+
+// Event-callback entry (timer.c processTimers, after each batch of timers due
+// at the same instant): see ng_runPendingRootGoto.
+void ng_runPendingRootGotoFromEvent(SWFAppContext* app_context)
+{
+	ng_runPendingRootGoto(app_context, app_context->frame_funcs);
+}
+
 void ng_executeGotoCatchUp(SWFAppContext* app_context)
 {
 	if (!goto_from_action || !manual_next_frame) return;
@@ -192,6 +287,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	// sprite scripts fire synchronously inside ng_run_deferred_sprite_init_impl
 	// after the target frame's root script drains.
 	actionGotoCatchupEnter();
+	tagGotoInitCapture(1);
 	if (target <= original_frame)
 	{
 #ifdef NO_GRAPHICS
@@ -227,8 +323,10 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 		}
 	}
 	actionGotoCatchupLeave();
+	tagGotoInitCapture(0);
 	catch_up_mode = 0;
 	g_tag_skip_mode = saved_tag_skip;
+	tagDrainGotoInitActions(app_context, 0);
 	// Do NOT restore g_defer_sprite_init here — keep it set so that the
 	// calling frame's tagShowFrame (which runs after this returns) also defers
 	// sprite init. g_defer_sprite_init is cleared in the deferred-script loop
@@ -336,6 +434,7 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
 	g_tag_skip_mode = 0;
 	g_defer_sprite_init = 1;
 	catch_up_mode = 1;
+	tagGotoInitCapture(1);
 	if (target <= original_frame)
 	{
 #ifdef NO_GRAPHICS
@@ -366,7 +465,9 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
 		}
 	}
 	catch_up_mode = 0;
+	tagGotoInitCapture(0);
 	g_tag_skip_mode = saved_tag_skip;
+	tagDrainGotoInitActions(app_context, 0);
 	g_defer_sprite_init = saved_defer_sprite;
 
 	// Restore current_frame — the main loop manages frame advancement.
@@ -1393,76 +1494,7 @@ void swfStart(SWFAppContext* app_context)
 		// the same frame advance, but skips DoAction tags (main timeline scripts).
 		// In our model, catch_up_mode=1 causes generated frame functions to skip
 		// their script_N() calls while still executing tag functions.
-		while (goto_from_action && manual_next_frame)
-		{
-			size_t original_frame = current_frame;
-			size_t target = next_frame;
-			manual_next_frame = 0;
-			goto_from_action = 0;
-
-			// Remove display list entries placed after the target frame
-			ng_display_clear_after(app_context, target);
-
-			catch_up_mode = 1;
-			if (target <= original_frame)
-			{
-				// Backward goto: replay tags from frame 0 to target.
-				// Intermediate frames (0..target-1) suppress scripts.
-				// Target frame runs normally (scripts included).
-				// Backward protection stays on through target frame so
-				// RemoveObject2 doesn't remove entries placed during rebuild.
-#ifdef NO_GRAPHICS
-				// Clean up dynamic MCs and reset swapped depths before replay
-				{
-					extern void actionRewindCleanup(SWFAppContext* app_context);
-					actionRewindCleanup(app_context);
-				}
-#endif
-				catch_up_backward = 1;
-				catch_up_target = target;
-				for (size_t f = 0; f < target && f < g_frame_count; f++)
-				{
-					current_frame = f;
-					if (funcs[f]) funcs[f](app_context);
-				}
-				catch_up_mode = 0;
-				// Execute target frame with scripts enabled but
-				// backward protection still active
-				if (target < g_frame_count)
-				{
-					current_frame = target;
-					if (funcs[target]) funcs[target](app_context);
-				}
-				catch_up_backward = 0;
-				{
-					extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
-					ng_display_cleanup_unplaced_after(app_context, target);
-				}
-			}
-			else
-			{
-				// Forward goto: process intermediate frames (current+1..target-1)
-				// with scripts suppressed, then target frame normally.
-				for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
-				{
-					current_frame = f;
-					if (funcs[f]) funcs[f](app_context);
-				}
-				catch_up_mode = 0;
-				// Execute target frame with scripts enabled
-				if (target < g_frame_count)
-				{
-					current_frame = target;
-					if (funcs[target]) funcs[target](app_context);
-				}
-			}
-			current_frame = target;
-
-			g_deferred_root_goto = 0;
-
-			// After catch-up, the goto's advance is consumed; fall through
-			// to the normal advance logic below.
-		}
+		ng_runPendingRootGoto(app_context, funcs);
 
 		// Phase G (GOTO_FIFO_UNIFICATION_INCREMENTAL): the outer 3-phase deferred
 		// goto drain that used to live here was retired. Phase E moved the
@@ -1543,6 +1575,9 @@ void swfStart(SWFAppContext* app_context)
 				processLocalConnectionMessages(app_context);
 			}
 		}
+		// s27 w2-timers-land: run a root goto issued by one of the callbacks
+		// above now (see ng_runPendingRootGoto).
+		ng_runPendingRootGoto(app_context, funcs);
 
 		// Flush pending onLoad dispatches for dynamically-attached MCs
 		// (queued during attachMovie, fires after current script/timer completes)

@@ -2809,6 +2809,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         # AVM1 BitmapData.draw() rasterizes timeline shapes/text through the CPU
         # shape rasterizer (s26 w2-tail-bitmap-draw), so it is base, not AVM2-only.
         "src/avm2/avm2_cpu_raster.c",
+        # AVM1 BitmapData.applyFilter's non-ColorMatrix kinds re-compile
+        # avm2_bitmap.c's kernel block (s27 w2-applyfilter-cm); the .inc copy
+        # below keeps the *.c glob from building the whole AVM2 TU.
+        "src/actionmodern/avm1_filter_kernels.c",
         "src/libswf/tag_stubs.c",
         "src/libswf/shape_hit_test.c",
         "src/libswf/ng_shared.c",
@@ -2837,6 +2841,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         copy_avm2_third_party(build_dir)
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
+    shutil.copy2(SWFMODERN / "src/avm2/avm2_bitmap.c", build_dir / "avm2_bitmap_kernels.inc")
 
     # Archipelago Rando class. Two opt-in backends, both define -DWITH_AP so
     # rando.c references the seam; only the backend differs:
@@ -3457,6 +3462,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "src/libswf/swf_core.c",
         "src/libswf/tag_stubs.c",
         "src/libswf/shape_hit_test.c",
+        "src/actionmodern/avm1_filter_kernels.c",   # AVM1 applyFilter (s27)
     ]
 
     # AVM2 (AS3) test — same trigger and same module tree as compile_native.
@@ -3470,6 +3476,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
 
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
+    shutil.copy2(SWFMODERN / "src/avm2/avm2_bitmap.c", build_dir / "avm2_bitmap_kernels.inc")
 
     # Archipelago Rando (opt-in via WITH_AP=1). WASM uses the EM_JS impl
     # (rando_ap_wasm.c → archipelago.js), NOT the native APCpp shim. See

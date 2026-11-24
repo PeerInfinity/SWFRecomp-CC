@@ -46,6 +46,7 @@ cp "${SRC}"/actionmodern/{action.c,variables.c,object.c,math.c,date.c,timer.c,re
 cp "${SRC}"/{utils.c,amf_packet.c} "$OUT/"
 cp "${SRC}"/libswf/{swf.c,tag.c,tag_stubs.c,ng_shared.c,hit_test.c,shape_hit_test.c,graphics_stubs.c} "$OUT/"
 cp "${SRC}"/avm2/avm2_cpu_raster.c "$OUT/"  # AVM1 draw() timeline arm (s26 1aef9cc7b); build_test.sh carries it too
+cp "${SRC}"/actionmodern/avm1_filter_kernels.c "$OUT/"; cp "${SRC}"/avm2/avm2_bitmap.c "$OUT/avm2_bitmap_kernels.inc"  # AVM1 applyFilter (s27), as bundle/build.sh
 cp "${SRC}"/actionmodern/{image_decode.c,video_codec.c} "$OUT/"
 cp "${SRC}"/libswf/stb_image_impl.c "$OUT/"; cp "${RT}"/lib/stb/stb_image.h "$OUT/"
 cp "${SRC}"/rendering/render_webgpu.c "$OUT/"

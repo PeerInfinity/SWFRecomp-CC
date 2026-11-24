@@ -1,0 +1,17 @@
+start
+blur ret 0
+blur c -13408615
+blur edge a<255 true
+glow ret 0
+glow c -65536
+glow far 0
+glow halo a>0 true
+shadow ret 0
+shadow c -65536
+shadow br a>0 true
+shadow tl 0
+conv ret 0
+conv c -12355927
+self ret 0
+self c -13408615
+done

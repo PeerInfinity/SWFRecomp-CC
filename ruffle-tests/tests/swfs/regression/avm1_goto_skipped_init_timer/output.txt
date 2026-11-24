@@ -1,0 +1,6 @@
+f1
+cb
+cb after f3
+init2 f3
+init3 f3
+f3

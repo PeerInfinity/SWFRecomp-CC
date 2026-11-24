@@ -1041,16 +1041,38 @@ static ASFunction* g_getmember_call_target = NULL;
 
 // --- Object.prototype.watch() / unwatch() watcher table ---
 #define MAX_WATCH_ENTRIES 64
+// s27 w2-timers-land: was 64. A watched name is stored truncated to the
+// buffer, but compared by its full length at set time, so a name of >= 64
+// UTF-8 bytes never matched and its watcher never fired. 512 matches the
+// addProperty name buffer; every watch/unwatch name buffer uses it.
+#define WATCH_NAME_MAX 512
 typedef struct {
 	ASObject* obj;          // NULL for timeline/MovieClip variable watches
 	MovieClip* mc;          // Non-NULL for timeline variable watches (obj==NULL)
-	char prop_name[64];
+	char prop_name[WATCH_NAME_MAX];
 	u32 prop_name_len;
 	ASFunction* watcher_func;
 	ActionVar user_data;    // userData (3rd arg passed to watch())
 } WatchEntry;
-static WatchEntry g_watch_table[MAX_WATCH_ENTRIES];
+// s27 w1-timers-robustness (landed w2-timers-land): growable (was a fixed 64: the 65th
+// live watch() returned false and its handler never ran). Starts on a static
+// block; past that it doubles on the heap. Watch handlers are invoked with
+// &g_watch_table[i].user_data and may call watch() themselves, so a replaced
+// block is never freed (bounded: the abandoned blocks sum to < the live one).
+static WatchEntry g_watch_table_static[MAX_WATCH_ENTRIES];
+static WatchEntry* g_watch_table = g_watch_table_static;
+static int g_watch_cap = MAX_WATCH_ENTRIES;
 static int g_watch_count = 0;
+static int watch_table_room(void)
+{
+	if (g_watch_count < g_watch_cap) return 1;
+	WatchEntry* nt = (WatchEntry*) calloc((size_t) g_watch_cap * 2, sizeof(WatchEntry));
+	if (nt == NULL) return 0;
+	memcpy(nt, g_watch_table, (size_t) g_watch_cap * sizeof(WatchEntry));
+	g_watch_table = nt;   // old block deliberately kept (see above)
+	g_watch_cap *= 2;
+	return 1;
+}
 
 // Re-entrancy guard for watch handlers. Setting a watched property from inside
 // its own watch handler re-fires the handler a Flash-version-specific number of
@@ -5260,7 +5282,7 @@ static ActionVar builtin_object_watch(SWFAppContext* app_context, ActionVar* arg
 		if (mc == NULL) return ret_false;
 	}
 
-	char prop_name[64] = {0};
+	char prop_name[WATCH_NAME_MAX] = {0};
 	u32 prop_name_len = 0;
 	if (args[0].type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* u16 = varGetU16Ptr(&args[0]);
@@ -5288,7 +5310,7 @@ static ActionVar builtin_object_watch(SWFAppContext* app_context, ActionVar* arg
 		}
 	}
 	// Add new entry
-	if (g_watch_count < MAX_WATCH_ENTRIES) {
+	if (watch_table_room()) {
 		g_watch_table[g_watch_count].obj = obj;
 		g_watch_table[g_watch_count].mc = mc;
 		strncpy(g_watch_table[g_watch_count].prop_name, prop_name, sizeof(g_watch_table[0].prop_name) - 1);
@@ -5320,7 +5342,7 @@ static ActionVar builtin_object_unwatch(SWFAppContext* app_context, ActionVar* a
 		if (mc == NULL) return ret;
 	}
 
-	char prop_name[64] = {0};
+	char prop_name[WATCH_NAME_MAX] = {0};
 	u32 prop_name_len = 0;
 	if (args[0].type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* u16 = varGetU16Ptr(&args[0]);
@@ -6743,8 +6765,11 @@ static ActionVar actionEI_addCallback(SWFAppContext* app_context, ActionVar* arg
 		g_ei_callbacks[slot].in_use = 1;
 	}
 
+	// s27 w2-timers-land: a callback dropped at MAX_EI_CALLBACKS was still
+	// reported as registered; report the failure instead (Flash returns false
+	// when the registration did not happen).
 	result.type = ACTION_STACK_VALUE_BOOLEAN;
-	result.data.numeric_value = 1;
+	result.data.numeric_value = (slot >= 0) ? 1 : 0;
 	return result;
 }
 
@@ -14534,6 +14559,11 @@ static uint32_t applyColorMatrixPixel(uint32_t argb_premul, const float matrix[2
 }
 
 static int avm1FilterTypeOf(ASObject* o);   // defined with the runtime-filters lowering
+#include <actionmodern/avm1_filter_kernels.h>
+// s27 w2-applyfilter-cm: AVM1 filter object -> the kernels' native form
+// (defined with the runtime-filters lowering).
+static int avm1FilterKernelParams(ASObject* o, int t, Avm1FilterKernelParams* p,
+                                  float* conv_buf, u32 conv_cap);
 
 // BitmapData.applyFilter(sourceBitmap, sourceRect, destPoint, filter)
 static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -14585,7 +14615,28 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
     // -1 for a non-filter object such as a bare {matrix: [...]}.
     int filter_type = avm1FilterTypeOf(filter_obj);
     if (filter_type == 0) { r = makeF64(-1); return r; }
-    if (filter_type != 6) { r = makeF64(0); return r; }   // non-CM kinds: not yet wired
+    if (filter_type != 6)
+    {
+        // s27 w2-applyfilter-cm: Blur / DropShadow / Glow / Bevel / Convolution
+        // / GradientGlow / GradientBevel run the AVM2 CPU kernels (Flash's
+        // blur + glow model, Flash convolution; the gradient kinds are the
+        // kernels' copy pass-through), as Ruffle runs one apply_filter for
+        // both VMs. Same sourceRect / destPoint reads as the CM arm below.
+        static float conv_buf[256 * 4];
+        Avm1FilterKernelParams kp;
+        if (avm1FilterKernelParams(filter_obj, filter_type, &kp, conv_buf,
+                                   (u32)(sizeof(conv_buf) / sizeof(conv_buf[0]))))
+        {
+            avm1_filter_kernels_apply(app_context,
+                dest_bmp->pixels, (uint32_t) dest_bmp->width, (uint32_t) dest_bmp->height,
+                dest_bmp->transparent,
+                src_bmp->pixels, (uint32_t) src_bmp->width, (uint32_t) src_bmp->height,
+                src_bmp->transparent,
+                rx, ry, rw, rh, dx, dy, &kp);
+        }
+        r = makeF64(0);
+        return r;
+    }
     ActionVar* matrix_var = getProperty(filter_obj, "matrix", 6);
     if (!matrix_var || matrix_var->type != ACTION_STACK_VALUE_ARRAY) { r = makeF64(0); return r; }
     ASArray* matrix_arr = (ASArray*)(u64)matrix_var->data.numeric_value;
@@ -25794,8 +25845,19 @@ typedef struct {
 	int is_level;  // 1 if target is a _levelN MC (needs display_list swap)
 } PendingDirectLoad;
 #define MAX_PENDING_DIRECT_LOADS 16
-static PendingDirectLoad g_pending_direct_loads[MAX_PENDING_DIRECT_LOADS];
+// s27 w2-timers-land: growable (was a fixed MAX_PENDING_DIRECT_LOADS = 16:
+// the 17th loadMovie / loadMovieNum of a tick was silently dropped and its
+// child never ran). actionFirePendingDirectLoads copies the queue out before
+// running child scripts, so a realloc by a nested load is safe.
+static PendingDirectLoad* g_pending_direct_loads = NULL;
+static size_t g_pending_direct_loads_cap = 0;
 int g_pending_direct_load_count = 0;
+static int direct_load_room(void)
+{
+	return (size_t)g_pending_direct_load_count < g_pending_direct_loads_cap
+		|| ng_table_grow((void**)&g_pending_direct_loads, &g_pending_direct_loads_cap,
+		                 sizeof(PendingDirectLoad), MAX_PENDING_DIRECT_LOADS);
+}
 
 // --- Deferred loadVariables `onData` queue ---------------------------------
 // Ruffle's load_form_into_object (core/src/loader.rs:1028-1042) parses the form
@@ -27292,7 +27354,8 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 	int count = g_pending_direct_load_count;
 	if (count == 0) return;
 	// Copy and reset (child scripts may queue more loads)
-	PendingDirectLoad loads[MAX_PENDING_DIRECT_LOADS];
+	PendingDirectLoad* loads = (PendingDirectLoad*) malloc((size_t)count * sizeof(PendingDirectLoad));
+	if (loads == NULL) return;
 	for (int i = 0; i < count; i++) loads[i] = g_pending_direct_loads[i];
 	g_pending_direct_load_count = 0;
 
@@ -27542,6 +27605,7 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		g_child_swf_init = _saved_child_init;
 		g_current_movie_id = _saved_movie_id;
 	}
+	free(loads);
 }
 
 // --- Deferred onUnload queue ---
@@ -40216,7 +40280,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		MovieEntry* entry = findMovieEntry(url_mut);
 		if (entry != NULL && mc != NULL) {
 			// Defer child init to next frame (async load simulation)
-			if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+			if (direct_load_room()) {
 				PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
 				pdl->target = mc;
 				pdl->entry = entry;
@@ -40294,7 +40358,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		MovieEntry* entry = findMovieEntry(url_mut2);
 		if (entry != NULL && mc != NULL) {
 			// Defer child init to next frame (async load simulation)
-			if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+			if (direct_load_room()) {
 				PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
 				pdl->target = mc;
 				pdl->entry = entry;
@@ -40785,9 +40849,17 @@ typedef struct {
     int is_swf_url;      // 1 if URL ends in .swf (affects error vs init behavior)
     char url[128];       // Requested URL (for _url update on failed loads)
 } PendingMCLLoad;
-static PendingMCLLoad g_pending_mcl_loads_this_tick[MAX_PENDING_MCL_LOADS];
+// s27 w2-timers-land: the three MCL queues were fixed arrays of
+// MAX_PENDING_MCL_LOADS (16): the 17th loadClip of a tick (a thumbnail
+// gallery, an asset-heavy preloader) was silently dropped -- no onLoadStart /
+// onLoadInit, the child never linked in. They now grow (doubling from 16);
+// every drain copies its entries out first, so a handler that queues more
+// loads (and so may realloc the queue) never invalidates a live pointer.
+static PendingMCLLoad* g_pending_mcl_loads_this_tick = NULL;
+static size_t g_pending_mcl_loads_this_tick_cap = 0;
 int g_pending_mcl_load_count_this_tick = 0;
-static PendingMCLLoad g_pending_mcl_loads_next_tick[MAX_PENDING_MCL_LOADS];
+static PendingMCLLoad* g_pending_mcl_loads_next_tick = NULL;
+static size_t g_pending_mcl_loads_next_tick_cap = 0;
 int g_pending_mcl_load_count_next_tick = 0;
 int g_pending_mcl_load_count = 0;  // sum of both buckets (for exit-condition checks)
 
@@ -40811,9 +40883,30 @@ int g_pending_mcl_load_count = 0;  // sum of both buckets (for exit-condition ch
 // drain that queues an entry runs inside tagShowFrame, which is EARLIER in the
 // same tick than the pre-advance slot, so a position-only move would still fire
 // onLoadInit before the next enterFrame broadcast.
-static PendingMCLLoad g_pending_load_inits[MAX_PENDING_MCL_LOADS];
-static size_t g_pending_load_init_tick[MAX_PENDING_MCL_LOADS];
+static PendingMCLLoad* g_pending_load_inits = NULL;
+static size_t* g_pending_load_init_tick = NULL;  // parallel to g_pending_load_inits
+static size_t g_pending_load_inits_cap = 0;
+static size_t g_pending_load_init_tick_cap = 0;
 static int g_pending_load_init_count = 0;
+
+// Room for one more entry in an MCL queue holding `count` entries.
+static int mcl_queue_room(PendingMCLLoad** q, size_t* cap, int count)
+{
+    return (size_t)count < *cap
+        || ng_table_grow((void**)q, cap, sizeof(PendingMCLLoad), MAX_PENDING_MCL_LOADS);
+}
+static int mcl_load_init_room(void)
+{
+    if ((size_t)g_pending_load_init_count < g_pending_load_inits_cap
+        && (size_t)g_pending_load_init_count < g_pending_load_init_tick_cap) return 1;
+    if ((size_t)g_pending_load_init_count >= g_pending_load_inits_cap
+        && !ng_table_grow((void**)&g_pending_load_inits, &g_pending_load_inits_cap,
+                          sizeof(PendingMCLLoad), MAX_PENDING_MCL_LOADS)) return 0;
+    if ((size_t)g_pending_load_init_count >= g_pending_load_init_tick_cap
+        && !ng_table_grow((void**)&g_pending_load_init_tick, &g_pending_load_init_tick_cap,
+                          sizeof(size_t), MAX_PENDING_MCL_LOADS)) return 0;
+    return 1;
+}
 
 // Helper: create an ActionVar string from an ASCII C string
 static ActionVar makeStringVar(SWFAppContext* app_context, const char* str)
@@ -41025,7 +41118,9 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
     extern int is_playing;
     int defer_to_next_tick = is_playing && (current_frame + 1 < g_frame_count);
 
-    if (defer_to_next_tick && g_pending_mcl_load_count_next_tick < MAX_PENDING_MCL_LOADS) {
+    if (defer_to_next_tick && mcl_queue_room(&g_pending_mcl_loads_next_tick,
+                                             &g_pending_mcl_loads_next_tick_cap,
+                                             g_pending_mcl_load_count_next_tick)) {
         int slot = g_pending_mcl_load_count_next_tick;
         g_pending_mcl_loads_next_tick[slot].mcl = mcl;
         g_pending_mcl_loads_next_tick[slot].target = target_mc;
@@ -41041,7 +41136,9 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
                  "%s", url_utf8);
         g_pending_mcl_load_count_next_tick++;
         g_pending_mcl_load_count++;
-    } else if (g_pending_mcl_load_count_this_tick < MAX_PENDING_MCL_LOADS) {
+    } else if (mcl_queue_room(&g_pending_mcl_loads_this_tick,
+                              &g_pending_mcl_loads_this_tick_cap,
+                              g_pending_mcl_load_count_this_tick)) {
         int slot = g_pending_mcl_load_count_this_tick;
         g_pending_mcl_loads_this_tick[slot].mcl = mcl;
         g_pending_mcl_loads_this_tick[slot].target = target_mc;
@@ -41321,7 +41418,10 @@ void actionPromotePendingMCLLoads(SWFAppContext* app_context)
     (void)app_context;
     int n = g_pending_mcl_load_count_next_tick;
     if (n == 0) return;
-    int avail = MAX_PENDING_MCL_LOADS - g_pending_mcl_load_count_this_tick;
+    while ((size_t)(g_pending_mcl_load_count_this_tick + n) > g_pending_mcl_loads_this_tick_cap)
+        if (!ng_table_grow((void**)&g_pending_mcl_loads_this_tick, &g_pending_mcl_loads_this_tick_cap,
+                           sizeof(PendingMCLLoad), MAX_PENDING_MCL_LOADS)) break;
+    int avail = (int)g_pending_mcl_loads_this_tick_cap - g_pending_mcl_load_count_this_tick;
     if (n > avail) n = avail;
     for (int i = 0; i < n; i++) {
         g_pending_mcl_loads_this_tick[g_pending_mcl_load_count_this_tick + i] =
@@ -41346,7 +41446,8 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     if (count == 0) return;
     // Copy and reset _this_tick (handlers may queue more loads into either
     // bucket via chained loadClips).
-    PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
+    PendingMCLLoad* loads = (PendingMCLLoad*) malloc((size_t)count * sizeof(PendingMCLLoad));
+    if (loads == NULL) return;
     int live = 0;
     for (int i = 0; i < count; i++) {
         // A removeMovieClip between queue time and drain time CANCELS the
@@ -41368,7 +41469,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     g_pending_mcl_load_count_this_tick = 0;
     g_pending_mcl_load_count -= count;
     count = live;
-    if (count == 0) return;
+    if (count == 0) { free(loads); return; }
 
     // Pre-phase: Set child SWF URLs and versions on target MCs (before events fire, so mc._url is correct)
     for (int i = 0; i < count; i++) {
@@ -41646,11 +41747,12 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     {
         extern size_t g_tick_count;
         for (int i = count - 1; i >= 0; i--) {
-            if (g_pending_load_init_count >= MAX_PENDING_MCL_LOADS) break;
+            if (!mcl_load_init_room()) break;
             g_pending_load_init_tick[g_pending_load_init_count] = g_tick_count;
             g_pending_load_inits[g_pending_load_init_count++] = loads[i];
         }
     }
+    free(loads);
 }
 
 // Fire the onLoadInit / onLoadError handlers parked by the previous drain.
@@ -41670,7 +41772,8 @@ static void drain_pending_load_inits(SWFAppContext* app_context, int force)
     // the end-of-run case). Copy and reset first: a handler may chain another
     // loadClip, whose own Phase 3 must land in a FRESH queue, not extend this
     // pass.
-    PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
+    PendingMCLLoad* loads = (PendingMCLLoad*) malloc((size_t)g_pending_load_init_count * sizeof(PendingMCLLoad));
+    if (loads == NULL) return;
     int count = 0, keep = 0;
     for (int i = 0; i < g_pending_load_init_count; i++) {
         if (force || g_pending_load_init_tick[i] != g_tick_count) {
@@ -41681,7 +41784,7 @@ static void drain_pending_load_inits(SWFAppContext* app_context, int force)
         }
     }
     g_pending_load_init_count = keep;
-    if (count == 0) return;
+    if (count == 0) { free(loads); return; }
 
     // For root replacement, onLoadInit fires in child's SWF version context
     for (int i = 0; i < count; i++) {
@@ -41725,6 +41828,7 @@ static void drain_pending_load_inits(SWFAppContext* app_context, int force)
             fireMCLEvent(app_context, loads[i].mcl, "onLoadInit", &mc_var, 1);
         }
     }
+    free(loads);
 }
 
 // The per-tick slot: fires only what an EARLIER tick queued.
@@ -46958,6 +47062,144 @@ static int avm1LowerFilterObject(ASObject* o, FilterListEntry* e)
 	}
 }
 
+// s27 w2-applyfilter-cm: an AVM1 filter object in the AVM2 kernels' native
+// form (Avm1FilterKernelParams = avm2_filters.c avm2_filter_from_object's
+// units), for BitmapData.applyFilter. Same property reads and clamps as
+// avm1LowerFilterObject; the quantization is Ruffle bitmap_filter.rs
+// avm1_to_filter's (Fixed16 blur / angle / distance, Fixed8 strength, alpha
+// as `(a * 255) as u8`, quality clamped 0..15). Returns 0 for a kind the
+// kernels do not take (ColorMatrix has its own arm; DisplacementMap is not
+// an AVM1 filter type here).
+static int32_t avm1FkFixed16(double n)
+{
+	double v = n * 65536.0;
+	if (isnan(v)) return 0;
+	if (v >= 2147483647.0) return 2147483647;
+	if (v <= -2147483648.0) return (int32_t) -2147483648LL;
+	return (int32_t) v;
+}
+static int16_t avm1FkFixed8(double n)
+{
+	double v = n * 256.0;
+	if (isnan(v)) return 0;
+	if (v >= 32767.0) return 32767;
+	if (v <= -32768.0) return -32768;
+	return (int16_t) v;
+}
+static uint8_t avm1FkAlpha(double a)
+{
+	double v = a * 255.0;
+	if (isnan(v) || v <= 0.0) return 0;
+	if (v >= 255.0) return 255;
+	return (uint8_t) v;
+}
+static ASArray* avm1FkArray(ASObject* o, const char* name)
+{
+	ActionVar* v = getProperty(o, name, (u32) strlen(name));
+	return (v && v->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) v->data.numeric_value : NULL;
+}
+// "inner" / "outer" / anything else ("full") -> inner / on_top.
+static void avm1FkType(ASObject* o, Avm1FilterKernelParams* p)
+{
+	ActionVar* tv = getProperty(o, "type", 4);
+	if (tv == NULL || tv->type != ACTION_STACK_VALUE_STRING) { p->on_top = 1; return; }
+	char tbuf[16];
+	int tl = u16_to_utf8((const uint16_t*)(uintptr_t) tv->data.numeric_value,
+	                     tv->str_size, tbuf, sizeof(tbuf));
+	if (tl == 5 && memcmp(tbuf, "inner", 5) == 0) p->inner = 1;
+	else if (!(tl == 5 && memcmp(tbuf, "outer", 5) == 0)) p->on_top = 1;
+}
+static int avm1FilterKernelParams(ASObject* o, int t, Avm1FilterKernelParams* p,
+                                  float* conv_buf, u32 conv_cap)
+{
+	memset(p, 0, sizeof(*p));
+	double pi = 3.14159265358979323846;
+	double dblur = (t == 3) ? 6.0 : 4.0;
+	p->kind = (uint8_t) t;
+	p->blur_x = avm1FkFixed16(avm1FiltClamp(avm1FiltNum(o, "blurX", dblur), 0.0, 255.0));
+	p->blur_y = avm1FkFixed16(avm1FiltClamp(avm1FiltNum(o, "blurY", dblur), 0.0, 255.0));
+	p->quality = (uint8_t) avm1FiltClamp(avm1FiltNum(o, "quality", 1.0), 0.0, 15.0);
+	p->knockout = avm1FiltNum(o, "knockout", 0.0) != 0.0;
+	switch (t)
+	{
+		case 1: // BlurFilter
+			return 1;
+		case 2: // DropShadowFilter
+		case 3: // GlowFilter
+			p->color = (u32)(s64) avm1FiltNum(o, "color", t == 2 ? 0.0 : 16711680.0) & 0xFFFFFFu;
+			p->alpha = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "alpha", 1.0), 0.0, 1.0));
+			p->strength = avm1FkFixed8(avm1FiltClamp(avm1FiltNum(o, "strength", t == 2 ? 1.0 : 2.0), 0.0, 255.0));
+			p->inner = avm1FiltNum(o, "inner", 0.0) != 0.0;
+			if (t == 2)
+			{
+				p->hide_object = avm1FiltNum(o, "hideObject", 0.0) != 0.0;
+				p->distance = avm1FkFixed16(avm1FiltNum(o, "distance", 4.0));
+				p->angle = avm1FkFixed16(avm1FiltNum(o, "angle", 45.0) * pi / 180.0);
+			}
+			return 1;
+		case 4: // BevelFilter
+		case 7: // GradientGlowFilter
+		case 8: // GradientBevelFilter
+		{
+			p->strength = avm1FkFixed8(avm1FiltClamp(avm1FiltNum(o, "strength", 1.0), 0.0, 255.0));
+			p->distance = avm1FkFixed16(avm1FiltNum(o, "distance", 4.0));
+			p->angle = avm1FkFixed16(avm1FiltNum(o, "angle", 45.0) * pi / 180.0);
+			avm1FkType(o, p);
+			if (t == 4)
+			{
+				p->color = (u32)(s64) avm1FiltNum(o, "shadowColor", 0.0) & 0xFFFFFFu;
+				p->alpha = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "shadowAlpha", 1.0), 0.0, 1.0));
+				p->color2 = (u32)(s64) avm1FiltNum(o, "highlightColor", 16777215.0) & 0xFFFFFFu;
+				p->alpha2 = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "highlightAlpha", 1.0), 0.0, 1.0));
+				return 1;
+			}
+			// Gradient stops: min(colors, ratios) entries, a short alphas
+			// array padded with 1.0 (avm2_filters.c gradient_from_object).
+			ASArray* ca = avm1FkArray(o, "colors");
+			ASArray* aa = avm1FkArray(o, "alphas");
+			ASArray* ra = avm1FkArray(o, "ratios");
+			if (ca == NULL || ra == NULL) return 1;
+			u32 n = ca->length < ra->length ? ca->length : ra->length;
+			if (n > 16) n = 16;
+			p->grad_count = (uint8_t) n;
+			for (u32 i = 0; i < n; i++)
+			{
+				p->grad_colors[i] = (u32)(s64) varToDoubleSimple(&ca->elements[i]) & 0xFFFFFFu;
+				double a = (aa != NULL && i < aa->length) ? varToDoubleSimple(&aa->elements[i]) : 1.0;
+				p->grad_alphas[i] = avm1FkAlpha(avm1FiltClamp(a, 0.0, 1.0));
+				p->grad_ratios[i] = (uint8_t) avm1FiltClamp(varToDoubleSimple(&ra->elements[i]), 0.0, 255.0);
+			}
+			return 1;
+		}
+		case 5: // ConvolutionFilter
+		{
+			double mx = avm1FiltClamp(avm1FiltNum(o, "matrixX", 0.0), 0.0, 15.0);
+			double my = avm1FiltClamp(avm1FiltNum(o, "matrixY", 0.0), 0.0, 15.0);
+			p->conv_cols = (uint8_t) mx;
+			p->conv_rows = (uint8_t) my;
+			u32 want = (u32) p->conv_cols * (u32) p->conv_rows;
+			if (want > conv_cap) want = 0;
+			ASArray* ma = avm1FkArray(o, "matrix");
+			for (u32 i = 0; i < want; i++)
+			{
+				double v = (ma != NULL && i < ma->length) ? varToDoubleSimple(&ma->elements[i]) : 0.0;
+				conv_buf[i] = isnan(v) ? 0.0f : (float) v;
+			}
+			p->conv_matrix = want ? conv_buf : NULL;
+			p->conv_len = want;
+			p->divisor = (float) avm1FiltNum(o, "divisor", 1.0);
+			p->bias = (float) avm1FiltNum(o, "bias", 0.0);
+			p->preserve_alpha = avm1FiltNum(o, "preserveAlpha", 1.0) != 0.0;
+			p->clamp = avm1FiltNum(o, "clamp", 1.0) != 0.0;
+			p->color = (u32)(s64) avm1FiltNum(o, "color", 0.0) & 0xFFFFFFu;
+			p->alpha = avm1FkAlpha(avm1FiltClamp(avm1FiltNum(o, "alpha", 0.0), 0.0, 1.0));
+			return 1;
+		}
+		default:
+			return 0;
+	}
+}
+
 // Number of live MovieClips (placed or dynamic) whose runtime filter list is
 // non-empty; lets the Drawing-API walk skip its filter-root checks entirely in
 // the (overwhelmingly common) movie that never assigns `filters`.
@@ -46999,6 +47241,16 @@ static void avm1ApplyRuntimeFiltersToEntry(DisplayObject* d, const FilterListDat
 	// (tagSetColorMatrixLive) go with it; a runtime CM keeps the fold
 	// (tag.c obj_runtime_cm), so leaving cm_live set would run it twice.
 	d->cm_live = 0;
+	// s27 w2-applyfilter-cm: authored CMs FOLDED into the placement cxform go
+	// too (Ruffle set_filters / FP32: `g.filters = []` on a folded R<->B swap
+	// renders the clip in its own colour). Back to the unfolded cxform; a
+	// runtime CM in the new list is folded on top of it by tag.c
+	// obj_runtime_cm.
+	if (d->cm_folded)
+	{
+		d->cxform_id = d->cm_plain_cxform_id;
+		d->cm_folded = 0;
+	}
 	if (fl == NULL || fl->count == 0)
 	{
 		d->filter_type = 0;
@@ -56029,7 +56281,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				g_current_movie_id = _saved_movie_id3;
 			} else if (_gu2_mc != NULL) {
 				// Non-root: defer child init to next frame (async load simulation)
-				if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+				if (direct_load_room()) {
 					PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
 					pdl->target = _gu2_mc;
 					pdl->entry = entry;
@@ -62627,105 +62879,6 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 				float fhr=0, fhg=0, fhb=0, fha=0;
 				u8 fquality=0, fflags=0;
 
-				// Check extended filter data first (ColorMatrix, Convolution, Gradient*)
-				const ExtFilterData* efd = (entry_depth != (size_t)-1) ? ng_getExtFilterDataByDepth(entry_depth) : NULL;
-				if (efd && efd->type >= 5 && efd->type <= 8) {
-					ASObject* proto = g_filter_protos_by_type[efd->type];
-					if (proto) {
-						ASObject* fobj = allocObject(app_context, 16);
-						fobj->native_type = NATIVE_FILTER;
-						ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
-						pv.data.numeric_value = (u64)proto;
-						setPropertyWithFlags(app_context, fobj, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
-						ActionVar v;
-						if (efd->type == 6) {
-							// ColorMatrixFilter: matrix (ASArray of 20 floats)
-							ASArray* marr = allocArray(app_context, 20);
-							marr->length = 20; initArrayProto(app_context, marr);
-							for (int i = 0; i < 20; i++) {
-								marr->elements[i] = makeF64((double)efd->cm_matrix[i]);
-							}
-							v.type = ACTION_STACK_VALUE_ARRAY;
-							v.data.numeric_value = (u64)marr;
-							setProperty(app_context, fobj, "matrix", 6, &v);
-						} else if (efd->type == 5) {
-							// ConvolutionFilter: matrixX, matrixY, matrix, divisor, bias,
-							//   preserveAlpha, clamp, color, alpha
-							v = makeF64((double)efd->conv_mx); setProperty(app_context, fobj, "matrixX", 7, &v);
-							v = makeF64((double)efd->conv_my); setProperty(app_context, fobj, "matrixY", 7, &v);
-							int n = efd->conv_mx * efd->conv_my;
-							if (n > 25) n = 25;
-							ASArray* marr = allocArray(app_context, n);
-							marr->length = n; initArrayProto(app_context, marr);
-							for (int i = 0; i < n; i++) {
-								marr->elements[i] = makeF64((double)efd->conv_matrix[i]);
-							}
-							v.type = ACTION_STACK_VALUE_ARRAY;
-							v.data.numeric_value = (u64)marr;
-							setProperty(app_context, fobj, "matrix", 6, &v);
-							v = makeF64((double)efd->conv_divisor); setProperty(app_context, fobj, "divisor", 7, &v);
-							v = makeF64((double)efd->conv_bias); setProperty(app_context, fobj, "bias", 4, &v);
-							v.type = ACTION_STACK_VALUE_BOOLEAN;
-							v.data.numeric_value = efd->conv_preserve_alpha;
-							setProperty(app_context, fobj, "preserveAlpha", 13, &v);
-							v.type = ACTION_STACK_VALUE_BOOLEAN;
-							v.data.numeric_value = efd->conv_clamp;
-							setProperty(app_context, fobj, "clamp", 5, &v);
-							uint32_t cc = ((uint32_t)efd->conv_color_r << 16) | ((uint32_t)efd->conv_color_g << 8) | efd->conv_color_b;
-							v = makeF64((double)cc); setProperty(app_context, fobj, "color", 5, &v);
-							v = makeF64(efd->conv_color_a / 255.0); setProperty(app_context, fobj, "alpha", 5, &v);
-						} else {
-							// GradientGlow (7) / GradientBevel (8): distance, angle, colors, alphas,
-							//   ratios, blurX, blurY, quality, strength, knockout, type
-							double angle_deg = (double)efd->angle * 180.0 / 3.14159265358979323846;
-							v = makeF64((double)efd->distance); setProperty(app_context, fobj, "distance", 8, &v);
-							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
-							// colors array
-							ASArray* carr = allocArray(app_context, efd->grad_count);
-							carr->length = efd->grad_count; initArrayProto(app_context, carr);
-							for (int i = 0; i < efd->grad_count; i++)
-								carr->elements[i] = makeF64((double)efd->grad_colors[i]);
-							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)carr;
-							setProperty(app_context, fobj, "colors", 6, &v);
-							// alphas array
-							ASArray* aarr = allocArray(app_context, efd->grad_count);
-							aarr->length = efd->grad_count; initArrayProto(app_context, aarr);
-							for (int i = 0; i < efd->grad_count; i++)
-								aarr->elements[i] = makeF64((double)efd->grad_alphas[i]);
-							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)aarr;
-							setProperty(app_context, fobj, "alphas", 6, &v);
-							// ratios array
-							ASArray* rarr = allocArray(app_context, efd->grad_count);
-							rarr->length = efd->grad_count; initArrayProto(app_context, rarr);
-							for (int i = 0; i < efd->grad_count; i++)
-								rarr->elements[i] = makeF64((double)efd->grad_ratios[i]);
-							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)rarr;
-							setProperty(app_context, fobj, "ratios", 6, &v);
-							v = makeF64((double)efd->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
-							v = makeF64((double)efd->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
-							v = makeF64((double)efd->quality); setProperty(app_context, fobj, "quality", 7, &v);
-							v = makeF64((double)efd->strength); setProperty(app_context, fobj, "strength", 8, &v);
-							int inner_f = (efd->flags >> 2) & 1;
-							int knockout_f = (efd->flags >> 1) & 1;
-							int on_top_f = efd->flags & 1;
-							v.type = ACTION_STACK_VALUE_BOOLEAN;
-							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
-							// Ruffle type logic: ON_TOP → Full, else INNER → Inner, else Outer
-							const char* type_str = on_top_f ? "full" : (inner_f ? "inner" : "outer");
-							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
-							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
-							v.data.string_data.heap_ptr = u16p;
-							setProperty(app_context, fobj, "type", 4, &v);
-						}
-						// Wrap in array
-						ASArray* farr = allocArray(app_context, 1);
-						farr->length = 1; initArrayProto(app_context, farr);
-						farr->elements[0].type = ACTION_STACK_VALUE_OBJECT;
-						farr->elements[0].data.numeric_value = (u64)fobj;
-						PUSH(ACTION_STACK_VALUE_ARRAY, (u64)farr);
-						return;
-					}
-				}
 
 				if (entry != NULL &&
 				    ng_getObjFilterData(entry, &ftype, &fblur_x, &fblur_y,
@@ -65986,6 +66139,7 @@ void actionRemoveSprite(SWFAppContext* app_context)
 				// Mark as removed. Its dynamic_props are detached where it leaves the
 					// registry below (Ruffle: a removed clip has no members, even via `this`).
 				_rs_mc->avm1_removed = 1;
+				{ extern void ng_clone_forget(const char*, int); ng_clone_forget(_rs_mc->name, _rs_mc->depth); }
 				_rs_mc->depth = INT_MIN;
 				// Also mark all descendant MCs as removed (children, grandchildren, etc.)
 				for (int _rs_j = 0; _rs_j < child_mc_count; _rs_j++) {
@@ -80492,6 +80646,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// Mark as removed. Its dynamic_props are detached where it leaves the
 					// registry below (Ruffle: a removed clip has no members, even via `this`).
 					mc->avm1_removed = 1;
+					{ extern void ng_clone_forget(const char*, int); ng_clone_forget(mc->name, mc->depth); }
 					mc->depth = INT_MIN;
 					// Remove from child_mc_cache
 					for (int _rmc_i = 0; _rmc_i < child_mc_count; _rmc_i++) {
@@ -80536,7 +80691,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					MovieEntry* entry = findMovieEntry(_lm_url);
 					if (entry != NULL && mc != NULL) {
 						// Defer child init to next frame (async loading)
-						if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+						if (direct_load_room()) {
 							PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
 							pdl->target = mc;
 							pdl->entry = entry;
@@ -80735,7 +80890,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			_w_ret.type = ACTION_STACK_VALUE_BOOLEAN;
 			_w_ret.data.numeric_value = 0;
 			if (num_args >= 2 && args[1].type == ACTION_STACK_VALUE_FUNCTION) {
-				char _w_prop[64] = {0};
+				char _w_prop[WATCH_NAME_MAX] = {0};
 				u32 _w_prop_len = 0;
 				if (args[0].type == ACTION_STACK_VALUE_STRING) {
 					const uint16_t* _wu16 = varGetU16Ptr(&args[0]);
@@ -80760,7 +80915,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						break;
 					}
 				}
-				if (!_w_found && g_watch_count < MAX_WATCH_ENTRIES) {
+				if (!_w_found && watch_table_room()) {
 					g_watch_table[g_watch_count].obj = NULL;
 					g_watch_table[g_watch_count].mc = mc;
 					strncpy(g_watch_table[g_watch_count].prop_name, _w_prop, sizeof(g_watch_table[0].prop_name) - 1);
@@ -80782,7 +80937,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			_uw_ret.type = ACTION_STACK_VALUE_BOOLEAN;
 			_uw_ret.data.numeric_value = 0;
 			if (num_args >= 1) {
-				char _uw_prop[64] = {0};
+				char _uw_prop[WATCH_NAME_MAX] = {0};
 				u32 _uw_prop_len = 0;
 				if (args[0].type == ACTION_STACK_VALUE_STRING) {
 					const uint16_t* _uwu16 = varGetU16Ptr(&args[0]);
@@ -85835,9 +85990,9 @@ void actionGcMarkRoots(void)
 	// MovieClipLoader two-bucket queue (found the hard way: CI graphics
 	// depth_replacement_audio_unloading segfault — the loader MCL object was
 	// swept between load() and the deferred onLoadInit).
-	for (int i = 0; i < g_pending_mcl_load_count_this_tick && i < MAX_PENDING_MCL_LOADS; i++)
+	for (int i = 0; i < g_pending_mcl_load_count_this_tick; i++)
 		swfGcMarkObject(g_pending_mcl_loads_this_tick[i].mcl);
-	for (int i = 0; i < g_pending_mcl_load_count_next_tick && i < MAX_PENDING_MCL_LOADS; i++)
+	for (int i = 0; i < g_pending_mcl_load_count_next_tick; i++)
 		swfGcMarkObject(g_pending_mcl_loads_next_tick[i].mcl);
 	// Deferred LoadVars loads (queue holds a retain, but retained-by-C-queue
 	// is still invisible to the trace — must be an explicit root).
@@ -85928,10 +86083,10 @@ void actionGcScrubStashes(const void* p)
 		if ((const void*)g_bitmap_natives[i].obj == p) g_bitmap_natives[i].obj = NULL;
 	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
 		if ((const void*)g_playing_sounds[i].sound_obj == p) g_playing_sounds[i].sound_obj = NULL;
-	for (int i = 0; i < g_pending_mcl_load_count_this_tick && i < MAX_PENDING_MCL_LOADS; i++)
+	for (int i = 0; i < g_pending_mcl_load_count_this_tick; i++)
 		if ((const void*)g_pending_mcl_loads_this_tick[i].mcl == p)
 			g_pending_mcl_loads_this_tick[i].mcl = NULL;
-	for (int i = 0; i < g_pending_mcl_load_count_next_tick && i < MAX_PENDING_MCL_LOADS; i++)
+	for (int i = 0; i < g_pending_mcl_load_count_next_tick; i++)
 		if ((const void*)g_pending_mcl_loads_next_tick[i].mcl == p)
 			g_pending_mcl_loads_next_tick[i].mcl = NULL;
 	for (int i = 0; i < g_pending_lv_load_count && i < MAX_PENDING_LV_LOADS; i++)

@@ -7141,10 +7141,13 @@ static const char* color_matrix_wgsl =
 	"}\n"
 	"@fragment fn fs_main(@builtin(position) fp: vec4f) -> @location(0) vec4f {\n"
 	"  let src = textureLoad(src_tex, vec2i(i32(fp.x), i32(fp.y)), 0);\n"
+	"  if (p.bias.w > 32768.0 && src.a <= 0.0) { return vec4f(0.0); }\n"
 	"  var s = vec4f(0.0, 0.0, 0.0, src.a);\n"
 	"  if (src.a > 0.0) { s = vec4f(src.rgb / src.a, src.a); }\n"
+	"  var bias = p.bias;\n"
+	"  if (bias.w > 32768.0) { bias.w = bias.w - 65536.0; }\n"
 	"  let c = clamp(vec4f(dot(p.r, s), dot(p.g, s), dot(p.b, s), dot(p.a, s))\n"
-	"                + p.bias / 255.0, vec4f(0.0), vec4f(1.0));\n"
+	"                + bias / 255.0, vec4f(0.0), vec4f(1.0));\n"
 	"  return vec4f(c.rgb * c.a, c.a);\n"
 	"}\n";
 
@@ -7225,8 +7228,26 @@ static void ensure_color_matrix_resources(WebGPURenderContext* ctx)
 	wgpuShaderModuleRelease(sm);
 }
 
+// s27 w2-applyfilter-cm: one-shot "keep empty texels empty" for the NEXT
+// run_color_matrix. A matrix with an alpha bias > 0 would otherwise give every
+// a = 0 texel of the stage-sized layer alpha = bias (our pass pins the
+// unpremultiplied colour of an empty texel to 0) and paint the bias over the
+// whole stage. Flash and Ruffle run the pass on a cache bounded to the
+// object, and Ruffle's unguarded divide leaves a = 0 texels empty (exporter);
+// with the flag set, a = 0 texels stay (0,0,0,0). Signalled to the shader by
+// lifting the alpha bias by 65536 (a real bias is far below 32768), so the
+// pipeline and its uniform layout are unchanged.
+static int g_cm_keep_empty = 0;
+void render_webgpu_set_cm_keep_empty(WebGPURenderContext* ctx, int on)
+{
+	(void)ctx;
+	g_cm_keep_empty = on ? 1 : 0;
+}
+
 void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
 {
+	int keep_empty = g_cm_keep_empty;
+	g_cm_keep_empty = 0;
 	if (!ctx->renderer_ok || m20 == NULL) return;
 	render_webgpu_ensure_filter_resources(ctx);
 	ensure_color_matrix_resources(ctx);
@@ -7239,6 +7260,7 @@ void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
 		for (int col = 0; col < 4; col++) params[row * 4 + col] = m20[row * 5 + col];
 		params[16 + row] = m20[row * 5 + 4];
 	}
+	if (keep_empty) params[19] += 65536.0f;
 	u32 params_offset = filter_uniform_push(ctx, params, 80);
 
 	WGPUBindGroupEntry bg_entries[2] = {0};

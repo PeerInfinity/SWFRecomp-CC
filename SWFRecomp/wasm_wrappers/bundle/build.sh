@@ -52,12 +52,13 @@ RUNTIME_C=(
     libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
     libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c
     libswf/stb_image_impl.c
-    avm2/avm2_cpu_raster.c
+    avm2/avm2_cpu_raster.c actionmodern/avm1_filter_kernels.c
     audio/audio.c audio/audio_output_web.c
     rendering/render_webgpu.c
     memory/heap.c
 )
 for f in "${RUNTIME_C[@]}"; do cp -p "${RT}/src/${f}" "${SRC}/"; done
+cp -p "${RT}/src/avm2/avm2_bitmap.c" "${SRC}/avm2_bitmap_kernels.inc"  # avm1_filter_kernels.c (s27)
 cp -p "${RT}/src/actionmodern/unicode_case_tables.h" "${SRC}/"
 cp -p "${RT}/lib/c-hashmap/map.c" "${RT}/lib/c-hashmap/map.h" "${SRC}/"
 cp -p "${RT}/lib/o1heap/o1heap.c" "${RT}/lib/o1heap/o1heap.h" "${SRC}/"

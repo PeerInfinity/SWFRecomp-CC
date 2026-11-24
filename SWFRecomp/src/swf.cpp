@@ -30,6 +30,15 @@
 #include <abc/abc_parser.hpp>
 #include <abc/abc_verifier.hpp>
 
+// s27 w1-timers-robustness (landed w2-timers-land): a DoInitAction whose sprite is not yet
+// defined (its DefineSprite comes later in the tag stream) is ignored by
+// Flash until the playhead has passed the definition (gnash misc-ming
+// InitActionTest2: val4/init7/init8). Top-level sprite id -> 0-based root
+// frame of its DefineSprite, and the ids whose init call was emitted "late".
+#include <map>
+static std::map<unsigned, size_t> s27_sprite_def_frame;
+static std::set<unsigned> s27_late_init_ids;
+
 #define MIN(x, y) ((x < y) ? x : y)
 #define MAX(x, y) ((x > y) ? x : y)
 
@@ -217,10 +226,13 @@ struct PlaceCmCompose
 	//    the fold sees the fragment's straight colour before coverage, so the
 	//    two differ by k on every edge (A' = 0.5 R: Ruffle a = 0.5 k, the
 	//    fold 0.5 k^2).
-	//  - abias: an alpha bias > 0. Kept FOLDED on purpose: our CM pass runs on
-	//    a stage-sized layer and would paint the bias over the whole stage,
-	//    where Ruffle's a = 0 texels divide by zero and stay empty (exporter:
-	//    the gap of w1 probe cm_offdiag stays white).
+	//  - abias: an alpha bias > 0. s27 w2-applyfilter-cm: goes LIVE. Flash
+	//    adds the bias per cache texel to the COVERAGE alpha (FP32 capture of
+	//    regression/avm1_po3_cm_alpha_bias_edge: A' = 0.5 A + 64 reads 127 on
+	//    a half-coverage edge, where the fold gives cov * (0.5 + 64/255)). The
+	//    runtime's CM pass leaves a = 0 texels empty for such a matrix (tag.c
+	//    render_filtered_core, renderer_set_cm_keep_empty), so the bias no
+	//    longer paints the stage-sized layer.
 	int count = 0;
 	bool clamp_bites = false, edge_inexact = false, abias = false;
 	bool cumulative_in_range() const
@@ -239,11 +251,17 @@ struct PlaceCmCompose
 	}
 	// The CMs go LIVE (filter passes, tagSetColorMatrixLive) instead of being
 	// folded when the fold is inexact and the placement cx is the identity.
-	// With a placement cx the runtime would apply cx BEFORE the pass (it draws
-	// the source with its cxform), so the fold stays the better approximation.
-	bool live(const s32 mult[4], const s32 add[4]) const
+	// s27 w2-applyfilter-cm: a placement cx no longer blocks it when the
+	// placed character is a SHAPE (`shape_leaf`): the runtime then draws the
+	// shape with an identity cx and applies the cx as a last pass after the
+	// CMs (tag.c render_filtered_core), the Flash/Ruffle order (FP32 capture
+	// of regression/avm1_po3_cm_live_under_cxform: 63 = 200 -> x2 clamp ->
+	// x0.5 -> cx 0.5; the fold gave 100). A sprite's children carry its cx in
+	// their composed slots, so a sprite with a cx keeps the fold.
+	bool live(const s32 mult[4], const s32 add[4], bool shape_leaf = false) const
 	{
-		if (!any || abias || !(clamp_bites || edge_inexact)) return false;
+		if (!any || !(clamp_bites || edge_inexact || abias)) return false;
+		if (shape_leaf) return true;
 		for (int r = 0; r < 4; r++)
 			if (mult[r] != 256 || add[r] != 0) return false;
 		return true;
@@ -1566,6 +1584,12 @@ namespace SWFRecomp
 		context.out_script_header << endl << endl
 								  << "#define FRAME_RATE " << to_string(header.framerate >> 8);
 
+		for (unsigned id : s27_late_init_ids)
+		{
+			auto it = s27_sprite_def_frame.find(id);
+			context.out_script_header << endl << "#define SWFRECOMP_INITDEF_" << id << " "
+				<< (it == s27_sprite_def_frame.end() ? std::string("((size_t)-1)") : to_string(it->second));
+		}
 		context.out_script_header.close();
 		context.out_script_defs.close();
 		context.out_script_decls.close();
@@ -4155,11 +4179,20 @@ namespace SWFRecomp
 				// Gated on (!catch_up_mode || g_tag_skip_mode) and dispatched
 				// via tagDoInitActionGuarded so the per-character once-only
 				// guard short-circuits during script-only target replay.
-				current_frame_init_actions
-					<< "\tif (!catch_up_mode || g_tag_skip_mode) "
-					<< "tagDoInitActionGuarded(app_context, "
-					<< charId(init_sprite_id) << ", " << func_name << ");"
-					<< endl;
+				if (defined_chars.count(init_sprite_id))
+					current_frame_init_actions
+						<< "\ttagDoInitActionFrame(app_context, "
+						<< charId(init_sprite_id) << ", " << func_name << ");"
+						<< endl;
+				else
+				{
+					s27_late_init_ids.insert(init_sprite_id);
+					current_frame_init_actions
+						<< "\ttagDoInitActionFrameLate(app_context, "
+						<< charId(init_sprite_id) << ", " << func_name
+						<< ", SWFRECOMP_INITDEF_" << init_sprite_id << ");"
+						<< endl;
+				}
 
 
 
@@ -5086,7 +5119,13 @@ namespace SWFRecomp
 				// ColorMatrixFilters: one cxform = placement cx ∘ CM_n ∘ … ∘ CM_1,
 				// unless the fold is inexact (PlaceCmCompose::live): then the
 				// list's type-6 members render as filter passes.
-				bool cm_live = has_color_matrix && po_cm.live(po_cx_mult, po_cx_add);
+				bool cm_live = has_color_matrix && po_cm.live(po_cx_mult, po_cx_add,
+					context.shape_char_ids.count(char_id) > 0);
+				// s27 w2-applyfilter-cm: the cxform the placement has WITHOUT the
+				// fold, restored when AS replaces the filter list
+				// (tagSetColorMatrixFolded; action.c avm1ApplyRuntimeFiltersToEntry).
+				u32 po_plain_cxform_id = cxform_id;
+				bool cm_folded = has_color_matrix && !cm_live;
 				if (has_color_matrix && !cm_live)
 				{
 					po_cm.emit(cxform_data, po_cx_mult, po_cx_add);
@@ -5507,6 +5546,9 @@ namespace SWFRecomp
 					context.tag_main << "\ttagEndFilterList(app_context, " << to_string(depth) << ");" << endl;
 					if (cm_live)
 						context.tag_main << "\ttagSetColorMatrixLive(app_context, " << to_string(depth) << ");" << endl;
+					if (cm_folded)
+						context.tag_main << "\ttagSetColorMatrixFolded(app_context, " << to_string(depth)
+						                 << ", " << to_string(po_plain_cxform_id) << ");" << endl;
 				}
 
 				break;
@@ -5953,6 +5995,8 @@ namespace SWFRecomp
 				// referencing it succeeds. PlaceObject* tags that came earlier in
 				// the tag stream were already degraded to no-op modifies above.
 				defined_chars.insert(sprite_id);
+				if (!s27_sprite_def_frame.count(sprite_id))
+					s27_sprite_def_frame[sprite_id] = next_frame_i > 0 ? next_frame_i - 1 : 0;
 
 				std::string sp = "sprite_" + to_string(sprite_id);
 
@@ -6575,7 +6619,10 @@ namespace SWFRecomp
 									}
 								}
 							}
-							bool sp_cm_live = sp_cm.live(sp_cx_mult, sp_cx_add);
+							bool sp_cm_live = sp_cm.live(sp_cx_mult, sp_cx_add,
+								context.shape_char_ids.count(char_id) > 0);
+							u32 sp_plain_cxform_id = cxform_id;
+							bool sp_cm_folded = sp_cm.any && !sp_cm_live;
 							if (sp_cm.any && !sp_cm_live)
 							{
 								sp_cm.emit(cxform_data, sp_cx_mult, sp_cx_add);
@@ -6917,6 +6964,10 @@ namespace SWFRecomp
 								if (sp_cm_live)
 									sprite_definitions << "\ttagSetColorMatrixLive(app_context, "
 									                   << to_string(depth) << ");" << endl;
+								if (sp_cm_folded)
+									sprite_definitions << "\ttagSetColorMatrixFolded(app_context, "
+									                   << to_string(depth) << ", "
+									                   << to_string(sp_plain_cxform_id) << ");" << endl;
 							}
 
 							{

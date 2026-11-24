@@ -61,7 +61,13 @@ extern const char* ng_lookupExportName(size_t char_id);
 // ---------------------------------------------------------------------------
 #define MAX_CLONE_DEPTH_ENTRIES 128
 typedef struct { int swf_depth; char name[64]; } CloneDepthEntry;
-static CloneDepthEntry g_clone_depth_table[MAX_CLONE_DEPTH_ENTRIES];
+// s27 w1-timers-robustness (landed w2-timers-land): growable (was a fixed 128 that is
+// only ever emptied by same-depth eviction, so the 129th duplicateMovieClip /
+// CloneSprite at a fresh depth was never registered: a later clone at that
+// depth did not evict the old name, and backward-goto survival lost it).
+// Indexed only (no long-lived entry pointers), so realloc is safe.
+static CloneDepthEntry* g_clone_depth_table = NULL;
+static size_t g_clone_depth_cap = 0;
 static size_t g_clone_depth_count = 0;
 
 extern MovieClip root_movieclip;
@@ -140,7 +146,9 @@ static void clone_depth_evict(SWFAppContext* app_context, int swf_depth, MovieCl
 static void clone_depth_register(SWFAppContext* app_context, int swf_depth, const char* name, MovieClip* keep)
 {
 	clone_depth_evict(app_context, swf_depth, keep);
-	if (g_clone_depth_count < MAX_CLONE_DEPTH_ENTRIES)
+	if (g_clone_depth_count < g_clone_depth_cap
+	    || ng_table_grow((void**)&g_clone_depth_table, &g_clone_depth_cap,
+	                     sizeof(*g_clone_depth_table), MAX_CLONE_DEPTH_ENTRIES))
 	{
 		g_clone_depth_table[g_clone_depth_count].swf_depth = swf_depth;
 		strncpy(g_clone_depth_table[g_clone_depth_count].name, name, 63);
@@ -166,6 +174,26 @@ int ng_clone_get_swf_depth(const char* name)
 		}
 	}
 	return INT_MIN;
+}
+
+// s27 w2-timers-land: forget a clone that was removed (removeMovieClip /
+// RemoveSprite, immediate arm). The table used to keep every removed clone's
+// entry: with growth it was unbounded (bullets / particles at rising depths),
+// and a stale entry made a later clone at that depth "evict" by name a LIVE
+// clip that reused the removed one's name at another depth. `as_depth` is the
+// removed MC's depth before it was cleared; entries are keyed by SWF depth,
+// which the MC stores in either convention (see ng_clone_get_swf_depth).
+void ng_clone_forget(const char* name, int as_depth)
+{
+	if (name == NULL || name[0] == '\0') return;
+	for (size_t i = 0; i < g_clone_depth_count; i++) {
+		if ((g_clone_depth_table[i].swf_depth == as_depth ||
+		     g_clone_depth_table[i].swf_depth == as_depth + 16384) &&
+		    strcmp(g_clone_depth_table[i].name, name) == 0) {
+			g_clone_depth_table[i] = g_clone_depth_table[--g_clone_depth_count];
+			return;
+		}
+	}
 }
 
 // Rewrite a clone's registered SWF depth (no eviction). Used by swapDepths

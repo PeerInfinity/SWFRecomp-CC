@@ -541,6 +541,7 @@ void render_webgpu_run_displacement(WebGPURenderContext* context,
 // premultiply). m20 is the AS3 ColorMatrixFilter.matrix, row-major 4x5,
 // bias column in 0..255 units.
 void render_webgpu_run_color_matrix(WebGPURenderContext* context, const float* m20);
+void render_webgpu_set_cm_keep_empty(WebGPURenderContext* context, int on);
 // Blend-mode layer compositing: 1 when this mode must be rendered to its own
 // layer and composited once, 0 when the caller should keep the legacy per-draw
 // pipeline (nested layers, or a backdrop we cannot sample).

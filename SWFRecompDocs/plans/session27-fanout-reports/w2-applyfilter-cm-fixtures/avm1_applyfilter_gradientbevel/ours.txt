@@ -1,0 +1,18 @@
+start gradientbevel
+transparent ret 0
+opaque ret 0
+dt 20,20 0
+dop 20,20 -16777216
+dt 29,40 0
+dop 29,40 -16777216
+dt 35,35 -16776961
+dop 35,35 -16776961
+dt 40,40 -16776961
+dop 40,40 -16776961
+dt 50,50 0
+dop 50,50 -16777216
+dt 52,40 0
+dop 52,40 -16777216
+dt 60,60 0
+dop 60,60 -1
+done

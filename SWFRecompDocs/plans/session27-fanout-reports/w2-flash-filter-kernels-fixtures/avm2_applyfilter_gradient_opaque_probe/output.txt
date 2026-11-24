@@ -1,0 +1,26 @@
+glow trans->opaque: err 2077
+glow opaque->opaque: err 2077
+glow opaque->trans: ok ff000000
+blur trans->opaque: ok ff060d23
+dropshadow trans->opaque: err 2077
+dropshadow inner trans->opaque: err 2077
+bevel trans->opaque: err 2077
+glow inner trans->opaque: err 2077
+glow knockout trans->opaque: err 2077
+gradientglow trans->opaque: ok ff000000
+gradientbevel trans->opaque: ok ff000000
+colormatrix trans->opaque: ok ff000000
+convolution trans->opaque: ok ff000000
+gradientglow outer y=6: 0 0 0 0 0 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientglow outer y=10: 0 0 0 0 0 993466ff 993466ff 993466ff ff000000 ff000000 ff000000 ff000000 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientglow inner y=6: 0 0 0 0 0 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientglow inner y=10: 0 0 0 0 0 993466ff 993466ff 993466ff ff000000 ff000000 ff000000 ff000000 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientglow full knockout y=6: 0 0 0 0 0 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientglow full knockout y=10: 0 0 0 0 0 993466ff 993466ff 993466ff ff000000 ff000000 ff000000 ff000000 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientbevel inner y=6: 0 0 0 0 0 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientbevel inner y=10: 0 0 0 0 0 993466ff 993466ff 993466ff ff000000 ff000000 ff000000 ff000000 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientbevel outer y=6: 0 0 0 0 0 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientbevel outer y=10: 0 0 0 0 0 993466ff 993466ff 993466ff ff000000 ff000000 ff000000 ff000000 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientbevel full knockout y=6: 0 0 0 0 0 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 993466ff 0 0 0 0 0
+gradientbevel full knockout y=10: 0 0 0 0 0 993466ff 993466ff 993466ff ff000000 ff000000 ff000000 ff000000 993466ff 993466ff 993466ff 0 0 0 0 0
+done

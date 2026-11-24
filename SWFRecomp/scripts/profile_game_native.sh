@@ -100,10 +100,11 @@ if [ "$RUN_ONLY" != true ]; then
         utils.c amf_packet.c
         libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
         libswf/ng_shared.c libswf/hit_test.c libswf/stb_image_impl.c
-        avm2/avm2_cpu_raster.c
+        avm2/avm2_cpu_raster.c actionmodern/avm1_filter_kernels.c
         memory/heap.c
     )
     for s in "${COMMON_SRCS[@]}"; do cp "${SWFMODERN_SRC}/${s}" "${BUILD_DIR}/"; done
+    cp "${SWFMODERN_SRC}/avm2/avm2_bitmap.c" "${BUILD_DIR}/avm2_bitmap_kernels.inc"  # avm1_filter_kernels.c (s27)
     # Runtime-local header included by action.c with quotes.
     cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
 

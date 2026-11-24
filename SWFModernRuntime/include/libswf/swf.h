@@ -360,6 +360,15 @@ typedef struct DisplayObject
 	// its cxform (tagSetColorMatrixLive; tag.c obj_filter_routed). Placement-
 	// scoped like filter_chain, and cleared with it.
 	u8 cm_live;
+
+	// s27 w2-applyfilter-cm: 1 when the recompiler FOLDED this placement's
+	// ColorMatrixFilters into cxform_id (tagSetColorMatrixFolded), with the
+	// placement's own (unfolded) cxform id in cm_plain_cxform_id. AS replacing
+	// the filter list (`mc.filters = ...`) drops the authored CMs, so
+	// action.c avm1ApplyRuntimeFiltersToEntry restores the plain id. Cleared
+	// with cm_live.
+	u8 cm_folded;
+	u32 cm_plain_cxform_id;
 } DisplayObject;
 
 typedef struct KeyState {

@@ -1,0 +1,7 @@
+# s26 w2-avm2-applyfilter-kernels fixture; s27 w2-flash-filter-kernels landed it.
+# output.txt = the FLASH Player 32 capture (SWFRecompDocs/plans/flash-oracle-captures/
+# avm2_applyfilter_glow_kernels/output.flash.txt; 3/3 Linux runs, Windows identical).
+# Flash throws Error #2077 at `glow to opaque`, so the trace ends there.
+# Known residual (s27): 7 rows still differ by 1-2 premultiplied levels (inner glow/DS
+# red channel, bevel); see session27-fanout-reports/w2-flash-filter-kernels-report.md.
+num_frames = 1
