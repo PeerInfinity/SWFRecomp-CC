@@ -3622,8 +3622,8 @@ Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-
 
 **Trace**
 - **N** (local ladder):
-  - `n-browser-pfx` is running: the browser removes self-removing particle clips 2 ticks late (`h=` only; native is exact).
-  - Next: the level 1 route (the key hollow is reachable only through a ~22 px notch), then levels 5+.
+  - `n-browser-pfx` landed `005bea42a` (record `n-browser-pfx-report.md`): browser pfx clips exact, L1 route exporter = native = browser.
+  - `n-trap-stroke` was launched at closeout (L1 trap-switch 1-px stroke coverage under a ×0.06 parent, then the exit-door panel offset). Then levels 5+.
 - **Held fixtures (oracle-gated)**:
   - Loaded-shell `avm1_loaded_bare_goto`, `_unload_shell`, `_shell_consumers`: the Feb-2026 runner disagrees on load/unload tick timing. Needs a current Ruffle runner or a re-derivation.
   - `avm1_edittext_html_typed_runs`: Ruffle's `c0=0` is a `replace_text` index-0 artifact. Needs a Flash capture, then an RvF entry.
