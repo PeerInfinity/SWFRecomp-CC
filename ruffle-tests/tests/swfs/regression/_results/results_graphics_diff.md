@@ -1,23 +1,44 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d70f2c0aa67f` (2026-11-24T01:36:19.282271+00:00)
-**Current:** `b8d3b736aaef` (2026-11-24T03:17:00.806389+00:00)
+**Previous:** `b8d3b736aaef` (2026-11-24T03:17:00.806389+00:00)
+**Current:** `cceb5133a189` (2026-11-24T07:25:12.278675+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 173 | 178 | +5 |
-| Total | 173 | 178 | +5 |
+| Passing | 178 | 204 | +26 |
+| Total | 178 | 204 | +26 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (5)
+## Added Tests (26)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm1_applyfilter_convolution_not_cm` | pass | 10/10 |
-| `avm1_definetext_matrix` | pass | 0/0 |
-| `avm1_edittext_html_typed_runs` | pass | 3/3 |
-| `avm1_holder_drawing_under_children` | pass | 1/1 |
-| `avm2_edittext_placed_cxform` | pass | 0/0 |
+| `avm1_applyfilter_kernels` | pass | 17/17 |
+| `avm1_attached_clip_timeline_child_parent` | pass | 6/6 |
+| `avm1_browser_gated_color` | pass | 3/3 |
+| `avm1_browser_gated_depth` | pass | 7/7 |
+| `avm1_browser_gated_textfield` | pass | 7/7 |
+| `avm1_clone_depth_overflow` | pass | 3/3 |
+| `avm1_clone_depth_removed_reuse` | pass | 4/4 |
+| `avm1_edittext_scaled_glyphs` | pass | 0/0 |
+| `avm1_edittext_wordwrap_render` | pass | 5/5 |
+| `avm1_empty_clip_drawing_depth_order` | pass | 1/1 |
+| `avm1_goto_skipped_init_script` | pass | 5/5 |
+| `avm1_goto_skipped_init_timer` | pass | 6/6 |
+| `avm1_po3_cm_alpha_bias_edge` | pass | 0/0 |
+| `avm1_po3_cm_folded_clear` | pass | 1/1 |
+| `avm1_po3_cm_live_under_cxform` | pass | 0/0 |
+| `avm1_textfield_attached_depth_order` | pass | 1/1 |
+| `avm1_timer_method_form` | pass | 6/6 |
+| `avm1_timer_native_method_play` | pass | 3/3 |
+| `avm1_timer_overflow` | pass | 2/2 |
+| `avm1_timer_root_goto_stopped_gs` | pass | 3/3 |
+| `avm1_timer_root_goto_stopped_nf` | pass | 3/3 |
+| `avm1_watch_long_name` | pass | 9/9 |
+| `avm1_watch_overflow` | pass | 2/2 |
+| `avm2_definetext_matrix` | pass | 0/0 |
+| `avm2_layer_group_alpha_transparency` | pass | 0/0 |
+| `layer_group_alpha_transparency` | pass | 0/0 |

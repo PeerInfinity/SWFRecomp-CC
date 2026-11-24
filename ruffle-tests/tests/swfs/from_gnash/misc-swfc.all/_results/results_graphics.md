@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-24 03:17 UTC
+**Date**: 2026-11-24 07:25 UTC
 
-**Git SHA**: `b8d3b736aa`
+**Git SHA**: `cceb5133a1`
 
-**Run Duration**: 4m 58s
+**Run Duration**: 4m 44s
 
 ## Summary
 
@@ -16,8 +16,8 @@
 | Effective pass | **20** (95.2%) |
 | Failing | 1 |
 | Total expected lines | 603 |
-| Matching lines | 491 (81.4%) |
-| Mismatched lines | 112 |
+| Matching lines | 524 (86.9%) |
+| Mismatched lines | 79 |
 
 ### Failure Breakdown
 
@@ -31,20 +31,20 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.1s |  |
-| 2 | `edittext_test1` | 47 | 19.4s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 15.5s |  |
-| 4 | `hello` | 4 | 18.2s |  |
-| 5 | `mouse_drag_test` | 12 | 2.1s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 18.8s |  |
-| 7 | `movieclip_destruction_test3` | 18 | 17.5s |  |
-| 8 | `movieclip_destruction_test4` | 40 | 19.5s |  |
-| 9 | `opcode_guard_test2` | 24 | 19.8s |  |
-| 10 | `soft_reference_test1` | 45 | 19.1s |  |
-| 11 | `sound` | 7 | 17.3s |  |
-| 12 | `stackscope` | 11 | 1.8s |  |
-| 13 | `submoviegetvar` | 4 | 18.3s |  |
-| 14 | `swf4opcode` | 117 | 4.4s |  |
+| 1 | `button_test1` | 31 | 3.0s |  |
+| 2 | `edittext_test1` | 47 | 19.1s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 2.1s |  |
+| 4 | `hello` | 4 | 18.9s |  |
+| 5 | `mouse_drag_test` | 12 | 2.0s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 3.6s |  |
+| 7 | `movieclip_destruction_test3` | 18 | 19.0s |  |
+| 8 | `movieclip_destruction_test4` | 40 | 20.3s |  |
+| 9 | `opcode_guard_test2` | 24 | 20.3s |  |
+| 10 | `soft_reference_test1` | 45 | 24.7s |  |
+| 11 | `sound` | 7 | 24.9s |  |
+| 12 | `stackscope` | 11 | 1.9s |  |
+| 13 | `submoviegetvar` | 4 | 18.6s |  |
+| 14 | `swf4opcode` | 117 | 3.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -52,12 +52,12 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 16.1s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 19.0s |  |
-| 3 | `gotoFrameFromInterval` | 20 | 30 | 24.4s |  |
-| 4 | `gotoFrameFromInterval2` | 18 | 18 | 19.4s |  |
-| 5 | `movieclip_destruction_test1` | 43 | 52 | 19.7s |  |
-| 6 | `registerclass_test3` | 12 | 20 | 2.8s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 19.3s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 19.7s |  |
+| 3 | `gotoFrameFromInterval` | 18 | 30 | 19.3s |  |
+| 4 | `gotoFrameFromInterval2` | 18 | 18 | 18.9s |  |
+| 5 | `movieclip_destruction_test1` | 12 | 52 | 20.1s |  |
+| 6 | `registerclass_test3` | 12 | 20 | 2.2s |  |
 
 ## Near-Passing Tests
 

@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-24T01:36:19.282271+00:00",
-    "old_git_sha": "d70f2c0aa67fd0701e0d0fe02ebf2e6c3d7e62c2",
-    "new_timestamp": "2026-11-24T03:17:00.806389+00:00",
-    "new_git_sha": "b8d3b736aaefa1b4dd3c960a140545c307eb2236",
+    "old_timestamp": "2026-11-24T03:17:00.806389+00:00",
+    "old_git_sha": "b8d3b736aaefa1b4dd3c960a140545c307eb2236",
+    "new_timestamp": "2026-11-24T07:25:12.278675+00:00",
+    "new_git_sha": "cceb5133a189db82d8715e3e9afe9ad500af5908",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 173,
+    "old_pass": 178,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 173,
-    "old_total": 173,
+    "old_effective_pass": 178,
+    "old_total": 178,
     "old_pass_rate": 100.0,
-    "new_pass": 178,
+    "new_pass": 204,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 178,
-    "new_total": 178,
+    "new_effective_pass": 204,
+    "new_total": 204,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,37 +25,37 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 173,
-    "added": 5,
+    "unchanged": 178,
+    "added": 26,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_applyfilter_convolution_not_cm",
+      "test": "avm1_applyfilter_kernels",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
       }
     },
     {
-      "test": "avm1_definetext_matrix",
+      "test": "avm1_attached_clip_timeline_child_parent",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     },
     {
-      "test": "avm1_edittext_html_typed_runs",
+      "test": "avm1_browser_gated_color",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -67,7 +67,79 @@
       }
     },
     {
-      "test": "avm1_holder_drawing_under_children",
+      "test": "avm1_browser_gated_depth",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "avm1_browser_gated_textfield",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "avm1_clone_depth_overflow",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm1_clone_depth_removed_reuse",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "avm1_edittext_scaled_glyphs",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1_edittext_wordwrap_render",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "avm1_empty_clip_drawing_depth_order",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -79,7 +151,187 @@
       }
     },
     {
-      "test": "avm2_edittext_placed_cxform",
+      "test": "avm1_goto_skipped_init_script",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "avm1_goto_skipped_init_timer",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "avm1_po3_cm_alpha_bias_edge",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1_po3_cm_folded_clear",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "avm1_po3_cm_live_under_cxform",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1_textfield_attached_depth_order",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "avm1_timer_method_form",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "avm1_timer_native_method_play",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm1_timer_overflow",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "avm1_timer_root_goto_stopped_gs",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm1_timer_root_goto_stopped_nf",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm1_watch_long_name",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "avm1_watch_overflow",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "avm2_definetext_matrix",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm2_layer_group_alpha_transparency",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "layer_group_alpha_transparency",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",

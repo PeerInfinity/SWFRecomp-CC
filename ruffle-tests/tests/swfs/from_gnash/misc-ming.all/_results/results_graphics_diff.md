@@ -1,15 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d70f2c0aa67f` (2026-11-24T01:36:19.308826+00:00)
-**Current:** `b8d3b736aaef` (2026-11-24T03:17:00.833796+00:00)
+**Previous:** `b8d3b736aaef` (2026-11-24T03:17:00.833796+00:00)
+**Current:** `cceb5133a189` (2026-11-24T07:25:12.329741+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 70 | 70 | 0 |
+| Passing | 70 | 71 | +1 |
 | Total | 111 | 111 | 0 |
-| Pass rate | 63.1% | 63.1% | 0% |
-| Mismatched lines | 959 | 959 | 0 |
+| Pass rate | 63.1% | 64.0% | +0.9% |
+| Mismatched lines | 959 | 935 | -24 |
+|   Decreased | | | -24 |
 
-No changes detected.
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `init_action/InitActionTest2` | ruffle_matched | 5/29 | 29/29 |
