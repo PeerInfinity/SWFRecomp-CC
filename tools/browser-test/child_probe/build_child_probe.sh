@@ -79,8 +79,13 @@ EXTRA="-DHAS_DISPLAY_BRIDGE -DMOCK_DATE_TIME=981152406000LL"
 [ -f "$OUT/movie_registry.c" ] && EXTRA="-DHAS_CHILD_MOVIES $EXTRA"
 EXTRA="$EXTRA -DSWF_FILE_SIZE=${SWF_SIZE} -DSWF_ONDISK_SIZE=${SWF_SIZE} -DSWF_URL=\"file:///test.swf\""
 [ -f "$OUT/data_registry.c" ] && EXTRA="$EXTRA -DHAS_DATA_FILES"
+# -Wl,--fatal-warnings: a call through an undeclared (implicit int) prototype
+# whose definition returns something else links as a wasm-ld "function
+# signature mismatch" stub that traps at run time -- silently, the frame loop
+# just stops (s27 browser-advance-order: ng_rootDLLeave, 78fee9e13). A clean
+# browser link has no wasm-ld warnings, so fail the build on any.
 emcc *.c -DUSE_WEBGPU ${EXTRA} --use-port=emdawnwebgpu \
-    -Wno-error=implicit-function-declaration \
+    -Wno-error=implicit-function-declaration -Wl,--fatal-warnings \
     -I. -I"${INC}" -I"${INC}/actionmodern" -I"${INC}/libswf" -I"${INC}/memory" \
     -I"${INC}/rendering" -I"${INC}/audio" -I"${RT}/lib/c-hashmap" \
     -o "${TEST}.js" \

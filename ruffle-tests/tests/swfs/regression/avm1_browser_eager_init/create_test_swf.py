@@ -19,15 +19,15 @@ Rows:
   * `root f2/f3 ...`, `outer f2/f3` — the next ticks: every timeline
     advances exactly once per tick (a double advance on the placement tick
     would show outer at 2 in `root f1`, or `outer f2` early). The browser
-    still fails `root f2`/`root f3`: it advances timeline sprites inside
-    tagShowFrame, AFTER the root DoAction, so the root reads last tick's
-    playheads (Flash: outer f2 before root f2). That per-tick order is the
-    next browser slice (s27 browser-eager-init report).
-
-Not traced on purpose: a nested sprite's own frame-2 script. Flash/Ruffle run
-it BEFORE its parent's (`inner f2, outer f2, root f2`); both CI modes run it
-after the root (`outer f2, root f2, inner f2`, Phase-3 nested advance). That is
-a separate CI exec-order lead (same report), kept out so this row stays green.
+    used to fail `root f2`/`root f3`: it advanced timeline sprites inside
+    tagShowFrame, AFTER the root DoAction, so the root read last tick's
+    playheads. Fixed by s27 browser-advance-order (swf.c advances before the
+    root frame func in every build).
+  * `inner f2`      — the nested sprite's own frame-2 script runs BEFORE its
+                      parent's and the root's (Flash/Ruffle exec list: newest
+                      first). Added in s27 browser-advance-order: the CI modes
+                      ran it after the root until s27 w2-exec-order-land
+                      (Phase 3 early); the browser now shares that order.
 Expected output is the Flash 32 projector trace, never ours.
 Hand-assembled SWF 8 (MTASC cannot emit timeline sprites or clip actions).
 """
@@ -105,10 +105,9 @@ def build():
     t = b''
     t += tag(69, struct.pack('<I', 0))          # FileAttributes
     t += tag(9, b'\xff\xff\xff')                # SetBackgroundColor
-    # sprite 1 `inner`: frame 1 traces, frame 2 stops (bounded trace). Frame 2 has
-    # no trace on purpose: see the docstring's note on nested frame-script order.
+    # sprite 1 `inner`: frame 1 traces, frame 2 traces and stops (bounded trace).
     inner = (doaction(trace('inner f1')) + SHOW
-             + doaction(STOP) + SHOW + tag(0, b''))
+             + doaction(trace('inner f2') + STOP) + SHOW + tag(0, b''))
     t += tag(39, struct.pack('<HH', 1, 2) + inner)
     # sprite 2 `outer`: frame 1 places `inner` then traces what it sees; 3 frames, stops on 3.
     po_inner = bytes([0x22]) + struct.pack('<HH', 1, 1) + b'inner\x00'   # HasName|HasCharacter

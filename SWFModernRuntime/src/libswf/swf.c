@@ -471,12 +471,12 @@ size_t max_depth = 0;
 
 RenderContext* context;
 
-#ifdef OFFSCREEN_RENDER
 // s27 w2-exec-order-land: nested-sprite frame order (Phase 3 early). Same rule
 // and kill switch (SWF_EXEC_ORDER_NESTED_EARLY=0) as swf_core.c
 // exec_order_nested_early: a sprite nested in a root-level sprite is newer than
 // its parent and _root in the Flash/Ruffle exec list, so its frame script runs
-// before theirs and before _root.onEnterFrame. Browser-WASM keeps its order.
+// before theirs and before _root.onEnterFrame. Every swf.c build since s27
+// browser-advance-order (the browser runs the same per-tick advance order).
 static int exec_order_nested_early(void)
 {
 	static int s_v = -1;
@@ -486,7 +486,6 @@ static int exec_order_nested_early(void)
 	}
 	return s_v;
 }
-#endif
 
 void tagMain(SWFAppContext* app_context)
 {
@@ -1026,13 +1025,21 @@ void tagMain(SWFAppContext* app_context)
 		app_context->mouse.released = 0;
 #endif
 
-#ifdef OFFSCREEN_RENDER
 		// Advance root-level sprites BEFORE root frame_func runs, mirroring
 		// swf_core.c's two-phase order. Each sprite's frame_func queues its
 		// script via actionQueueSpriteScript; the recompiler-emitted
 		// actionDrainAllInPriorityOrder at the top of root frame_funcs[current_frame]
 		// drains those scripts before the root's own DoAction. Without this
 		// call, sprite frame_funcs (frame > 0) never run.
+		// Every swf.c build (s27 browser-advance-order): browser-WASM and the
+		// native windowed player used to advance timeline sprites inside
+		// tagShowFrame, i.e. AFTER the root DoAction, so from tick 2 a root
+		// frame script read its sprites' previous playheads and their frame
+		// scripts ran after the root's (Flash/Ruffle/CI run them before).
+		// Fixture: regression/avm1_browser_eager_init (root f2/f3 rows). The
+		// browser still re-runs a parked root frame func every tick (tags +
+		// tagShowFrame, root DoAction suppressed) -- that no longer advances
+		// anything; this is the one per-tick advance in every build.
 		// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
 		// nested sprites first, then their root-level parents (Phase 1).
 		const int nested_early = exec_order_nested_early();
@@ -1052,6 +1059,11 @@ void tagMain(SWFAppContext* app_context)
 		// Auto-advance attachMovie'd multi-frame clips (PROGRESS #15). Phase 1,
 		// before the root frame func reads _currentframe. Skips clips attached
 		// this tick (not yet promoted) and stopped clips. Mirrors swf_core.c.
+		// Browser-WASM: the same pump (s24 browser follow-up; before it these
+		// clips froze on frame 1 there). Clips attached this tick are skipped
+		// until ng_promote_attached_playheads at the end of the tick, and a
+		// pending manual nav is left to advance_attached_clip_frames
+		// (tagShowFrame).
 		{
 			extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
 			ng_advance_attached_clip_playheads(app_context);
@@ -1068,23 +1080,6 @@ void tagMain(SWFAppContext* app_context)
 			extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
 			presync_nested_sprite_currentframe(app_context);
 		}
-#else
-		// Browser-WASM (and the native windowed player): run attachMovie'd clips'
-		// natural timelines — frame tags, DoActions and nested children — with the
-		// pump the CI modes run just above (s24 browser follow-up; before it these
-		// clips froze on frame 1 here, and only gotoAndPlay'd ones stepped forward,
-		// placement tags only). Same slot as OFFSCREEN: BEFORE the root frame
-		// func, so the scripts it queues drain in the frame func's
-		// actionDrainAllInPriorityOrder ahead of the root DoAction (Ruffle's
-		// newest-first exec list runs root last). Timeline sprites still advance
-		// later, inside tagShowFrame, in this build. Clips attached this tick are
-		// skipped until ng_promote_attached_playheads at the end of the tick, and a
-		// pending manual nav is left to advance_attached_clip_frames (tagShowFrame).
-		{
-			extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
-			ng_advance_attached_clip_playheads(app_context);
-		}
-#endif
 
 		// Mark ENTER_FRAME dispatch pending. tagFlushPendingEnterFrame is
 		// called by the recompiler-emitted code right before each DoAction
@@ -1230,6 +1225,17 @@ void tagMain(SWFAppContext* app_context)
 		// -- construct_as_avm1_object(run_frame=true)). Fixture:
 		// regression/avm1_exec_order_dynamic_eligible.
 #ifndef OFFSCREEN_RENDER
+		// Phase 3 (s27 browser-advance-order): nested sprite children deferred
+		// from the pre-frame-func advance above, unless they ran early, then the
+		// SCRIPT drain -- the OFFSCREEN slot below. Before the eligibility mark,
+		// so a clip a Phase-3 script creates is marked this tick (the OFFSCREEN
+		// order). tagShowFrame no longer advances anything in this build.
+		if (!nested_early)
+		{
+			extern void advance_nested_sprite_frames(SWFAppContext* app_context);
+			advance_nested_sprite_frames(app_context);
+		}
+		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
 		{
 			extern void actionMarkDynamicMCsEnterFrameEligible(void);
 			actionMarkDynamicMCsEnterFrameEligible();

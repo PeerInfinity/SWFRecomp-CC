@@ -1317,12 +1317,6 @@ static void ng_sprite_park_no_end_tag(DisplayObject* obj)
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-// Set only around tagShowFrame's top-level browser-WASM advance_sprite_frames
-// call (the per-tick pump), so other advance callers (goto replay, attached
-// clips) keep their behaviour. See the placed_at_tick skip in the loop.
-static int g_browser_tick_advance = 0;
-#endif
 void advance_sprite_frames(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -1457,21 +1451,6 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			if (obj->placed_at_tick == g_tick_count)
 				continue;
 		}
-
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-		// Browser-WASM: tagShowFrame's per-tick advance runs AFTER the frame's
-		// placements, unlike the CI loops (before the root frame func). A sprite
-		// placed this tick already built its frame 0 through eager placement init
-		// (tagPlaceObject2), so advancing it here would run its frame 2 on the
-		// placement tick. Skip it, as advance_nested_sprite_frames already does;
-		// it first advances next tick, like CI. (s27 browser-eager-init.)
-		if (g_browser_tick_advance && !just_allocated)
-		{
-			extern size_t g_tick_count;
-			if (obj->placed_at_tick == g_tick_count)
-				continue;
-		}
-#endif
 
 		// Check for manual frame navigation (gotoAndPlay/gotoAndStop)
 		size_t frame = obj->sprite_current_frame;
@@ -10473,9 +10452,8 @@ void tagShowFrame(SWFAppContext* app_context)
 	// queues, then process_sprite_needs_init (registerClass ctors, deferred
 	// goto-catch-up frame-0 scripts, sprite_initialized=1), then the late
 	// SCRIPT drain and the duplicateMovieClip onLoad drain, in the CI order.
-	// The sprites it built are skipped by this tick's advance_sprite_frames
-	// below (placed_at_tick), as advance_nested_sprite_frames already does:
-	// in CI they first advance on the next tick.
+	// The sprites it built first advance next tick (swf.c's pre-frame-func
+	// advance), as in CI.
 	if (!g_goto_catchup_active) {
 		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
 		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
@@ -10491,23 +10469,14 @@ void tagShowFrame(SWFAppContext* app_context)
 		ng_fire_pending_loads(app_context);
 		actionFlushPendingOnLoads(app_context);
 	}
-	// Browser-WASM: tagShowFrame is the only sprite-advance pump in this
-	// build (unlike OFFSCREEN_RENDER, where swf.c's main tick loop runs
-	// the same defer+nested pattern). Without the nested pass, sprites
-	// parented to 1-frame containers never advance: advance_sprite_frames
-	// short-circuits at the 1-frame !just_allocated check and the inline
-	// recursion is skipped along with it. Key symptom: Pong stuck at
-	// preloader (sprite_9 inside 1-frame sprite_10). See
-	// SWFRecompDocs/status/2026-05-25-pong-browser-diagnosis.md.
+	// Timeline sprites are NOT advanced here (s27 browser-advance-order):
+	// swf.c's tick loop advances them before the root frame func, with the
+	// nested pass (Phase 3) after it, in every swf.c build -- the CI order.
+	// This used to be the browser's only sprite pump, so it ran after the root
+	// DoAction and root scripts read stale playheads from tick 2 on. The
+	// nested pass is still what advances sprites in 1-frame containers
+	// (Pong's sprite_9 inside sprite_10, 2026-05-25-pong-browser-diagnosis).
 	{
-		extern int g_advance_defer_nested;
-		extern void advance_nested_sprite_frames(SWFAppContext* app_context);
-		g_advance_defer_nested = 1;
-		g_browser_tick_advance = 1;
-		advance_sprite_frames(app_context);
-		g_browser_tick_advance = 0;
-		g_advance_defer_nested = 0;
-		advance_nested_sprite_frames(app_context);
 		// Apply deferred gotoAndStop/Play navs on attachMovie'd clips (e.g.
 		// Doodle Jump platforms) and build their nested sprite sub-lists.
 		advance_attached_clip_frames(app_context);
