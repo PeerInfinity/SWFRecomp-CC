@@ -154,7 +154,9 @@ Expected moves:
   attached branch, and it is byte-identical locally).
 - **no-graphics:** no moves.
 
-*CI result: pending the coordinator's grading run. It will be appended here by name when it lands.*
+*CI result: graded in the coordinator's s27 interim #2 graphics run. The by-name result is recorded in the s27 arc doc,
+not here. Successor session: `n-l2l4-pixel-pass` (L2/L4 native pixel pass, then the goto-rebuild `_root` fallback
+reproducer).*
 
 ## 6. Goal 2 detail: the remaining native residual
 
