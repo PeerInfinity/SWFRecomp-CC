@@ -82,6 +82,7 @@ void render_webgpu_resume_pass(WebGPURenderContext* c) { (void)c; }
 void render_webgpu_begin_offscreen_pass(WebGPURenderContext* c) { (void)c; }
 int  render_webgpu_begin_child_layer(WebGPURenderContext* c) { (void)c; return 0; }
 void render_webgpu_end_child_layer(WebGPURenderContext* c, u8 m) { (void)c; (void)m; }
+void render_webgpu_set_group_alpha(WebGPURenderContext* c, float ga) { (void)c; (void)ga; }
 int  render_webgpu_begin_nested_filter(WebGPURenderContext* c) { (void)c; return 0; }
 void render_webgpu_end_nested_filter(WebGPURenderContext* c) { (void)c; }
 void render_webgpu_end_offscreen_pass(WebGPURenderContext* c) { (void)c; }

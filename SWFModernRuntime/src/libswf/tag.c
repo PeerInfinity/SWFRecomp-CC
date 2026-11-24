@@ -3048,9 +3048,11 @@ static size_t g_cxform_override_cap;
 static int g_cxform_override_count;
 
 static int g_attached_cx_cache_n;   // attached_mc_world_cxform slot dedupe
+static void lga_reset(void);
 static void cxform_overrides_reset(void)
 {
 	g_cxform_override_count = 0;
+	lga_reset();   // s27: the recorded LAYER group alphas pair with these slots
 	// Called at both per-frame rewinds of g_next_dynamic_cxform_slot: every
 	// cached dynamic slot is about to be reused for other content.
 	g_attached_cx_cache_n = 0;
@@ -3862,6 +3864,90 @@ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
 	renderer_write_transform(context, slot, snapped);
 }
 
+// ---------------------------------------------------------------------------
+// s27 w2-layer-alpha-group: blendMode = LAYER as a TRANSPARENCY GROUP.
+// Flash Player 32 (oracle capture flash-oracle-captures/n3_layer_alpha): a
+// LAYER clip at alpha 50% holding two overlapping OPAQUE rects shows only the
+// top rect at the overlap, (128,128,255) — its children are composited
+// opaquely into the group and the alpha is applied ONCE to the group. The
+// per-child model (ours before, and Ruffle's render_base, which pushes the
+// cxform before capturing the blend's commands) gives (127,63,191).
+//
+// compose_children bakes every ancestor's cxform into each leaf's slot, so
+// the split happens here: for a LAYER sprite whose concatenated cxform has a
+// pure alpha MULTIPLIER m in (0,1) (no alpha offset, no colour->alpha terms),
+// its subtree (and its own Drawing-API content, via its cxform_id) is
+// composed with m stripped, and m is recorded for the render arms, which hand
+// it to renderer_set_group_alpha just before the LAYER composite. The RGB rows
+// stay per child: an affine colour map commutes with normal-over.
+//
+// Only where the render arms are certain to open a group: never for a
+// filtered LAYER entry (its filter offscreen is its group, a separate
+// composite) nor anywhere under a filtered or bitmap-cached ancestor (a
+// padded filter capture refuses child layers), and at most two blend-group
+// ancestors deep (the child-layer stack is CHILD_LAYER_MAX = 4).
+// ---------------------------------------------------------------------------
+#define LGA_MAX 128
+static struct { const DisplayObject* obj; float ga; } g_lga[LGA_MAX];
+static int g_lga_n;
+static int g_lga_block;       // > 0 while composing under a filtered ancestor
+static int g_lga_blend_anc;   // blend-mode (> 1) ancestors of the subtree
+
+static void lga_reset(void) { g_lga_n = 0; }
+
+static float lga_for_entry(const DisplayObject* obj)
+{
+	for (int i = g_lga_n - 1; i >= 0; --i)
+		if (g_lga[i].obj == obj) return g_lga[i].ga;
+	return 1.0f;
+}
+
+// `cx` is the entry's concatenated cxform (NULL = identity) and `slot` the GPU
+// slot holding it. On a split, *sub_cx / *sub_slot are rewritten to the
+// alpha-stripped values the subtree composes against, obj->cxform_id is
+// re-pointed at the stripped slot (restored by cxform_overrides_restore), and
+// the multiplier is recorded. Returns 1 on a split.
+static int lga_split_entry(DisplayObject* obj, const float* cx,
+	float stripped[20], const float** sub_cx, u32* sub_slot)
+{
+	if (cx == NULL || obj->blend_mode != 2 || obj_filter_routed(obj)) return 0;
+	if (g_lga_block > 0 || g_lga_blend_anc >= 2 || g_lga_n >= LGA_MAX) return 0;
+	if (cx[3] != 0.0f || cx[7] != 0.0f || cx[11] != 0.0f || cx[19] != 0.0f) return 0;
+	float m = cx[15];
+	if (!(m > 0.0f && m < 1.0f)) return 0;
+	memcpy(stripped, cx, 20 * sizeof(float));
+	stripped[15] = 1.0f;
+	u32 slot = 0;
+	int ident = cx_is_identity(stripped);
+	if (!ident) {
+		if (g_next_dynamic_cxform_slot >= g_cxform_slot_capacity) return 0;
+		slot = g_next_dynamic_cxform_slot++;
+		renderer_write_cxform(context, slot, stripped);
+	}
+	if (obj->cxform_id != slot) {
+		cxform_overrides_push(obj, obj->cxform_id);
+		obj->cxform_id = slot;
+	}
+	g_lga[g_lga_n].obj = obj;
+	g_lga[g_lga_n].ga = m;
+	g_lga_n++;
+	*sub_cx = ident ? NULL : stripped;
+	*sub_slot = slot;
+	return 1;
+}
+
+// Ancestor bookkeeping around a recursive compose of obj's subtree.
+static inline void lga_enter(const DisplayObject* obj)
+{
+	if (obj_filter_routed(obj)) g_lga_block++;
+	if (obj->blend_mode > 1) g_lga_blend_anc++;
+}
+static inline void lga_leave(const DisplayObject* obj)
+{
+	if (obj_filter_routed(obj)) g_lga_block--;
+	if (obj->blend_mode > 1) g_lga_blend_anc--;
+}
+
 #ifndef NO_GRAPHICS
 static int attached_mc_local_cxform(float out[20], const MovieClip* mc);
 #endif
@@ -4178,9 +4264,18 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			case CHAR_TYPE_SPRITE:
 			{
 				if (obj->sprite_display_list != NULL)
+				{
+					// s27: a LAYER sprite's alpha moves to its group composite.
+					const float* sub_cx = child_cx;
+					u32 sub_slot = eff_slot;
+					float lga_cx[20];
+					lga_split_entry(obj, child_cx, lga_cx, &sub_cx, &sub_slot);
+					lga_enter(obj);
 					compose_children(app_context,
 						obj->sprite_display_list, obj->sprite_max_depth,
-						composed, child_cx, eff_slot);
+						composed, sub_cx, sub_slot);
+					lga_leave(obj);
+				}
 				break;
 			}
 
@@ -4226,9 +4321,13 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				}
 
 				if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+				{
+					lga_enter(obj);
 					compose_children(app_context,
 						obj->sprite_display_list, obj->sprite_max_depth,
 						composed, child_cx, eff_slot);
+					lga_leave(obj);
+				}
 				break;
 			}
 
@@ -5357,6 +5456,8 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				if (obj->blend_mode == 2) g_layer_group_depth--;
 				renderer_end_offscreen_pass(context);
 				renderer_resume_pass(context);
+				if (obj->blend_mode == 2)   // s27 transparency group
+					renderer_set_group_alpha(context, lga_for_entry(obj));
 				renderer_composite_blend(context, obj->blend_mode,
 					active_clip_depth > 0 ? 1 : 0);
 				continue;
@@ -5370,6 +5471,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				g_layer_group_depth++;
 				render_single_object(app_context, obj);
 				g_layer_group_depth--;
+				renderer_set_group_alpha(context, lga_for_entry(obj));   // s27
 				renderer_end_child_layer(context, 2);
 				continue;
 			}
@@ -8719,9 +8821,16 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
+				// s27: a root LAYER sprite's alpha moves to its group composite.
+				const float* sub_cx = seed;
+				u32 sub_slot = obj->cxform_id;
+				float lga_cx[20];
+				lga_split_entry(obj, seed, lga_cx, &sub_cx, &sub_slot);
+				lga_enter(obj);
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
-					sprite_xform, seed, obj->cxform_id);
+					sprite_xform, sub_cx, sub_slot);
+				lga_leave(obj);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
@@ -8754,9 +8863,11 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
+				lga_enter(obj);
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					btn_xform, seed, obj->cxform_id);
+				lga_leave(obj);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_TEXT)
@@ -8896,6 +9007,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (obj->blend_mode == 2) g_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
+			if (obj->blend_mode == 2)   // s27 transparency group
+				renderer_set_group_alpha(context, lga_for_entry(obj));
 			renderer_composite_blend(context, obj->blend_mode,
 				active_clip_depth > 0 ? 1 : 0);
 		} else if (obj_filter_routed(obj)) {
@@ -8980,9 +9093,11 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			float att_cx[20];
 			u32 att_cx_slot = 0;
 			int att_has_cx = attached_mc_world_cxform(mc, att_cx, &att_cx_slot);
+			lga_enter(d);
 			compose_children(app_context, d->sprite_display_list,
 				d->sprite_max_depth, mc_xform,
 				att_has_cx ? att_cx : NULL, att_cx_slot);
+			lga_leave(d);
 			actionRenderMCDrawingsInlineEntryCx(mc, drawing_render_cb, NULL,
 				att_has_cx ? att_cx_slot : 0);
 			render_display_list(app_context, d->sprite_display_list,
@@ -9218,9 +9333,11 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	float att_cx[20];
 	u32 att_cx_slot = 0;
 	int att_has_cx = attached_mc_world_cxform(mc, att_cx, &att_cx_slot);
+	lga_enter(d);
 	compose_children(app_context, d->sprite_display_list,
 		d->sprite_max_depth, mc_xform,
 		att_has_cx ? att_cx : NULL, att_cx_slot);
+	lga_leave(d);
 	// setMask maskee: dynamic clips with display-list content get the same
 	// stencil push/restore as timeline entries (mask defect B).
 	MovieClip* avm1_masker = (MovieClip*)actionAvm1MaskerForMC(mc);
@@ -9765,9 +9882,16 @@ void tagShowFrame(SWFAppContext* app_context)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
+				// s27: a root LAYER sprite's alpha moves to its group composite.
+				const float* sub_cx = seed;
+				u32 sub_slot = obj->cxform_id;
+				float lga_cx[20];
+				lga_split_entry(obj, seed, lga_cx, &sub_cx, &sub_slot);
+				lga_enter(obj);
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
-					sprite_xform, seed, obj->cxform_id);
+					sprite_xform, sub_cx, sub_slot);
+				lga_leave(obj);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
@@ -9823,9 +9947,11 @@ void tagShowFrame(SWFAppContext* app_context)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
+				lga_enter(obj);
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					btn_xform, seed, obj->cxform_id);
+				lga_leave(obj);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_TEXT)
@@ -9981,6 +10107,8 @@ void tagShowFrame(SWFAppContext* app_context)
 			if (obj->blend_mode == 2) g_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
+			if (obj->blend_mode == 2)   // s27 transparency group
+				renderer_set_group_alpha(context, lga_for_entry(obj));
 			renderer_composite_blend(context, obj->blend_mode,
 				active_clip_depth > 0 ? 1 : 0);
 		}

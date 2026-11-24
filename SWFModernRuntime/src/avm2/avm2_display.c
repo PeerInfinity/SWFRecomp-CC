@@ -21214,6 +21214,51 @@ static int avm2_render_blend_shader(Avm2Context* ctx, Avm2Object* obj,
 	return 1;
 }
 
+// s27 w2-layer-alpha-group: blendMode = LAYER as a TRANSPARENCY GROUP (the
+// twin of tag.c's lga_split_entry; Flash Player 32 oracle n3_layer_alpha:
+// overlapping opaque children of a 50% LAYER clip show only the top child,
+// (128,128,255), where the per-child model gives (127,63,191)). When the
+// group is open, the node re-enters with its concatenated alpha MULTIPLIER
+// stripped (parent_cx's and its own), and the composite applies it once.
+// Only a pure multiplier in (0,1): no alpha offset on either side.
+static Avm2Object* g_avm2_lga_strip;   // the node whose OWN alpha is stripped
+
+static int avm2_lga_split(const Avm2Cx* parent_cx, const Avm2DisplayObjectExt* ext,
+                          Avm2Cx* stripped_parent, float* ga)
+{
+	if (parent_cx->add[3] != 0.0f || ext->cx_aa != 0) return 0;
+	float m = parent_cx->mult[3] * ((float) ext->alpha_fixed8 / 256.0f);
+	if (!(m > 0.0f && m < 1.0f)) return 0;
+	*stripped_parent = *parent_cx;
+	stripped_parent->mult[3] = 1.0f;
+	*ga = m;
+	return 1;
+}
+
+// Render `obj` (blend-wrapped) into the open LAYER group, stripped when it
+// splits; returns the group alpha for renderer_set_group_alpha (1 = none).
+static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+                             const Mat* parent_world, double parent_alpha,
+                             const Avm2Cx* parent_cx);
+static float avm2_render_layer_group(Avm2Context* ctx, Avm2Object* obj,
+                                     const Avm2DisplayObjectExt* ext,
+                                     const Mat* parent_world, double parent_alpha,
+                                     const Avm2Cx* parent_cx)
+{
+	Avm2Cx sp;
+	float ga = 1.0f;
+	if (avm2_lga_split(parent_cx, ext, &sp, &ga))
+	{
+		Avm2Object* saved = g_avm2_lga_strip;
+		g_avm2_lga_strip = obj;
+		avm2_render_node(ctx, obj, parent_world, 1.0, &sp);
+		g_avm2_lga_strip = saved;
+		return ga;
+	}
+	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+	return 1.0f;
+}
+
 static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
                              const Mat* parent_world, double parent_alpha,
                              const Avm2Cx* parent_cx)
@@ -21284,11 +21329,17 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 			renderer_suspend_pass(context);
 			renderer_capture_backdrop(context, bm);
 			renderer_begin_offscreen_pass(context);
+			float lga = 1.0f;
 			if (bm == 2) g_avm2_layer_group_depth++;
-			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+			if (bm == 2)   // s27 transparency group
+				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
+					parent_alpha, parent_cx);
+			else
+				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
 			if (bm == 2) g_avm2_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
+			renderer_set_group_alpha(context, lga);
 			// The stencil reference is read from the context inside
 			// composite_blend; the argument is the legacy boolean.
 			renderer_composite_blend(context, bm,
@@ -21301,9 +21352,17 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 			// ALPHA / ERASE node inside a group, or a LAYER nested in a
 			// filter/blend offscreen, renders into its own child layer and
 			// composites once (alpha/erase.wgsl, or premultiplied over).
-			if (bm == 2) g_avm2_layer_group_depth++;
-			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
-			if (bm == 2) g_avm2_layer_group_depth--;
+			float lga = 1.0f;
+			if (bm == 2)
+			{
+				g_avm2_layer_group_depth++;
+				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
+					parent_alpha, parent_cx);   // s27 transparency group
+				g_avm2_layer_group_depth--;
+			}
+			else
+				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+			renderer_set_group_alpha(context, lga);
 			renderer_end_child_layer(context, bm);
 		}
 		else
@@ -21363,7 +21422,10 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 
 	Mat local = ext_matrix(ext);
 	Mat world = mat_mul(parent_world, &local);
-	double alpha = parent_alpha * ((double) ext->alpha_fixed8 / 256.0);
+	// s27: a LAYER group's own alpha is applied at its composite instead.
+	int lga_own = (obj == g_avm2_lga_strip);
+	if (lga_own) g_avm2_lga_strip = NULL;
+	double alpha = parent_alpha * (lga_own ? 1.0 : (double) ext->alpha_fixed8 / 256.0);
 	double saved_render_tz = g_avm2_render_tz;
 	double node_tz = saved_render_tz + ext->render_tz;
 	g_avm2_render_tz = node_tz;
@@ -21376,6 +21438,7 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// and every child re-publishes on entry, so a single global is enough.
 	Avm2Cx own_cx, node_cx;
 	avm2_cx_of_ext(&own_cx, ext);
+	if (lga_own) own_cx.mult[3] = 1.0f;
 	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
 	g_avm2_cur_cx = node_cx;
 

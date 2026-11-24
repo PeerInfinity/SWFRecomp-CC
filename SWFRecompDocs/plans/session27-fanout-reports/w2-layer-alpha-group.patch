@@ -1,0 +1,882 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index f8b8a51a..e4a995b9 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -556,6 +556,11 @@ void render_webgpu_composite_blend(WebGPURenderContext* context, u8 blend_mode,
+ // offscreen as ALPHA (11), ERASE (12) or premultiplied over (anything else).
+ int  render_webgpu_begin_child_layer(WebGPURenderContext* context);
+ void render_webgpu_end_child_layer(WebGPURenderContext* context, u8 blend_mode);
++// s27 w2-layer-alpha-group: a LAYER (2) group's alpha multiplier, applied ONCE
++// to the group texture by the NEXT render_webgpu_composite_blend(.., 2, ..) or
++// render_webgpu_end_child_layer(.., 2) (Flash's transparency group). The value
++// is consumed (reset to 1) by that call, whatever its mode.
++void render_webgpu_set_group_alpha(WebGPURenderContext* context, float group_alpha);
+ int  render_webgpu_begin_nested_filter(WebGPURenderContext* context);   // s26 N1
+ void render_webgpu_end_nested_filter(WebGPURenderContext* context);
+ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index f55c154f..ff29870e 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -79,6 +79,7 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_composite_blend(ctx, m, sr)           render_webgpu_composite_blend(ctx, m, sr)
+ #define renderer_begin_child_layer(ctx)                render_webgpu_begin_child_layer(ctx)
+ #define renderer_end_child_layer(ctx, m)               render_webgpu_end_child_layer(ctx, m)
++#define renderer_set_group_alpha(ctx, ga)              render_webgpu_set_group_alpha(ctx, ga)
+ #define renderer_begin_nested_filter(ctx)              render_webgpu_begin_nested_filter(ctx)
+ #define renderer_end_nested_filter(ctx)                render_webgpu_end_nested_filter(ctx)
+ 
+@@ -150,6 +151,7 @@ typedef FlashbangContext RenderContext;
+ #define renderer_composite_blend(ctx, m, sr)           ((void)0)
+ #define renderer_begin_child_layer(ctx)                (0)
+ #define renderer_end_child_layer(ctx, m)               ((void)0)
++#define renderer_set_group_alpha(ctx, ga)              ((void)0)
+ #define renderer_begin_nested_filter(ctx)              (0)
+ #define renderer_end_nested_filter(ctx)                ((void)0)
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 3ed2e81f..386db36f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -21198,6 +21198,51 @@ static int avm2_render_blend_shader(Avm2Context* ctx, Avm2Object* obj,
+ 	return 1;
+ }
+ 
++// s27 w2-layer-alpha-group: blendMode = LAYER as a TRANSPARENCY GROUP (the
++// twin of tag.c's lga_split_entry; Flash Player 32 oracle n3_layer_alpha:
++// overlapping opaque children of a 50% LAYER clip show only the top child,
++// (128,128,255), where the per-child model gives (127,63,191)). When the
++// group is open, the node re-enters with its concatenated alpha MULTIPLIER
++// stripped (parent_cx's and its own), and the composite applies it once.
++// Only a pure multiplier in (0,1): no alpha offset on either side.
++static Avm2Object* g_avm2_lga_strip;   // the node whose OWN alpha is stripped
++
++static int avm2_lga_split(const Avm2Cx* parent_cx, const Avm2DisplayObjectExt* ext,
++                          Avm2Cx* stripped_parent, float* ga)
++{
++	if (parent_cx->add[3] != 0.0f || ext->cx_aa != 0) return 0;
++	float m = parent_cx->mult[3] * ((float) ext->alpha_fixed8 / 256.0f);
++	if (!(m > 0.0f && m < 1.0f)) return 0;
++	*stripped_parent = *parent_cx;
++	stripped_parent->mult[3] = 1.0f;
++	*ga = m;
++	return 1;
++}
++
++// Render `obj` (blend-wrapped) into the open LAYER group, stripped when it
++// splits; returns the group alpha for renderer_set_group_alpha (1 = none).
++static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
++                             const Mat* parent_world, double parent_alpha,
++                             const Avm2Cx* parent_cx);
++static float avm2_render_layer_group(Avm2Context* ctx, Avm2Object* obj,
++                                     const Avm2DisplayObjectExt* ext,
++                                     const Mat* parent_world, double parent_alpha,
++                                     const Avm2Cx* parent_cx)
++{
++	Avm2Cx sp;
++	float ga = 1.0f;
++	if (avm2_lga_split(parent_cx, ext, &sp, &ga))
++	{
++		Avm2Object* saved = g_avm2_lga_strip;
++		g_avm2_lga_strip = obj;
++		avm2_render_node(ctx, obj, parent_world, 1.0, &sp);
++		g_avm2_lga_strip = saved;
++		return ga;
++	}
++	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++	return 1.0f;
++}
++
+ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+                              const Mat* parent_world, double parent_alpha,
+                              const Avm2Cx* parent_cx)
+@@ -21268,11 +21313,17 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 			renderer_suspend_pass(context);
+ 			renderer_capture_backdrop(context, bm);
+ 			renderer_begin_offscreen_pass(context);
++			float lga = 1.0f;
+ 			if (bm == 2) g_avm2_layer_group_depth++;
+-			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++			if (bm == 2)   // s27 transparency group
++				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
++					parent_alpha, parent_cx);
++			else
++				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+ 			if (bm == 2) g_avm2_layer_group_depth--;
+ 			renderer_end_offscreen_pass(context);
+ 			renderer_resume_pass(context);
++			renderer_set_group_alpha(context, lga);
+ 			// The stencil reference is read from the context inside
+ 			// composite_blend; the argument is the legacy boolean.
+ 			renderer_composite_blend(context, bm,
+@@ -21285,9 +21336,17 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 			// ALPHA / ERASE node inside a group, or a LAYER nested in a
+ 			// filter/blend offscreen, renders into its own child layer and
+ 			// composites once (alpha/erase.wgsl, or premultiplied over).
+-			if (bm == 2) g_avm2_layer_group_depth++;
+-			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+-			if (bm == 2) g_avm2_layer_group_depth--;
++			float lga = 1.0f;
++			if (bm == 2)
++			{
++				g_avm2_layer_group_depth++;
++				lga = avm2_render_layer_group(ctx, obj, ext, parent_world,
++					parent_alpha, parent_cx);   // s27 transparency group
++				g_avm2_layer_group_depth--;
++			}
++			else
++				avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++			renderer_set_group_alpha(context, lga);
+ 			renderer_end_child_layer(context, bm);
+ 		}
+ 		else
+@@ -21347,7 +21406,10 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 
+ 	Mat local = ext_matrix(ext);
+ 	Mat world = mat_mul(parent_world, &local);
+-	double alpha = parent_alpha * ((double) ext->alpha_fixed8 / 256.0);
++	// s27: a LAYER group's own alpha is applied at its composite instead.
++	int lga_own = (obj == g_avm2_lga_strip);
++	if (lga_own) g_avm2_lga_strip = NULL;
++	double alpha = parent_alpha * (lga_own ? 1.0 : (double) ext->alpha_fixed8 / 256.0);
+ 	double saved_render_tz = g_avm2_render_tz;
+ 	double node_tz = saved_render_tz + ext->render_tz;
+ 	g_avm2_render_tz = node_tz;
+@@ -21360,6 +21422,7 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 	// and every child re-publishes on entry, so a single global is enough.
+ 	Avm2Cx own_cx, node_cx;
+ 	avm2_cx_of_ext(&own_cx, ext);
++	if (lga_own) own_cx.mult[3] = 1.0f;
+ 	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
+ 	g_avm2_cur_cx = node_cx;
+ 
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index e742e9d0..cfabdc58 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3022,9 +3022,11 @@ static size_t g_cxform_override_cap;
+ static int g_cxform_override_count;
+ 
+ static int g_attached_cx_cache_n;   // attached_mc_world_cxform slot dedupe
++static void lga_reset(void);
+ static void cxform_overrides_reset(void)
+ {
+ 	g_cxform_override_count = 0;
++	lga_reset();   // s27: the recorded LAYER group alphas pair with these slots
+ 	// Called at both per-frame rewinds of g_next_dynamic_cxform_slot: every
+ 	// cached dynamic slot is about to be reused for other content.
+ 	g_attached_cx_cache_n = 0;
+@@ -3836,6 +3838,90 @@ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
+ 	renderer_write_transform(context, slot, snapped);
+ }
+ 
++// ---------------------------------------------------------------------------
++// s27 w2-layer-alpha-group: blendMode = LAYER as a TRANSPARENCY GROUP.
++// Flash Player 32 (oracle capture flash-oracle-captures/n3_layer_alpha): a
++// LAYER clip at alpha 50% holding two overlapping OPAQUE rects shows only the
++// top rect at the overlap, (128,128,255) — its children are composited
++// opaquely into the group and the alpha is applied ONCE to the group. The
++// per-child model (ours before, and Ruffle's render_base, which pushes the
++// cxform before capturing the blend's commands) gives (127,63,191).
++//
++// compose_children bakes every ancestor's cxform into each leaf's slot, so
++// the split happens here: for a LAYER sprite whose concatenated cxform has a
++// pure alpha MULTIPLIER m in (0,1) (no alpha offset, no colour->alpha terms),
++// its subtree (and its own Drawing-API content, via its cxform_id) is
++// composed with m stripped, and m is recorded for the render arms, which hand
++// it to renderer_set_group_alpha just before the LAYER composite. The RGB rows
++// stay per child: an affine colour map commutes with normal-over.
++//
++// Only where the render arms are certain to open a group: never for a
++// filtered LAYER entry (its filter offscreen is its group, a separate
++// composite) nor anywhere under a filtered or bitmap-cached ancestor (a
++// padded filter capture refuses child layers), and at most two blend-group
++// ancestors deep (the child-layer stack is CHILD_LAYER_MAX = 4).
++// ---------------------------------------------------------------------------
++#define LGA_MAX 128
++static struct { const DisplayObject* obj; float ga; } g_lga[LGA_MAX];
++static int g_lga_n;
++static int g_lga_block;       // > 0 while composing under a filtered ancestor
++static int g_lga_blend_anc;   // blend-mode (> 1) ancestors of the subtree
++
++static void lga_reset(void) { g_lga_n = 0; }
++
++static float lga_for_entry(const DisplayObject* obj)
++{
++	for (int i = g_lga_n - 1; i >= 0; --i)
++		if (g_lga[i].obj == obj) return g_lga[i].ga;
++	return 1.0f;
++}
++
++// `cx` is the entry's concatenated cxform (NULL = identity) and `slot` the GPU
++// slot holding it. On a split, *sub_cx / *sub_slot are rewritten to the
++// alpha-stripped values the subtree composes against, obj->cxform_id is
++// re-pointed at the stripped slot (restored by cxform_overrides_restore), and
++// the multiplier is recorded. Returns 1 on a split.
++static int lga_split_entry(DisplayObject* obj, const float* cx,
++	float stripped[20], const float** sub_cx, u32* sub_slot)
++{
++	if (cx == NULL || obj->blend_mode != 2 || obj_filter_routed(obj)) return 0;
++	if (g_lga_block > 0 || g_lga_blend_anc >= 2 || g_lga_n >= LGA_MAX) return 0;
++	if (cx[3] != 0.0f || cx[7] != 0.0f || cx[11] != 0.0f || cx[19] != 0.0f) return 0;
++	float m = cx[15];
++	if (!(m > 0.0f && m < 1.0f)) return 0;
++	memcpy(stripped, cx, 20 * sizeof(float));
++	stripped[15] = 1.0f;
++	u32 slot = 0;
++	int ident = cx_is_identity(stripped);
++	if (!ident) {
++		if (g_next_dynamic_cxform_slot >= g_cxform_slot_capacity) return 0;
++		slot = g_next_dynamic_cxform_slot++;
++		renderer_write_cxform(context, slot, stripped);
++	}
++	if (obj->cxform_id != slot) {
++		cxform_overrides_push(obj, obj->cxform_id);
++		obj->cxform_id = slot;
++	}
++	g_lga[g_lga_n].obj = obj;
++	g_lga[g_lga_n].ga = m;
++	g_lga_n++;
++	*sub_cx = ident ? NULL : stripped;
++	*sub_slot = slot;
++	return 1;
++}
++
++// Ancestor bookkeeping around a recursive compose of obj's subtree.
++static inline void lga_enter(const DisplayObject* obj)
++{
++	if (obj_filter_routed(obj)) g_lga_block++;
++	if (obj->blend_mode > 1) g_lga_blend_anc++;
++}
++static inline void lga_leave(const DisplayObject* obj)
++{
++	if (obj_filter_routed(obj)) g_lga_block--;
++	if (obj->blend_mode > 1) g_lga_blend_anc--;
++}
++
+ #ifndef NO_GRAPHICS
+ static int attached_mc_local_cxform(float out[20], const MovieClip* mc);
+ #endif
+@@ -4152,9 +4238,18 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 			case CHAR_TYPE_SPRITE:
+ 			{
+ 				if (obj->sprite_display_list != NULL)
++				{
++					// s27: a LAYER sprite's alpha moves to its group composite.
++					const float* sub_cx = child_cx;
++					u32 sub_slot = eff_slot;
++					float lga_cx[20];
++					lga_split_entry(obj, child_cx, lga_cx, &sub_cx, &sub_slot);
++					lga_enter(obj);
+ 					compose_children(app_context,
+ 						obj->sprite_display_list, obj->sprite_max_depth,
+-						composed, child_cx, eff_slot);
++						composed, sub_cx, sub_slot);
++					lga_leave(obj);
++				}
+ 				break;
+ 			}
+ 
+@@ -4200,9 +4295,13 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 				}
+ 
+ 				if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
++				{
++					lga_enter(obj);
+ 					compose_children(app_context,
+ 						obj->sprite_display_list, obj->sprite_max_depth,
+ 						composed, child_cx, eff_slot);
++					lga_leave(obj);
++				}
+ 				break;
+ 			}
+ 
+@@ -5331,6 +5430,8 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 				if (obj->blend_mode == 2) g_layer_group_depth--;
+ 				renderer_end_offscreen_pass(context);
+ 				renderer_resume_pass(context);
++				if (obj->blend_mode == 2)   // s27 transparency group
++					renderer_set_group_alpha(context, lga_for_entry(obj));
+ 				renderer_composite_blend(context, obj->blend_mode,
+ 					active_clip_depth > 0 ? 1 : 0);
+ 				continue;
+@@ -5344,6 +5445,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 				g_layer_group_depth++;
+ 				render_single_object(app_context, obj);
+ 				g_layer_group_depth--;
++				renderer_set_group_alpha(context, lga_for_entry(obj));   // s27
+ 				renderer_end_child_layer(context, 2);
+ 				continue;
+ 			}
+@@ -8693,9 +8795,16 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 				float seed_cx[20];
+ 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+ 					? seed_cx : NULL;
++				// s27: a root LAYER sprite's alpha moves to its group composite.
++				const float* sub_cx = seed;
++				u32 sub_slot = obj->cxform_id;
++				float lga_cx[20];
++				lga_split_entry(obj, seed, lga_cx, &sub_cx, &sub_slot);
++				lga_enter(obj);
+ 				compose_children(app_context,
+ 					obj->sprite_display_list, obj->sprite_max_depth,
+-					sprite_xform, seed, obj->cxform_id);
++					sprite_xform, sub_cx, sub_slot);
++				lga_leave(obj);
+ 			}
+ 		}
+ 		else if (ch->type == CHAR_TYPE_BUTTON)
+@@ -8728,9 +8837,11 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 				float seed_cx[20];
+ 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+ 					? seed_cx : NULL;
++				lga_enter(obj);
+ 				compose_children(app_context,
+ 					obj->sprite_display_list, obj->sprite_max_depth,
+ 					btn_xform, seed, obj->cxform_id);
++				lga_leave(obj);
+ 			}
+ 		}
+ 		else if (ch->type == CHAR_TYPE_TEXT)
+@@ -8870,6 +8981,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			if (obj->blend_mode == 2) g_layer_group_depth--;
+ 			renderer_end_offscreen_pass(context);
+ 			renderer_resume_pass(context);
++			if (obj->blend_mode == 2)   // s27 transparency group
++				renderer_set_group_alpha(context, lga_for_entry(obj));
+ 			renderer_composite_blend(context, obj->blend_mode,
+ 				active_clip_depth > 0 ? 1 : 0);
+ 		} else if (obj_filter_routed(obj)) {
+@@ -8954,9 +9067,11 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			float att_cx[20];
+ 			u32 att_cx_slot = 0;
+ 			int att_has_cx = attached_mc_world_cxform(mc, att_cx, &att_cx_slot);
++			lga_enter(d);
+ 			compose_children(app_context, d->sprite_display_list,
+ 				d->sprite_max_depth, mc_xform,
+ 				att_has_cx ? att_cx : NULL, att_cx_slot);
++			lga_leave(d);
+ 			actionRenderMCDrawingsInlineEntryCx(mc, drawing_render_cb, NULL,
+ 				att_has_cx ? att_cx_slot : 0);
+ 			render_display_list(app_context, d->sprite_display_list,
+@@ -9192,9 +9307,11 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
+ 	float att_cx[20];
+ 	u32 att_cx_slot = 0;
+ 	int att_has_cx = attached_mc_world_cxform(mc, att_cx, &att_cx_slot);
++	lga_enter(d);
+ 	compose_children(app_context, d->sprite_display_list,
+ 		d->sprite_max_depth, mc_xform,
+ 		att_has_cx ? att_cx : NULL, att_cx_slot);
++	lga_leave(d);
+ 	// setMask maskee: dynamic clips with display-list content get the same
+ 	// stencil push/restore as timeline entries (mask defect B).
+ 	MovieClip* avm1_masker = (MovieClip*)actionAvm1MaskerForMC(mc);
+@@ -9739,9 +9856,16 @@ void tagShowFrame(SWFAppContext* app_context)
+ 				float seed_cx[20];
+ 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+ 					? seed_cx : NULL;
++				// s27: a root LAYER sprite's alpha moves to its group composite.
++				const float* sub_cx = seed;
++				u32 sub_slot = obj->cxform_id;
++				float lga_cx[20];
++				lga_split_entry(obj, seed, lga_cx, &sub_cx, &sub_slot);
++				lga_enter(obj);
+ 				compose_children(app_context,
+ 					obj->sprite_display_list, obj->sprite_max_depth,
+-					sprite_xform, seed, obj->cxform_id);
++					sprite_xform, sub_cx, sub_slot);
++				lga_leave(obj);
+ 			}
+ 		}
+ 		else if (ch->type == CHAR_TYPE_BUTTON)
+@@ -9797,9 +9921,11 @@ void tagShowFrame(SWFAppContext* app_context)
+ 				float seed_cx[20];
+ 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+ 					? seed_cx : NULL;
++				lga_enter(obj);
+ 				compose_children(app_context,
+ 					obj->sprite_display_list, obj->sprite_max_depth,
+ 					btn_xform, seed, obj->cxform_id);
++				lga_leave(obj);
+ 			}
+ 		}
+ 		else if (ch->type == CHAR_TYPE_TEXT)
+@@ -9955,6 +10081,8 @@ void tagShowFrame(SWFAppContext* app_context)
+ 			if (obj->blend_mode == 2) g_layer_group_depth--;
+ 			renderer_end_offscreen_pass(context);
+ 			renderer_resume_pass(context);
++			if (obj->blend_mode == 2)   // s27 transparency group
++				renderer_set_group_alpha(context, lga_for_entry(obj));
+ 			renderer_composite_blend(context, obj->blend_mode,
+ 				active_clip_depth > 0 ? 1 : 0);
+ 		}
+diff --git a/SWFModernRuntime/src/rendering/render_stub.c b/SWFModernRuntime/src/rendering/render_stub.c
+index 1a6f8f2a..9b0522af 100644
+--- a/SWFModernRuntime/src/rendering/render_stub.c
++++ b/SWFModernRuntime/src/rendering/render_stub.c
+@@ -82,6 +82,7 @@ void render_webgpu_resume_pass(WebGPURenderContext* c) { (void)c; }
+ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* c) { (void)c; }
+ int  render_webgpu_begin_child_layer(WebGPURenderContext* c) { (void)c; return 0; }
+ void render_webgpu_end_child_layer(WebGPURenderContext* c, u8 m) { (void)c; (void)m; }
++void render_webgpu_set_group_alpha(WebGPURenderContext* c, float ga) { (void)c; (void)ga; }
+ int  render_webgpu_begin_nested_filter(WebGPURenderContext* c) { (void)c; return 0; }
+ void render_webgpu_end_nested_filter(WebGPURenderContext* c) { (void)c; }
+ void render_webgpu_end_offscreen_pass(WebGPURenderContext* c) { (void)c; }
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index df612c5f..90411aa9 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -5501,9 +5501,47 @@ void render_webgpu_capture_backdrop(WebGPURenderContext* ctx, u8 blend_mode)
+ 	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+ }
+ 
++// s27 w2-layer-alpha-group: Flash renders a blendMode = LAYER object as a
++// TRANSPARENCY GROUP: its subtree is composited opaquely into the group, and
++// the object's (concatenated) alpha multiplier is applied ONCE to the group
++// at the composite. Flash Player 32 oracle, n3_layer_alpha: two overlapping
++// opaque rects in a 50% LAYER clip read (128,128,255) at the overlap, the
++// blue alone, where the per-child model (and Ruffle) shows red under blue
++// (127,63,191). tag.c / avm2_display.c strip that multiplier from the
++// subtree's colour transforms and hand it here just before the composite.
++// composite_wgsl's params.w is the group alpha (premultiplied: rgb AND a
++// scale), so the LAYER pipelines' over blend gives dst*(1 - a*ga) + c*ga.
++static float g_group_alpha_pending = 1.0f;
++
++void render_webgpu_set_group_alpha(WebGPURenderContext* ctx, float group_alpha)
++{
++	(void) ctx;
++	g_group_alpha_pending = group_alpha;
++}
++
++// Consume the pending group alpha; returns a value in (0, 1) or 1 (= none).
++static float take_group_alpha(void)
++{
++	float ga = g_group_alpha_pending;
++	g_group_alpha_pending = 1.0f;
++	return (ga > 0.0f && ga < 1.0f) ? ga : 1.0f;
++}
++
++// The params binding for a LAYER composite with group alpha `ga` < 1: its
++// own filter-ring slot (a queue write to the shared, permanently zero
++// blend_params_buf would land on EVERY composite of the frame).
++static void group_alpha_params(WebGPURenderContext* ctx, float ga, WGPUBindGroupEntry* e)
++{
++	float params[8] = { 0.0f, 0.0f, 0.0f, ga, 0.0f, 0.0f, 0.0f, 0.0f };
++	e->buffer = ctx->filter_uniform_ring;
++	e->offset = filter_uniform_push(ctx, params, 32);
++	e->size = 32;
++}
++
+ // Composite the layer in filter_tex_a onto the resumed main pass.
+ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 stencil_ref)
+ {
++	float group_alpha = take_group_alpha();
+ 	if (!ctx->renderer_ok) return;
+ 	render_webgpu_ensure_blend_resources(ctx);
+ 
+@@ -5537,6 +5575,8 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32
+ 		e[2].binding = 2;
+ 		e[2].buffer = ctx->blend_params_buf;
+ 		e[2].size = 32;
++		if (blend_mode == 2 && group_alpha < 1.0f)
++			group_alpha_params(ctx, group_alpha, &e[2]);
+ 		WGPUBindGroupDescriptor bd = {0};
+ 		bd.layout = ctx->composite_bgl;
+ 		bd.entryCount = 3;
+@@ -5734,6 +5774,7 @@ int render_webgpu_begin_child_layer(WebGPURenderContext* ctx)
+ 
+ void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
+ {
++	float group_alpha = take_group_alpha();
+ 	if (!ctx->renderer_ok || ctx->child_layer_open <= 0) return;
+ 	int level = --ctx->child_layer_open;
+ 	render_webgpu_end_offscreen_pass(ctx);      // offscreen_depth -> parent; un-parks clip
+@@ -5775,14 +5816,23 @@ void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
+ 	e[2].binding = 2;
+ 	e[2].buffer = ctx->blend_params_buf;
+ 	e[2].size = 32;
++	// s27: a LAYER child layer with group alpha composites through
++	// blend_layer_pipeline[2] (composite_wgsl, which reads params.w): the
++	// same premultiplied-over blend, layout and stencil as child_layer_over.
++	WGPURenderPipeline pl = ctx->child_layer_pipeline[k];
++	if (k == 2 && group_alpha < 1.0f && ctx->blend_layer_pipeline[2] != NULL)
++	{
++		group_alpha_params(ctx, group_alpha, &e[2]);
++		pl = ctx->blend_layer_pipeline[2];
++	}
+ 	WGPUBindGroupDescriptor bd = {0};
+ 	bd.layout = ctx->composite_bgl;
+ 	bd.entryCount = 3;
+ 	bd.entries = e;
+ 	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bd);
+-	if (bg != NULL && ctx->child_layer_pipeline[k] != NULL)
++	if (bg != NULL && pl != NULL)
+ 	{
+-		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->child_layer_pipeline[k]);
++		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, pl);
+ 		wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
+ 		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+ 		wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 8a13378e..57543c8c 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -736,3 +736,9 @@ regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased
+ # s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
+ # tier=1
+ regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp
++
++# s27 w2-layer-alpha-group: LAYER clip alpha as a transparency group (alpha applied
++# once at the group composite; Flash Player 32 golden). Covers the composite-time
++# group alpha in render_webgpu.c (root composite_blend + nested end_child_layer).
++regression/layer_group_alpha_transparency          # AVM1, Flash golden (tol 1)        1 cmp
++regression/avm2_layer_group_alpha_transparency     # AVM2 twin, Flash golden (tol 1)   1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/create_test_swf.py
+new file mode 100755
+index 00000000..b8dc23f6
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/create_test_swf.py
+@@ -0,0 +1,127 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for layer_group_alpha_transparency (AVM1) and its AVM2
++twin avm2_layer_group_alpha_transparency (s27 w2-layer-alpha-group).
++
++Pins down: a blendMode = LAYER clip is a TRANSPARENCY GROUP. Its children
++composite opaquely into the group and the clip's alpha applies ONCE to the
++group (Flash "forces the creation of a transparency group ... precomposed in a
++temporary buffer"). Static timeline, no scripts, SWF 10, 200x150, white:
++  root depth 1 = sprite 10, PlaceObject3 cxform alpha mult 128/256, blend = layer
++    sprite 10 depth 1 = shape 1, opaque red rect (20,20)-(100,80)
++    sprite 10 depth 2 = shape 2, opaque blue rect (60,40)-(140,110)
++At the overlap (e.g. (80,50)) Flash shows blue only: (128,128,255). The
++per-child model (and Ruffle, whose render_base pushes the cxform before
++capturing the blend's commands) shows red under blue: (127,63,191).
++
++The SWF is byte-identical to the s26 probe
++SWFRecompDocs/plans/session26-fanout-reports/w1-pixel-layer-colour-fixtures/probes/n3_layer_alpha.swf
++(generator: mkprobes.py there, `n3(2)`).
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) capture of that probe at quality
++HIGH (SWFRecompDocs/plans/flash-oracle-captures/n3_layer_alpha/flash.high.png;
++screen == draw(), and flash.low.png is identical: no edge is fractional). The
++AVM2 twin uses the same golden: a script-free timeline renders the same under
++both VMs (the twin adds FileAttributes.ActionScript3 and a minimal DoABC, the
++avm2_layer_group_overlap_alpha recipe, so the placements reach avm2_display.c).
++
++Usage: create_test_swf.py [avm1|avm2]   (default: from the directory name)
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++# ---------------- AVM1 helpers (from s25 mkdyn2.py) ----------------
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def build(variant):
++    tags = [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)]),
++            place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 128)), blend=2)]
++    if variant == "avm2":
++        t = [tag(69, bytes([0x08, 0, 0, 0])), tag(9, bytes((255, 255, 255))), DOABC]
++        t += tags + [tag(1, b''), tag(0, b'')]
++        body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++        return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++    return movie(tags)
++
++if __name__ == "__main__":
++    v = sys.argv[1] if len(sys.argv) > 1 else ("avm2" if HERE.name.startswith("avm2_") else "avm1")
++    (HERE / "test.swf").write_bytes(build(v))
++    print("wrote", HERE / "test.swf", v)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/output.expected.png b/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2ded5b2850eef19e40acef89dd4dcf01134c6c9
+GIT binary patch
+literal 384
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2NRGK*%#o)z`*G4>EaktaqI0JN3H`3JPeMy
+z|Ezy}`oi5hrK|Lr-n0!*Lf*{0`5<??pn^_I>jsAi4(`Op4FY0^m=YCrT38P`0R@2K
+z0%BKsFTJ!pKP#*yDF?qoj_&t8vi4QmB1%6BS^vw*PX?NU&tRa1iaJ0Gog#3#;7`Qc
+yx!)~b?=2-{GlogsxnIwiu#&6|GYIDGW^78})!gbnZ7MKi89ZJ6T-G@yGywpXhl1Du
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/output.txt b/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/test.swf b/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..841ba77cae6acc4c2df8f6f9fe3b256c5e9a8ce3
+GIT binary patch
+literal 192
+zcmZ<@59T_+z`&5fAn(AydWV5Qj*-DdkOL^<%=G{N|79YKKqi9#gC2+i0Wcp-F)}a$
+z5%UEDcLoLp4n~HA6Lt+JjDQOMGXRkQuTQh$ixj>o8(z%en;pQQ#KFXnsU!Nph{XqN
+z#($8K&V&@XHiwtteVqqhu4rJm!^s7d>kwoEl8g*YU=|aQW@2yv+T1V5$Hd6M1>|Ki
+KI0yhmL4p7Z@+5fx
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/test.toml b/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/test.toml
+new file mode 100644
+index 00000000..f3c9a68a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_layer_group_alpha_transparency/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }
+diff --git a/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/create_test_swf.py b/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/create_test_swf.py
+new file mode 100755
+index 00000000..b8dc23f6
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/create_test_swf.py
+@@ -0,0 +1,127 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf for layer_group_alpha_transparency (AVM1) and its AVM2
++twin avm2_layer_group_alpha_transparency (s27 w2-layer-alpha-group).
++
++Pins down: a blendMode = LAYER clip is a TRANSPARENCY GROUP. Its children
++composite opaquely into the group and the clip's alpha applies ONCE to the
++group (Flash "forces the creation of a transparency group ... precomposed in a
++temporary buffer"). Static timeline, no scripts, SWF 10, 200x150, white:
++  root depth 1 = sprite 10, PlaceObject3 cxform alpha mult 128/256, blend = layer
++    sprite 10 depth 1 = shape 1, opaque red rect (20,20)-(100,80)
++    sprite 10 depth 2 = shape 2, opaque blue rect (60,40)-(140,110)
++At the overlap (e.g. (80,50)) Flash shows blue only: (128,128,255). The
++per-child model (and Ruffle, whose render_base pushes the cxform before
++capturing the blend's commands) shows red under blue: (127,63,191).
++
++The SWF is byte-identical to the s26 probe
++SWFRecompDocs/plans/session26-fanout-reports/w1-pixel-layer-colour-fixtures/probes/n3_layer_alpha.swf
++(generator: mkprobes.py there, `n3(2)`).
++
++GOLDEN = Flash Player 32 (LNX 32,0,0,465) capture of that probe at quality
++HIGH (SWFRecompDocs/plans/flash-oracle-captures/n3_layer_alpha/flash.high.png;
++screen == draw(), and flash.low.png is identical: no edge is fractional). The
++AVM2 twin uses the same golden: a script-free timeline renders the same under
++both VMs (the twin adds FileAttributes.ActionScript3 and a minimal DoABC, the
++avm2_layer_group_overlap_alpha recipe, so the placements reach avm2_display.c).
++
++Usage: create_test_swf.py [avm1|avm2]   (default: from the directory name)
++"""
++import pathlib, struct, sys
++HERE = pathlib.Path(__file__).resolve().parent
++
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty, sx=None, sy=None):
++    b = Bits()
++    if sx is not None:
++        b.u(1, 1); A = int(sx * 65536); D = int(sy * 65536); n = nbits(A, D); b.u(n, 5); b.u(A, n); b.u(D, n)
++    else: b.u(0, 1)
++    b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def cxform_alpha(mult=None, add=None):
++    # mult/add: 4-tuples (r,g,b,a), mult in 8.8 (256 = 1.0)
++    b = Bits(); b.u(1 if add else 0, 1); b.u(1 if mult else 0, 1)
++    vals = list(mult or ()) + list(add or ())
++    n = max(nbits(*vals), 2) if vals else 1; b.u(n, 4)
++    for v in vals: b.u(v, n)
++    return b.bytes()
++def shape(cid, rects, rgba):
++    """DefineShape3 with one solid RGBA fill and one or more rects (px, may be fractional)."""
++    T = lambda v: int(round(v * 20))
++    xs = [T(r[0]) for r in rects] + [T(r[0] + r[2]) for r in rects]
++    ys = [T(r[1]) for r in rects] + [T(r[1] + r[3]) for r in rects]
++    body = struct.pack('<H', cid) + rectrec(min(xs), max(xs), min(ys), max(ys))
++    body += b'\x01\x00' + bytes(rgba) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    first = True
++    for (x, y, w, h) in rects:
++        X, Y, W, H = T(x), T(y), T(w), T(h)
++        b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1 if first else 0, 1); b.u(1, 1)
++        n = nbits(X, Y); b.u(n, 5); b.u(X, n); b.u(Y, n)
++        if first: b.u(1, 1)
++        first = False
++        for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++            n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++            if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++            else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(32, body + b.bytes())
++def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, name=None, sx=None, sy=None):
++    f1 = 0x02 | 0x04 | (0x08 if cx else 0) | (0x20 if name else 0)
++    f2 = (0x01 if filters else 0) | (0x02 if blend else 0)
++    body = bytes([f1, f2]) + struct.pack('<HH', depth, cid) + matrix(int(tx * 20), int(ty * 20), sx, sy)
++    if cx: body += cx
++    if name: body += name.encode() + b'\0'
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    if blend: body += bytes([blend])
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++def movie(tags, w=200, h=150, bg=(255, 255, 255), ver=10):
++    t = [tag(69, bytes([0, 0, 0, 0])), tag(9, bytes(bg))] + tags + [tag(1, b''), tag(0, b'')]
++    body = rectrec(0, w * 20, 0, h * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++    return b'FWS' + bytes([ver]) + struct.pack('<I', 8 + len(body)) + body
++
++# ---------------- AVM1 helpers (from s25 mkdyn2.py) ----------------
++
++RED = (255, 0, 0, 255); BLUE = (0, 0, 255, 255)
++
++# minor 16, major 46; empty constant pool; 1 method (init: getlocal0 /
++# pushscope / returnvoid), 1 script, no classes (avm2_layer_group_alpha).
++ABC = (struct.pack("<HH", 16, 46) + bytes(7)
++       + bytes([1, 0, 0, 0, 0]) + bytes([0]) + bytes([0])
++       + bytes([1, 0, 0])
++       + bytes([1, 0, 1, 1, 0, 1, 3, 0xD0, 0x30, 0x47, 0, 0]))
++DOABC = tag(82, struct.pack("<I", 1) + b"\0" + ABC)
++
++def build(variant):
++    tags = [shape(1, [(20, 20, 80, 60)], RED), shape(2, [(60, 40, 80, 70)], BLUE),
++            sprite(10, [place3(1, 1), place3(2, 2)]),
++            place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 128)), blend=2)]
++    if variant == "avm2":
++        t = [tag(69, bytes([0x08, 0, 0, 0])), tag(9, bytes((255, 255, 255))), DOABC]
++        t += tags + [tag(1, b''), tag(0, b'')]
++        body = rectrec(0, 200 * 20, 0, 150 * 20) + struct.pack('<BBH', 0, 30, 1) + b''.join(t)
++        return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++    return movie(tags)
++
++if __name__ == "__main__":
++    v = sys.argv[1] if len(sys.argv) > 1 else ("avm2" if HERE.name.startswith("avm2_") else "avm1")
++    (HERE / "test.swf").write_bytes(build(v))
++    print("wrote", HERE / "test.swf", v)
+diff --git a/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/output.expected.png b/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2ded5b2850eef19e40acef89dd4dcf01134c6c9
+GIT binary patch
+literal 384
+zcmeAS@N?(olHy`uVBq!ia0vp^CxCbw2NRGK*%#o)z`*G4>EaktaqI0JN3H`3JPeMy
+z|Ezy}`oi5hrK|Lr-n0!*Lf*{0`5<??pn^_I>jsAi4(`Op4FY0^m=YCrT38P`0R@2K
+z0%BKsFTJ!pKP#*yDF?qoj_&t8vi4QmB1%6BS^vw*PX?NU&tRa1iaJ0Gog#3#;7`Qc
+yx!)~b?=2-{GlogsxnIwiu#&6|GYIDGW^78})!gbnZ7MKi89ZJ6T-G@yGywpXhl1Du
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/output.txt b/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/test.swf b/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..8d54a5aea44f79040929c0a129ea7554840cfbeb
+GIT binary patch
+literal 152
+zcmZ<@59XS|z`&5fAn(AydWV5Qj*-Dd5GcUl%=G{Ne+3RkhJ+J#4JV8k7#aRE0FeN%
+zPqX5S6uv1NUd-W}9l)T(!NicMBl^II#RsSar~;&<Ga*H;&EaKuU+00BD;gN?aB>0V
+mIt1B(BqIY8n8gI7nHU^^I{F3qm>3zjfV@lw2LYfcNDu&%CL#a;
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/test.toml b/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/test.toml
+new file mode 100644
+index 00000000..f3c9a68a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/layer_group_alpha_transparency/test.toml
+@@ -0,0 +1,7 @@
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 1
++
++[player_options]
++with_renderer = { optional = false, quality = "high" }

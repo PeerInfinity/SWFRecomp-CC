@@ -5501,9 +5501,47 @@ void render_webgpu_capture_backdrop(WebGPURenderContext* ctx, u8 blend_mode)
 	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
 }
 
+// s27 w2-layer-alpha-group: Flash renders a blendMode = LAYER object as a
+// TRANSPARENCY GROUP: its subtree is composited opaquely into the group, and
+// the object's (concatenated) alpha multiplier is applied ONCE to the group
+// at the composite. Flash Player 32 oracle, n3_layer_alpha: two overlapping
+// opaque rects in a 50% LAYER clip read (128,128,255) at the overlap, the
+// blue alone, where the per-child model (and Ruffle) shows red under blue
+// (127,63,191). tag.c / avm2_display.c strip that multiplier from the
+// subtree's colour transforms and hand it here just before the composite.
+// composite_wgsl's params.w is the group alpha (premultiplied: rgb AND a
+// scale), so the LAYER pipelines' over blend gives dst*(1 - a*ga) + c*ga.
+static float g_group_alpha_pending = 1.0f;
+
+void render_webgpu_set_group_alpha(WebGPURenderContext* ctx, float group_alpha)
+{
+	(void) ctx;
+	g_group_alpha_pending = group_alpha;
+}
+
+// Consume the pending group alpha; returns a value in (0, 1) or 1 (= none).
+static float take_group_alpha(void)
+{
+	float ga = g_group_alpha_pending;
+	g_group_alpha_pending = 1.0f;
+	return (ga > 0.0f && ga < 1.0f) ? ga : 1.0f;
+}
+
+// The params binding for a LAYER composite with group alpha `ga` < 1: its
+// own filter-ring slot (a queue write to the shared, permanently zero
+// blend_params_buf would land on EVERY composite of the frame).
+static void group_alpha_params(WebGPURenderContext* ctx, float ga, WGPUBindGroupEntry* e)
+{
+	float params[8] = { 0.0f, 0.0f, 0.0f, ga, 0.0f, 0.0f, 0.0f, 0.0f };
+	e->buffer = ctx->filter_uniform_ring;
+	e->offset = filter_uniform_push(ctx, params, 32);
+	e->size = 32;
+}
+
 // Composite the layer in filter_tex_a onto the resumed main pass.
 void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 stencil_ref)
 {
+	float group_alpha = take_group_alpha();
 	if (!ctx->renderer_ok) return;
 	render_webgpu_ensure_blend_resources(ctx);
 
@@ -5537,6 +5575,8 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 
 		e[2].binding = 2;
 		e[2].buffer = ctx->blend_params_buf;
 		e[2].size = 32;
+		if (blend_mode == 2 && group_alpha < 1.0f)
+			group_alpha_params(ctx, group_alpha, &e[2]);
 		WGPUBindGroupDescriptor bd = {0};
 		bd.layout = ctx->composite_bgl;
 		bd.entryCount = 3;
@@ -5734,6 +5774,7 @@ int render_webgpu_begin_child_layer(WebGPURenderContext* ctx)
 
 void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
 {
+	float group_alpha = take_group_alpha();
 	if (!ctx->renderer_ok || ctx->child_layer_open <= 0) return;
 	int level = --ctx->child_layer_open;
 	render_webgpu_end_offscreen_pass(ctx);      // offscreen_depth -> parent; un-parks clip
@@ -5775,14 +5816,23 @@ void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
 	e[2].binding = 2;
 	e[2].buffer = ctx->blend_params_buf;
 	e[2].size = 32;
+	// s27: a LAYER child layer with group alpha composites through
+	// blend_layer_pipeline[2] (composite_wgsl, which reads params.w): the
+	// same premultiplied-over blend, layout and stencil as child_layer_over.
+	WGPURenderPipeline pl = ctx->child_layer_pipeline[k];
+	if (k == 2 && group_alpha < 1.0f && ctx->blend_layer_pipeline[2] != NULL)
+	{
+		group_alpha_params(ctx, group_alpha, &e[2]);
+		pl = ctx->blend_layer_pipeline[2];
+	}
 	WGPUBindGroupDescriptor bd = {0};
 	bd.layout = ctx->composite_bgl;
 	bd.entryCount = 3;
 	bd.entries = e;
 	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bd);
-	if (bg != NULL && ctx->child_layer_pipeline[k] != NULL)
+	if (bg != NULL && pl != NULL)
 	{
-		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->child_layer_pipeline[k]);
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, pl);
 		wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
 		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
 		wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);

@@ -736,3 +736,9 @@ regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased 
 # s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
 # tier=1
 regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp
+
+# s27 w2-layer-alpha-group: LAYER clip alpha as a transparency group (alpha applied
+# once at the group composite; Flash Player 32 golden). Covers the composite-time
+# group alpha in render_webgpu.c (root composite_blend + nested end_child_layer).
+regression/layer_group_alpha_transparency          # AVM1, Flash golden (tol 1)        1 cmp
+regression/avm2_layer_group_alpha_transparency     # AVM2 twin, Flash golden (tol 1)   1 cmp

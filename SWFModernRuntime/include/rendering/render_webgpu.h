@@ -556,6 +556,11 @@ void render_webgpu_composite_blend(WebGPURenderContext* context, u8 blend_mode, 
 // offscreen as ALPHA (11), ERASE (12) or premultiplied over (anything else).
 int  render_webgpu_begin_child_layer(WebGPURenderContext* context);
 void render_webgpu_end_child_layer(WebGPURenderContext* context, u8 blend_mode);
+// s27 w2-layer-alpha-group: a LAYER (2) group's alpha multiplier, applied ONCE
+// to the group texture by the NEXT render_webgpu_composite_blend(.., 2, ..) or
+// render_webgpu_end_child_layer(.., 2) (Flash's transparency group). The value
+// is consumed (reset to 1) by that call, whatever its mode.
+void render_webgpu_set_group_alpha(WebGPURenderContext* context, float group_alpha);
 int  render_webgpu_begin_nested_filter(WebGPURenderContext* context);   // s26 N1
 void render_webgpu_end_nested_filter(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
