@@ -30,7 +30,8 @@ Upstream `3e98d9ba6..1e604fa87` (14 commits) → w1-drift.
 |---|---|---|---|
 | w2-layer-alpha-group | Flash capture n3_layer_alpha | fixtures (Flash golden); priced Ruffle-golden losses | session_018CoDi4H4DqA4qwhbCgk45g |
 | w2-flash-filter-kernels | Flash captures glow_kernels/draw_filtered | 2 fixtures (Flash trace) | session_018CoDi5rf6MrkHLk3QibWyX |
-| w2-jpeg-flash-decode | w1-drift lead 1 | headroom on 2 Flash-golden rows | session_018CoDi66FA1hXSXXAwLB8kW |
+| w2-jpeg-flash-decode | w1-drift lead 1 | headroom on 2 Flash-golden rows | session_018CoDi66FA1hXSXXAwLB8kW — DELIVERED, HELD: IJG v7+ model bit-exact on clone, 27 on dithering, +1 getpixel; but Flash 32 BitmapDataDraw = 82944 (stb flat) contradicts → w2b-jpeg-refine |
+| w2b-jpeg-refine | w2-jpeg-flash-decode + Flash oracles | refined decoder or NO-GO | session_018CoDi3cn6pb1EqGj5vDUvC |
 | w2-allow-networking-subtests | w1-drift §3 | NEW subtest rows | session_018CoDi4rozCuYyCVd6iWznD — DELIVERED, LANDED `d37ca69b5` (+8 NEW trace rows, all pass both modes) |
 | w2-draw-cx-text | w1-text-glyph-fidelity §4 | 2 fixtures (Flash trace) | session_018CoDi5MC3ifTEYbRy5fxSf |
 | w2-applyfilter-cm | w1-applyfilter-tail items 3, 5 | 3 CM fixtures (Flash PNG) | session_018CoDi4dFuVDgVxQdWMdvo7 |
