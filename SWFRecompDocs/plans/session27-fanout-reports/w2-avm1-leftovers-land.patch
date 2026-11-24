@@ -1,0 +1,3636 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index c8ee21284..e1cbb988c 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -9291,10 +9291,18 @@ static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, A
+ // Returns ASFunction* if a callable __resolve is found, NULL otherwise.
+ // Semantics: FUNCTION type → return it; OBJECT type → block (return NULL, sets *blocked=1);
+ // all other types (number, string, movieclip, etc.) → skip, continue up chain.
++// s27 w2 (item 3): set while a GetVariable/SetVariable path string walks its
++// TARGET segments. Flash 32 never calls __resolve there: `o.b.c` with no `b`
++// reads undefined without __resolve("b"), and SetVariable "o.w.c" does not
++// resolve `w`; only GetVariable's FINAL segment (`o.zz`) resolves (regression
++// avm1_resolve_dotted_getvariable). Ruffle resolves the intermediates.
++int g_path_walk_no_resolve = 0;
++
+ static ASFunction* findResolveMethod(SWFAppContext* app_context, ASObject* obj)
+ {
+ 	ASObject* current = obj;
+ 	int max_depth = 256;
++	if (g_path_walk_no_resolve) return NULL;
+ 
+ 	for (int depth = 0; depth < max_depth && current != NULL; depth++)
+ 	{
+@@ -23810,6 +23818,96 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
+ // targets this property name. Mirrors Ruffle's
+ // `notify_property_change` (core/src/avm1/object/stage_object.rs:63).
+ // Returns the number of bindings notified (0 if none).
++// s27 w1-avm1-leftovers (item 2): EditText `variable` paths. Ruffle
++// resolve_variable_path splits at the RIGHT-MOST ':' or '.' (path.rfind(":."),
++// any SWF version): "_root.mc:foo" is target "_root.mc", variable "foo"; a
++// name with neither is a plain variable on the parent.
++static const char* tfVarPathSep(const char* var_name)
++{
++	const char* sep = NULL;
++	for (const char* p = var_name; *p; p++)
++		if (*p == '.' || *p == ':') sep = p;
++	return sep;
++}
++
++// The clip a field's variable resolves from: its parent, climbed past AVM1
++// buttons (Ruffle try_bind_text_field_variable runs resolve_variable_path in a
++// child frame for that parent), never the context that happens to be current
++// (a placing timeline, a retry from any clip's frame, an input handler).
++static MovieClip* tfVarScopeClip(MovieClip* tf_mc)
++{
++	extern MovieClip root_movieclip;
++	MovieClip* p = (tf_mc != NULL && tf_mc->parent != NULL) ? tf_mc->parent : &root_movieclip;
++	while (p->is_button_mc && p->parent != NULL) p = p->parent;
++	return p;
++}
++
++// s27 w2 (2b): walk a clip-only target path ("mc", "_root.s.mc", "_parent")
++// over the live display list from `scope`. A field placed in the SAME frame as
++// its target clip binds during the parent's construction, when GetVariable
++// "mc" (context = parent) does not find the parent's already-placed child and
++// materializes a ghost clip instead (Flash 32 binds to the real child:
++// regression avm1_edittext_path_variable_same_frame). Returns NULL when any
++// segment is not a clip child, so the caller keeps the GetVariable route.
++static MovieClip* tfVarWalkClipPath(MovieClip* scope, const char* path, u32 len)
++{
++	extern MovieClip root_movieclip;
++	MovieClip* cur = scope;
++	u32 i = 0;
++	int first = 1;
++	int ci = (g_swf_version <= 6);
++	while (i < len) {
++		u32 j = i;
++		while (j < len && path[j] != '.' && path[j] != ':') j++;
++		u32 sl = j - i;
++		const char* sg = path + i;
++		if (sl == 0) return NULL;
++		if (first && sl == 5 && strncmp(sg, "_root", 5) == 0) cur = &root_movieclip;
++		else if (first && sl == 4 && strncmp(sg, "this", 4) == 0) { /* cur = scope */ }
++		else if (sl == 7 && strncmp(sg, "_parent", 7) == 0) {
++			if (cur->parent == NULL) return NULL;
++			cur = cur->parent;
++		} else if (sg[0] == '_') {
++			return NULL;   // _levelN, _global, ...: leave to GetVariable
++		} else {
++			MovieClip* hit = NULL;
++			for (int k = 0; k < child_mc_count; k++) {
++				MovieClip* c = child_mc_cache[k];
++				if (c == NULL || c->parent != cur || c->avm1_removed || c->pending_removal || strlen(c->name) != sl) continue;
++				if (ci ? strncasecmp(c->name, sg, sl) == 0 : strncmp(c->name, sg, sl) == 0) {
++					if (hit == NULL || c->depth < hit->depth) hit = c;
++				}
++			}
++			if (hit == NULL) return NULL;
++			cur = hit;
++		}
++		first = 0;
++		i = j + 1;
++	}
++	return cur;
++}
++
++// GetVariable of the target part of a path variable, from the field's scope.
++static void tfVarResolveTarget(SWFAppContext* app_context, MovieClip* tf_mc,
++	const char* var_name, u32 target_len, ActionVar* out)
++{
++	MovieClip* scope = tfVarScopeClip(tf_mc);
++	MovieClip* walked = tfVarWalkClipPath(scope, var_name, target_len);
++	if (walked != NULL) {
++		memset(out, 0, sizeof(*out));
++		out->type = ACTION_STACK_VALUE_MOVIECLIP;
++		out->data.numeric_value = (u64)(uintptr_t)walked;
++		return;
++	}
++	MovieClip* saved = g_current_context;
++	if (scope != saved) actionSetCurrentContext(scope);
++	PUSH_STR(var_name, target_len);
++	actionGetVariable(app_context);
++	peekVar(app_context, out);
++	POP();
++	if (scope != saved) actionSetCurrentContext(saved);
++}
++
+ int actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
+ 	const char* prop_name, u32 prop_name_len, ActionVar* value)
+ {
+@@ -23843,7 +23941,7 @@ int actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
+ 		// with the whole name. Either way the registry's variable_name
+ 		// is the property we care about.
+ 		const char* match_name = b->variable_name;
+-		const char* last_dot = strrchr(match_name, '.');
++		const char* last_dot = tfVarPathSep(match_name); // s27 item 2: ':' too
+ 		if (last_dot != NULL) match_name = last_dot + 1;
+ 		size_t match_len = strlen(match_name);
+ 		if (match_len != prop_name_len) continue;
+@@ -23948,7 +24046,7 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
+ 	ASObject* container = NULL;
+ 	const char* prop_name = NULL;
+ 	u32 prop_name_len = 0;
+-	int is_path = (strchr(var_name, '.') != NULL);
++	int is_path = (tfVarPathSep(var_name) != NULL); // s27 item 2: ':' too
+ 	MovieClip* simple_binding_mc = NULL;  // for simple-name → also mirror to global var_map if root
+ 	// Phase C: track the container MC (when resolvable to an MC) for binding
+ 	// registration after a successful bind. NULL when the container is a
+@@ -23956,30 +24054,18 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
+ 	MovieClip* binding_container_mc = NULL;
+ 
+ 	if (is_path) {
+-		const char* last_dot = strrchr(var_name, '.');
++		const char* last_dot = tfVarPathSep(var_name);
+ 		u32 container_path_len = (u32)(last_dot - var_name);
+ 		prop_name = last_dot + 1;
+ 		prop_name_len = (u32)strlen(prop_name);
+ 
+ 		// Ruffle resolve_variable_path(parent, path): a path resolves from
+-		// the field's parent, climbed past AVM1 buttons as in the simple
+-		// branch below, not from whatever context is current (the button
+-		// clip while its state function places the field).
+-		// regression avm1_button_textfield_path_binding.
+-		MovieClip* path_scope = NULL;
+-		if (tf_mc->parent != NULL && tf_mc->parent->is_button_mc) {
+-			path_scope = tf_mc->parent;
+-			while (path_scope->is_button_mc && path_scope->parent != NULL)
+-				path_scope = path_scope->parent;
+-		}
+-		MovieClip* path_saved_ctx = g_current_context;
+-		if (path_scope != NULL) actionSetCurrentContext(path_scope);
+-		PUSH_STR(var_name, container_path_len);
+-		actionGetVariable(app_context);
++		// the field's parent (climbed past AVM1 buttons), not from whatever
++		// context is current. regression avm1_button_textfield_path_binding;
++		// s27 item 2: every field, not only button children (also the
++		// actionRetryUnboundTextFields retry, which runs from any clip).
+ 		ActionVar cvar;
+-		peekVar(app_context, &cvar);
+-		POP();
+-		if (path_scope != NULL) actionSetCurrentContext(path_saved_ctx);
++		tfVarResolveTarget(app_context, tf_mc, var_name, container_path_len, &cvar);
+ 
+ 		if (cvar.type == ACTION_STACK_VALUE_OBJECT) {
+ 			container = (ASObject*) VAL(u64, &cvar.data.numeric_value);
+@@ -24012,7 +24098,11 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
+ 
+ 	if (container == NULL) return 0;
+ 
+-	if (!set_initial_value) return 1;  // retry path — binding resolved, done.
++	// Retry path — binding resolved, done. s27 w2: Flash refutes Ruffle's
++	// late registration here (Flash 32: a field whose target clip appears
++	// later never sees later writes; regression
++	// avm1_edittext_path_variable_scope, `s.t5.text=L`).
++	if (!set_initial_value) return 1;
+ 
+ 	// Set-initial-value direction: variable wins if defined; otherwise TF.text
+ 	// seeds the variable.
+@@ -30667,23 +30757,18 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
+ 	const char* var_name = _vn_buf;
+ 	if (var_name[0] == '\0') return;
+ 
+-	// Handle dot-path variables (e.g., "obj.theVar")
+-	const char* dot = strchr(var_name, '.');
++	// Handle path variables (e.g., "obj.theVar", "_root.mc:theVar").
++	// s27 item 2: split at the right-most ':' or '.', resolve the target from
++	// the field's parent scope (Ruffle propagate_text_binding ->
++	// resolve_variable_path(parent, ..)).
++	const char* dot = tfVarPathSep(var_name);
+ 	if (dot != NULL) {
+-		// For path variables, resolve the path and set the property
+ 		const char* last_dot = dot;
+-		for (const char* p = dot + 1; *p; p++) {
+-			if (*p == '.') last_dot = p;
+-		}
+ 		u32 container_len = (u32)(last_dot - var_name);
+ 		const char* final_prop = last_dot + 1;
+ 		u32 final_prop_len = strlen(final_prop);
+-		// Resolve container
+-		PUSH_STR(var_name, container_len);
+-		actionGetVariable(app_context);
+ 		ActionVar container_var;
+-		peekVar(app_context, &container_var);
+-		POP();
++		tfVarResolveTarget(app_context, mc, var_name, container_len, &container_var);
+ 		int container_resolved = 0;
+ 		if (container_var.type == ACTION_STACK_VALUE_MOVIECLIP) {
+ 			MovieClip* target_mc = (MovieClip*) VAL(u64, &container_var.data.numeric_value);
+@@ -49418,6 +49503,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
+ 					int first_seg = 1;
+ 					int walk_ok = 1;
+ 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
++					int _pw_nr_saved = g_path_walk_no_resolve; g_path_walk_no_resolve = 1; // s27 w2 item 3: no __resolve on target segments
+ 					while (tp_remaining > 0 && walk_ok)
+ 					{
+ 						while (tp_remaining > 0 && *tp == ':') { tp++; tp_remaining--; }
+@@ -49483,6 +49569,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
+ 						tp_remaining -= seg_len;
+ 						if (tp_remaining > 0) { tp++; tp_remaining--; }
+ 					}
++					g_path_walk_no_resolve = _pw_nr_saved;
+ 					if (walk_ok && STACK_TOP_TYPE != ACTION_STACK_VALUE_UNDEFINED &&
+ 					    STACK_TOP_TYPE != ACTION_STACK_VALUE_NULL) {
+ 						PUSH_STR(prop_name, prop_len);
+@@ -49743,6 +49830,8 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
+ 					extern int g_path_walk_level0_undef;
+ 					int _saved_pw_lvl = g_path_walk_level0_undef;
+ 					g_path_walk_level0_undef = 1;
++					int _saved_pw_nr = g_path_walk_no_resolve;
++					g_path_walk_no_resolve = 1; // s27 w2 item 3
+ 					while (rest_len > 0) {
+ 						const char* next_sep = NULL;
+ 						for (u32 ri = 0; ri < rest_len; ri++) {
+@@ -49757,6 +49846,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
+ 						else { rest_len = 0; }
+ 					}
+ 					g_path_walk_level0_undef = _saved_pw_lvl;
++					g_path_walk_no_resolve = _saved_pw_nr;
+ 				}
+ 				if (prop_len > 0) {
+ 					PUSH_STR(prop_name, prop_len);
+@@ -51326,6 +51416,7 @@ void actionSetVariable(SWFAppContext* app_context)
+ 					int first_seg = 1;
+ 					int walk_ok = 1;
+ 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
++					int _pw_nr_saved = g_path_walk_no_resolve; g_path_walk_no_resolve = 1; // s27 w2 item 3: no __resolve on target segments
+ 					while (tp_remaining > 0 && walk_ok)
+ 					{
+ 						while (tp_remaining > 0 && *tp == ':') { tp++; tp_remaining--; }
+@@ -51391,6 +51482,7 @@ void actionSetVariable(SWFAppContext* app_context)
+ 						tp_remaining -= seg_len;
+ 						if (tp_remaining > 0) { tp++; tp_remaining--; }
+ 					}
++					g_path_walk_no_resolve = _pw_nr_saved;
+ 					PUSH_STR(prop_name, prop_len);
+ 					pushVar(app_context, &value_var);
+ 					actionSetMember(app_context);
+@@ -51406,8 +51498,13 @@ void actionSetVariable(SWFAppContext* app_context)
+ 						actionSetVariable(app_context);
+ 						return;
+ 					}
+-					PUSH_STR(target_ptr, target_len);
+-					actionGetVariable(app_context);
++					{
++						// s27 w2 item 3: the target path never calls __resolve.
++						int _pw_nr_saved = g_path_walk_no_resolve; g_path_walk_no_resolve = 1;
++						PUSH_STR(target_ptr, target_len);
++						actionGetVariable(app_context);
++						g_path_walk_no_resolve = _pw_nr_saved;
++					}
+ 					PUSH_STR(prop_name, prop_len);
+ 					pushVar(app_context, &value_var);
+ 					actionSetMember(app_context);
+@@ -67719,6 +67816,41 @@ static MovieClip* cfBareMCReceiver(const char* name, u32 name_len, int* shadowed
+ 	return g_current_context ? g_current_context : &root_movieclip;
+ }
+ 
++// s27 w1-avm1-leftovers (item 6): SWF<=6 identifiers are case-insensitive
++// (Ruffle Activation::is_case_sensitive() = swf_version > 6), but the builtin
++// name arms below compare with strncmp. Map a case variant onto the arm's
++// canonical spelling at dispatcher entry (NULL-terminated table), so e.g. a
++// SWF6 `PARSEINT("12")` or `"abc".TOUPPERCASE()` takes the same arm as the
++// canonical spelling. SWF7+ (and an exact match) return `name` unchanged.
++static const char* swf6CanonBuiltinName(const char* name, u32 len, const char* const* table)
++{
++	if (g_swf_version > 6 || name == NULL) return name;
++	for (int i = 0; table[i] != NULL; i++) {
++		if (strlen(table[i]) == len && strncasecmp(name, table[i], len) == 0)
++			return table[i];
++	}
++	return name;
++}
++
++static const char* const k_swf6_cf_builtins[] = {
++	"lineStyle", "lineTo", "moveTo", "curveTo", "endFill", "beginFill", "clear",
++	"beginBitmapFill", "beginGradientFill", "lineGradientStyle", "parseInt",
++	"parseFloat", "isNaN", "isFinite", "escape", "unescape", "Array", "Date",
++	"Object", "Number", "Boolean", "String", "ASSetPropFlags", "addProperty",
++	"createTextField", "createEmptyMovieClip", "attachMovie", "getNextHighestDepth",
++	"getInstanceAtDepth", "setInterval", "setTimeout", "clearInterval",
++	"clearTimeout", "updateAfterEvent", "Function", "getBounds", "getRect", "hitTest",
++	NULL
++};
++static const char* const k_swf6_array_methods[] = {
++	"concat", "hasOwnProperty", "join", "pop", "push", "reverse", "shift", "slice",
++	"sort", "sortOn", "splice", "toString", "unshift", NULL
++};
++static const char* const k_swf6_string_methods[] = {
++	"charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "slice", "split",
++	"substr", "substring", "toLowerCase", "toString", "toUpperCase", "valueOf", NULL
++};
++
+ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ {
+ 	if (g_execution_halted) return;
+@@ -67732,6 +67864,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	const char* func_name = _cf_buf;
+ 	u32 func_name_string_id = STACK_TOP_ID;  // Preserve string_id for var_array lookup
+ 	POP();
++	{
++		// s27 w1-avm1-leftovers (item 6): canonical spelling for the builtin arms
++		// (same length, so func_name_len and _cf_buf's NUL stay valid).
++		const char* _canon = swf6CanonBuiltinName(func_name, func_name_len, k_swf6_cf_builtins);
++		if (_canon != func_name) memcpy(_cf_buf, _canon, func_name_len);
++	}
+ 
+ 	// 2. Pop number of arguments
+ 	ActionVar num_args_var;
+@@ -69331,7 +69469,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	}
+ 	// getNextHighestDepth() — bare call: the with-clip / target clip
+ 	// (cfBareMCReceiver); the root walk below serves a root receiver.
+-	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
++	// s27 w2 lead 3: VERSION_7 (Ruffle movie_clip.rs; the CallMethod arm
++	// already gates); a bare SWF6 call falls through to undefined.
++	else if (g_swf_version >= 7 && func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
+ 	{
+ 		// s26 PROTOTYPE: with-clip / target clip, not a hard-coded _root.
+ 		{
+@@ -69362,7 +69502,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	// (what Ruffle-method convention uses; stored by attachMovie / createEmptyMovieClip)
+ 	// or SWF-depth (stored by CloneSprite / duplicateMovieClip — the bytecode-biased
+ 	// form). Checking both lets clones placed at SWF-space depths still resolve.
+-	else if (func_name_len == 18 && strncmp(func_name, "getInstanceAtDepth", 18) == 0)
++	// s27 w2 lead 3: VERSION_7 (Ruffle movie_clip.rs; the CallMethod arm
++	// already gates); a bare SWF6 call falls through to undefined.
++	else if (g_swf_version >= 7 && func_name_len == 18 && strncmp(func_name, "getInstanceAtDepth", 18) == 0)
+ 	{
+ 		// s26 PROTOTYPE: inside `with (clip)` the receiver is the with-clip.
+ 		{
+@@ -70855,6 +70997,7 @@ static int callArrayMethod(SWFAppContext* app_context,
+                            const char* method_name, u32 method_name_len,
+                            ActionVar* args, u32 num_args)
+ {
++	method_name = swf6CanonBuiltinName(method_name, method_name_len, k_swf6_array_methods); // s27 item 6
+ 	// hasOwnProperty(name) — arrays own "length", their live numeric indices,
+ 	// and any name in the props sidecar. Object.prototype.hasOwnProperty
+ 	// mis-casts an ASArray to ASObject, so handle it here (XML.as:354
+@@ -72711,6 +72854,7 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
+ {
+ 	(void)str_buffer;
+ 	int slen = (int)str_len; // UTF-16 code unit count
++	method_name = swf6CanonBuiltinName(method_name, method_name_len, k_swf6_string_methods); // s27 item 6
+ 
+ 	// toUpperCase() - no arguments
+ 	if (method_name_len == 11 && strncmp(method_name, "toUpperCase", 11) == 0)
+@@ -73458,6 +73602,80 @@ static int primNumBoolCallProtoMethod(SWFAppContext* app_context, ActionVar* obj
+ 	return 1;
+ }
+ 
++// s27 w2 (lead 2): SWF7+ is case-sensitive, but actionCallMethod's
++// MovieClip/TextField builtin arms compare with strncasecmp, so `_root.GETDEPTH()`
++// and `_root.CREATEEMPTYMOVIECLIP(..)` ran the builtin in SWF7 (Flash 32 and
++// Ruffle: undefined; regression avm1_swf7_case_sensitive_builtins). Returns 1
++// when, in SWF7+, `name` names one of those arms only case-insensitively.
++static const char* const k_mc_arm_names[] = {
++	"addProperty",
++	"attachBitmap",
++	"attachMovie",
++	"beginBitmapFill",
++	"beginFill",
++	"beginGradientFill",
++	"clear",
++	"createEmptyMovieClip",
++	"createTextField",
++	"curveTo",
++	"duplicateMovieClip",
++	"endFill",
++	"getBounds",
++	"getBytesLoaded",
++	"getBytesTotal",
++	"getDepth",
++	"getInstanceAtDepth",
++	"getNewTextFormat",
++	"getNextHighestDepth",
++	"getRect",
++	"getSWFVersion",
++	"getTextFormat",
++	"getTextSnapshot",
++	"globalToLocal",
++	"gotoAndPlay",
++	"gotoAndStop",
++	"hasOwnProperty",
++	"hitTest",
++	"isPropertyEnumerable",
++	"lineGradientStyle",
++	"lineStyle",
++	"lineTo",
++	"loadMovie",
++	"loadVariables",
++	"localToGlobal",
++	"moveTo",
++	"nextFrame",
++	"play",
++	"prevFrame",
++	"removeMovieClip",
++	"removeTextField",
++	"replaceSel",
++	"replaceText",
++	"setMask",
++	"setNewTextFormat",
++	"setTextFormat",
++	"startDrag",
++	"stop",
++	"stopDrag",
++	"swapDepths",
++	"toString",
++	"unloadMovie",
++	"unwatch",
++	"valueOf",
++	"watch",
++	NULL
++};
++static int mcArmCaseMiss(const char* name, u32 len)
++{
++	if (EFFECTIVE_SWF_VERSION() < 7) return 0;
++	for (int i = 0; k_mc_arm_names[i] != NULL; i++) {
++		const char* n = k_mc_arm_names[i];
++		if (strlen(n) == len && strncasecmp(n, name, len) == 0)
++			return strncmp(n, name, len) != 0;
++	}
++	return 0;
++}
++
+ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ {
+ 	if (g_execution_halted) return;
+@@ -76206,6 +76424,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 			else if (method_name_len == 7 && strncasecmp(method_name, "unwatch", 7) == 0) _mcm_is_object_method = 1;
+ 			if (!_mcm_is_object_method) goto _mc_user_dispatch;
+ 		}
++		if (mcArmCaseMiss(method_name, method_name_len)) goto _mc_user_dispatch; // s27 w2 lead 2
+ 
+ 		if (method_name_len == 11 &&
+ 			(strncasecmp(method_name, "gotoAndStop", 11) == 0 || strncasecmp(method_name, "gotoAndPlay", 11) == 0))
+@@ -77830,8 +78049,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 		else if (method_name_len == 16 && strncasecmp(method_name, "setNewTextFormat", 16) == 0)
+ 		{
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+-			// setNewTextFormat(fmt): set the default format for newly-typed text
+-			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
++			// setNewTextFormat(fmt): set the default format for newly-typed text.
++			// s27 w2 (item 4 rework): only a real TextFormat counts; Flash 32 and
++			// the Ruffle exporter ignore a plain {size, font} object entirely
++			// (regression avm1_set_new_text_format_size).
++			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0
++			    && ((ASObject*) args[0].data.numeric_value)->native_type == NATIVE_TEXTFORMAT) {
+ 				ASObject* fmt_obj = (ASObject*) args[0].data.numeric_value;
+ 				tf_ps_set_new_text_format(app_context, mc, fmt_obj); // s25 span model
+ 				// Apply color to textColor
+@@ -81036,7 +81259,22 @@ _mc_user_dispatch: ;
+ 	         obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
+ 	{
+ 		// Number/Boolean primitive - handle toString() and valueOf()
+-		if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0)
++		// s27 w2 (lead 2): SWF7+ is case-sensitive; `(10).TOSTRING(16)` must
++		// not reach these strncasecmp arms (Flash 32: undefined).
++		int _nb_cs = (EFFECTIVE_SWF_VERSION() >= 7);
++		if (_nb_cs && ((method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0 && strncmp(method_name, "toString", 8) != 0)
++		            || (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0 && strncmp(method_name, "valueOf", 7) != 0)
++		            || (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0 && strncmp(method_name, "hasOwnProperty", 14) != 0)))
++		{
++			ActionVar _pnb_res;
++			int _pnb_done = primNumBoolCallProtoMethod(app_context, &obj_var,
++			                                           method_name, method_name_len,
++			                                           args, num_args, &_pnb_res);
++			if (args != NULL) FREE(args);
++			if (_pnb_done) pushVar(app_context, &_pnb_res);
++			else pushUndefined(app_context);
++		}
++		else if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0)
+ 		{
+ 			if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
+ 			{
+@@ -82072,6 +82310,20 @@ static int mc_hit_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2,
+ 	return mc_get_pixel_aabb_ng(mc, x1, y1, x2, y2);
+ }
+ 
++// s27 w1-avm1-leftovers (item 1): AS-handler clips and DefineButtons share ONE
++// pick (Ruffle run_mouse_pick -> mouse_pick_avm1: the first interactive hit in
++// render order, a DefineButton or a button-mode clip). tag.c's
++// ng_update_button_states runs that pick first on every move/press (both
++// walks, three phases); when a DefineButton won it, no handler clip may also
++// fire.
++static int ng_defbutton_won_pick(void)
++{
++	extern int ng_btn_last_pick(MovieClip** sprite, unsigned* seq);
++	MovieClip* sp = NULL;
++	return ng_btn_last_pick(&sp, NULL) && sp == NULL;
++}
++static MovieClip* ng_roll_pick_topmost(float mx, float my);
++
+ // Dispatch AS2 onPress to all dynamic MCs whose hit area contains the mouse.
+ // Called from swf_core.c on EV_MOUSE_DOWN_LEFT (after dispatch_clip_event_press).
+ void actionDispatchMCPress(SWFAppContext* app_context)
+@@ -82084,10 +82336,17 @@ void actionDispatchMCPress(SWFAppContext* app_context)
+ 	ng_update_drag_droptarget();
+ 
+ 	mc_hit_area_pick_begin(app_context);
++	// s27 item 1: ONE target. The topmost button-mode clip (ancestors before
++	// descendants), and none when a DefineButton above it won tag.c's pick.
++	MovieClip* press_picked = ng_defbutton_won_pick() ? NULL : ng_roll_pick_topmost(mx, my);
+ 
+ 	for (int i = 0; i < child_mc_count; i++) {
+ 		MovieClip* mc = child_mc_cache[i];
+ 		if (mc == NULL || mc->dynamic_props == NULL) continue;
++		// s27 item 1: sprite clips take part in the single pick; a DefineButton
++		// instance's own AS handlers (is_button_mc wrapper) ride on tag.c's
++		// button pick and keep their own path.
++		if (!mc->is_button_mc && mc != press_picked) continue;
+ 		// Text fields don't receive onPress/onRelease — clicking them acquires focus instead
+ 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
+ 		if (mc_removed_during_pick_ng(mc)) continue;
+@@ -82293,7 +82552,7 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
+ 	// Button-mode sprites share ONE pick: only the topmost one under the
+ 	// pointer is "inside" (avm1/hitarea_remove_owner_drag: btnRm at depth 2
+ 	// occludes btnZ at depth 1).
+-	MovieClip* roll_picked = ng_roll_pick_topmost(mx, my);
++	MovieClip* roll_picked = ng_defbutton_won_pick() ? NULL : ng_roll_pick_topmost(mx, my); // s27 item 1
+ 
+ 	for (int i = 0; i < child_mc_count; i++) {
+ 		MovieClip* mc = child_mc_cache[i];
+@@ -84402,67 +84661,61 @@ void actionTextControlSelectAll(SWFAppContext* app_context)
+ 	g_tf_select_all = 1;
+ }
+ 
+-void actionTextControlCopy(SWFAppContext* app_context)
++static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
++                                 const uint16_t* ins, u32 ins_len);
++
++// s27 w1-avm1-leftovers (item 5): the focused field's selected range [*lo, *hi)
++// in UTF-16 units. 0 for a collapsed caret (Ruffle is_text_control_applicable:
++// Copy/Cut need !selection.is_caret()), or when there is no text.
++static int tf_selected_range(ActionVar* text_prop, u32* lo, u32* hi)
+ {
+-	(void)app_context;
+-	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
+-	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+-	if (props == NULL) return;
++	u32 len = (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING) ? text_prop->str_size : 0;
++	if (g_tf_select_all) { *lo = 0; *hi = len; return len > 0; }
++	if (g_selection_begin < 0 || g_selection_end < 0 || g_selection_begin == g_selection_end) return 0;
++	u32 a = (u32)(g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end);
++	u32 b = (u32)(g_selection_begin > g_selection_end ? g_selection_begin : g_selection_end);
++	if (a > len) a = len;
++	if (b > len) b = len;
++	*lo = a; *hi = b;
++	return b > a;
++}
+ 
+-	// Check password flag — password fields don't allow Copy
++static int tf_is_password(ASObject* props)
++{
+ 	ActionVar* pw_prop = getProperty(props, "password", 8);
+-	if (pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0)
+-		return;
++	return pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0;
++}
+ 
+-	// Read text property
++// Copy: the clipboard gets the SELECTED text (Ruffle text_control_input:
++// text[selection]). A collapsed caret or a password field is a no-op (the
++// clipboard keeps its content). Dynamic (createTextField, idx -2) fields too.
++void actionTextControlCopy(SWFAppContext* app_context)
++{
++	(void)app_context;
++	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
++	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
++	if (props == NULL || tf_is_password(props)) return;
+ 	ActionVar* text_prop = getProperty(props, "text", 4);
+-	if (text_prop == NULL || text_prop->type != ACTION_STACK_VALUE_STRING) {
+-		g_clipboard_text[0] = '\0';
+-		g_clipboard_len = 0;
+-		return;
+-	}
+-
++	u32 lo, hi;
++	if (!tf_selected_range(text_prop, &lo, &hi)) return;
+ 	const uint16_t* u16 = varGetU16Ptr(text_prop);
+-	if (u16 == NULL || text_prop->str_size == 0) {
+-		g_clipboard_text[0] = '\0';
+-		g_clipboard_len = 0;
+-		return;
+-	}
+-
+-	int written = u16_to_utf8(u16, text_prop->str_size, g_clipboard_text, (int)sizeof(g_clipboard_text));
++	if (u16 == NULL) return;
++	int written = u16_to_utf8(u16 + lo, hi - lo, g_clipboard_text, (int)sizeof(g_clipboard_text));
+ 	g_clipboard_len = (size_t)written;
+ }
+ 
++// Cut: Copy, then delete the selection (caret at its start) and fire
++// onChanged (Ruffle: replace_text(sel.start, sel.end, ""), changed = true).
+ void actionTextControlCut(SWFAppContext* app_context)
+ {
+-	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
++	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+ 	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+-	if (props == NULL) return;
+-
+-	// Check password flag — password fields: complete no-op (no copy, no delete)
+-	ActionVar* pw_prop = getProperty(props, "password", 8);
+-	if (pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0)
+-		return;
+-
+-	// Copy text to clipboard first
++	if (props == NULL || tf_is_password(props)) return;
++	ActionVar* text_prop = getProperty(props, "text", 4);
++	u32 lo, hi;
++	if (!tf_selected_range(text_prop, &lo, &hi)) return;
+ 	actionTextControlCopy(app_context);
+-
+-	// Clear the text field
+-	static const uint16_t empty_u16[] = {0};
+-	ActionVar empty_text = {0};
+-	empty_text.type = ACTION_STACK_VALUE_STRING;
+-	empty_text.data.numeric_value = (u64)(uintptr_t)empty_u16;
+-	empty_text.str_size = 0;
+-	setProperty(app_context, props, "text", 4, &empty_text);
+-
+-	ActionVar len_val = {0};
+-	len_val.type = ACTION_STACK_VALUE_F64;
+-	VAL(double, &len_val.data.numeric_value) = 0.0;
+-	setProperty(app_context, props, "length", 6, &len_val);
+-
+-	ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
+-	tf_invalidate_run_table(g_focused_mc);
+-	g_tf_select_all = 0;
++	tf_replace_selection(app_context, props, NULL, 0);
+ }
+ 
+ // Helper: get text length (in UTF-16 codepoints) for the focused text field.
+@@ -85013,22 +85266,31 @@ static size_t apply_restrict_filter(const char* input, size_t input_len,
+ 	return out_pos;
+ }
+ 
++// Paste = text input of the clipboard (Ruffle text_control_input Paste ->
++// text_input): it REPLACES the selection (or inserts at the caret), the caret
++// lands after it, onChanged fires. Newlines are dropped from a single-line
++// field and control characters always; a restrict that filters everything
++// still deletes the selection. An empty clipboard is a no-op.
+ void actionTextControlPaste(SWFAppContext* app_context)
+ {
+-	// Empty clipboard → no-op
+ 	if (g_clipboard_len == 0) return;
+-
+-	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
++	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+ 	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+ 	if (props == NULL) return;
+ 
+-	// Start with clipboard text
++	ActionVar* ml_prop = getProperty(props, "multiline", 9);
++	int multiline = ml_prop != NULL && ml_prop->type == ACTION_STACK_VALUE_BOOLEAN && ml_prop->data.numeric_value != 0;
+ 	char filtered[1024];
+-	size_t filtered_len = g_clipboard_len;
+-	memcpy(filtered, g_clipboard_text, g_clipboard_len);
+-	filtered[g_clipboard_len] = '\0';
++	size_t filtered_len = 0;
++	for (size_t i = 0; i < g_clipboard_len && filtered_len < sizeof(filtered) - 1; i++) {
++		unsigned char c = (unsigned char)g_clipboard_text[i];
++		int is_nl = (c == '\n' || c == '\r');
++		if (is_nl ? !multiline : (c < 0x20 || c == 0x7f)) continue;
++		filtered[filtered_len++] = (char)c;
++	}
++	filtered[filtered_len] = '\0';
++	if (filtered_len == 0) return;
+ 
+-	// Apply restrict filter if set
+ 	ActionVar* restrict_prop = getProperty(props, "restrict", 8);
+ 	if (restrict_prop != NULL && restrict_prop->type == ACTION_STACK_VALUE_STRING
+ 	    && restrict_prop->str_size > 0) {
+@@ -85043,68 +85305,9 @@ void actionTextControlPaste(SWFAppContext* app_context)
+ 		}
+ 	}
+ 
+-	// If filtered result is empty, no-op
+-	if (filtered_len == 0) return;
+-
+-	// Determine existing text
+-	char existing[2048] = {0};
+-	size_t existing_len = 0;
+-	if (!g_tf_select_all) {
+-		ActionVar* text_prop = getProperty(props, "text", 4);
+-		if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
+-			const uint16_t* t_u16 = varGetU16Ptr(text_prop);
+-			if (t_u16 != NULL)
+-				existing_len = (size_t)u16_to_utf8(t_u16, text_prop->str_size, existing, (int)sizeof(existing));
+-		}
+-	}
+-
+-	// Build result: existing + filtered (or just filtered if select_all)
+-	char result[2048];
+-	size_t result_len = 0;
+-	if (existing_len > 0) {
+-		memcpy(result, existing, existing_len);
+-		result_len = existing_len;
+-	}
+-	if (result_len + filtered_len < sizeof(result)) {
+-		memcpy(result + result_len, filtered, filtered_len);
+-		result_len += filtered_len;
+-	}
+-	result[result_len] = '\0';
+-
+-	// Apply maxChars truncation (in characters, not bytes — count UTF-16 code units)
+-	ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
+-	int max_chars = -1;
+-	if (maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
+-		double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
+-		if (d > 0 && d == d) max_chars = (int)d;
+-	}
+-
+-	// Convert result to UTF-16
+ 	u32 u16_len = 0;
+-	uint16_t* u16_result = utf8_to_u16(app_context, result, (u32)result_len, &u16_len);
+-
+-	// Truncate to maxChars if needed
+-	if (max_chars > 0 && (int)u16_len > max_chars) {
+-		u16_len = (u32)max_chars;
+-		u16_result[u16_len] = 0;
+-	}
+-
+-	// Set text property
+-	ActionVar new_text = {0};
+-	new_text.type = ACTION_STACK_VALUE_STRING;
+-	new_text.data.numeric_value = (u64)(uintptr_t)u16_result;
+-	new_text.str_size = u16_len;
+-	setProperty(app_context, props, "text", 4, &new_text);
+-
+-	// Update length property
+-	ActionVar len_val = {0};
+-	len_val.type = ACTION_STACK_VALUE_F64;
+-	VAL(double, &len_val.data.numeric_value) = (double)u16_len;
+-	setProperty(app_context, props, "length", 6, &len_val);
+-
+-	// Sync to variable binding
+-	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+-	g_tf_select_all = 0;
++	uint16_t* u16_ins = filtered_len > 0 ? utf8_to_u16(app_context, filtered, (u32)filtered_len, &u16_len) : NULL;
++	tf_replace_selection(app_context, props, u16_ins, u16_len);
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -85229,57 +85432,13 @@ void actionTextFieldImeCommit(SWFAppContext* app_context, const char* text)
+ 	}
+ }
+ 
+-void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
++// s27 w1-avm1-leftovers (item 5): replace the focused field's selection (or
++// insert at the caret; the whole text after a select-all) with `ins`, move
++// the caret past it and fire onChanged. Shared by typing (actionTextFieldInput),
++// Paste and Cut (ins_len = 0). Ruffle: text_input / replace_text(sel, ..).
++static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
++                                 const uint16_t* ins, u32 ins_len)
+ {
+-	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+-	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+-	if (props == NULL) return;
+-
+-	// Encode codepoint to UTF-8
+-	char ch_utf8[8];
+-	size_t ch_len = 0;
+-	if (codepoint < 0x80) {
+-		ch_utf8[0] = (char)codepoint;
+-		ch_len = 1;
+-	} else if (codepoint < 0x800) {
+-		ch_utf8[0] = (char)(0xC0 | (codepoint >> 6));
+-		ch_utf8[1] = (char)(0x80 | (codepoint & 0x3F));
+-		ch_len = 2;
+-	} else if (codepoint < 0x10000) {
+-		ch_utf8[0] = (char)(0xE0 | (codepoint >> 12));
+-		ch_utf8[1] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+-		ch_utf8[2] = (char)(0x80 | (codepoint & 0x3F));
+-		ch_len = 3;
+-	} else {
+-		ch_utf8[0] = (char)(0xF0 | (codepoint >> 18));
+-		ch_utf8[1] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+-		ch_utf8[2] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+-		ch_utf8[3] = (char)(0x80 | (codepoint & 0x3F));
+-		ch_len = 4;
+-	}
+-	ch_utf8[ch_len] = '\0';
+-
+-	// Apply restrict filter if set
+-	ActionVar* restrict_prop = getProperty(props, "restrict", 8);
+-	if (restrict_prop != NULL && restrict_prop->type == ACTION_STACK_VALUE_STRING
+-	    && restrict_prop->str_size > 0) {
+-		const uint16_t* r_u16 = varGetU16Ptr(restrict_prop);
+-		char restrict_utf8[256];
+-		if (r_u16 != NULL) {
+-			u16_to_utf8(r_u16, restrict_prop->str_size, restrict_utf8, (int)sizeof(restrict_utf8));
+-			char restricted[8];
+-			size_t new_len = apply_restrict_filter(ch_utf8, ch_len, restrict_utf8, restricted, sizeof(restricted));
+-			if (new_len == 0) return;  // Character filtered out
+-			memcpy(ch_utf8, restricted, new_len);
+-			ch_len = new_len;
+-			ch_utf8[ch_len] = '\0';
+-		}
+-	}
+-
+-	// Convert the (restricted) input char to UTF-16.
+-	u32 ch_u16_len = 0;
+-	uint16_t* ch_u16 = utf8_to_u16(app_context, ch_utf8, (u32)ch_len, &ch_u16_len);
+-
+ 	// Existing text (UTF-16). When the whole field is selected, the input
+ 	// replaces it entirely (treat existing as empty, insert at 0).
+ 	const uint16_t* old_u16 = NULL;
+@@ -85311,40 +85470,44 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
+ 		del_lo = caret; del_hi = caret;
+ 	}
+ 
++	// s27 w2 lead 6: maxChars clips the INSERTION (Ruffle edit_text.rs
++	// available_chars = maxChars - (len - selection_len); 0 -> no edit, no
++	// onChanged). Master truncated the TAIL of the result instead, so typing
++	// into a full field at the caret dropped the last character.
++	{
++		ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
++		if (ins_len > 0 && maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
++			double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
++			if (d > 0 && d == d) {
++				long avail = (long)(int)d - ((long)old_len - (long)(del_hi - del_lo));
++				if (avail <= 0) return;
++				if ((long)ins_len > avail) ins_len = (u32)avail;
++			}
++		}
++	}
++
+ 	// Build new text = old[0..del_lo] + ch + old[del_hi..]
+ 	u32 tail_len = (old_len > del_hi) ? (old_len - del_hi) : 0;
+-	u32 u16_len = del_lo + ch_u16_len + tail_len;
++	u32 u16_len = del_lo + ins_len + tail_len;
+ 	uint16_t* u16_result = (uint16_t*) malloc((u16_len + 1) * sizeof(uint16_t));
+ 	if (old_u16 != NULL && del_lo > 0)
+ 		memcpy(u16_result, old_u16, del_lo * sizeof(uint16_t));
+-	if (ch_u16 != NULL && ch_u16_len > 0)
+-		memcpy(u16_result + del_lo, ch_u16, ch_u16_len * sizeof(uint16_t));
++	if (ins != NULL && ins_len > 0)
++		memcpy(u16_result + del_lo, ins, ins_len * sizeof(uint16_t));
+ 	if (old_u16 != NULL && tail_len > 0)
+-		memcpy(u16_result + del_lo + ch_u16_len, old_u16 + del_hi,
++		memcpy(u16_result + del_lo + ins_len, old_u16 + del_hi,
+ 		       tail_len * sizeof(uint16_t));
+ 	u16_result[u16_len] = 0;
+ 
+-	// Apply maxChars truncation
+-	ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
+-	int max_chars = -1;
+-	if (maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
+-		double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
+-		if (d > 0 && d == d) max_chars = (int)d;
+-	}
+-	if (max_chars > 0 && (int)u16_len > max_chars) {
+-		u16_len = (u32)max_chars;
+-		u16_result[u16_len] = 0;
+-	}
+-
+ 	// Advance the caret past the inserted text (clamped to the final length).
+-	u32 new_caret = del_lo + ch_u16_len;
++	u32 new_caret = del_lo + ins_len;
+ 	if (new_caret > u16_len) new_caret = u16_len;
+ 
+ 	// s26 PROTOTYPE (item 5): edit the run table in place (before the text
+ 	// store, as tf_ps_on_replace requires). No maxChars truncation case.
+ 	int _typed_in_place = 0;
+-	if ((int)u16_len == (int)(del_lo + ch_u16_len + tail_len))
+-		_typed_in_place = tf_ps_on_typed(app_context, g_focused_mc, del_lo, del_hi, ch_u16, ch_u16_len);
++	if ((int)u16_len == (int)(del_lo + ins_len + tail_len))
++		_typed_in_place = tf_ps_on_typed(app_context, g_focused_mc, del_lo, del_hi, ins, ins_len);
+ 	// Set text property
+ 	ActionVar new_text = {0};
+ 	new_text.type = ACTION_STACK_VALUE_STRING;
+@@ -85375,6 +85538,60 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
+ 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+ }
+ 
++void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
++{
++	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
++	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
++	if (props == NULL) return;
++
++	// Encode codepoint to UTF-8
++	char ch_utf8[8];
++	size_t ch_len = 0;
++	if (codepoint < 0x80) {
++		ch_utf8[0] = (char)codepoint;
++		ch_len = 1;
++	} else if (codepoint < 0x800) {
++		ch_utf8[0] = (char)(0xC0 | (codepoint >> 6));
++		ch_utf8[1] = (char)(0x80 | (codepoint & 0x3F));
++		ch_len = 2;
++	} else if (codepoint < 0x10000) {
++		ch_utf8[0] = (char)(0xE0 | (codepoint >> 12));
++		ch_utf8[1] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
++		ch_utf8[2] = (char)(0x80 | (codepoint & 0x3F));
++		ch_len = 3;
++	} else {
++		ch_utf8[0] = (char)(0xF0 | (codepoint >> 18));
++		ch_utf8[1] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
++		ch_utf8[2] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
++		ch_utf8[3] = (char)(0x80 | (codepoint & 0x3F));
++		ch_len = 4;
++	}
++	ch_utf8[ch_len] = '\0';
++
++	// Apply restrict filter if set
++	ActionVar* restrict_prop = getProperty(props, "restrict", 8);
++	if (restrict_prop != NULL && restrict_prop->type == ACTION_STACK_VALUE_STRING
++	    && restrict_prop->str_size > 0) {
++		const uint16_t* r_u16 = varGetU16Ptr(restrict_prop);
++		char restrict_utf8[256];
++		if (r_u16 != NULL) {
++			u16_to_utf8(r_u16, restrict_prop->str_size, restrict_utf8, (int)sizeof(restrict_utf8));
++			char restricted[8];
++			size_t new_len = apply_restrict_filter(ch_utf8, ch_len, restrict_utf8, restricted, sizeof(restricted));
++			if (new_len == 0) return;  // Character filtered out
++			memcpy(ch_utf8, restricted, new_len);
++			ch_len = new_len;
++			ch_utf8[ch_len] = '\0';
++		}
++	}
++
++	// Convert the (restricted) input char to UTF-16.
++	u32 ch_u16_len = 0;
++	uint16_t* ch_u16 = utf8_to_u16(app_context, ch_utf8, (u32)ch_len, &ch_u16_len);
++
++	tf_replace_selection(app_context, props, ch_u16, ch_u16_len);
++}
++
+ // (was: #endif — see comment above for the open)
+ 
+ // ==================================================================
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index e742e9d0e..cf12b2ecf 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -5667,6 +5667,20 @@ static int g_btn_pick_key[BTN_PICK_PATH_MAX];
+ static int g_btn_pick_key_n;               // 0 = no winner yet
+ static DisplayObject* g_btn_pick_obj;      // winning DefineButton entry
+ static MovieClip* g_btn_pick_sprite;       // winning button-mode sprite
++// s27 item 1: the last outermost pick's winner (read by ng_btn_last_pick).
++static DisplayObject* g_btn_last_pick_obj;
++static MovieClip* g_btn_last_pick_sprite;
++static unsigned g_btn_last_pick_seq;
++// 1 when the last outermost ng_update_button_states pick was won by a
++// DefineButton (*sprite = NULL) or a button-mode sprite (*sprite set); 0 when
++// nothing was picked. *seq changes on every pick, so a caller can tell a
++// fresh pick from a stale one.
++int ng_btn_last_pick(MovieClip** sprite, unsigned* seq)
++{
++	if (sprite) *sprite = g_btn_last_pick_sprite;
++	if (seq) *seq = g_btn_last_pick_seq;
++	return g_btn_last_pick_obj != NULL || g_btn_last_pick_sprite != NULL;
++}
+ 
+ static void btn_path_push(int v)
+ {
+@@ -6425,6 +6439,14 @@ int ng_update_button_states(SWFAppContext* app_context)
+ 	g_btn_path_n = 0;
+ 	ng_update_button_states_attached(app_context, &unit_hover);
+ 	int found_hover = g_btn_pick_key_n > 0;
++	// s27 w1-avm1-leftovers (item 1): publish the outermost pick's winner so
++	// action.c's AS-handler clip dispatch (actionDispatchMCPress /
++	// actionDispatchMCMouseMove) defers to a DefineButton that won above it.
++	if (saved_phase == BTN_PHASE_LEGACY) {
++		g_btn_last_pick_obj = g_btn_pick_obj;
++		g_btn_last_pick_sprite = g_btn_pick_sprite;
++		g_btn_last_pick_seq++;
++	}
+ 
+ 	// LEAVE: everything but the winner sees a miss (found_hover forced).
+ 	g_btn_phase = BTN_PHASE_LEAVE;
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/create_test_swf.py
+new file mode 100644
+index 000000000..8fe48bb11
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/create_test_swf.py
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python3
++"""avm1_edittext_cut_copy_selection: TextControl Copy / Cut act on the
++selection, not the whole text; with a collapsed caret both are no-ops (the
++clipboard keeps its previous content and the text is untouched).
++
++s27 w1-avm1-leftovers item 5. Ruffle edit_text.rs is_text_control_applicable
++(Copy|Cut need !password && !selection.is_caret()) and text_control_input
++(Copy: clipboard = text[sel]; Cut: same, then replace_text(sel, "") and
++caret at sel.start, changed = true -> onChanged).
++
++Golden: analytic (Ruffle edit_text.rs). Needs TextControl (clipboard) input,
++which the Flash oracle cannot replay; Ruffle test-runner confirmation is a
++standing LOCAL ORACLE REQUEST (s27 w2-avm1-leftovers-land report).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++caret = callm('Selection', 'getCaretIndex', keep=True)
++
++
++def sel(a, b):
++    return callm('Selection', 'setSelection', a, b)
++
++
++def report(tag):
++    return T(tag, get('tf.text'), ' caret=', caret)
++
++
++onchg = deffunc2('', [], T('changed: ', get('tf.text')), nregs=1, flags=0, first_param_reg=0)
++f1 = (
++    callm('this', 'createTextField', 'tf', 1, 10, 10, 200, 40)
++    + get('tf') + push('type', 'input') + SETMEM
++    + get('tf') + push('text', 'ABCDE') + SETMEM
++    + get('tf') + push('onChanged') + onchg + SETMEM
++    + get('tf') + push(1, 'Selection') + GETVAR + push('setFocus') + CALLM + POP
++    + sel(1, 3)
++    + report('f1: ')
++)
++# input: Copy (clipboard = "BC")
++f2 = report('f2 after Copy [1,3): ') + sel(0, 0)
++# input: Paste at 0
++f3 = report('f3 after Paste at 0: ') + sel(2, 4)
++# input: Cut [2,4)
++f4 = report('f4 after Cut [2,4): ') + sel(3, 3)
++# input: Cut, Copy with a collapsed caret (no-ops)
++f5 = report('f5 after caret Cut+Copy: ') + sel(0, 0)
++# input: Paste at 0 (clipboard still the Cut text)
++f6 = report('f6 after Paste at 0: ') + STOP
++open(sys.argv[1], 'wb').write(swf(8, b'', [doaction(f) for f in (f1, f2, f3, f4, f5, f6)]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/input.json b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/input.json
+new file mode 100644
+index 000000000..16a8f3b71
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/input.json
+@@ -0,0 +1,12 @@
++[
++  { "type": "TextControl", "code": "Copy" },
++  { "type": "Wait" },
++  { "type": "TextControl", "code": "Paste" },
++  { "type": "Wait" },
++  { "type": "TextControl", "code": "Cut" },
++  { "type": "Wait" },
++  { "type": "TextControl", "code": "Cut" },
++  { "type": "TextControl", "code": "Copy" },
++  { "type": "Wait" },
++  { "type": "TextControl", "code": "Paste" }
++]
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/output.txt b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/output.txt
+new file mode 100644
+index 000000000..8f3e994d4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/output.txt
+@@ -0,0 +1,9 @@
++f1: ABCDE caret=3
++f2 after Copy [1,3): ABCDE caret=3
++changed: BCABCDE
++f3 after Paste at 0: BCABCDE caret=2
++changed: BCCDE
++f4 after Cut [2,4): BCCDE caret=2
++f5 after caret Cut+Copy: BCCDE caret=3
++changed: ABBCCDE
++f6 after Paste at 0: ABBCCDE caret=2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/test.swf b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..739b959f349ce78b72c5ba5d973ccc16a76b1845
+GIT binary patch
+literal 1194
+zcmcIiyG{a85Iusjh*7kWLNqrPMk9qhv@kKKix3+%U}8bFSuU^%SvGLjK<5`&Zl^Jp
+z{(?W?U*XJxJd6bzp%^xIX3jZtX7YEX@Y_7#Ao>ElKVU0_+#2Yo2YS6;Hh4b=c$?66
+z=}G(G5E%wa0jdgb0a}PYJqoIBwGsCS!fZ)H$y?b`c}q4bD8@V@qVl-6O#fX+0+#K#
+z3fB_}Y5>m8_1wi+VhL#4dfl*VvVzAj6BGM3JW81T=VO5(4hvzNtHRC*d=;9nxFj3W
+zR94d_B{WQ1s(jOQ+bl2wElALQ9ZwbDsfc2{WyNn9y-*v`Rg*vSdy9ZDjh0j=C@>^T
+z{|*@iYEtQ3b!k^*2gSk;PLT~hb8(E&Q^Ke!*%Erw>56hPk>2}fIv$;+_4Q3X`lQPA
+zK;@0mR#F&B9Lzu^9noMhzf<|dUapgunJ+J0CCaHpW)@cZSHxlZEAp*;<(3T+c{mX1
+epN`O7wa=@cft^J7r={0fDWB%ite38lGr%WJkQK`S
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/test.toml b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/test.toml
+new file mode 100644
+index 000000000..c9072e537
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_cut_copy_selection/test.toml
+@@ -0,0 +1 @@
++num_frames = 6
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/create_test_swf.py
+new file mode 100644
+index 000000000..4e4d45f4e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/create_test_swf.py
+@@ -0,0 +1,71 @@
++#!/usr/bin/env python3
++"""avm1_edittext_path_variable_same_frame: (LEAD fixture, fails after the s27
++prototype) the same bindings as avm1_edittext_path_variable_scope, but `mc`
++and the fields are placed on the SAME frame of `s`. On master + prototype the
++bind-time GetVariable "mc" (context s) does not find s's just-created child
++and materializes a second `mc` under _root, so the bindings land on a ghost.
++
++Original description: DefineEditText `variable` paths on a
++field inside a sprite (no button) resolve from the field's PARENT, and the
++right-most ':' or '.' splits target from variable name.
++
++s27 w1-avm1-leftovers item 2. Ruffle edit_text.rs try_bind_text_field_variable
++runs resolve_variable_path(parent, path) in a child frame for the parent
++(climbed past buttons); resolve_variable_path splits at path.rfind(":."), and
++an unresolved field is retried by bind_variables (set_initial_value = false)
++when a later frame runs, again from the parent.
++Sprite `s` (root depth 1) holds empty sprite `mc` (depth 1) and fields:
++  t1 "mc:foo"         = "F"  -> s.mc.foo = "F"
++  t2 "_root.s.mc:bar" = "B"  -> s.mc.bar = "B"
++  t3 "mc.baz"         = "Z"  -> s.mc.baz = "Z"   (relative to s, not _root)
++  t4 "_parent.pv"     = "P"  -> _root.pv = "P"
++  t5 "late.q"         = "L"  -> unbound until frame 2 creates s.late; the
++                                retry does not copy; s.late.q = "X" (frame 3)
++                                then sets t5.text.
++With no existing variable, the field's non-empty text seeds the variable.
++
++Golden: Flash Player 32 DIRECT-mode trace (s27 coordinator). Flash binds the
++same-frame fields to the real `s.mc` (and `_root.s.mc:bar`); before s27 w2 the
++bind-time GetVariable "mc" materialized a ghost clip (tfVarWalkClipPath fix).
++`s.t5.text=L`: like the _scope twin, Flash never late-binds t5.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import struct
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++
++
++def edit_text(cid, var, text):
++    # HasText | ReadOnly; no font (device default), no layout.
++    return tag(37, struct.pack('<H', cid) + rect(0, 2000, 0, 400) + bytes([0x80 | 0x08, 0x00])
++               + s(var) + s(text))
++
++
++fields = [('t1', 'mc:foo', 'F'), ('t2', '_root.s.mc:bar', 'B'), ('t3', 'mc.baz', 'Z'),
++          ('t4', '_parent.pv', 'P'), ('t5', 'late.q', 'L')]
++defs = sprite(2, [b''])
++for i, (_, var, txt) in enumerate(fields):
++    defs += edit_text(10 + i, var, txt)
++s_f1 = place(1, 2, 'mc') + b''.join(place(2 + i, 10 + i, nm, 0, 20 * i) for i, (nm, _, _) in enumerate(fields))
++defs += sprite(3, [s_f1])
++
++f1 = place(1, 3, 's')
++f2 = doaction(
++    T('s.mc.foo=', get('s.mc.foo')) + T('s.mc:foo=', push('s.mc:foo') + GETVAR)
++    + T('s[mc:foo]=', get('s') + push('mc:foo') + GETMEM)
++    + T('s.mc.bar=', get('s.mc.bar'))
++    + T('s.mc.baz=', get('s.mc.baz')) + T('_root.mc=', get('_root.mc') + TYPEOF)
++    + T('_root.pv=', get('_root.pv')) + T('s.pv=', get('s.pv'))
++    + T('same mc=', get('s.mc') + get('s.t1') + push('_parent') + GETMEM + push('mc') + GETMEM + op(0x49))
++    + callm('s', 'createEmptyMovieClip', 'late', 10)
++)
++f3 = doaction(T('s.late.q=', get('s.late.q') + TYPEOF)
++              + get('s.late') + push('q', 'X') + SETMEM)
++f4 = doaction(T('s.t5.text=', get('s.t5.text')) + STOP)
++open(sys.argv[1], 'wb').write(swf(8, defs, [f1, f2, f3, f4]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/output.txt b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/output.txt
+new file mode 100644
+index 000000000..59251b8a0
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/output.txt
+@@ -0,0 +1,11 @@
++s.mc.foo=F
++s.mc:foo=F
++s[mc:foo]=undefined
++s.mc.bar=B
++s.mc.baz=Z
++_root.mc=undefined
++_root.pv=P
++s.pv=undefined
++same mc=true
++s.late.q=undefined
++s.t5.text=L
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/test.swf b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..782b12a3d1aa14519e663ea83566d85dcacd2e22
+GIT binary patch
+literal 807
+zcmZ`%O-mb56g`=ViIa?qP_%+baiJR-s2>}lDw;$Dot7#ntwqN$g5Wrl$s=f1*_lPx
+zgG>KM|3Lp$Join)Q%h&{&b#NGbMLv+I6WR;wt)mw&%mD^7K*4%gWsMt7!3Y877ExQ
+zJaH<x#8wY(uaBs?c^$`S;M}R2+lw@gmDl!Iy$Vw7@{Mb%QPaB$y7+-JXTscGBtaV9
+zDKF{Z8~Kx_avP}7YvB+B=Y;+?`{<Vz3$W-eCkqv*&-h(hvQfnctU|2{D#FDK=AhOD
+zjbQ>G;asY9K_yHQxjnU^XL=Mp8*PGZ`>6nARY3apINcXyHWB8tBE-_q#sHbx-(MQ>
+zBn9#+`752tJgYA8&pe}FMrK@OH0PB9Gf55Qm6Ig+me>6cuRG%9`A1Fi%78|u`&!<0
+z&Ph7|aJT@m<HI(W@y2Rck|~2I{G<)uMPndW;%5%+^TiSjhdR&=l&J#9Zoxdu7Qray
+z8K9Yltkk1KJsicIn{e;;Cc*bvy`Q>J^?vd{!?ai$3i_hdf-j>E8!{!HTEH2;Qf$T6
+aEArHar^0(>l-MeN4L>7U3X({feBcGGAh4_e
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/test.toml b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/test.toml
+new file mode 100644
+index 000000000..6236b8239
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_same_frame/test.toml
+@@ -0,0 +1 @@
++num_frames = 4
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/create_test_swf.py
+new file mode 100644
+index 000000000..194a5a693
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/create_test_swf.py
+@@ -0,0 +1,69 @@
++#!/usr/bin/env python3
++"""avm1_edittext_path_variable_scope: DefineEditText `variable` paths on a
++field inside a sprite (no button) resolve from the field's PARENT, and the
++right-most ':' or '.' splits target from variable name.
++
++s27 w1-avm1-leftovers item 2. Ruffle edit_text.rs try_bind_text_field_variable
++runs resolve_variable_path(parent, path) in a child frame for the parent
++(climbed past buttons); resolve_variable_path splits at path.rfind(":."), and
++an unresolved field is retried by bind_variables (set_initial_value = false)
++when a later frame runs, again from the parent.
++Sprite `s` (root depth 1) places empty sprite `mc` (depth 1) on its frame 1 and
++the fields on its frame 2 (then stops); root frame 3 reads:
++  t1 "mc:foo"         = "F"  -> s.mc.foo = "F"
++  t2 "_root.s.mc:bar" = "B"  -> s.mc.bar = "B"
++  t3 "mc.baz"         = "Z"  -> s.mc.baz = "Z"   (relative to s, not _root)
++  t4 "_parent.pv"     = "P"  -> _root.pv = "P"
++  t5 "late.q"         = "L"  -> unbound until root frame 3 creates s.late; the
++                                retry does not copy; s.late.q = "X" (frame 3)
++                                (frame 4) then sets t5.text.
++With no existing variable, the field's non-empty text seeds the variable.
++
++Golden: Flash Player 32 (LNX 32,0,0,465) DIRECT-mode trace, s27 coordinator
++(w1-local-oracles/w1-avm1-leftovers). Flash REFUTES the Ruffle-derived t5 row:
++the late-bound field never sees the later write (`s.t5.text=L`), so the w1
++retry-registration hunk was dropped in s27 w2-avm1-leftovers-land. (The
++`--wrapped` capture is not a golden here: inside an AS3 host `_root`-relative
++paths do not resolve and every binding read undefined.)
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import struct
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++
++
++def edit_text(cid, var, text):
++    # HasText | ReadOnly; no font (device default), no layout.
++    return tag(37, struct.pack('<H', cid) + rect(0, 2000, 0, 400) + bytes([0x80 | 0x08, 0x00])
++               + s(var) + s(text))
++
++
++fields = [('t1', 'mc:foo', 'F'), ('t2', '_root.s.mc:bar', 'B'), ('t3', 'mc.baz', 'Z'),
++          ('t4', '_parent.pv', 'P'), ('t5', 'late.q', 'L')]
++defs = sprite(2, [b''])
++for i, (_, var, txt) in enumerate(fields):
++    defs += edit_text(10 + i, var, txt)
++s_f0 = place(1, 2, 'mc')
++s_f1 = b''.join(place(2 + i, 10 + i, nm, 0, 20 * i) for i, (nm, _, _) in enumerate(fields))
++defs += sprite(3, [s_f0, s_f1 + doaction(STOP)])
++
++f1 = place(1, 3, 's')
++f1b = doaction(b'')
++f2 = doaction(
++    T('s.mc.foo=', get('s.mc.foo')) + T('s.mc:foo=', push('s.mc:foo') + GETVAR)
++    + T('s[mc:foo]=', get('s') + push('mc:foo') + GETMEM)
++    + T('s.mc.bar=', get('s.mc.bar'))
++    + T('s.mc.baz=', get('s.mc.baz')) + T('_root.mc=', get('_root.mc') + TYPEOF)
++    + T('_root.pv=', get('_root.pv')) + T('s.pv=', get('s.pv'))
++    + callm('s', 'createEmptyMovieClip', 'late', 10)
++)
++f3 = doaction(T('s.late.q=', get('s.late.q') + TYPEOF)
++              + get('s.late') + push('q', 'X') + SETMEM)
++f4 = doaction(T('s.t5.text=', get('s.t5.text')) + STOP)
++open(sys.argv[1], 'wb').write(swf(8, defs, [f1, f1b, f2, f3, f4]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/output.txt b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/output.txt
+new file mode 100644
+index 000000000..a4e6a88a9
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/output.txt
+@@ -0,0 +1,10 @@
++s.mc.foo=F
++s.mc:foo=F
++s[mc:foo]=undefined
++s.mc.bar=B
++s.mc.baz=Z
++_root.mc=undefined
++_root.pv=P
++s.pv=undefined
++s.late.q=undefined
++s.t5.text=L
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/test.swf b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c0cfd14f7116a0cf00ddbf6e78098e56cdb4545f
+GIT binary patch
+literal 751
+zcmZ`$%Syvg6r3h)(=@3fNL45<T)2{ek8T7X*jhIl#RrNHY77wsW770ew5#rP;W}&o
+z!yoW({DgQ;(sC_g7RjB=+&SmWX`P>xz7-(E<OlFMz<dGCDbUkUk|g=k738o@@Ki73
+z7MlZ@gE#o@`h5_fg=^iAf7?+I2&-!md*?*hp*yBzeb>5k`nbe}UXg#>p%Zye!U}sh
+zBK?G99v$IX9qc2~FR8u?1#iWL9DRJ3I-;|JGQ=|8i;F4@Ok)LNg;5?Rs+faVWmG@~
+zv(RtF8lxg62$=&>hoWlfWUuV1qDvsB(rZgS%K@<g@F*4yx`9|Fgj$>jSGVH=zya8M
+ziz6KeLb`HxD~+c{tV#GPi|a<(l-MTK{BodpA}RS*iNhS%_5acJN4jhkzDqg{NRjNm
+znRT6M!rmVZ?SjkE#V+k-tkjS)pwXZJ?+6rzrVtoqR0Z6~BWBkR#mhm^d+-{M4<U|c
+z(r|ZKnueQgSo#--hBiBOU~`|t+$BY)4sd}(GFwv9d@WJ8g!e3@6NN_$wqp`A!Q*7R
+F{sGTlqI>`V
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/test.toml b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/test.toml
+new file mode 100644
+index 000000000..1e15fdf27
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_path_variable_scope/test.toml
+@@ -0,0 +1 @@
++num_frames = 5
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/create_test_swf.py
+new file mode 100644
+index 000000000..986a71b8f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/create_test_swf.py
+@@ -0,0 +1,91 @@
++#!/usr/bin/env python3
++"""avm1_mc_button_unified_pick: AS-handler MovieClips (onPress / onRelease /
++onRollOver / onRollOut) and DefineButton2 buttons share ONE mouse pick: only
++the topmost interactive object under the pointer gets the event.
++
++s27 w1-avm1-leftovers item 1. Ruffle player.rs run_mouse_pick ->
++mouse_pick_avm1 walks the render list top-down and returns the FIRST
++interactive hit: a DefineButton (avm1_button.rs) or a button-mode clip
++(movie_clip.rs: a clip with button handlers returns itself before recursing,
++so its children never pick). One target per event.
++Zones (100x100 px squares):
++  Z1 (0,0)     DefineButton B1 (depth 1) under clip m1 (depth 2)  -> m1 only
++  Z2 (200,0)   clip m2 (depth 3) under DefineButton B2 (depth 4)  -> B2 only
++  Z3 (0,200)   clip lo (depth 5) under clip hi (depth 6)          -> hi only
++  Z4 (200,200) clip par (depth 7) holding clip kid, both handlers -> par only
++Each zone: move in, press, release, move out (to the empty (150,150)).
++
++Golden: analytic (Ruffle source run_mouse_pick / mouse_pick_avm1). Neither
++Flash oracle mode replays mouse input; Ruffle test-runner confirmation is a
++standing LOCAL ORACLE REQUEST (s27 w2-avm1-leftovers-land report).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import struct
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++
++def sbits(v, n):
++    return format(v & ((1 << n) - 1), '0%db' % n)
++
++
++def square_shape(sid, px, rgb):
++    w = px * 20
++    nb = w.bit_length() + 1
++    body = struct.pack('<H', sid) + rect(0, w, 0, w) + b'\x01\x00' + bytes(rgb) + b'\x00'
++    b = '0001' + '0000' + '0' + '0' + '0' + '0' + '1' + '1' + '00001' + '0' + '0' + '1'
++    for dx, dy in ((w, 0), (0, w), (-w, 0), (0, -w)):
++        b += '1' + '1' + format(nb - 2, '04b') + '1' + sbits(dx, nb) + sbits(dy, nb)
++    b += '000000'
++    b += '0' * ((8 - len(b) % 8) % 8)
++    return tag(2, body + int(b, 2).to_bytes(len(b) // 8, 'big'))
++
++
++def trace_this(label):
++    return push('this') + GETVAR + push(label) + ADD2 + TRACE
++
++
++CONDS = [(0x01, 'rollOver'), (0x02, 'rollOut'), (0x04, 'press'), (0x08, 'release')]
++
++
++def button2(bid, shape_id, name):
++    recs = bytes([0x0f]) + struct.pack('<HH', shape_id, 1) + b'\x00' + b'\x00' + b'\x00'
++    acts = b''
++    for i, (flag, ev) in enumerate(CONDS):
++        body = bytes([flag, 0]) + trace_this(' %s %s' % (name, ev)) + b'\x00'
++        size = 0 if i == len(CONDS) - 1 else 2 + len(body)
++        acts += struct.pack('<H', size) + body
++    return tag(34, struct.pack('<HB', bid, 0) + struct.pack('<H', 2 + len(recs)) + recs + acts)
++
++
++kid = sprite(22, [tag(26, bytes([0x02]) + struct.pack('<HH', 1, 2))])            # blue 50px clip
++defs = (square_shape(1, 100, (255, 0, 0)) + square_shape(2, 50, (0, 0, 255))
++        + button2(10, 1, 'B1') + button2(11, 1, 'B2')
++        + sprite(20, [tag(26, bytes([0x02]) + struct.pack('<HH', 1, 1))])        # red 100px clip
++        + kid
++        + sprite(21, [tag(26, bytes([0x02]) + struct.pack('<HH', 1, 1)) + place(2, 22, 'kid', 25, 25)]))
++
++
++def bt_place(depth, cid, x, y):
++    return tag(26, bytes([0x02 | 0x04]) + struct.pack('<HH', depth, cid) + matrix_translate(x, y)) if (x or y) \
++        else tag(26, bytes([0x02]) + struct.pack('<HH', depth, cid))
++
++
++def handlers(path):
++    code = b''
++    for ev in ('onRollOver', 'onRollOut', 'onPress', 'onRelease'):
++        code += get(path) + push(ev) + deffunc1('', [], trace_this(' ' + ev)) + SETMEM
++    return code
++
++
++root_f1 = (bt_place(1, 10, 0, 0) + place(2, 20, 'm1')
++           + place(3, 20, 'm2', 200, 0) + bt_place(4, 11, 200, 0)
++           + place(5, 20, 'lo', 0, 200) + place(6, 20, 'hi', 0, 200)
++           + place(7, 21, 'par', 200, 200)
++           + doaction(handlers('m1') + handlers('m2') + handlers('lo') + handlers('hi')
++                      + handlers('par') + handlers('par.kid') + push('ready') + TRACE + STOP))
++open(sys.argv[1], 'wb').write(swf(8, defs, [root_f1]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/input.json b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/input.json
+new file mode 100644
+index 000000000..b242631e1
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/input.json
+@@ -0,0 +1,215 @@
++[
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   50,
++   50
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseDown",
++  "pos": [
++   50,
++   50
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseUp",
++  "pos": [
++   50,
++   50
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   150,
++   150
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   250,
++   50
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseDown",
++  "pos": [
++   250,
++   50
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseUp",
++  "pos": [
++   250,
++   50
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   150,
++   150
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   50,
++   250
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseDown",
++  "pos": [
++   50,
++   250
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseUp",
++  "pos": [
++   50,
++   250
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   150,
++   150
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   210,
++   210
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseDown",
++  "pos": [
++   210,
++   210
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseUp",
++  "pos": [
++   210,
++   210
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   150,
++   150
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   240,
++   240
++  ]
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseDown",
++  "pos": [
++   240,
++   240
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseUp",
++  "pos": [
++   240,
++   240
++  ],
++  "btn": "Left"
++ },
++ {
++  "type": "Wait"
++ },
++ {
++  "type": "MouseMove",
++  "pos": [
++   150,
++   150
++  ]
++ },
++ {
++  "type": "Wait"
++ }
++]
+\ No newline at end of file
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/output.txt b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/output.txt
+new file mode 100644
+index 000000000..aa168a27f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/output.txt
+@@ -0,0 +1,21 @@
++ready
++_level0.m1 onRollOver
++_level0.m1 onPress
++_level0.m1 onRelease
++_level0.m1 onRollOut
++_level0 B2 rollOver
++_level0 B2 press
++_level0 B2 release
++_level0 B2 rollOut
++_level0.hi onRollOver
++_level0.hi onPress
++_level0.hi onRelease
++_level0.hi onRollOut
++_level0.par onRollOver
++_level0.par onPress
++_level0.par onRelease
++_level0.par onRollOut
++_level0.par onRollOver
++_level0.par onPress
++_level0.par onRelease
++_level0.par onRollOut
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/test.swf b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c6e11ae4bc4efd2e40982365607d6d6c35882277
+GIT binary patch
+literal 2005
+zcmbuAPfrs;7{;I7mf036f09C?7OfoWmG%Q*qXuq5^dLu?unCRDHd`d&K+=neF_C!c
+zg^-|EFWx=iH^7Tmuk-_O;!>ZP=}spmU}k7GX?Nb|_rCA*&hB*e^{d?P2<Twu6!_7@
+zg8<Lxz|XUAI2?XOfGw=_cm)`8b++*M+W^r94yV6wVX+<-@C6|@afslOVo*iR@c^Zt
+znZboXv>XVW<vueqDX*D8sj$Saz5w=inq8Fo(?I!YwVbqDt@Zsl!CD26nAcL=u@vw2
+zq~Ia4wqQyNI!WB^$}o_#!zmxP;zl=?0^Jp{o4cz0x2uuj`mSo_8@nPu?&>^W<Y?ZD
+zP!6h27w7qfbRkp=fAaI`LV!=A5@G?xtCilH=C+C}b`l@NQivjUt5TEUuX|U_wp+tT
+zA+ng#w+v0l5TajbwWU&|w>wQ7iAscdDjDrG5<JPAOaT2X(^R=>1)%-*Wx8d@3<0Ho
+zXKpFhD(i;j*hdkLO{4d1l)1}eflcNmxuJGhb9Zfy4;eWfwkch2H0JB;nSIcm)^6ca
+zvVJZl>F#n|&(S6K-Fq(;>*Z3B&MvKbjxPB)d%IMumrF%DyR_=Lxa12c-%>xD26p#p
+vP&cCn(-pm(GKW0&UU;2FrU8@X7T!$`&mkDzeH#4#PU6P)0eD*1c?SOloQBE_
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/test.toml b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/test.toml
+new file mode 100644
+index 000000000..eb4fb4e2f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_button_unified_pick/test.toml
+@@ -0,0 +1 @@
++num_frames = 22
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/create_test_swf.py
+new file mode 100644
+index 000000000..69d28bfa7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/create_test_swf.py
+@@ -0,0 +1,68 @@
++#!/usr/bin/env python3
++"""avm1_resolve_dotted_getvariable: GetVariable / SetVariable of a dotted
++path string ("o.b.c") calls __resolve for a MISSING INTERMEDIATE segment,
++but not for the final one.
++
++s27 w1-avm1-leftovers item 3. Ruffle activation.rs get_variable: the path
++before the right-most '.'/':' goes through resolve_target_path, which reads
++each segment with object.get(name) (get_opt(.., call_resolve_fn = true)), so
++a miss calls __resolve; the final name is checked with has_property (no
++__resolve) and an absent one falls through the scope chain to undefined.
++set_variable resolves the target the same way. Clips too (child_by_name
++first, then object.get -> MovieClip __resolve).
++
++Golden: Flash Player 32 trace (direct == wrapped). Flash REFUTES the Ruffle
++derivation: a GetVariable/SetVariable path string never calls __resolve for
++its TARGET segments (`o.b.c` reads undefined, no `resolve b`; SetVariable
++"o.w.c" resolves nothing, the single `resolve w` is the GetMember `o.w`), and
++DOES call it for GetVariable's final segment (`o.zz` = the resolver's object).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++
++
++def gv(path):
++    return push(path) + GETVAR
++
++
++# __resolve(n): trace, then return {c: "C_" + n, d: {e: "E_" + n}} for n != "prim", else "P"
++res_body = (
++    T('  resolve ', push('n') + GETVAR)
++    + push('n') + GETVAR + push('prim') + op(0x49)       # Equals2
++    + op(0x12)                                           # Not
++    + op(0x9d, (len(push('P') + RETURN)).to_bytes(2, 'little', signed=True))  # If !(n==prim) skip
++    + push('P') + RETURN
++    + push('c', 'C_') + push('n') + GETVAR + ADD2
++    + push('d', 'e', 'E_') + push('n') + GETVAR + ADD2 + push(1) + INITOBJ
++    + push(2) + INITOBJ + RETURN
++)
++resolver = deffunc1('', ['n'], res_body)
++
++f1 = (
++    push('o', 0) + INITOBJ + SETVAR
++    + get('o') + push('__resolve') + resolver + SETMEM
++    + get('o') + push('real', 'R') + SETMEM
++    + T('o.b.c = ', gv('o.b.c'))
++    + T('o.b.d.e = ', gv('o.b.d.e'))
++    + T('o:b.c = ', gv('o:b.c'))
++    + T('o.zz = ', gv('o.zz'))
++    + T('o.real = ', gv('o.real'))
++    + T('o.prim.c = ', gv('o.prim.c'))
++    + push('o.w.c', 'set') + SETVAR
++    + T('after set o.w.c: o.w = ', get('o.w') + TYPEOF)
++    # a clip with __resolve
++    + callm('this', 'createEmptyMovieClip', 'm', 1)
++    + get('m') + push('__resolve') + resolver + SETMEM
++    + T('m.q.c = ', gv('m.q.c'))
++    + T('m.zz = ', gv('m.zz'))
++    + T('_root.m.q.c = ', gv('_root.m.q.c'))
++    + STOP
++)
++open(sys.argv[1], 'wb').write(swf(6, b'', [doaction(f1)]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/output.txt b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/output.txt
+new file mode 100644
+index 000000000..46de33941
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/output.txt
+@@ -0,0 +1,13 @@
++o.b.c = 
++o.b.d.e = 
++o:b.c = 
++  resolve zz
++o.zz = [object Object]
++o.real = R
++o.prim.c = 
++  resolve w
++after set o.w.c: o.w = object
++m.q.c = 
++  resolve zz
++m.zz = [object Object]
++_root.m.q.c = 
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/test.swf b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..04d2c149a6045b276dac13cf70a819b525cb9bce
+GIT binary patch
+literal 735
+zcmd5)OHKko6f7VD{^Dn$F#$6xmwf;d(FD-APz)|y5`;ER!q7NOB(m}py)h=9!i|UV
+zC|K_?BOJlmbl0n{_o}Ps;{LAqlLyAw`2@b-aGXPP5BwVW`Fws>_#)}cfI~^ERbLQL
+z@tZ)m8{3H+zF54I%wfbfehUbKv>rfCk5IWhNjJX8S#cQQYX2k8mQub&-BaJ^%<iAS
+zZvX?p0<D$e8cI3w=DDFUH0tfl&pHs>-Vo@ZEn;ULOg}iK1@=~;HfT@4z*yy|N};l%
+ztF7t;D5D2wGZpa;&dg?7XAI8BU}YpIMapdplG~<6)YSqjuU@7cfQd~|^+!POF|lz#
+z7&t?wCX04vPLev8DQ=p~v%H7`5wb8O+vF*n@Yn(4q^ZQVqH*$i?OsCL7=~kX4y8l%
+ppPrAQMCN(<R0^`lBgULXE_<!-^3RK%OUzQoq*qFEs)Td?AHU-3n}GlT
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/test.toml b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/test.toml
+new file mode 100644
+index 000000000..dbee897f5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_resolve_dotted_getvariable/test.toml
+@@ -0,0 +1 @@
++num_frames = 1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/create_test_swf.py
+new file mode 100644
+index 000000000..361af5fba
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/create_test_swf.py
+@@ -0,0 +1,52 @@
++#!/usr/bin/env python3
++"""avm1_set_new_text_format_size: setNewTextFormat({size, font}) only formats
++text inserted LATER; the existing text keeps its size/face, so textWidth /
++textHeight / getTextFormat(0) are unchanged until the next `text =`.
++
++s27 w1-avm1-leftovers item 4 (s26 landed the colour half). Ruffle
++text_field.rs set_new_text_format -> EditText::set_new_text_format only
++stores the format; replace_text uses it for new text.
++
++Golden: Flash Player 32 trace, with Linux Flash's default device font name
++`Times` replaced by `Times New Roman` (the Windows/corpus spelling, e.g.
++avm1/edittext_default_format). The argument is a PLAIN object built with
++InitObject, not a TextFormat: Flash 32 and the Ruffle exporter both ignore it
++entirely (getNewTextFormat().size stays 12, metrics unchanged). The deferral
++of a REAL TextFormat's size/font is not pinned here (Flash oracle pending).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++
++
++def fmt0(prop):
++    return push(0, 1) + get('tf') + push('getTextFormat') + CALLM + push(prop) + GETMEM
++
++
++def report(tag):
++    return T(tag, ' size0=', fmt0('size'), ' font0=', fmt0('font'),
++             ' nsize=', push(0) + get('tf') + push('getNewTextFormat') + CALLM + push('size') + GETMEM)
++
++
++newfmt = push('size', 40, 'font', '_serif', 2) + INITOBJ
++f1 = (
++    callm('this', 'createTextField', 'tf', 1, 10, 10, 300, 100)
++    + get('tf') + push('text', 'AB') + SETMEM
++    + report('before')
++    + push('w0') + get('tf.textWidth') + SETVAR
++    + push('h0') + get('tf.textHeight') + SETVAR
++    + newfmt + push(1) + get('tf') + push('setNewTextFormat') + CALLM + POP
++    + report('after setNewTextFormat')
++    + T('unchanged w=', get('tf.textWidth') + get('w0') + op(0x49), ' h=', get('tf.textHeight') + get('h0') + op(0x49))
++    + get('tf') + push('text', 'AB') + SETMEM
++    + report('after text=')
++    + T('grew h=', get('tf.textHeight') + get('h0') + op(0x48) + op(0x12))   # !(h < h0)... Less2 then Not
++    + STOP
++)
++open(sys.argv[1], 'wb').write(swf(8, b'', [doaction(f1)]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/output.txt b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/output.txt
+new file mode 100644
+index 000000000..bfadd7e0a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/output.txt
+@@ -0,0 +1,5 @@
++before size0=12 font0=Times New Roman nsize=12
++after setNewTextFormat size0=12 font0=Times New Roman nsize=12
++unchanged w=true h=true
++after text= size0=12 font0=Times New Roman nsize=12
++grew h=true
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/test.swf b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..483a659a5591f620b77cd60c491a3f697a44a65d
+GIT binary patch
+literal 1064
+zcmdT?%TB^j5Iul;@kwNZ3m{z)7B2V!;sXP?!30fMno6gSM2l&!sd433+_nGV$JLqg
+zP*GxB(#7O<X3m_MGt(Vi7n>WvBT8?;`zz`>TpWVGPCiZ3lR{bmObyCmmpaa|*^yUf
+z_z%!7%qG+pKMfo02QjLKON=A3HQms&?gn)4U|2Cs#OYPTXw81$>>O972;7l7i3nyJ
+zu;So_T5a?=O9_Dzngz53c%-wcljy<L7z(RkFz97?cM|IV;srCuhf+-Vc`D&wP?t06
+z0VONg8<Lr{J^{PaF-L);eGF<6_P>Pprr|yXp3m$xQ=bi@n!=m)gxi>+z=g`Qrz0(W
+zQ-fQINiVfjF-L&yYKp8M!F5;o0C)<=z8!kxSV?=8*0W7iFJ+6cd|BuG_?Bd!ZG}^_
+i{rz&E`*StrW|?x$kCfZ@B1%M*zclHWdkuwCKD`ei@%!=s
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/test.toml b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/test.toml
+new file mode 100644
+index 000000000..dbee897f5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_set_new_text_format_size/test.toml
+@@ -0,0 +1 @@
++num_frames = 1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/create_test_swf.py
+new file mode 100644
+index 000000000..d6eba73a3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/create_test_swf.py
+@@ -0,0 +1,115 @@
++#!/usr/bin/env python3
++"""avm1_swf6_case_insensitive_builtins: in a SWF6 movie identifiers are
++case-insensitive (Ruffle: Activation::is_case_sensitive() = swf_version > 6),
++so a builtin spelled in another case must still resolve: bare CallFunction
++globals and MovieClip methods, CallMethod on builtin objects / primitives /
++clips, GetVariable of builtin classes, and timeline event handler names.
++
++s27 w1-avm1-leftovers item 6 (census of case-sensitive builtin name arms; s26
++fixed only the CallFunction nav arm, gnash `sound` = `gotoandPlay`).
++Each row: `<label>: <typeof result> <result>`. Rows whose CANONICAL spelling
++also disagrees with Ruffle (version-7 MovieClip methods in SWF6, getVersion,
++hasOwnProperty) are left out: see the s27 report's leads.
++
++Golden: Flash Player 32 DIRECT-mode trace, cut at num_frames (== the
++Ruffle-source prediction). The `--wrapped` capture reads getDepth -77824 for
++`_root` only because the SWF is then a loaded child of the AS3 host.
++
++Usage: create_test_swf.py <out.swf> [version]
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++VER = int(sys.argv[2]) if len(sys.argv) > 2 else 6
++CANON_MODE = len(sys.argv) > 3 and sys.argv[3] == 'canon'   # control twin: canonical spellings
++CANON = {n.lower(): n for n in '''parseInt parseFloat isNaN isFinite escape unescape String Number Boolean Array
++Object getVersion setInterval ASnative getDepth getBytesTotal getNextHighestDepth createEmptyMovieClip
++getInstanceAtDepth createTextField getSWFVersion hitTest getBounds swapDepths floor Math toUpperCase charAt
++indexOf join fromCharCode toString hasOwnProperty isDown getTextFormat replaceSel PI _x _name text width
++onEnterFrame'''.split()}
++
++
++def C(name):
++    return CANON.get(name.lower(), name) if CANON_MODE else name
++
++
++def args_code(args):
++    return b''.join(a if isinstance(a, bytes) else push(a) for a in reversed(args))
++
++
++def cf(name, *args):
++    """bare name(args), value left on the stack"""
++    return args_code(args) + push(len(args), C(name)) + CALLF
++
++
++def cm(objcode, meth, *args):
++    return args_code(args) + push(len(args)) + objcode + push(C(meth)) + CALLM
++
++
++def row(label, code):
++    # trace(label + ": " + typeof(v) + " " + v) with v evaluated twice? no:
++    # store in a register-free temp var
++    return (push('_v') + code + SETVAR
++            + T(label + ': ', get('_v') + TYPEOF, ' ', get('_v')))
++
++
++def lit(v):
++    return push(v)
++
++
++rows = [
++    # --- bare CallFunction: globals
++    ('cf parseint', cf('parseint', '12')),
++    ('cf PARSEFLOAT', cf('PARSEFLOAT', '1.5')),
++    ('cf isnan', cf('isnan', 1)),
++    ('cf isFINITE', cf('isFINITE', 1)),
++    ('cf ESCAPE', cf('ESCAPE', 'a b')),
++    ('cf unescape', cf('unescape', 'a%20b')),
++    ('cf string', cf('string', 5)),
++    ('cf NUMBER', cf('NUMBER', '3')),
++    ('cf boolean', cf('boolean', 1)),
++    ('cf array.length', cf('array', 4, 5, 6) + push('length') + GETMEM),
++    ('cf OBJECT', cf('OBJECT') + TYPEOF),
++    ('cf asnative', cf('asnative', 200, 0) + TYPEOF),
++    # --- bare CallFunction: MovieClip methods on _root
++    ('cf getdepth', cf('getdepth')),
++    ('cf GETBYTESTOTAL', cf('GETBYTESTOTAL') + TYPEOF),
++    ('cf createemptymovieclip', cf('createemptymovieclip', 'c1', 5) + POP + get('c1') + TYPEOF),
++    ('cf createtextfield', cf('createtextfield', 't1', 6, 0, 0, 50, 20) + POP + get('t1') + TYPEOF),
++    ('cf getswfversion', cf('getswfversion')),
++    ('cf swapdepths', cm(get('c1'), 'swapdepths', 9) + POP + cm(get('c1'), 'getDepth')),
++    # --- CallMethod on builtins / primitives
++    ('cm Math.FLOOR', cm(get('Math'), 'FLOOR', 1.5)),
++    ('cm math.floor', cm(get('math'), 'floor', 2.5)),
++    ('cm str.TOUPPERCASE', cm(lit('abc'), 'TOUPPERCASE')),
++    ('cm str.charat', cm(lit('abc'), 'charat', 1)),
++    ('cm str.INDEXOF', cm(lit('abc'), 'INDEXOF', 'c')),
++    ('cm arr.JOIN', cm(cf('Array', 1, 2), 'JOIN', '-')),
++    ('cm String.FROMCHARCODE', cm(get('String'), 'FROMCHARCODE', 65)),
++    ('cm num.TOSTRING', cm(lit(10), 'TOSTRING', 16)),
++    ('cm Key.ISDOWN', cm(get('Key'), 'ISDOWN', 65)),
++    ('cm _root.GETDEPTH', cm(get('_root'), 'GETDEPTH')),
++    ('cm c1.getdepth', cm(get('c1'), 'getdepth')),
++    ('cm _root.CREATEEMPTYMOVIECLIP', cm(get('_root'), 'CREATEEMPTYMOVIECLIP', 'c2', 7) + POP + get('c2') + TYPEOF),
++    ('cm t1.GETTEXTFORMAT', cm(get('t1'), 'GETTEXTFORMAT') + TYPEOF),
++    ('cm t1.REPLACESEL', cm(get('t1'), 'REPLACESEL', 'q') + TYPEOF),
++    # --- GetMember / GetVariable on builtins
++    ('gm Math.pi', get('Math') + push(C('pi')) + GETMEM),
++    ('gv MATH', get(C('MATH')) + TYPEOF),
++    ('gm _root._X', get('_root') + push(C('_X')) + GETMEM),
++    ('gm c1._NAME', get('c1') + push(C('_NAME')) + GETMEM),
++    ('gm t1.TEXT', get('t1') + push(C('TEXT')) + GETMEM),
++    ('gm Stage.WIDTH', get('Stage') + push(C('WIDTH')) + GETMEM),
++]
++
++f1 = b''.join(row(l, c) for l, c in rows)
++# event handler name case: onenterframe on a clip (fires each frame)
++onef = deffunc2('', [], T('c1.onenterframe ', get('_root.n')) + push('n') + get('n') + op(0x50) + SETVAR, nregs=1, flags=0, first_param_reg=0)
++f1 += push('n', 0) + SETVAR + get('c1') + push(C('onenterframe')) + onef + SETMEM
++f2 = T('f2 n=', get('n'))
++f3 = T('f3 n=', get('n')) + STOP
++open(sys.argv[1], 'wb').write(swf(VER, b'', [doaction(f1), doaction(f2), doaction(f3)]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/output.txt b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/output.txt
+new file mode 100644
+index 000000000..0fd275b4f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/output.txt
+@@ -0,0 +1,42 @@
++cf parseint: number 12
++cf PARSEFLOAT: number 1.5
++cf isnan: boolean false
++cf isFINITE: boolean true
++cf ESCAPE: string a%20b
++cf unescape: string a b
++cf string: string 5
++cf NUMBER: number 3
++cf boolean: boolean true
++cf array.length: number 3
++cf OBJECT: string object
++cf asnative: string function
++cf getdepth: number -16384
++cf GETBYTESTOTAL: string number
++cf createemptymovieclip: string movieclip
++cf createtextfield: string object
++cf getswfversion: number 6
++cf swapdepths: number 9
++cm Math.FLOOR: number 1
++cm math.floor: number 2
++cm str.TOUPPERCASE: string ABC
++cm str.charat: string b
++cm str.INDEXOF: number 2
++cm arr.JOIN: string 1-2
++cm String.FROMCHARCODE: string A
++cm num.TOSTRING: string a
++cm Key.ISDOWN: boolean false
++cm _root.GETDEPTH: number -16384
++cm c1.getdepth: number 9
++cm _root.CREATEEMPTYMOVIECLIP: string movieclip
++cm t1.GETTEXTFORMAT: string object
++cm t1.REPLACESEL: string undefined
++gm Math.pi: number 3.14159265358979
++gv MATH: string object
++gm _root._X: number 0
++gm c1._NAME: string c1
++gm t1.TEXT: string q
++gm Stage.WIDTH: number 400
++c1.onenterframe 0
++f2 n=1
++c1.onenterframe 1
++f3 n=2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/test.swf b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd0b12bfe1e51f43cd692e6ed2f6a5429ebfa653
+GIT binary patch
+literal 3601
+zcmb7{&2HO95XYx+5;bi;>eh*YMlRSxaw}0OC{PqI5?WfxN+nSsnc6uSv_dHaL`tO?
+zrM~qEdgQrp(L-OLkJOv{pIxpf1p&J9!8B)=zxmI{4(ZOBe|!Hv(SjcQN%Z&c^vxc%
+z_X$6(8`sy@&-ebiM^xM-x>(6eqe;aBs(r#c7GbuG;xwn@BiLv>v9#qUOFvU@cZ)qD
+zi@GJG-hHZZw}=|{4^-@zypiMiqSJSsfQb+RVr4UBN^Qm6k{K`4FlF3biIcaxk#w~2
+zveO&(0#QY)Ev7sQtxGEImCA(Qaz>Jd3?ou?Z^o(-g-@E_gQnHJOQYpDTtt;RZ80O>
+zq8iFksaxh*oKBgh)Tw(j7V7=1A`M>+PJ~yH)V&!As<_jN`(@59=kr;l>WQ93(n^Cd
+z?KabNthl1FiF*Z-k<u&+ujsh=lxP;E)BG(BkBYCPAGu^JtC=&DnVICCyc8`obX#Xq
+z8O$J1$P8Be4_{I38*B*C)p@)^wSiSfPn*oZ05ONAQT`@cAky^_))q6)LCNWg;N*26
+z{J;&IzEpJ}^R{I-L+a|FG~)&pkIRt9Srq0`lq~YAWWI`{@ho1@@gdI=Y^x&=kEO?t
+z?K5@^(K6Z1^2#aV<m;<!A9&0m>=D)YmXyOh`YoTt(d<pB2|HNRqYX{#EoO3bYEh8o
+z`^hTGmhoIpGL_javl$VA+$jT+r>aaHkH+Qua3LFEN#5Z)V!h!r*(hz<D4w3o)gxx!
+z?-0`U?{l3>sQ{Kii0-QwNHHeA>ru&1EMBmsZ3q6%7a#JIHGeXj&$Eip3%0bG@vAnV
+z@N&%ajRN=8Xe7Lr;|u0;u@eiE(%x7whRcM&NqJRHFp9=+!z|1z-ON`uGc-mU)P4v?
+zBlL!Caqf1Q{N-ACX*5QEw~3a+Y3&MQRSqks9IGhyOSd;<e>}1h3q#dri<vV-;B0m;
+zQsb+aR2}aJ>Ui#;b?SI6w=IkDwRE9&*qe*S-oDuM2JbipRNz<O`hnLQb~zA!J0w>6
+zE<wqa)fm4O4BovzM^`uph^pte-7}dc{sc-aEZE9s%$A1$N9rP*&vQ_r8k4v!M!_ko
+zeki$e(bo3e*xQpqy+YP~G;Y|ty+x2*9<g$k<NFe~+&DZFbO1P7El)Us5Q9<hdf@)j
+z6Rm!4#KVfEH07}Ub|b8h?cO;=9^%}q$Wb89gO2MB@NMd0t{+NQd4tneEtxsMf&8^P
+zHIOgeU<i9+)OT9K7k%l2=X_$pM`bs2P)$|97cqau;DAiak-CV@DGvIDUt^!+@s)+(
+zPtBg)s2n6*oU;Vv5fW6>U7VY7xVBsa<_(>Js5s~`X))%=BqK9ittunPE*s1!P~qp{
+zG*W`jdTnF}fnj(eFu7t&<Nwfb#8dT2aiqUqxIXhVO7ke2WMLA~AJ{~MSHX`YhjYW;
+wT(-8(2Kp(bA^xqBf2iN}(UD6p=wOdiH)&ewF_jD5r?5X%_Ger68WxED0~kZ;5&!@I
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/test.toml b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/test.toml
+new file mode 100644
+index 000000000..c64cb4c7d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_swf6_case_insensitive_builtins/test.toml
+@@ -0,0 +1 @@
++num_frames = 3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/create_test_swf.py
+new file mode 100644
+index 000000000..ea7d9be53
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/create_test_swf.py
+@@ -0,0 +1,18 @@
++#!/usr/bin/env python3
++"""avm1_swf7_case_sensitive_builtins: the SWF7 twin of
++avm1_swf6_case_insensitive_builtins (same rows, SWF version 7): every case
++variant must MISS (Ruffle is_case_sensitive() for swf_version > 6), except the
++display properties (`_X`, `_NAME`: Ruffle stage_object get_by_name is case
++insensitive in every version). Generator: ../avm1_swf6_case_insensitive_builtins.
++
++Golden: Flash Player 32 trace (== the Ruffle-source prediction).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import subprocess
++import sys
++
++here = os.path.dirname(os.path.abspath(__file__))
++gen = os.path.join(here, '..', 'avm1_swf6_case_insensitive_builtins', 'create_test_swf.py')
++subprocess.check_call([sys.executable, gen, sys.argv[1], '7'])
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/output.txt b/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/output.txt
+new file mode 100644
+index 000000000..90756cfd0
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/output.txt
+@@ -0,0 +1,40 @@
++cf parseint: undefined undefined
++cf PARSEFLOAT: undefined undefined
++cf isnan: undefined undefined
++cf isFINITE: undefined undefined
++cf ESCAPE: undefined undefined
++cf unescape: string a b
++cf string: undefined undefined
++cf NUMBER: undefined undefined
++cf boolean: undefined undefined
++cf array.length: undefined undefined
++cf OBJECT: string undefined
++cf asnative: string undefined
++cf getdepth: undefined undefined
++cf GETBYTESTOTAL: string undefined
++cf createemptymovieclip: string undefined
++cf createtextfield: string undefined
++cf getswfversion: undefined undefined
++cf swapdepths: undefined undefined
++cm Math.FLOOR: undefined undefined
++cm math.floor: undefined undefined
++cm str.TOUPPERCASE: undefined undefined
++cm str.charat: undefined undefined
++cm str.INDEXOF: undefined undefined
++cm arr.JOIN: undefined undefined
++cm String.FROMCHARCODE: undefined undefined
++cm num.TOSTRING: undefined undefined
++cm Key.ISDOWN: undefined undefined
++cm _root.GETDEPTH: undefined undefined
++cm c1.getdepth: undefined undefined
++cm _root.CREATEEMPTYMOVIECLIP: string undefined
++cm t1.GETTEXTFORMAT: string undefined
++cm t1.REPLACESEL: string undefined
++gm Math.pi: undefined undefined
++gv MATH: string undefined
++gm _root._X: number 0
++gm c1._NAME: undefined undefined
++gm t1.TEXT: undefined undefined
++gm Stage.WIDTH: undefined undefined
++f2 n=0
++f3 n=0
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/test.swf b/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..886bff7f08e4a410aa4889394bd7a915992569de
+GIT binary patch
+literal 3601
+zcmb7{&2HO95XYx+QZ;Qp>ePvWMlRSxb1M-kC{PqI5?WfxN+nSsnc6uSv_dHaL`tO?
+zrM~qEdgQrp(L-OLkJOv{pIxpf1p&J9!8B)=zxmI{4(ZOBU)#S&w4nQc68-%<eX~dH
+zeZo)c#`X2}^S!_B5*0UzE>`l=Xi{;XYM=0qMVKw4IL+z!2sRo|EN%J8($Cb}-C~c(
+zqHYPPcb{n7Eux0~0~PxvZ{&Es==5DDU?N0-SlLXOQd@DSWX8)hOc{4a;^ggaBpq$M
+z?DU4cKvdCciz$yn>ynDQr842SoROp<!-!Pfo3Uy{;djlaplNmQ(r7sj7g427Tg-^J
+zsD^S>>XvyHr&FdWb?V-Xg?c}$NW)iy6X8`Pb#F$3D(<x6UYWDY`Fs|sdZK5Mw9;Tq
+z`;=)qR$S58#JvK^NNJXZS9Dx_Ml_4kY5tamN5xmtk6f~q)yx^n%uI4mUWyhPx~(&*
+z3}z50WCkn#hp(vi4K{@6>O5Yd+Q6!#r%h&HfS5zmD1Q?z5b62|Yl|7@pyYH#aPm43
+ze&7a9U#dEgdE2s^A$4_7nsI}Q$7RUlEDG}|N*4K5GGE2fcor|{_>gA_w$+h`$I|1+
+z_8B{dXqoJ0dF2#w^7U1=4?N}&_K0eHOUhv${gzMSX!fSmgdMEu(T1k=7Be|IwJ6B)
+z{bUto%Xls)nab>z*^G!lZkGYcQ&pypN8|E+xR8yoB=2w?vEJ~xY?QWa6i-j)>Jc;V
+zw+ZR`_qk4`Q~=8$MEBJTq!^Rm^{C`07BAS+wgdm>ix2t9nm?J%=UK()1zXz8_*ENF
+zcsb_zMuGckG!kCR@db0a*olQnX>TkT!(~F?q`WF87)9f^VHW0<ZsseS85*MvYCi;{
+z5qiV6ICnctey~<v8jaE4Z=&UJTD!tnmBY#@$0~~b((Mh|ACIiW!ceu@V&)7HIGf#z
+z)cEQpRmb~*I-WadojP92ZOdYOEnTP`_U59ow=Xxn!8=X?75Ejne&F?nT@Hlb4vCe%
+zOHguUHO6lRgLm)G(G|`CqU!l=_e`dVKY<bp3%0Tuv*jVck-Es{^Bh#D#w2cwQE<wt
+zA4;xVw6%RV_V#2@uaI>gjT`oEZxJMyN35LX_`bv~HxADP9RQA2%M(r@#9$P>9=N~s
+zM62H$@vvekO*w48-3aSryLS$ehdB2taukU3pyPT2e4Bch>xa@+-r)3AOJ)vmAb+h+
+z4dhEV7{Z<y^_`aRMPK^hIiFbYQQ6HLR8tl3Ma*9@I3Uw<q%LA}ii3XP*Vq?$d}Sf{
+zQ?q9`DhCM{=PUtvgap-e7w2Xit}WMqc|&I)Dh_%~T8ud|$;b>>tI7zn%LX$FRQP!~
+zjg+9XUK`m#U>KeVOs?3{_&+op@l<_M9O<tYuFpJ;(mcv0S(rrh2R0GmRq!Lp;oPt{
+wm#wX{fqqJ9h<~f(AL@5~bmY<tI@sgXO`2AEOyxrN3G5G*{n?hih6SSk047oC6951J
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/test.toml b/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/test.toml
+new file mode 100644
+index 000000000..c64cb4c7d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_swf7_case_sensitive_builtins/test.toml
+@@ -0,0 +1 @@
++num_frames = 3

@@ -5883,6 +5883,20 @@ static int g_btn_pick_key[BTN_PICK_PATH_MAX];
 static int g_btn_pick_key_n;               // 0 = no winner yet
 static DisplayObject* g_btn_pick_obj;      // winning DefineButton entry
 static MovieClip* g_btn_pick_sprite;       // winning button-mode sprite
+// s27 item 1: the last outermost pick's winner (read by ng_btn_last_pick).
+static DisplayObject* g_btn_last_pick_obj;
+static MovieClip* g_btn_last_pick_sprite;
+static unsigned g_btn_last_pick_seq;
+// 1 when the last outermost ng_update_button_states pick was won by a
+// DefineButton (*sprite = NULL) or a button-mode sprite (*sprite set); 0 when
+// nothing was picked. *seq changes on every pick, so a caller can tell a
+// fresh pick from a stale one.
+int ng_btn_last_pick(MovieClip** sprite, unsigned* seq)
+{
+	if (sprite) *sprite = g_btn_last_pick_sprite;
+	if (seq) *seq = g_btn_last_pick_seq;
+	return g_btn_last_pick_obj != NULL || g_btn_last_pick_sprite != NULL;
+}
 
 static void btn_path_push(int v)
 {
@@ -6641,6 +6655,14 @@ int ng_update_button_states(SWFAppContext* app_context)
 	g_btn_path_n = 0;
 	ng_update_button_states_attached(app_context, &unit_hover);
 	int found_hover = g_btn_pick_key_n > 0;
+	// s27 w1-avm1-leftovers (item 1): publish the outermost pick's winner so
+	// action.c's AS-handler clip dispatch (actionDispatchMCPress /
+	// actionDispatchMCMouseMove) defers to a DefineButton that won above it.
+	if (saved_phase == BTN_PHASE_LEGACY) {
+		g_btn_last_pick_obj = g_btn_pick_obj;
+		g_btn_last_pick_sprite = g_btn_pick_sprite;
+		g_btn_last_pick_seq++;
+	}
 
 	// LEAVE: everything but the winner sees a miss (found_hover forced).
 	g_btn_phase = BTN_PHASE_LEAVE;

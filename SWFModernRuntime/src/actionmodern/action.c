@@ -9316,10 +9316,18 @@ static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, A
 // Returns ASFunction* if a callable __resolve is found, NULL otherwise.
 // Semantics: FUNCTION type → return it; OBJECT type → block (return NULL, sets *blocked=1);
 // all other types (number, string, movieclip, etc.) → skip, continue up chain.
+// s27 w2 (item 3): set while a GetVariable/SetVariable path string walks its
+// TARGET segments. Flash 32 never calls __resolve there: `o.b.c` with no `b`
+// reads undefined without __resolve("b"), and SetVariable "o.w.c" does not
+// resolve `w`; only GetVariable's FINAL segment (`o.zz`) resolves (regression
+// avm1_resolve_dotted_getvariable). Ruffle resolves the intermediates.
+int g_path_walk_no_resolve = 0;
+
 static ASFunction* findResolveMethod(SWFAppContext* app_context, ASObject* obj)
 {
 	ASObject* current = obj;
 	int max_depth = 256;
+	if (g_path_walk_no_resolve) return NULL;
 
 	for (int depth = 0; depth < max_depth && current != NULL; depth++)
 	{
@@ -14823,6 +14831,100 @@ static void bd1_draw_timeline_entry(BitmapDataNative* dest, const DisplayObject*
 	                  stencil, stencil_write_value, stencil_out);
 }
 
+// s27 w2-draw-cx-text: a TextField clip's background + border in draw().
+// Flash Player 32 (w1 oracle avm1_bitmapdata_draw_edittext): the box is
+// painted (draw(tf) = 16711680), and NEITHER the draw() colorTransform nor an
+// ancestor's Color tints it (draw(tf, m, ct) and draw(h > Color'd c > tf) both
+// stay 16711680), so `cx` is deliberately not applied. The box geometry is
+// the one actionIterateTextFields hands the renderer (field-local pixels:
+// createTextField visual offset + DefineEditText RECT min, mc->width/height),
+// rastered by the shared CPU painter avm2_cpu_raster_textbox into the
+// premultiplied scratch and composited like a timeline entry. Glyphs are not
+// drawn yet (the AVM1 EditText layout lives in tag.c's GPU text pass; see the
+// s27 w2-draw-cx-text report).
+static void bd1_draw_textfield_box(BitmapDataNative* dest, MovieClip* mc,
+                                   double ma, double mb, double mc_, double md,
+                                   double mtx, double mty,
+                                   int dx0, int dy0, int dx1, int dy1,
+                                   const uint8_t* stencil, uint8_t stencil_write_value,
+                                   uint8_t* stencil_out)
+{
+	if (mc->dynamic_props == NULL || dx1 <= dx0 || dy1 <= dy0) return;
+	ASObject* props = (ASObject*) mc->dynamic_props;
+	int has_bg = 0, has_border = 0;
+	u32 bg = 0xFFFFFF, bc = 0x000000;
+	ActionVar* v = getProperty(props, "background", 10);
+	if (v && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value) has_bg = 1;
+	if (has_bg && (v = getProperty(props, "backgroundColor", 15)) != NULL)
+		bg = (u32) varToDoubleSimple(v);
+	v = getProperty(props, "border", 6);
+	if (v && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value) has_border = 1;
+	if (has_border && (v = getProperty(props, "borderColor", 11)) != NULL)
+		bc = (u32) varToDoubleSimple(v);
+	if (!has_bg && !has_border) return;
+	// Device-font cull (Ruffle edit_text.rs:2698, the actionIterateTextFields
+	// rule): a rotated/sheared/reflected device-font field draws nothing.
+	v = getProperty(props, "embedFonts", 10);
+	int embed = (v && varToDoubleSimple(v) != 0.0);
+	if (!embed && !(fabs(mb) < 0.006 && fabs(mc_) < 0.006 && ma > 0.0 && md > 0.0))
+		return;
+	double bx = 0.0, by = 0.0;
+	if ((v = getProperty(props, "_tf_visualOffX", 14)) != NULL) bx = varToDoubleSimple(v);
+	if ((v = getProperty(props, "_tf_visualOffY", 14)) != NULL) by = varToDoubleSimple(v);
+	if (mc->ng_textfield_idx >= 0) {
+		s32 xmin, xmax, ymin, ymax;
+		ng_getTextFieldBounds(mc->ng_textfield_idx, &xmin, &xmax, &ymin, &ymax);
+		bx += xmin / 20.0;
+		by += ymin / 20.0;
+	}
+	size_t n = (size_t) dest->width * dest->height;
+	if (g_bd1_scratch_n < n) {
+		free(g_bd1_scratch);
+		g_bd1_scratch = (uint32_t*) malloc(n * sizeof(uint32_t));
+		g_bd1_scratch_n = g_bd1_scratch ? n : 0;
+		if (!g_bd1_scratch) return;
+	}
+	for (int y = dy0; y < dy1; y++)
+		memset(g_bd1_scratch + (size_t) y * dest->width + dx0, 0,
+		       (size_t) (dx1 - dx0) * sizeof(uint32_t));
+	avm2_cpu_raster_textbox(g_bd1_scratch, dest->width, dest->height, 1,
+	                        ma, mb, mc_, md, mtx, mty,
+	                        bx, by, (double) mc->width, (double) mc->height,
+	                        has_bg, bg & 0xFFFFFFu, has_border, bc & 0xFFFFFFu, 1.0);
+	bd1_apply_cx_over(dest, g_bd1_scratch, NULL, NULL, dx0, dy0, dx1, dy1,
+	                  stencil, stencil_write_value, stencil_out);
+}
+
+// s27 w2-draw-cx-text: a child clip's own colour transform composed UNDER the
+// running draw() transform `outer` (NULL = identity): out = outer(child).
+// Source: the MovieClip's cx_* mirror, which Color.setRGB / setTransform,
+// transform.colorTransform and _alpha all keep in sync in every build mode
+// (multipliers in percent, offsets in 0..255). rasterizeMovieClipToBitmap used
+// to pass `cx` to children unchanged, so a descendant's Color never tinted a
+// draw(). Returns 0 (out untouched) when the child's transform is identity.
+// A placed clip's baked PlaceObject cxform is not read here (no row needs it).
+static int bd1_compose_child_cx(const MovieClip* child, const DrawColorTransform* outer,
+                                DrawColorTransform* out)
+{
+	double im[4] = { child->cx_ra / 100.0, child->cx_ga / 100.0,
+	                 child->cx_ba / 100.0, child->cx_aa / 100.0 };
+	double io[4] = { child->cx_rb, child->cx_gb, child->cx_bb, child->cx_ab };
+	int ident = 1;
+	for (int k = 0; k < 4; k++)
+		if (im[k] != 1.0 || io[k] != 0.0) ident = 0;
+	if (ident) return 0;
+	DrawColorTransform o = outer ? *outer : (DrawColorTransform){1,1,1,1, 0,0,0,0};
+	double om[4] = { o.rm, o.gm, o.bm, o.am }, oo[4] = { o.ro, o.go, o.bo, o.ao };
+	double rm_[4], ro_[4];
+	for (int k = 0; k < 4; k++) {
+		rm_[k] = om[k] * im[k];
+		ro_[k] = om[k] * io[k] + oo[k];
+	}
+	out->rm = rm_[0]; out->gm = rm_[1]; out->bm = rm_[2]; out->am = rm_[3];
+	out->ro = ro_[0]; out->go = ro_[1]; out->bo = ro_[2]; out->ao = ro_[3];
+	return 1;
+}
+
 // Rasterize a MovieClip's finalized drawing paths into `dest_pixels`/`stencil`,
 // then recursively rasterize children (dynamic MCs on child_mc_cache).
 // - `dest_pixels` may be NULL when we're only writing a stencil.
@@ -14852,6 +14954,13 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
     if (dx1 > w) dx1 = w;
     if (dy1 > h) dy1 = h;
     if (dx0 >= dx1 || dy0 >= dy1) return;
+
+    // s27 w2-draw-cx-text: a TextField clip (MC_IS_TEXTFIELD, defined later in
+    // this file) paints its box (untinted, see bd1_draw_textfield_box).
+    if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2)
+        bd1_draw_textfield_box(dest, mc, ma, mb, mc_, md, mtx, mty,
+                               dx0, dy0, dx1, dy1,
+                               stencil, stencil_write_value, stencil_out);
 
     // Helper: invert the 2D affine part of a 4x4 column-major matrix as used
     // by gradient_matrix. Returns 0 if singular (then out_* are zeroed).
@@ -15179,9 +15288,15 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         double cd = mb * lc + md  * ld;
         double ctx = ma * ltx + mc_ * lty + mtx;
         double cty = mb * ltx + md  * lty + mty;
+        // s27 w2-draw-cx-text: compose the child's own Color (not when
+        // writing a mask stencil, which is coverage-only).
+        DrawColorTransform child_cx;
+        const DrawColorTransform* ccx = cx;
+        if (stencil_out == NULL && bd1_compose_child_cx(child, cx, &child_cx))
+            ccx = &child_cx;
         rasterizeMovieClipToBitmap(dest, child, ca, cb, cc, cd, ctx, cty,
                                    dx0, dy0, dx1, dy1,
-                                   stencil, stencil_write_value, stencil_out, cx);
+                                   stencil, stencil_write_value, stencil_out, ccx);
     }
 }
 
@@ -23814,6 +23929,96 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
 // targets this property name. Mirrors Ruffle's
 // `notify_property_change` (core/src/avm1/object/stage_object.rs:63).
 // Returns the number of bindings notified (0 if none).
+// s27 w1-avm1-leftovers (item 2): EditText `variable` paths. Ruffle
+// resolve_variable_path splits at the RIGHT-MOST ':' or '.' (path.rfind(":."),
+// any SWF version): "_root.mc:foo" is target "_root.mc", variable "foo"; a
+// name with neither is a plain variable on the parent.
+static const char* tfVarPathSep(const char* var_name)
+{
+	const char* sep = NULL;
+	for (const char* p = var_name; *p; p++)
+		if (*p == '.' || *p == ':') sep = p;
+	return sep;
+}
+
+// The clip a field's variable resolves from: its parent, climbed past AVM1
+// buttons (Ruffle try_bind_text_field_variable runs resolve_variable_path in a
+// child frame for that parent), never the context that happens to be current
+// (a placing timeline, a retry from any clip's frame, an input handler).
+static MovieClip* tfVarScopeClip(MovieClip* tf_mc)
+{
+	extern MovieClip root_movieclip;
+	MovieClip* p = (tf_mc != NULL && tf_mc->parent != NULL) ? tf_mc->parent : &root_movieclip;
+	while (p->is_button_mc && p->parent != NULL) p = p->parent;
+	return p;
+}
+
+// s27 w2 (2b): walk a clip-only target path ("mc", "_root.s.mc", "_parent")
+// over the live display list from `scope`. A field placed in the SAME frame as
+// its target clip binds during the parent's construction, when GetVariable
+// "mc" (context = parent) does not find the parent's already-placed child and
+// materializes a ghost clip instead (Flash 32 binds to the real child:
+// regression avm1_edittext_path_variable_same_frame). Returns NULL when any
+// segment is not a clip child, so the caller keeps the GetVariable route.
+static MovieClip* tfVarWalkClipPath(MovieClip* scope, const char* path, u32 len)
+{
+	extern MovieClip root_movieclip;
+	MovieClip* cur = scope;
+	u32 i = 0;
+	int first = 1;
+	int ci = (g_swf_version <= 6);
+	while (i < len) {
+		u32 j = i;
+		while (j < len && path[j] != '.' && path[j] != ':') j++;
+		u32 sl = j - i;
+		const char* sg = path + i;
+		if (sl == 0) return NULL;
+		if (first && sl == 5 && strncmp(sg, "_root", 5) == 0) cur = &root_movieclip;
+		else if (first && sl == 4 && strncmp(sg, "this", 4) == 0) { /* cur = scope */ }
+		else if (sl == 7 && strncmp(sg, "_parent", 7) == 0) {
+			if (cur->parent == NULL) return NULL;
+			cur = cur->parent;
+		} else if (sg[0] == '_') {
+			return NULL;   // _levelN, _global, ...: leave to GetVariable
+		} else {
+			MovieClip* hit = NULL;
+			for (int k = 0; k < child_mc_count; k++) {
+				MovieClip* c = child_mc_cache[k];
+				if (c == NULL || c->parent != cur || c->avm1_removed || c->pending_removal || strlen(c->name) != sl) continue;
+				if (ci ? strncasecmp(c->name, sg, sl) == 0 : strncmp(c->name, sg, sl) == 0) {
+					if (hit == NULL || c->depth < hit->depth) hit = c;
+				}
+			}
+			if (hit == NULL) return NULL;
+			cur = hit;
+		}
+		first = 0;
+		i = j + 1;
+	}
+	return cur;
+}
+
+// GetVariable of the target part of a path variable, from the field's scope.
+static void tfVarResolveTarget(SWFAppContext* app_context, MovieClip* tf_mc,
+	const char* var_name, u32 target_len, ActionVar* out)
+{
+	MovieClip* scope = tfVarScopeClip(tf_mc);
+	MovieClip* walked = tfVarWalkClipPath(scope, var_name, target_len);
+	if (walked != NULL) {
+		memset(out, 0, sizeof(*out));
+		out->type = ACTION_STACK_VALUE_MOVIECLIP;
+		out->data.numeric_value = (u64)(uintptr_t)walked;
+		return;
+	}
+	MovieClip* saved = g_current_context;
+	if (scope != saved) actionSetCurrentContext(scope);
+	PUSH_STR(var_name, target_len);
+	actionGetVariable(app_context);
+	peekVar(app_context, out);
+	POP();
+	if (scope != saved) actionSetCurrentContext(saved);
+}
+
 int actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
 	const char* prop_name, u32 prop_name_len, ActionVar* value)
 {
@@ -23847,7 +24052,7 @@ int actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
 		// with the whole name. Either way the registry's variable_name
 		// is the property we care about.
 		const char* match_name = b->variable_name;
-		const char* last_dot = strrchr(match_name, '.');
+		const char* last_dot = tfVarPathSep(match_name); // s27 item 2: ':' too
 		if (last_dot != NULL) match_name = last_dot + 1;
 		size_t match_len = strlen(match_name);
 		if (match_len != prop_name_len) continue;
@@ -23952,7 +24157,7 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 	ASObject* container = NULL;
 	const char* prop_name = NULL;
 	u32 prop_name_len = 0;
-	int is_path = (strchr(var_name, '.') != NULL);
+	int is_path = (tfVarPathSep(var_name) != NULL); // s27 item 2: ':' too
 	MovieClip* simple_binding_mc = NULL;  // for simple-name → also mirror to global var_map if root
 	// Phase C: track the container MC (when resolvable to an MC) for binding
 	// registration after a successful bind. NULL when the container is a
@@ -23960,30 +24165,18 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 	MovieClip* binding_container_mc = NULL;
 
 	if (is_path) {
-		const char* last_dot = strrchr(var_name, '.');
+		const char* last_dot = tfVarPathSep(var_name);
 		u32 container_path_len = (u32)(last_dot - var_name);
 		prop_name = last_dot + 1;
 		prop_name_len = (u32)strlen(prop_name);
 
 		// Ruffle resolve_variable_path(parent, path): a path resolves from
-		// the field's parent, climbed past AVM1 buttons as in the simple
-		// branch below, not from whatever context is current (the button
-		// clip while its state function places the field).
-		// regression avm1_button_textfield_path_binding.
-		MovieClip* path_scope = NULL;
-		if (tf_mc->parent != NULL && tf_mc->parent->is_button_mc) {
-			path_scope = tf_mc->parent;
-			while (path_scope->is_button_mc && path_scope->parent != NULL)
-				path_scope = path_scope->parent;
-		}
-		MovieClip* path_saved_ctx = g_current_context;
-		if (path_scope != NULL) actionSetCurrentContext(path_scope);
-		PUSH_STR(var_name, container_path_len);
-		actionGetVariable(app_context);
+		// the field's parent (climbed past AVM1 buttons), not from whatever
+		// context is current. regression avm1_button_textfield_path_binding;
+		// s27 item 2: every field, not only button children (also the
+		// actionRetryUnboundTextFields retry, which runs from any clip).
 		ActionVar cvar;
-		peekVar(app_context, &cvar);
-		POP();
-		if (path_scope != NULL) actionSetCurrentContext(path_saved_ctx);
+		tfVarResolveTarget(app_context, tf_mc, var_name, container_path_len, &cvar);
 
 		if (cvar.type == ACTION_STACK_VALUE_OBJECT) {
 			container = (ASObject*) VAL(u64, &cvar.data.numeric_value);
@@ -24016,7 +24209,11 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 
 	if (container == NULL) return 0;
 
-	if (!set_initial_value) return 1;  // retry path — binding resolved, done.
+	// Retry path — binding resolved, done. s27 w2: Flash refutes Ruffle's
+	// late registration here (Flash 32: a field whose target clip appears
+	// later never sees later writes; regression
+	// avm1_edittext_path_variable_scope, `s.t5.text=L`).
+	if (!set_initial_value) return 1;
 
 	// Set-initial-value direction: variable wins if defined; otherwise TF.text
 	// seeds the variable.
@@ -30684,23 +30881,18 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 	const char* var_name = _vn_buf;
 	if (var_name[0] == '\0') return;
 
-	// Handle dot-path variables (e.g., "obj.theVar")
-	const char* dot = strchr(var_name, '.');
+	// Handle path variables (e.g., "obj.theVar", "_root.mc:theVar").
+	// s27 item 2: split at the right-most ':' or '.', resolve the target from
+	// the field's parent scope (Ruffle propagate_text_binding ->
+	// resolve_variable_path(parent, ..)).
+	const char* dot = tfVarPathSep(var_name);
 	if (dot != NULL) {
-		// For path variables, resolve the path and set the property
 		const char* last_dot = dot;
-		for (const char* p = dot + 1; *p; p++) {
-			if (*p == '.') last_dot = p;
-		}
 		u32 container_len = (u32)(last_dot - var_name);
 		const char* final_prop = last_dot + 1;
 		u32 final_prop_len = strlen(final_prop);
-		// Resolve container
-		PUSH_STR(var_name, container_len);
-		actionGetVariable(app_context);
 		ActionVar container_var;
-		peekVar(app_context, &container_var);
-		POP();
+		tfVarResolveTarget(app_context, mc, var_name, container_len, &container_var);
 		int container_resolved = 0;
 		if (container_var.type == ACTION_STACK_VALUE_MOVIECLIP) {
 			MovieClip* target_mc = (MovieClip*) VAL(u64, &container_var.data.numeric_value);
@@ -49844,6 +50036,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
 					int first_seg = 1;
 					int walk_ok = 1;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+					int _pw_nr_saved = g_path_walk_no_resolve; g_path_walk_no_resolve = 1; // s27 w2 item 3: no __resolve on target segments
 					while (tp_remaining > 0 && walk_ok)
 					{
 						while (tp_remaining > 0 && *tp == ':') { tp++; tp_remaining--; }
@@ -49909,6 +50102,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
 						tp_remaining -= seg_len;
 						if (tp_remaining > 0) { tp++; tp_remaining--; }
 					}
+					g_path_walk_no_resolve = _pw_nr_saved;
 					if (walk_ok && STACK_TOP_TYPE != ACTION_STACK_VALUE_UNDEFINED &&
 					    STACK_TOP_TYPE != ACTION_STACK_VALUE_NULL) {
 						PUSH_STR(prop_name, prop_len);
@@ -50169,6 +50363,8 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
 					extern int g_path_walk_level0_undef;
 					int _saved_pw_lvl = g_path_walk_level0_undef;
 					g_path_walk_level0_undef = 1;
+					int _saved_pw_nr = g_path_walk_no_resolve;
+					g_path_walk_no_resolve = 1; // s27 w2 item 3
 					while (rest_len > 0) {
 						const char* next_sep = NULL;
 						for (u32 ri = 0; ri < rest_len; ri++) {
@@ -50183,6 +50379,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
 						else { rest_len = 0; }
 					}
 					g_path_walk_level0_undef = _saved_pw_lvl;
+					g_path_walk_no_resolve = _saved_pw_nr;
 				}
 				if (prop_len > 0) {
 					PUSH_STR(prop_name, prop_len);
@@ -51738,6 +51935,7 @@ void actionSetVariable(SWFAppContext* app_context)
 					int first_seg = 1;
 					int walk_ok = 1;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+					int _pw_nr_saved = g_path_walk_no_resolve; g_path_walk_no_resolve = 1; // s27 w2 item 3: no __resolve on target segments
 					while (tp_remaining > 0 && walk_ok)
 					{
 						while (tp_remaining > 0 && *tp == ':') { tp++; tp_remaining--; }
@@ -51803,6 +52001,7 @@ void actionSetVariable(SWFAppContext* app_context)
 						tp_remaining -= seg_len;
 						if (tp_remaining > 0) { tp++; tp_remaining--; }
 					}
+					g_path_walk_no_resolve = _pw_nr_saved;
 					PUSH_STR(prop_name, prop_len);
 					pushVar(app_context, &value_var);
 					actionSetMember(app_context);
@@ -51818,8 +52017,13 @@ void actionSetVariable(SWFAppContext* app_context)
 						actionSetVariable(app_context);
 						return;
 					}
-					PUSH_STR(target_ptr, target_len);
-					actionGetVariable(app_context);
+					{
+						// s27 w2 item 3: the target path never calls __resolve.
+						int _pw_nr_saved = g_path_walk_no_resolve; g_path_walk_no_resolve = 1;
+						PUSH_STR(target_ptr, target_len);
+						actionGetVariable(app_context);
+						g_path_walk_no_resolve = _pw_nr_saved;
+					}
 					PUSH_STR(prop_name, prop_len);
 					pushVar(app_context, &value_var);
 					actionSetMember(app_context);
@@ -68037,6 +68241,41 @@ static MovieClip* cfBareMCReceiver(const char* name, u32 name_len, int* shadowed
 	return g_current_context ? g_current_context : &root_movieclip;
 }
 
+// s27 w1-avm1-leftovers (item 6): SWF<=6 identifiers are case-insensitive
+// (Ruffle Activation::is_case_sensitive() = swf_version > 6), but the builtin
+// name arms below compare with strncmp. Map a case variant onto the arm's
+// canonical spelling at dispatcher entry (NULL-terminated table), so e.g. a
+// SWF6 `PARSEINT("12")` or `"abc".TOUPPERCASE()` takes the same arm as the
+// canonical spelling. SWF7+ (and an exact match) return `name` unchanged.
+static const char* swf6CanonBuiltinName(const char* name, u32 len, const char* const* table)
+{
+	if (g_swf_version > 6 || name == NULL) return name;
+	for (int i = 0; table[i] != NULL; i++) {
+		if (strlen(table[i]) == len && strncasecmp(name, table[i], len) == 0)
+			return table[i];
+	}
+	return name;
+}
+
+static const char* const k_swf6_cf_builtins[] = {
+	"lineStyle", "lineTo", "moveTo", "curveTo", "endFill", "beginFill", "clear",
+	"beginBitmapFill", "beginGradientFill", "lineGradientStyle", "parseInt",
+	"parseFloat", "isNaN", "isFinite", "escape", "unescape", "Array", "Date",
+	"Object", "Number", "Boolean", "String", "ASSetPropFlags", "addProperty",
+	"createTextField", "createEmptyMovieClip", "attachMovie", "getNextHighestDepth",
+	"getInstanceAtDepth", "setInterval", "setTimeout", "clearInterval",
+	"clearTimeout", "updateAfterEvent", "Function", "getBounds", "getRect", "hitTest",
+	NULL
+};
+static const char* const k_swf6_array_methods[] = {
+	"concat", "hasOwnProperty", "join", "pop", "push", "reverse", "shift", "slice",
+	"sort", "sortOn", "splice", "toString", "unshift", NULL
+};
+static const char* const k_swf6_string_methods[] = {
+	"charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "slice", "split",
+	"substr", "substring", "toLowerCase", "toString", "toUpperCase", "valueOf", NULL
+};
+
 void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
@@ -68050,6 +68289,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	const char* func_name = _cf_buf;
 	u32 func_name_string_id = STACK_TOP_ID;  // Preserve string_id for var_array lookup
 	POP();
+	{
+		// s27 w1-avm1-leftovers (item 6): canonical spelling for the builtin arms
+		// (same length, so func_name_len and _cf_buf's NUL stay valid).
+		const char* _canon = swf6CanonBuiltinName(func_name, func_name_len, k_swf6_cf_builtins);
+		if (_canon != func_name) memcpy(_cf_buf, _canon, func_name_len);
+	}
 
 	// 2. Pop number of arguments
 	ActionVar num_args_var;
@@ -69639,7 +69884,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	}
 	// getNextHighestDepth() — bare call: the with-clip / target clip
 	// (cfBareMCReceiver); the root walk below serves a root receiver.
-	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
+	// s27 w2 lead 3: VERSION_7 (Ruffle movie_clip.rs; the CallMethod arm
+	// already gates); a bare SWF6 call falls through to undefined.
+	else if (g_swf_version >= 7 && func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
 	{
 		// s26 PROTOTYPE: with-clip / target clip, not a hard-coded _root.
 		{
@@ -69670,7 +69917,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// (what Ruffle-method convention uses; stored by attachMovie / createEmptyMovieClip)
 	// or SWF-depth (stored by CloneSprite / duplicateMovieClip — the bytecode-biased
 	// form). Checking both lets clones placed at SWF-space depths still resolve.
-	else if (func_name_len == 18 && strncmp(func_name, "getInstanceAtDepth", 18) == 0)
+	// s27 w2 lead 3: VERSION_7 (Ruffle movie_clip.rs; the CallMethod arm
+	// already gates); a bare SWF6 call falls through to undefined.
+	else if (g_swf_version >= 7 && func_name_len == 18 && strncmp(func_name, "getInstanceAtDepth", 18) == 0)
 	{
 		// s26 PROTOTYPE: inside `with (clip)` the receiver is the with-clip.
 		{
@@ -71157,6 +71406,7 @@ static int callArrayMethod(SWFAppContext* app_context,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args)
 {
+	method_name = swf6CanonBuiltinName(method_name, method_name_len, k_swf6_array_methods); // s27 item 6
 	// hasOwnProperty(name) — arrays own "length", their live numeric indices,
 	// and any name in the props sidecar. Object.prototype.hasOwnProperty
 	// mis-casts an ASArray to ASObject, so handle it here (XML.as:354
@@ -73013,6 +73263,7 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 {
 	(void)str_buffer;
 	int slen = (int)str_len; // UTF-16 code unit count
+	method_name = swf6CanonBuiltinName(method_name, method_name_len, k_swf6_string_methods); // s27 item 6
 
 	// toUpperCase() - no arguments
 	if (method_name_len == 11 && strncmp(method_name, "toUpperCase", 11) == 0)
@@ -73758,6 +74009,80 @@ static int primNumBoolCallProtoMethod(SWFAppContext* app_context, ActionVar* obj
 	}
 	leaveClosureFrame(app_context, &cf);
 	return 1;
+}
+
+// s27 w2 (lead 2): SWF7+ is case-sensitive, but actionCallMethod's
+// MovieClip/TextField builtin arms compare with strncasecmp, so `_root.GETDEPTH()`
+// and `_root.CREATEEMPTYMOVIECLIP(..)` ran the builtin in SWF7 (Flash 32 and
+// Ruffle: undefined; regression avm1_swf7_case_sensitive_builtins). Returns 1
+// when, in SWF7+, `name` names one of those arms only case-insensitively.
+static const char* const k_mc_arm_names[] = {
+	"addProperty",
+	"attachBitmap",
+	"attachMovie",
+	"beginBitmapFill",
+	"beginFill",
+	"beginGradientFill",
+	"clear",
+	"createEmptyMovieClip",
+	"createTextField",
+	"curveTo",
+	"duplicateMovieClip",
+	"endFill",
+	"getBounds",
+	"getBytesLoaded",
+	"getBytesTotal",
+	"getDepth",
+	"getInstanceAtDepth",
+	"getNewTextFormat",
+	"getNextHighestDepth",
+	"getRect",
+	"getSWFVersion",
+	"getTextFormat",
+	"getTextSnapshot",
+	"globalToLocal",
+	"gotoAndPlay",
+	"gotoAndStop",
+	"hasOwnProperty",
+	"hitTest",
+	"isPropertyEnumerable",
+	"lineGradientStyle",
+	"lineStyle",
+	"lineTo",
+	"loadMovie",
+	"loadVariables",
+	"localToGlobal",
+	"moveTo",
+	"nextFrame",
+	"play",
+	"prevFrame",
+	"removeMovieClip",
+	"removeTextField",
+	"replaceSel",
+	"replaceText",
+	"setMask",
+	"setNewTextFormat",
+	"setTextFormat",
+	"startDrag",
+	"stop",
+	"stopDrag",
+	"swapDepths",
+	"toString",
+	"unloadMovie",
+	"unwatch",
+	"valueOf",
+	"watch",
+	NULL
+};
+static int mcArmCaseMiss(const char* name, u32 len)
+{
+	if (EFFECTIVE_SWF_VERSION() < 7) return 0;
+	for (int i = 0; k_mc_arm_names[i] != NULL; i++) {
+		const char* n = k_mc_arm_names[i];
+		if (strlen(n) == len && strncasecmp(n, name, len) == 0)
+			return strncmp(n, name, len) != 0;
+	}
+	return 0;
 }
 
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
@@ -76508,6 +76833,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			else if (method_name_len == 7 && strncasecmp(method_name, "unwatch", 7) == 0) _mcm_is_object_method = 1;
 			if (!_mcm_is_object_method) goto _mc_user_dispatch;
 		}
+		if (mcArmCaseMiss(method_name, method_name_len)) goto _mc_user_dispatch; // s27 w2 lead 2
 
 		if (method_name_len == 11 &&
 			(strncasecmp(method_name, "gotoAndStop", 11) == 0 || strncasecmp(method_name, "gotoAndPlay", 11) == 0))
@@ -78119,8 +78445,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 16 && strncasecmp(method_name, "setNewTextFormat", 16) == 0)
 		{
-			// setNewTextFormat(fmt): set the default format for newly-typed text
-			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+			// setNewTextFormat(fmt): set the default format for newly-typed text.
+			// s27 w2 (item 4 rework): only a real TextFormat counts; Flash 32 and
+			// the Ruffle exporter ignore a plain {size, font} object entirely
+			// (regression avm1_set_new_text_format_size).
+			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0
+			    && ((ASObject*) args[0].data.numeric_value)->native_type == NATIVE_TEXTFORMAT) {
 				ASObject* fmt_obj = (ASObject*) args[0].data.numeric_value;
 				tf_ps_set_new_text_format(app_context, mc, fmt_obj); // s25 span model
 				// Apply color to textColor
@@ -81308,7 +81638,22 @@ _mc_user_dispatch: ;
 	         obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
 	{
 		// Number/Boolean primitive - handle toString() and valueOf()
-		if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0)
+		// s27 w2 (lead 2): SWF7+ is case-sensitive; `(10).TOSTRING(16)` must
+		// not reach these strncasecmp arms (Flash 32: undefined).
+		int _nb_cs = (EFFECTIVE_SWF_VERSION() >= 7);
+		if (_nb_cs && ((method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0 && strncmp(method_name, "toString", 8) != 0)
+		            || (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0 && strncmp(method_name, "valueOf", 7) != 0)
+		            || (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0 && strncmp(method_name, "hasOwnProperty", 14) != 0)))
+		{
+			ActionVar _pnb_res;
+			int _pnb_done = primNumBoolCallProtoMethod(app_context, &obj_var,
+			                                           method_name, method_name_len,
+			                                           args, num_args, &_pnb_res);
+			if (args != NULL) FREE(args);
+			if (_pnb_done) pushVar(app_context, &_pnb_res);
+			else pushUndefined(app_context);
+		}
+		else if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0)
 		{
 			if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
 			{
@@ -82344,6 +82689,20 @@ static int mc_hit_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	return mc_get_pixel_aabb_ng(mc, x1, y1, x2, y2);
 }
 
+// s27 w1-avm1-leftovers (item 1): AS-handler clips and DefineButtons share ONE
+// pick (Ruffle run_mouse_pick -> mouse_pick_avm1: the first interactive hit in
+// render order, a DefineButton or a button-mode clip). tag.c's
+// ng_update_button_states runs that pick first on every move/press (both
+// walks, three phases); when a DefineButton won it, no handler clip may also
+// fire.
+static int ng_defbutton_won_pick(void)
+{
+	extern int ng_btn_last_pick(MovieClip** sprite, unsigned* seq);
+	MovieClip* sp = NULL;
+	return ng_btn_last_pick(&sp, NULL) && sp == NULL;
+}
+static MovieClip* ng_roll_pick_topmost(float mx, float my);
+
 // Dispatch AS2 onPress to all dynamic MCs whose hit area contains the mouse.
 // Called from swf_core.c on EV_MOUSE_DOWN_LEFT (after dispatch_clip_event_press).
 void actionDispatchMCPress(SWFAppContext* app_context)
@@ -82356,10 +82715,17 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 	ng_update_drag_droptarget();
 
 	mc_hit_area_pick_begin(app_context);
+	// s27 item 1: ONE target. The topmost button-mode clip (ancestors before
+	// descendants), and none when a DefineButton above it won tag.c's pick.
+	MovieClip* press_picked = ng_defbutton_won_pick() ? NULL : ng_roll_pick_topmost(mx, my);
 
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		// s27 item 1: sprite clips take part in the single pick; a DefineButton
+		// instance's own AS handlers (is_button_mc wrapper) ride on tag.c's
+		// button pick and keep their own path.
+		if (!mc->is_button_mc && mc != press_picked) continue;
 		// Text fields don't receive onPress/onRelease — clicking them acquires focus instead
 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
 		if (mc_removed_during_pick_ng(mc)) continue;
@@ -82565,7 +82931,7 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 	// Button-mode sprites share ONE pick: only the topmost one under the
 	// pointer is "inside" (avm1/hitarea_remove_owner_drag: btnRm at depth 2
 	// occludes btnZ at depth 1).
-	MovieClip* roll_picked = ng_roll_pick_topmost(mx, my);
+	MovieClip* roll_picked = ng_defbutton_won_pick() ? NULL : ng_roll_pick_topmost(mx, my); // s27 item 1
 
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
@@ -84674,67 +85040,61 @@ void actionTextControlSelectAll(SWFAppContext* app_context)
 	g_tf_select_all = 1;
 }
 
+static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
+                                 const uint16_t* ins, u32 ins_len);
+
+// s27 w1-avm1-leftovers (item 5): the focused field's selected range [*lo, *hi)
+// in UTF-16 units. 0 for a collapsed caret (Ruffle is_text_control_applicable:
+// Copy/Cut need !selection.is_caret()), or when there is no text.
+static int tf_selected_range(ActionVar* text_prop, u32* lo, u32* hi)
+{
+	u32 len = (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING) ? text_prop->str_size : 0;
+	if (g_tf_select_all) { *lo = 0; *hi = len; return len > 0; }
+	if (g_selection_begin < 0 || g_selection_end < 0 || g_selection_begin == g_selection_end) return 0;
+	u32 a = (u32)(g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end);
+	u32 b = (u32)(g_selection_begin > g_selection_end ? g_selection_begin : g_selection_end);
+	if (a > len) a = len;
+	if (b > len) b = len;
+	*lo = a; *hi = b;
+	return b > a;
+}
+
+static int tf_is_password(ASObject* props)
+{
+	ActionVar* pw_prop = getProperty(props, "password", 8);
+	return pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0;
+}
+
+// Copy: the clipboard gets the SELECTED text (Ruffle text_control_input:
+// text[selection]). A collapsed caret or a password field is a no-op (the
+// clipboard keeps its content). Dynamic (createTextField, idx -2) fields too.
 void actionTextControlCopy(SWFAppContext* app_context)
 {
 	(void)app_context;
-	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
 	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
-	if (props == NULL) return;
-
-	// Check password flag — password fields don't allow Copy
-	ActionVar* pw_prop = getProperty(props, "password", 8);
-	if (pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0)
-		return;
-
-	// Read text property
+	if (props == NULL || tf_is_password(props)) return;
 	ActionVar* text_prop = getProperty(props, "text", 4);
-	if (text_prop == NULL || text_prop->type != ACTION_STACK_VALUE_STRING) {
-		g_clipboard_text[0] = '\0';
-		g_clipboard_len = 0;
-		return;
-	}
-
+	u32 lo, hi;
+	if (!tf_selected_range(text_prop, &lo, &hi)) return;
 	const uint16_t* u16 = varGetU16Ptr(text_prop);
-	if (u16 == NULL || text_prop->str_size == 0) {
-		g_clipboard_text[0] = '\0';
-		g_clipboard_len = 0;
-		return;
-	}
-
-	int written = u16_to_utf8(u16, text_prop->str_size, g_clipboard_text, (int)sizeof(g_clipboard_text));
+	if (u16 == NULL) return;
+	int written = u16_to_utf8(u16 + lo, hi - lo, g_clipboard_text, (int)sizeof(g_clipboard_text));
 	g_clipboard_len = (size_t)written;
 }
 
+// Cut: Copy, then delete the selection (caret at its start) and fire
+// onChanged (Ruffle: replace_text(sel.start, sel.end, ""), changed = true).
 void actionTextControlCut(SWFAppContext* app_context)
 {
-	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
 	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
-	if (props == NULL) return;
-
-	// Check password flag — password fields: complete no-op (no copy, no delete)
-	ActionVar* pw_prop = getProperty(props, "password", 8);
-	if (pw_prop != NULL && pw_prop->type == ACTION_STACK_VALUE_BOOLEAN && pw_prop->data.numeric_value != 0)
-		return;
-
-	// Copy text to clipboard first
+	if (props == NULL || tf_is_password(props)) return;
+	ActionVar* text_prop = getProperty(props, "text", 4);
+	u32 lo, hi;
+	if (!tf_selected_range(text_prop, &lo, &hi)) return;
 	actionTextControlCopy(app_context);
-
-	// Clear the text field
-	static const uint16_t empty_u16[] = {0};
-	ActionVar empty_text = {0};
-	empty_text.type = ACTION_STACK_VALUE_STRING;
-	empty_text.data.numeric_value = (u64)(uintptr_t)empty_u16;
-	empty_text.str_size = 0;
-	setProperty(app_context, props, "text", 4, &empty_text);
-
-	ActionVar len_val = {0};
-	len_val.type = ACTION_STACK_VALUE_F64;
-	VAL(double, &len_val.data.numeric_value) = 0.0;
-	setProperty(app_context, props, "length", 6, &len_val);
-
-	ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
-	tf_invalidate_run_table(g_focused_mc);
-	g_tf_select_all = 0;
+	tf_replace_selection(app_context, props, NULL, 0);
 }
 
 // Helper: get text length (in UTF-16 codepoints) for the focused text field.
@@ -85285,22 +85645,31 @@ static size_t apply_restrict_filter(const char* input, size_t input_len,
 	return out_pos;
 }
 
+// Paste = text input of the clipboard (Ruffle text_control_input Paste ->
+// text_input): it REPLACES the selection (or inserts at the caret), the caret
+// lands after it, onChanged fires. Newlines are dropped from a single-line
+// field and control characters always; a restrict that filters everything
+// still deletes the selection. An empty clipboard is a no-op.
 void actionTextControlPaste(SWFAppContext* app_context)
 {
-	// Empty clipboard → no-op
 	if (g_clipboard_len == 0) return;
-
-	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
 	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
 	if (props == NULL) return;
 
-	// Start with clipboard text
+	ActionVar* ml_prop = getProperty(props, "multiline", 9);
+	int multiline = ml_prop != NULL && ml_prop->type == ACTION_STACK_VALUE_BOOLEAN && ml_prop->data.numeric_value != 0;
 	char filtered[1024];
-	size_t filtered_len = g_clipboard_len;
-	memcpy(filtered, g_clipboard_text, g_clipboard_len);
-	filtered[g_clipboard_len] = '\0';
+	size_t filtered_len = 0;
+	for (size_t i = 0; i < g_clipboard_len && filtered_len < sizeof(filtered) - 1; i++) {
+		unsigned char c = (unsigned char)g_clipboard_text[i];
+		int is_nl = (c == '\n' || c == '\r');
+		if (is_nl ? !multiline : (c < 0x20 || c == 0x7f)) continue;
+		filtered[filtered_len++] = (char)c;
+	}
+	filtered[filtered_len] = '\0';
+	if (filtered_len == 0) return;
 
-	// Apply restrict filter if set
 	ActionVar* restrict_prop = getProperty(props, "restrict", 8);
 	if (restrict_prop != NULL && restrict_prop->type == ACTION_STACK_VALUE_STRING
 	    && restrict_prop->str_size > 0) {
@@ -85315,68 +85684,9 @@ void actionTextControlPaste(SWFAppContext* app_context)
 		}
 	}
 
-	// If filtered result is empty, no-op
-	if (filtered_len == 0) return;
-
-	// Determine existing text
-	char existing[2048] = {0};
-	size_t existing_len = 0;
-	if (!g_tf_select_all) {
-		ActionVar* text_prop = getProperty(props, "text", 4);
-		if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
-			const uint16_t* t_u16 = varGetU16Ptr(text_prop);
-			if (t_u16 != NULL)
-				existing_len = (size_t)u16_to_utf8(t_u16, text_prop->str_size, existing, (int)sizeof(existing));
-		}
-	}
-
-	// Build result: existing + filtered (or just filtered if select_all)
-	char result[2048];
-	size_t result_len = 0;
-	if (existing_len > 0) {
-		memcpy(result, existing, existing_len);
-		result_len = existing_len;
-	}
-	if (result_len + filtered_len < sizeof(result)) {
-		memcpy(result + result_len, filtered, filtered_len);
-		result_len += filtered_len;
-	}
-	result[result_len] = '\0';
-
-	// Apply maxChars truncation (in characters, not bytes — count UTF-16 code units)
-	ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
-	int max_chars = -1;
-	if (maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
-		double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
-		if (d > 0 && d == d) max_chars = (int)d;
-	}
-
-	// Convert result to UTF-16
 	u32 u16_len = 0;
-	uint16_t* u16_result = utf8_to_u16(app_context, result, (u32)result_len, &u16_len);
-
-	// Truncate to maxChars if needed
-	if (max_chars > 0 && (int)u16_len > max_chars) {
-		u16_len = (u32)max_chars;
-		u16_result[u16_len] = 0;
-	}
-
-	// Set text property
-	ActionVar new_text = {0};
-	new_text.type = ACTION_STACK_VALUE_STRING;
-	new_text.data.numeric_value = (u64)(uintptr_t)u16_result;
-	new_text.str_size = u16_len;
-	setProperty(app_context, props, "text", 4, &new_text);
-
-	// Update length property
-	ActionVar len_val = {0};
-	len_val.type = ACTION_STACK_VALUE_F64;
-	VAL(double, &len_val.data.numeric_value) = (double)u16_len;
-	setProperty(app_context, props, "length", 6, &len_val);
-
-	// Sync to variable binding
-	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
-	g_tf_select_all = 0;
+	uint16_t* u16_ins = filtered_len > 0 ? utf8_to_u16(app_context, filtered, (u32)filtered_len, &u16_len) : NULL;
+	tf_replace_selection(app_context, props, u16_ins, u16_len);
 }
 
 // ---------------------------------------------------------------------------
@@ -85501,6 +85811,112 @@ void actionTextFieldImeCommit(SWFAppContext* app_context, const char* text)
 	}
 }
 
+// s27 w1-avm1-leftovers (item 5): replace the focused field's selection (or
+// insert at the caret; the whole text after a select-all) with `ins`, move
+// the caret past it and fire onChanged. Shared by typing (actionTextFieldInput),
+// Paste and Cut (ins_len = 0). Ruffle: text_input / replace_text(sel, ..).
+static void tf_replace_selection(SWFAppContext* app_context, ASObject* props,
+                                 const uint16_t* ins, u32 ins_len)
+{
+	// Existing text (UTF-16). When the whole field is selected, the input
+	// replaces it entirely (treat existing as empty, insert at 0).
+	const uint16_t* old_u16 = NULL;
+	u32 old_len = 0;
+	if (!g_tf_select_all) {
+		ActionVar* text_prop = getProperty(props, "text", 4);
+		if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
+			old_u16 = varGetU16Ptr(text_prop);
+			old_len = text_prop->str_size;
+		}
+	}
+
+	// Determine the range the input replaces. A non-empty selection is replaced
+	// (so typing over a selection overwrites it); otherwise the input is inserted
+	// at the caret (a zero-width range). Clamp everything to the text length.
+	u32 del_lo, del_hi;
+	if (g_tf_select_all) {
+		del_lo = 0; del_hi = old_len;  // old_len==0 here (whole field replaced)
+	} else if (g_selection_begin >= 0 && g_selection_end >= 0
+	           && g_selection_begin != g_selection_end) {
+		u32 a = (u32)(g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end);
+		u32 b = (u32)(g_selection_begin > g_selection_end ? g_selection_begin : g_selection_end);
+		if (a > old_len) a = old_len;
+		if (b > old_len) b = old_len;
+		del_lo = a; del_hi = b;
+	} else {
+		u32 caret = (g_selection_caret >= 0) ? (u32)g_selection_caret : old_len;
+		if (caret > old_len) caret = old_len;
+		del_lo = caret; del_hi = caret;
+	}
+
+	// s27 w2 lead 6: maxChars clips the INSERTION (Ruffle edit_text.rs
+	// available_chars = maxChars - (len - selection_len); 0 -> no edit, no
+	// onChanged). Master truncated the TAIL of the result instead, so typing
+	// into a full field at the caret dropped the last character.
+	{
+		ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
+		if (ins_len > 0 && maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
+			double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
+			if (d > 0 && d == d) {
+				long avail = (long)(int)d - ((long)old_len - (long)(del_hi - del_lo));
+				if (avail <= 0) return;
+				if ((long)ins_len > avail) ins_len = (u32)avail;
+			}
+		}
+	}
+
+	// Build new text = old[0..del_lo] + ch + old[del_hi..]
+	u32 tail_len = (old_len > del_hi) ? (old_len - del_hi) : 0;
+	u32 u16_len = del_lo + ins_len + tail_len;
+	uint16_t* u16_result = (uint16_t*) malloc((u16_len + 1) * sizeof(uint16_t));
+	if (old_u16 != NULL && del_lo > 0)
+		memcpy(u16_result, old_u16, del_lo * sizeof(uint16_t));
+	if (ins != NULL && ins_len > 0)
+		memcpy(u16_result + del_lo, ins, ins_len * sizeof(uint16_t));
+	if (old_u16 != NULL && tail_len > 0)
+		memcpy(u16_result + del_lo + ins_len, old_u16 + del_hi,
+		       tail_len * sizeof(uint16_t));
+	u16_result[u16_len] = 0;
+
+	// Advance the caret past the inserted text (clamped to the final length).
+	u32 new_caret = del_lo + ins_len;
+	if (new_caret > u16_len) new_caret = u16_len;
+
+	// s26 PROTOTYPE (item 5): edit the run table in place (before the text
+	// store, as tf_ps_on_replace requires). No maxChars truncation case.
+	int _typed_in_place = 0;
+	if ((int)u16_len == (int)(del_lo + ins_len + tail_len))
+		_typed_in_place = tf_ps_on_typed(app_context, g_focused_mc, del_lo, del_hi, ins, ins_len);
+	// Set text property
+	ActionVar new_text = {0};
+	new_text.type = ACTION_STACK_VALUE_STRING;
+	new_text.data.numeric_value = (u64)(uintptr_t)u16_result;
+	new_text.str_size = u16_len;
+	setProperty(app_context, props, "text", 4, &new_text);
+
+	// Update length property
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)u16_len;
+	setProperty(app_context, props, "length", 6, &len_val);
+
+	// Sync to variable binding
+	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+	g_tf_select_all = 0;
+
+	// Move the caret past the just-inserted text.
+	g_selection_begin = (int)new_caret;
+	g_selection_end = (int)new_caret;
+	g_selection_caret = (int)new_caret;
+
+	// Drop the stale run table so the renderer reads the updated `text`
+	// (s26 PROTOTYPE: unless the typed edit was applied to it in place).
+	if (!_typed_in_place) tf_invalidate_run_table(g_focused_mc);
+
+	// Fire onChanged callback
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+}
+
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 {
 	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
@@ -85552,99 +85968,7 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	u32 ch_u16_len = 0;
 	uint16_t* ch_u16 = utf8_to_u16(app_context, ch_utf8, (u32)ch_len, &ch_u16_len);
 
-	// Existing text (UTF-16). When the whole field is selected, the input
-	// replaces it entirely (treat existing as empty, insert at 0).
-	const uint16_t* old_u16 = NULL;
-	u32 old_len = 0;
-	if (!g_tf_select_all) {
-		ActionVar* text_prop = getProperty(props, "text", 4);
-		if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
-			old_u16 = varGetU16Ptr(text_prop);
-			old_len = text_prop->str_size;
-		}
-	}
-
-	// Determine the range the input replaces. A non-empty selection is replaced
-	// (so typing over a selection overwrites it); otherwise the input is inserted
-	// at the caret (a zero-width range). Clamp everything to the text length.
-	u32 del_lo, del_hi;
-	if (g_tf_select_all) {
-		del_lo = 0; del_hi = old_len;  // old_len==0 here (whole field replaced)
-	} else if (g_selection_begin >= 0 && g_selection_end >= 0
-	           && g_selection_begin != g_selection_end) {
-		u32 a = (u32)(g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end);
-		u32 b = (u32)(g_selection_begin > g_selection_end ? g_selection_begin : g_selection_end);
-		if (a > old_len) a = old_len;
-		if (b > old_len) b = old_len;
-		del_lo = a; del_hi = b;
-	} else {
-		u32 caret = (g_selection_caret >= 0) ? (u32)g_selection_caret : old_len;
-		if (caret > old_len) caret = old_len;
-		del_lo = caret; del_hi = caret;
-	}
-
-	// Build new text = old[0..del_lo] + ch + old[del_hi..]
-	u32 tail_len = (old_len > del_hi) ? (old_len - del_hi) : 0;
-	u32 u16_len = del_lo + ch_u16_len + tail_len;
-	uint16_t* u16_result = (uint16_t*) malloc((u16_len + 1) * sizeof(uint16_t));
-	if (old_u16 != NULL && del_lo > 0)
-		memcpy(u16_result, old_u16, del_lo * sizeof(uint16_t));
-	if (ch_u16 != NULL && ch_u16_len > 0)
-		memcpy(u16_result + del_lo, ch_u16, ch_u16_len * sizeof(uint16_t));
-	if (old_u16 != NULL && tail_len > 0)
-		memcpy(u16_result + del_lo + ch_u16_len, old_u16 + del_hi,
-		       tail_len * sizeof(uint16_t));
-	u16_result[u16_len] = 0;
-
-	// Apply maxChars truncation
-	ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
-	int max_chars = -1;
-	if (maxc_prop != NULL && maxc_prop->type == ACTION_STACK_VALUE_F64) {
-		double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
-		if (d > 0 && d == d) max_chars = (int)d;
-	}
-	if (max_chars > 0 && (int)u16_len > max_chars) {
-		u16_len = (u32)max_chars;
-		u16_result[u16_len] = 0;
-	}
-
-	// Advance the caret past the inserted text (clamped to the final length).
-	u32 new_caret = del_lo + ch_u16_len;
-	if (new_caret > u16_len) new_caret = u16_len;
-
-	// s26 PROTOTYPE (item 5): edit the run table in place (before the text
-	// store, as tf_ps_on_replace requires). No maxChars truncation case.
-	int _typed_in_place = 0;
-	if ((int)u16_len == (int)(del_lo + ch_u16_len + tail_len))
-		_typed_in_place = tf_ps_on_typed(app_context, g_focused_mc, del_lo, del_hi, ch_u16, ch_u16_len);
-	// Set text property
-	ActionVar new_text = {0};
-	new_text.type = ACTION_STACK_VALUE_STRING;
-	new_text.data.numeric_value = (u64)(uintptr_t)u16_result;
-	new_text.str_size = u16_len;
-	setProperty(app_context, props, "text", 4, &new_text);
-
-	// Update length property
-	ActionVar len_val = {0};
-	len_val.type = ACTION_STACK_VALUE_F64;
-	VAL(double, &len_val.data.numeric_value) = (double)u16_len;
-	setProperty(app_context, props, "length", 6, &len_val);
-
-	// Sync to variable binding
-	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
-	g_tf_select_all = 0;
-
-	// Move the caret past the just-inserted text.
-	g_selection_begin = (int)new_caret;
-	g_selection_end = (int)new_caret;
-	g_selection_caret = (int)new_caret;
-
-	// Drop the stale run table so the renderer reads the updated `text`
-	// (s26 PROTOTYPE: unless the typed edit was applied to it in place).
-	if (!_typed_in_place) tf_invalidate_run_table(g_focused_mc);
-
-	// Fire onChanged callback
-	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+	tf_replace_selection(app_context, props, ch_u16, ch_u16_len);
 }
 
 // (was: #endif — see comment above for the open)

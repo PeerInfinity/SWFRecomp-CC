@@ -2222,9 +2222,41 @@ static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
 	heap_free(ctx->app, gl);
 }
 
+// s27 w2-draw-cx-text: the field's background + border for draw(). Flash
+// Player 32 (w1 oracle avm2_bitmapdata_draw_edittext_box): `draw(tf)` paints
+// the box (A: ff0000), and neither the draw() colorTransform (A, ct) nor the
+// field's own colorTransform under a drawn holder (B) tints it, while a tinted
+// SHAPE under the same holder IS tinted (B: ff00). So the box is drawn with the
+// raw colours, before (under) the glyphs. The matrix maps field-local pixels ->
+// target pixels (text_raster_core's convention). Ruffle render_self culls a
+// rotated/sheared/reflected device-font field entirely; same here.
+int avm2_text_box_info(struct Avm2EditTextExt* et, int32_t* out_xywh,
+                       uint32_t* out_flags, uint32_t* out_bg,
+                       uint32_t* out_border);
+static void bd_draw_tf_box(Avm2Context* ctx, uint32_t* buf, int W, int H,
+                           int transparent, Avm2Object* tf_obj,
+                           double ma, double mb, double mc, double md,
+                           double mtx, double mty, double node_alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, tf_obj);
+	if (ext == NULL || ext->edittext == NULL) return;
+	int32_t bb[4];
+	uint32_t flags = 0, bg = 0, bc = 0;
+	if (!avm2_text_box_info(ext->edittext, bb, &flags, &bg, &bc)) return;
+	if ((flags & 4u) != 0
+	    && !(fabs(mb) < 0.006 && fabs(mc) < 0.006 && ma > 0.0 && md > 0.0))
+		return;
+	avm2_cpu_raster_textbox(buf, W, H, transparent, ma, mb, mc, md, mtx, mty,
+	                        (double) bb[0] / 20.0, (double) bb[1] / 20.0,
+	                        (double) bb[2] / 20.0, (double) bb[3] / 20.0,
+	                        (flags & 1u) != 0, bg, (flags & 2u) != 0, bc,
+	                        node_alpha);
+}
+
 // Thin BitmapData.draw wrapper — byte-for-byte the pre-refactor rasterizer
 // (node_alpha == 1, cxform/blend passed through). Keeps
-// avm2_bitmapdata_draw_textfield green.
+// avm2_bitmapdata_draw_textfield green. s27: the box is drawn first,
+// untinted (bd_draw_tf_box); the draw colorTransform still tints the glyphs.
 static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                               Avm2Object* tf_obj,
                               double ma, double mb, double mc, double md,
@@ -2233,6 +2265,8 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                               int16_t ro, int16_t go, int16_t bo, int16_t ao,
                               int blend_mode)
 {
+	bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+	               dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
 	text_raster_core(ctx, dst->pixels, (int) dst->width, (int) dst->height,
 	                 dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty,
 	                 has_cxform, rm, gm, bmul, am, ro, go, bo, ao,
@@ -2471,6 +2505,85 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                                double wa, double wb, double wc, double wd,
                                double wtx, double wty, double alpha, int depth);
 
+// s27 w2-draw-cx-text: the running colour transform of a draw() walk, the
+// CPU twin of avm2_display.c's g_avm2_cur_cx. The walk used to thread only
+// `alpha`, so every descendant colorTransform (shape, morph, bitmap, text)
+// was dropped (Flash: `draw(holder > tinted shape)` = ff00, w1 oracle
+// avm2_bitmapdata_draw_edittext_box B). The draw ROOT's own transform stays
+// ignored (draw() semantics); its children compose theirs in. The draw()
+// colorTransform argument seeds it for a vector source. m[] are unit
+// multipliers, a[] addends in 0..255; m[3]/a[3] are the draw()-ct alpha terms
+// (descendant alpha multipliers keep riding the walk's `alpha`).
+typedef struct { double m[4]; double a[4]; } BdCx;
+static BdCx g_bd_cx = { { 1.0, 1.0, 1.0, 1.0 }, { 0.0, 0.0, 0.0, 0.0 } };
+static const BdCx BD_CX_IDENTITY = { { 1.0, 1.0, 1.0, 1.0 }, { 0.0, 0.0, 0.0, 0.0 } };
+
+static int bd_cx_is_identity(const BdCx* c)
+{
+	for (int i = 0; i < 4; i++)
+		if (c->m[i] != 1.0 || c->a[i] != 0.0) return 0;
+	return 1;
+}
+
+// g_bd_cx = g_bd_cx(child's own cx), returning the previous value.
+static BdCx bd_cx_push(const Avm2DisplayObjectExt* c)
+{
+	BdCx saved = g_bd_cx;
+	double im[3] = { c->cx_rm / 256.0, c->cx_gm / 256.0, c->cx_bm / 256.0 };
+	double ia[4] = { c->cx_ra, c->cx_ga, c->cx_ba, c->cx_aa };
+	for (int i = 0; i < 4; i++)
+	{
+		g_bd_cx.a[i] = g_bd_cx.m[i] * ia[i] + g_bd_cx.a[i];
+		if (i < 3) g_bd_cx.m[i] *= im[i];
+	}
+	return saved;
+}
+
+static int16_t bd_cx_fixed8(double m)
+{
+	double v = nearbyint(m * 256.0);
+	if (v > 32767.0) v = 32767.0;
+	if (v < -32768.0) v = -32768.0;
+	return (int16_t) v;
+}
+
+static int16_t bd_cx_add16(double a)
+{
+	double v = nearbyint(a);
+	if (v > 32767.0) v = 32767.0;
+	if (v < -32768.0) v = -32768.0;
+	return (int16_t) v;
+}
+
+// Compose a node's self-content layer (rastered at the running alpha into a
+// transparent scratch) onto `dst` through g_bd_cx, per covered texel. Same
+// fixed-8 channel math as the pre-s27 draw(vector, ct) layer loop, so a
+// draw-ct-only draw of a single-node source is byte-identical to it.
+static void bd_cx_compose_layer(Avm2BitmapDataExt* dst, const uint32_t* layer)
+{
+	int16_t rm = bd_cx_fixed8(g_bd_cx.m[0]), gm = bd_cx_fixed8(g_bd_cx.m[1]);
+	int16_t bm = bd_cx_fixed8(g_bd_cx.m[2]), am = bd_cx_fixed8(g_bd_cx.m[3]);
+	int16_t ro = bd_cx_add16(g_bd_cx.a[0]), go = bd_cx_add16(g_bd_cx.a[1]);
+	int16_t bo = bd_cx_add16(g_bd_cx.a[2]), ao = bd_cx_add16(g_bd_cx.a[3]);
+	size_t n = (size_t) dst->width * dst->height;
+	int opaque_dst = !dst->transparency;
+	for (size_t i = 0; i < n; i++)
+	{
+		uint32_t color = layer[i];
+		if (CA(color) == 0) continue;
+		uint32_t c = unmul(color);
+		uint8_t r = ctx_channel(rm, ro, (uint8_t) CR(c));
+		uint8_t g = ctx_channel(gm, go, (uint8_t) CG(c));
+		uint8_t b = ctx_channel(bm, bo, (uint8_t) CB(c));
+		uint8_t a = ctx_channel(am, ao, (uint8_t) CA(c));
+		color = premul(CMK(r, g, b, a), 1);
+		if (CA(color) == 0) continue;
+		color = blend_over(dst->pixels[i], color);
+		if (opaque_dst) color = with_alpha(color, 0xFF);
+		dst->pixels[i] = color;
+	}
+}
+
 // An object's local-to-global matrix (twips), stopping below the Stage like
 // Ruffle's local_to_global_matrix. m = {a, b, c, d, tx, ty}.
 static void bd_l2g_matrix(Avm2Context* ctx, Avm2Object* obj, double m[6])
@@ -2545,11 +2658,14 @@ static void bd_draw_masked(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	mdst.transparency = 1;
 	Avm2Object* saved_mask = ext->mask;
 	ext->mask = NULL;  // the node itself, unmasked, below
+	BdCx saved_cx = g_bd_cx;   // coverage is alpha-only: no colour transform
+	g_bd_cx = BD_CX_IDENTITY;
 	bd_draw_shape_walk(ctx, &mdst, mask,
 	                   wa * mm[0] + wc * mm[1], wb * mm[0] + wd * mm[1],
 	                   wa * mm[2] + wc * mm[3], wb * mm[2] + wd * mm[3],
 	                   wa * mm[4] + wc * mm[5] + wtx, wb * mm[4] + wd * mm[5] + wty,
 	                   1.0, depth + 1);
+	g_bd_cx = saved_cx;
 	bd_draw_shape_walk(ctx, dst, obj, wa, wb, wc, wd, wtx, wty, alpha, depth);
 	ext->mask = saved_mask;
 
@@ -2751,43 +2867,72 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		return;
 	}
 
+	// s27 w2-draw-cx-text: a TextField's box goes straight onto the target,
+	// untinted (Flash), under the node's glyphs.
+	if (ext->edittext != NULL && !ext->is_bitmap && ext->shape_vert_count == 0)
+		bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+		               dst->transparency, obj, wa, wb, wc, wd,
+		               wtx / 20.0, wty / 20.0, alpha);
+	// Under a non-identity running colour transform the node's own content is
+	// rastered into a transparent layer and composed through it (bd_cx_*);
+	// otherwise straight onto the target as before (identity: byte-identical).
+	Avm2BitmapDataExt* sdst = dst;
+	Avm2BitmapDataExt cxdst;
+	uint32_t* cxlayer = NULL;
+	if (dst->pixels != NULL && !bd_cx_is_identity(&g_bd_cx))
+	{
+		size_t ln = (size_t) dst->width * dst->height;
+		cxlayer = (uint32_t*) calloc(ln ? ln : 1, sizeof(uint32_t));
+		if (cxlayer != NULL)
+		{
+			cxdst = *dst;
+			cxdst.pixels = cxlayer;
+			cxdst.transparency = 1;
+			sdst = &cxdst;
+		}
+	}
 	if (ext->is_bitmap)
 		// A Bitmap inside the drawn subtree. avm2_cpu_walk has had this arm all
 		// along; this walk had not, so drawing a container that holds a Bitmap
 		// wrote nothing at all.
-		bd_draw_bitmap_node(ctx, dst, ext, wa, wb, wc, wd, wtx, wty, alpha);
+		bd_draw_bitmap_node(ctx, sdst, ext, wa, wb, wc, wd, wtx, wty, alpha);
 	else if (ext->is_morph_shape && ext->shape_vert_count > 0)
 		// T6: ratio-lerped morph shape (the getPixel gate reads its interpolated
 		// edge + fill colour through this path).
-		avm2_cpu_raster_morph(dst->pixels, (int) dst->width, (int) dst->height,
-		                      dst->transparency,
+		avm2_cpu_raster_morph(sdst->pixels, (int) sdst->width, (int) sdst->height,
+		                      sdst->transparency,
 		                      ext->shape_vert_offset, ext->shape_vert_count,
 		                      ext->morph_end_offset,
 		                      (double) ext->ratio / 65535.0,
 		                      wa, wb, wc, wd, wtx, wty, alpha);
 	else if (ext->shape_vert_count > 0)
-		avm2_cpu_raster_shape(dst->pixels, (int) dst->width, (int) dst->height,
-		                      dst->transparency,
+		avm2_cpu_raster_shape(sdst->pixels, (int) sdst->width, (int) sdst->height,
+		                      sdst->transparency,
 		                      ext->shape_vert_offset, ext->shape_vert_count,
 		                      wa, wb, wc, wd, wtx, wty, alpha);
 	else if (ext->edittext != NULL)
 		// Native timeline TextField glyphs — makes a placed field getPixel-gateable
 		// via BitmapData.draw(container) (the T6 gate shape, extended to text).
-		avm2_cpu_raster_text(dst->pixels, (int) dst->width, (int) dst->height,
-		                     dst->transparency, ctx, obj,
+		avm2_cpu_raster_text(sdst->pixels, (int) sdst->width, (int) sdst->height,
+		                     sdst->transparency, ctx, obj,
 		                     wa, wb, wc, wd, wtx, wty, alpha);
 	else if (ext->statictext != NULL)
 		// Native timeline static text (DefineText/2) — makes a placed StaticText
 		// getPixel-gateable via BitmapData.draw(container) (the probe gate).
-		avm2_cpu_raster_statictext(dst->pixels, (int) dst->width, (int) dst->height,
-		                           dst->transparency, ctx, obj,
+		avm2_cpu_raster_statictext(sdst->pixels, (int) sdst->width, (int) sdst->height,
+		                           sdst->transparency, ctx, obj,
 		                           wa, wb, wc, wd, wtx, wty, alpha);
 
 	// T4: script-drawn Graphics geometry on this node (the getPixel gate reads
 	// runtime fills/strokes/gradients through this path).
 	avm2_graphics_cpu_composite(ctx, obj, wa, wb, wc, wd, wtx, wty, alpha,
-	                            dst->pixels, (int) dst->width, (int) dst->height,
-	                            dst->transparency);
+	                            sdst->pixels, (int) sdst->width, (int) sdst->height,
+	                            sdst->transparency);
+	if (cxlayer != NULL)
+	{
+		bd_cx_compose_layer(dst, cxlayer);
+		free(cxlayer);
+	}
 
 	// SimpleButton: BitmapData.draw(container) must see the button's current
 	// state child, which is NOT in render_list (a button is not a container).
@@ -2801,6 +2946,7 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 			double sa = sext->mtx_a, sb = sext->mtx_b;
 			double sc = sext->mtx_c, sd = sext->mtx_d;
 			double stx = (double) sext->mtx_tx, sty = (double) sext->mtx_ty;
+			BdCx saved_cx = bd_cx_push(sext);
 			bd_draw_shape_walk(ctx, dst, bst,
 			                   wa * sa + wc * sb, wb * sa + wd * sb,
 			                   wa * sc + wc * sd, wb * sc + wd * sd,
@@ -2808,6 +2954,7 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 			                   wb * stx + wd * sty + wty,
 			                   alpha * ((double) sext->alpha_fixed8 / 256.0),
 			                   depth + 1);
+			g_bd_cx = saved_cx;
 		}
 	}
 
@@ -2829,8 +2976,10 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		double ntx = wa * ctx_ + wc * cty + wtx;
 		double nty = wb * ctx_ + wd * cty + wty;
 		double calpha = alpha * ((double) cext->alpha_fixed8 / 256.0);
+		BdCx saved_cx = bd_cx_push(cext);
 		bd_draw_shape_walk(ctx, dst, child, na, nb, nc, nd, ntx, nty,
 		                   calpha, depth + 1);
+		g_bd_cx = saved_cx;
 	}
 }
 
@@ -3095,15 +3244,28 @@ static Avm2Value bd_draw(Avm2Activation* act)
 			if (q != NULL && strcmp(q, "low") == 0) draw_aa = 0;
 		}
 		int prev_aa = avm2_cpu_raster_set_aa(draw_aa);
+		// s27 w2-draw-cx-text: the draw() colorTransform seeds the walk's
+		// running colour transform (g_bd_cx) and is applied per node, composed
+		// with every descendant's own colorTransform, like Ruffle's per-draw
+		// cxform. It no longer tints one whole-subtree layer, which is what
+		// lets a TextField's box stay untinted (Flash) inside a tinted draw.
+		BdCx saved_cx = g_bd_cx;
+		g_bd_cx = BD_CX_IDENTITY;
+		if (has_cxform)
+		{
+			g_bd_cx.m[0] = rm / 256.0; g_bd_cx.m[1] = gm / 256.0;
+			g_bd_cx.m[2] = bm / 256.0; g_bd_cx.m[3] = am / 256.0;
+			g_bd_cx.a[0] = ro; g_bd_cx.a[1] = go;
+			g_bd_cx.a[2] = bo; g_bd_cx.a[3] = ao;
+		}
 		size_t layer_n = (size_t) dst->width * dst->height;
-		uint32_t* layer = (has_cxform || blend_mode != BM_NORMAL)
+		uint32_t* layer = (blend_mode != BM_NORMAL)
 			? (uint32_t*) calloc(layer_n ? layer_n : 1, sizeof(uint32_t)) : NULL;
 		if (layer != NULL)
 		{
-			// colorTransform / blendMode on a vector source: raster into a
-			// transparent layer, then transform each premultiplied texel and
-			// compose it onto the target (Ruffle renders the source with the
-			// cxform applied, then blends the layer with the named mode).
+			// blendMode on a vector source: raster into a transparent layer,
+			// then compose it onto the target with the named mode (Ruffle
+			// renders the source, then blends the layer).
 			Avm2BitmapDataExt ldst = *dst;
 			ldst.pixels = layer;
 			ldst.transparency = 1;
@@ -3113,21 +3275,9 @@ static Avm2Value bd_draw(Avm2Activation* act)
 			for (size_t i = 0; i < layer_n; i++)
 			{
 				uint32_t color = layer[i];
-				if (CA(color) == 0 && !has_cxform) continue;
-				if (has_cxform)
-				{
-					uint32_t c = unmul(color);
-					uint8_t r = ctx_channel(rm, ro, (uint8_t) CR(c));
-					uint8_t g = ctx_channel(gm, go, (uint8_t) CG(c));
-					uint8_t b = ctx_channel(bm, bo, (uint8_t) CB(c));
-					uint8_t a = ctx_channel(am, ao, (uint8_t) CA(c));
-					color = premul(CMK(r, g, b, a), 1);
-					if (CA(color) == 0) continue;
-				}
+				if (CA(color) == 0) continue;
 				uint32_t under = dst->pixels[i];
-				color = (blend_mode != BM_NORMAL)
-					? blend_mode_apply(blend_mode, under, color)
-					: blend_over(under, color);
+				color = blend_mode_apply(blend_mode, under, color);
 				if (opaque_dst) color = with_alpha(color, 0xFF);
 				dst->pixels[i] = color;
 			}
@@ -3136,6 +3286,7 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		else
 			bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
 			                   mtx * 20.0, mty * 20.0, 1.0, 0);
+		g_bd_cx = saved_cx;
 		avm2_cpu_raster_set_aa(prev_aa);
 		bd_clip_end(dst, clip_snap, clip_px);
 		return avm2_undefined();

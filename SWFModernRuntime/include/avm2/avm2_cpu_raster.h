@@ -97,4 +97,20 @@ void avm2_cpu_raster_statictext(uint32_t* buf, int W, int H, int transparent,
                                 double wa, double wb, double wc, double wd,
                                 double wtx, double wty, double node_alpha);
 
+// s27 w2-draw-cx-text: a TextField's background + border for BitmapData.draw()
+// (AVM2 avm2_bitmap.c and AVM1 action.c share it). The matrix maps field-local
+// PIXELS -> target PIXELS; (x, y, w, h) is the box in field-local pixels.
+// Composited source-over into a premultiplied-ARGB target with `node_alpha`.
+// Flash Player 32 measured (s27 w1 oracles avm1_bitmapdata_draw_edittext /
+// avm2_bitmapdata_draw_edittext_box): in draw() neither the draw()
+// colorTransform nor any ancestor's / the field's own colour transform tints
+// the box, so callers pass the field's raw colours.
+void avm2_cpu_raster_textbox(uint32_t* buf, int W, int H, int transparent,
+                             double ma, double mb, double mc, double md,
+                             double mtx, double mty,
+                             double x, double y, double w, double h,
+                             int has_bg, uint32_t bg_rgb,
+                             int has_border, uint32_t border_rgb,
+                             double node_alpha);
+
 #endif // AVM2_CPU_RASTER_H

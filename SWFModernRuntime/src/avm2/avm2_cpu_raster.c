@@ -959,3 +959,98 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 	}
 	cpu_aa_end();
 }
+
+// ---------------------------------------------------------------------------
+// s27 w2-draw-cx-text: CPU TextField box (background + 1px border) for
+// BitmapData.draw(), shared by AVM2 (avm2_bitmap.c text_raster_core / the
+// draw walk) and AVM1 (action.c rasterizeMovieClipToBitmap). See the header.
+// Device-font rule (Ruffle draw_device_text_box, edit_text.rs:2845-2910, the
+// same snapping avm2_render_textbox's device arm uses): the transformed corners
+// are rounded to whole pixels, the background fills [x0,x0+w) x [y0,y0+h), and
+// the border is four independent 1px lines whose bottom-right corner pixel no
+// line inks. A non-axis-aligned box is filled by pixel-centre coverage of the
+// transformed quad (its border is not drawn: no corpus row needs it).
+// ---------------------------------------------------------------------------
+static void cpu_box_px(uint32_t* buf, int W, int H, int transparent,
+                       int x, int y, uint32_t src_pm)
+{
+	if (x < 0 || y < 0 || x >= W || y >= H) return;
+	size_t off = (size_t) y * (size_t) W + (size_t) x;
+	uint32_t o = cpu_blend_over(buf[off], src_pm);
+	if (!transparent) o |= 0xFF000000u;
+	buf[off] = o;
+}
+
+void avm2_cpu_raster_textbox(uint32_t* buf, int W, int H, int transparent,
+                             double ma, double mb, double mc, double md,
+                             double mtx, double mty,
+                             double x, double y, double w, double h,
+                             int has_bg, uint32_t bg_rgb,
+                             int has_border, uint32_t border_rgb,
+                             double node_alpha)
+{
+	if (buf == NULL || W <= 0 || H <= 0 || node_alpha <= 0.0) return;
+	if (!has_bg && !has_border) return;
+	if (!isfinite(ma) || !isfinite(mb) || !isfinite(mc) || !isfinite(md)
+	    || !isfinite(mtx) || !isfinite(mty)) return;
+	uint32_t a8 = f2b(node_alpha);
+	uint32_t bg_pm = cpu_premul((a8 << 24) | (bg_rgb & 0xFFFFFFu));
+	uint32_t bc_pm = cpu_premul((a8 << 24) | (border_rgb & 0xFFFFFFu));
+	const double EPS = 1e-9;
+	if (fabs(mb) < EPS && fabs(mc) < EPS && ma > 0.0 && md > 0.0)
+	{
+		double fx0 = ma * x + mtx, fy0 = md * y + mty;
+		double fx1 = ma * (x + w) + mtx, fy1 = md * (y + h) + mty;
+		int iw = (int) nearbyint(fx1 - fx0), ih = (int) nearbyint(fy1 - fy0);
+		int x0 = (int) nearbyint(fx0), y0 = (int) nearbyint(fy0);
+		if (has_bg)
+		{
+			int ya = y0 < 0 ? 0 : y0, yb = y0 + ih > H ? H : y0 + ih;
+			int xa = x0 < 0 ? 0 : x0, xb = x0 + iw > W ? W : x0 + iw;
+			for (int py = ya; py < yb; py++)
+				for (int px = xa; px < xb; px++)
+					cpu_box_px(buf, W, H, transparent, px, py, bg_pm);
+		}
+		if (has_border)
+		{
+			for (int px = x0; px <= x0 + iw; px++)          // top (keeps TR)
+				cpu_box_px(buf, W, H, transparent, px, y0, bc_pm);
+			for (int px = x0; px < x0 + iw; px++)           // bottom (no BR)
+				cpu_box_px(buf, W, H, transparent, px, y0 + ih, bc_pm);
+			for (int py = y0 + 1; py <= y0 + ih; py++)      // left (keeps BL)
+				cpu_box_px(buf, W, H, transparent, x0, py, bc_pm);
+			for (int py = y0 + 1; py < y0 + ih; py++)       // right (no BR)
+				cpu_box_px(buf, W, H, transparent, x0 + iw, py, bc_pm);
+		}
+		return;
+	}
+	if (!has_bg) return;
+	double det = ma * md - mb * mc;
+	if (det == 0.0) return;
+	double ia = md / det, ib = -mb / det, ic = -mc / det, id = ma / det;
+	double cxs[4] = { x, x + w, x, x + w }, cys[4] = { y, y, y + h, y + h };
+	double minx = 1e30, miny = 1e30, maxx = -1e30, maxy = -1e30;
+	for (int k = 0; k < 4; k++)
+	{
+		double px = ma * cxs[k] + mc * cys[k] + mtx;
+		double py = mb * cxs[k] + md * cys[k] + mty;
+		if (px < minx) minx = px;
+		if (px > maxx) maxx = px;
+		if (py < miny) miny = py;
+		if (py > maxy) maxy = py;
+	}
+	int px0 = (int) floor(minx), px1 = (int) ceil(maxx);
+	int py0 = (int) floor(miny), py1 = (int) ceil(maxy);
+	if (px0 < 0) px0 = 0;
+	if (py0 < 0) py0 = 0;
+	if (px1 > W) px1 = W;
+	if (py1 > H) py1 = H;
+	for (int py = py0; py < py1; py++)
+		for (int px = px0; px < px1; px++)
+		{
+			double ex = px + 0.5 - mtx, ey = py + 0.5 - mty;
+			double lx = ia * ex + ic * ey, ly = ib * ex + id * ey;
+			if (lx < x || lx >= x + w || ly < y || ly >= y + h) continue;
+			cpu_box_px(buf, W, H, transparent, px, py, bg_pm);
+		}
+}
