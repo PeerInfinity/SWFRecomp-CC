@@ -11,16 +11,38 @@ import struct
 import subprocess
 import tempfile
 import time
+import urllib.parse
 import zlib
 import lzma
+
+# Tall enough that GTK never constrains a 1000-px stage's window (that would
+# show-all scale it) and the whole stage stays on screen for grabs.
+XVFB_SCREEN = "2048x2600x24"
 
 DEFAULT_PLAYER = os.environ.get(
     "FLASH_PLAYER", os.path.expanduser("~/CC/flashplayer/linux/flashplayerdebugger"))
 
 
+def toml_fonts(test_dir, toml):
+    """The test.toml [fonts.*] files: Ruffle injects them as DEVICE fonts."""
+    out = []
+    for f in (toml.get("fonts") or {}).values():
+        if isinstance(f, dict) and f.get("path"):
+            out.append(os.path.join(test_dir, f["path"]))
+    return out
+
+
 class PlayerEnv:
-    def __init__(self, log_warnings=False, trust_paths=()):
+    def __init__(self, log_warnings=False, trust_paths=(), fonts=()):
+        """fonts: font files installed into the temp HOME's ~/.fonts, so the
+        Linux projector (fontconfig) finds them as device fonts the way Ruffle's
+        runner injects a test.toml's [fonts.*]."""
         self.root = tempfile.mkdtemp(prefix="flashoracle-")
+        if fonts:
+            fdir = os.path.join(self.root, ".fonts")
+            os.makedirs(fdir, exist_ok=True)
+            for p in fonts:
+                shutil.copy(p, fdir)
         cfg = "TraceOutputFileEnable=1\n"
         if log_warnings:
             cfg += "ErrorReportingEnable=1\n"
@@ -35,8 +57,10 @@ class PlayerEnv:
                 f.write("\n".join(os.path.abspath(p) for p in trust_paths) + "\n")
 
     def run(self, swf, max_duration=3.0, max_idle=0.5, player=DEFAULT_PLAYER, cwd=None,
-            screen="1280x1024x24", done_marker=None, on_marker=None, triggers=()):
+            screen=XVFB_SCREEN, done_marker=None, on_marker=None, triggers=(), pin_gate=None):
         """Run the projector until exit / timeout / done_marker in flashlog.
+
+        pin_gate: a PinGate (direct-mode window pin), polled every tick.
 
         on_marker(display_env) is called once when done_marker appears,
         before the player is killed (used for X screenshots). triggers is a
@@ -69,6 +93,8 @@ class PlayerEnv:
                 last_mtime = mtime
                 last_activity = time.monotonic()
             now = time.monotonic()
+            if pin_gate is not None and os.path.exists(xinfo):
+                pin_gate.poll(self._display_env(env, xinfo))
             for i, (marker, fn) in enumerate(triggers):
                 if i not in fired and mtime is not None and marker in self.read_log():
                     fired.add(i)
@@ -193,13 +219,30 @@ def encode_rect(xmin, xmax, ymin, ymax):
     return acc.to_bytes((bits_total + pad) // 8, "big")
 
 
-def patch_swf_header(src, dst, rect, rate):
-    """Rewrite src SWF's stage RECT and frame rate; write uncompressed dst."""
+def patch_swf_header(src, dst, rect, rate, bg=None):
+    """Rewrite src SWF's stage RECT and frame rate; write uncompressed dst.
+    bg: also drop src's SetBackgroundColor tags and put one with this colour
+    first (the pin stub's background survives the _level0 replacement)."""
     ver, body = read_swf_body(src)
     _, n = parse_rect(body)
     rest = body[n:]
     rate_fixed = int(round(rate * 256))
-    new_body = encode_rect(*rect) + struct.pack("<H", rate_fixed) + rest[2:]
+    tags = rest[4:]
+    if bg is not None:
+        out_tags, pos = [], 0
+        while pos + 2 <= len(tags):
+            code_len = struct.unpack("<H", tags[pos:pos + 2])[0]
+            code, ln, hdr = code_len >> 6, code_len & 0x3F, 2
+            if ln == 0x3F:
+                ln, hdr = struct.unpack("<I", tags[pos + 2:pos + 6])[0], 6
+            if code != 9:
+                out_tags.append(tags[pos:pos + hdr + ln])
+            pos += hdr + ln
+        bgtag = struct.pack("<H", (9 << 6) | 3) + bytes([(bg >> 16) & 255, (bg >> 8) & 255, bg & 255])
+        # after a leading FileAttributes tag (it must stay first)
+        first = out_tags[:1] if out_tags and (struct.unpack("<H", out_tags[0][:2])[0] >> 6) == 69 else []
+        tags = b"".join(first + [bgtag] + out_tags[len(first):])
+    new_body = encode_rect(*rect) + struct.pack("<H", rate_fixed) + rest[2:4] + tags
     out = b"FWS" + bytes([ver]) + struct.pack("<I", 8 + len(new_body)) + new_body
     with open(dst, "wb") as f:
         f.write(out)
@@ -243,7 +286,7 @@ class WinPlayerEnv(PlayerEnv):
         self.root = None
 
     def run(self, swf, max_duration=3.0, max_idle=0.5, player=WIN_PLAYER, cwd=None,
-            screen=None, done_marker=None, on_marker=None, triggers=()):
+            screen=None, done_marker=None, on_marker=None, triggers=(), pin_gate=None):
         # Windows projector timing (measured 2026-11-23): ~4 s from launch to
         # the first flashlog write, then flushes in ~5 KB/s chunks. So the
         # budget gets +WIN_STARTUP_S and idle only counts after the first write.
@@ -263,6 +306,8 @@ class WinPlayerEnv(PlayerEnv):
             if size != last_size:
                 last_size, last_activity = size, time.monotonic()
             now = time.monotonic()
+            if pin_gate is not None:
+                pin_gate.poll(None)  # no X tree on Windows: time-based
             if done_marker and size and done_marker in self.read_log():
                 killed = "done"
             elif now - start > max_duration + WIN_STARTUP_S:
@@ -281,6 +326,87 @@ class WinPlayerEnv(PlayerEnv):
 
     def cleanup(self):
         pass
+
+
+# The projector's GTK menubar keeps the drawing area >= ~296 px wide; narrower
+# stages are pinned with Stage.align = TL so the stage stays inside the
+# (stage-wide) window.
+NARROW_STAGE = 296
+
+PIN_STUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "capture", "PinStub.swf")
+
+
+def pinned_root(swf, work, url=None, quality=None):
+    """Direct-mode window pin. Returns a root stub SWF (release it with a
+    PinGate on the same `work`) (in `work`, which must be
+    trusted, and must be the test's own directory or a staged copy of it:
+    Flash resolves relative URLs against the FIRST root's directory) that replaces _level0 with `swf` only once the projector's drawing
+    area is exactly the stage size, so the test runs as the REAL root at 1:1
+    from frame 1. Without it the GTK drawing area is 640x468 for the first
+    ~0.3-1.5 s (the toplevel shrinks first) and the root is show-all scaled.
+    The stub loads `swf` by its basename (same directory); `url` overrides.
+    quality: the test.toml with_renderer.quality ("low"/"medium"/"high"/
+    "best"); a direct root otherwise renders at the SWF default (high)."""
+    info = swf_info(swf)
+    stub = os.path.join(work, "__pinstub.swf")
+    patch_swf_header(PIN_STUB, stub, info["rect"], info["rate"], bg=info["bg"])
+    with open(os.path.join(work, "__pin_config.txt"), "w", newline="") as f:
+        f.write(f"width={int(round(info['width']))}&height={int(round(info['height']))}"
+                f"&rate={max(info['rate'], 1.0)}"
+                + (f"&quality={quality}" if quality else "")
+                + ("&align=TL" if info["width"] < NARROW_STAGE else "")
+                + f"&swf={urllib.parse.quote(url or os.path.basename(swf), safe=':/')}")
+    return stub
+
+
+XGRAB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xgrab", "xgrab")
+
+
+class PinGate:
+    """Releases the PinStub (drops __pin_go.txt in its dir) once the projector
+    window has settled. Linux: the toplevel's X geometry has left its 640x520
+    startup size and held still for `stable` s. Windows (denv None): a fixed
+    `win_delay` s after the first poll. Fallback either way: `timeout` s."""
+
+    def __init__(self, work, stable=0.5, timeout=4.0, win_delay=3.0):
+        self.go = os.path.join(work, "__pin_go.txt")
+        self.stable, self.timeout, self.win_delay = stable, timeout, win_delay
+        self.t0 = None
+        self.geom = None
+        self.since = None
+        self.released = None  # "settled WxH" / "timeout" / "delay"
+        self.last_poll = 0.0
+
+    def poll(self, denv):
+        if self.released:
+            return
+        now = time.monotonic()
+        if self.t0 is None:
+            self.t0 = now
+        if now - self.last_poll < 0.05:
+            return
+        self.last_poll = now
+        if denv is None:
+            if now - self.t0 >= self.win_delay:
+                self._release("delay")
+            return
+        r = subprocess.run([XGRAB], env=denv, capture_output=True, text=True)
+        geom = None
+        for line in r.stderr.splitlines():
+            if "name=Adobe Flash Player" in line:
+                geom = line.split("size=")[1].split()[0]
+        if geom != self.geom:
+            self.geom, self.since = geom, now
+        elif geom and geom != "640x520" and now - self.since >= self.stable:
+            self._release("settled " + geom)
+            return
+        if now - self.t0 >= self.timeout:
+            self._release("timeout")
+
+    def _release(self, why):
+        with open(self.go, "w") as f:
+            f.write("go=1")
+        self.released = why
 
 
 def winpath(p):

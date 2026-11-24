@@ -50,6 +50,7 @@ python3 tools/flash-oracle/run_trace.py <test_dir> -o flash.txt      # save
 python3 tools/flash-oracle/run_trace.py <test_dir> --windows --diff  # Windows projector
 python3 tools/flash-oracle/run_trace.py <test_dir> --type CD --type-after "before:"   # XTest typing (input.json fixtures)
 python3 tools/flash-oracle/run_trace.py <test_dir> --wrapped         # exact num_frames cut (see limits)
+python3 tools/flash-oracle/run_trace.py <test_dir> --no-pin --diff   # direct WITHOUT the window pin (old behaviour)
 
 # Images: AS3 wrapper loads the SWF, draws the stage at tick N, and ships pixels through flashlog.
 python3 tools/flash-oracle/run_image.py <test_dir> -o out.png [--ticks 1,3,5] [--quality low] \
@@ -101,6 +102,12 @@ tick k depends on the child's VM:
 - **Device fonts are host fonts.** Times on Windows, the fontconfig serif under Linux, against Ruffle's bundled Noto
   Sans. Any `with_default_font` or device-text golden is unreproducible by real Flash on either platform:
   `cache_as_bitmap/text` 4 954 px, and the text band of `bitmapdata_applyfilter_blur`.
+- **Windows has no direct-mode window race** (unpinned direct traces of both hitTest rows are byte-identical) and
+  renders device text with the host's **ClearType** (colour fringes). The upstream device-text "Flash references"
+  (`captions`, `stylesheet`, `hardwrap`, `MaskTest-2`, `acid-text-5`) use the same Windows faces in grayscale AA, so
+  they don't reproduce here (s27 round 2).
+- **Test fonts:** Linux direct runs install `test.toml` `[fonts.*]` into the temp HOME (fontconfig), so Ruffle's
+  injected device fonts are reproducible on Linux. Bundled default-font goldens still are not.
 - **Windows `draw()` leaves alpha < 255 under scrollRect'd content**, even in an opaque BitmapData; the RGB is identical.
   `run_image.py` forces alpha to 255.
 - Otherwise Windows == Linux on every image and trace compared: both validation goldens, scroll_rect_culling (after the
@@ -139,7 +146,7 @@ gives `false` and the golden says `true`.
 ## Golden sweep (`sweep_goldens.py`, s27)
 
 ```bash
-python3 tools/flash-oracle/sweep_goldens.py <test rel to root> --root ruffle-tests/tests/swfs --out-dir D [--screen | --direct]
+python3 tools/flash-oracle/sweep_goldens.py <test rel to root> --root ruffle-tests/tests/swfs --out-dir D [--screen | --direct [--no-pin] | --windows]
 ```
 
 - **What it does.**
@@ -148,7 +155,14 @@ python3 tools/flash-oracle/sweep_goldens.py <test rel to root> --root ruffle-tes
   - Writes `D/<test>[.screen|.direct].json` and the Flash PNGs to `D/png/`.
   - `validate_images.py` only grades the first comparison at the last tick.
 - **`--screen`:** one projector run per trigger tick, since the hold only happens at the last captured tick.
-- **`--direct`:** the SWF runs as the REAL root, and the Xvfb window is grabbed after it settles. The tick is NOT
+- **`--quality Q`** overrides `test.toml`'s quality. Some goldens are Flash at its DEFAULT quality (high) although
+  `test.toml` says low (`gradientTransform` exact, `acid-color` frame1); a `--quality high` wrapper sweep finds them.
+- **`--windows`:** draw mode on the Windows projector (strictly one run at a time).
+- **Wrapper false negatives:** a pinned `--direct` root is a second opinion for "not Flash" wrapper verdicts.
+  `displayobject_hittestpoint_boundary` (off-stage child), `loader_jpegxr`, `loader_jpegxr_alpha` and
+  `acid-bitmap-draw_quality_low` all fail under the wrapper and pass exactly as roots, pinned or not.
+- **`--direct`:** the SWF runs as the REAL root behind the window pin (`--no-pin` to skip it), and the Xvfb window is
+  grabbed after it settles, twice, 1 s apart (`static`). The tick is NOT
   pinned, so use it only for static content.
   - It is needed for the ~50 AVM2 tests whose document-class constructor touches `stage`. In a Loader child `stage`
     is null, so under the wrapper they die with `TypeError #1009` before tick 1.
@@ -156,14 +170,47 @@ python3 tools/flash-oracle/sweep_goldens.py <test rel to root> --root ruffle-tes
   - A modal dialog (e.g. `FileReference.save`) covers the stage and spoils the crop.
 - **`mm.cfg PreloadSwf` root agent: tried and ruled out.** The preload SWF runs (for AVM1 and AVM2 roots), but the
   main movie gets a NEW Stage. The preload's `stage` becomes null, and no stage event of the main movie reaches it.
-- **Window-size race (direct mode, traces AND images).**
-  - The projector window starts at about 640×480 and shrinks to the SWF size later.
-  - SWFs narrower than 640 stay show-all scaled: the drawing area measured 640×468 for a 500×250 SWF.
-  - 550-wide stages can still be scaled during their first frames under parallel load (`displayobject_scrollrect`'s
-    concatenatedMatrix came out ×640/550).
-  - Coordinate-dependent direct traces (`hitTest*`, `concatenatedMatrix`, mouse coords) are therefore unreliable
-    unless run serially and checked.
-  - Wrapper captures set NO_SCALE and are immune.
+- **Window-size race: FIXED by the direct-mode window pin (below).** Unpinned, the projector's GTK drawing area is
+  640×468 for the first ~0.3–1.5 s, so a direct root plays its first frames show-all scaled (`concatenatedMatrix`
+  ×640/550, hitTest results flipped). `--no-pin` (both tools) reproduces the old behaviour.
+
+## Direct-mode window pin (s27 round 2; `capture/PinStub.as`)
+
+Direct runs (`run_trace.py` default, `sweep_goldens.py --direct`) no longer start the test as the projector's first
+root. They start `capture/PinStub.swf` (AVM1, built by `capture/build.sh` with MTASC), header-patched to the test's
+stage RECT, frame rate and background colour, inside a **staged copy of the test dir**. The harness (`flashenv.PinGate`)
+watches the X window tree, and once the toplevel has left its 640×520 startup size and held still for 0.5 s it drops
+`__pin_go.txt`; the stub then `getURL(test.swf, "_level0")`, so the test replaces `_level0` and runs as the real root
+at 1:1 from its frame 1. The Windows projector (no X tree) is released after a fixed 3 s.
+
+- **Proof:** `displayobject_scrollrect`, `movieclip_hittest`, `displayobject_hittestpoint_boundary`, 4 parallel runs
+  each: pinned 12/12 byte-identical to the goldens, unpinned 0/12. On the 106 image tests with an `output.txt`:
+  72 byte-identical pinned vs 70 unpinned; the only loss was a load flake (`acid-text-x`, serial 3/3 identical).
+- **Why the gate is X-side:** `Stage.width/height` (noScale) inside the stub report the final size from its first
+  frame on, before GTK has resized the drawing area, so the stub can't time itself.
+- **Staged copy:** Flash resolves relative URLs against the FIRST root's directory, so the stub must sit next to the
+  test (`mcl_replace_root_*`, `movieclip_state_values` load siblings). Paths in traces therefore show a temp dir.
+- **Background:** the stub's `SetBackgroundColor` survives the replacement, so the harness stamps the test's colour
+  into the stub (`patch_swf_header(..., bg=)`); without it black-stage tests (`focus_*`) came out white.
+- **Quality:** the stub sets `_quality` from `test.toml` `with_renderer.quality`. It carries into an **AVM1** root
+  (`_quality` traces `LOW`) but **not an AVM2 root** (new Stage, `stage.quality` = `HIGH`). AVM2 `quality = "low"`
+  rows can't be graded from a direct capture (use the wrapper when the test allows it).
+- **Narrow stages (< 296 px wide):** the menubar keeps the drawing area ≥ ~296 px wide while the toplevel is only
+  stage-wide and clips it, so a centred stage sits off-window. Those stages are pinned with `Stage.align = "TL"`
+  (it survives the replacement; the test then traces `Stage.align` = `TL`/`LT`, not `""`). Heights are not clamped.
+- **Crop:** the stage is now the top-left of the **largest child of the projector toplevel** (`run_image.drawing_area`).
+  The old rule ("smallest window ≥ w×h") picked the 20×72 toplevel (its menubar) for small stages.
+- **Device fonts:** `[fonts.*]` files in `test.toml` (Ruffle injects them as device fonts) are copied into the temp
+  HOME's `~/.fonts`; Linux Flash finds them through fontconfig (`device_font_no_ink`, `leading_device_font`,
+  `edittext_device_transform_negative` now match their goldens). Windows has no equivalent yet.
+- **Screen:** Xvfb is now 2048×2600 (`flashenv.XVFB_SCREEN`), so 800/1000-px-tall stages are not clipped (or
+  constrained by GTK).
+- **Static check:** `sweep_goldens.py --direct` grabs twice 1 s apart and records `static`; only a static PASS (or an
+  exact match) is evidence for an animating test, whose tick is still unpinned.
+- **Known divergence:** `from_gnash/misc-swfmill.all/missing_bitmap` (a fill naming an undefined bitmap) draws a
+  200×200 red block as a first root (and under the wrapper) but only a 2×2 red block at (0,0) as a replaced `_level0`.
+  Use `--no-pin` to cross-check anything that depends on first-root-only state.
+
 - **The README's validation goldens.** The two rows below were validated against upstream goldens NEWER than our
   mirror. Ruffle re-baked them as Flash references on 2026-11-23 (`5128d3943`, `7facc1fcc`). Against our mirror's
   older goldens, Flash is 22 953 px / 23 380 px off. (CI is unaffected: it downloads upstream master at run time.)
@@ -174,5 +221,6 @@ python3 tools/flash-oracle/sweep_goldens.py <test rel to root> --root ruffle-tes
 - `flashenv.py`: player environments (Linux temp-HOME + Xvfb; Windows interop) and the SWF header parse/patch.
 - `run_trace.py`, `run_image.py`, `validate_images.py`, `sweep_goldens.py`: the CLIs above.
 - `capture/CaptureWrapper.as` + `build.sh` → `CaptureWrapper.swf` (committed, 4.7 KB).
+- `capture/PinStub.as` + `build.sh` (MTASC) → `PinStub.swf` (committed): the direct-mode window pin.
 - `xgrab/xgrab.c`: X window tree, root screenshot (PPM), and XTest typing.
 - `probes/tick_avm1`, `probes/tick_avm2`: the tick-alignment probes (MTASC / mxmlc sources + SWFs).

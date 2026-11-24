@@ -9,3 +9,8 @@ FLEX="${FLEX_SDK:-$HOME/CC/flex-sdk}"
   -omit-trace-statements=false -static-link-runtime-shared-libraries=true \
   -default-size 100 100 -default-frame-rate 30 \
   -output CaptureWrapper.swf CaptureWrapper.as
+
+# PinStub.swf: the direct-mode window pin (AVM1 root stub; README "Direct-mode
+# window pin"). Header size is irrelevant: flashenv patches RECT + rate per run.
+"${MTASC:-$HOME/CC/mtasc/bin/mtasc}" -cp "${MTASC_STD:-$HOME/CC/mtasc/ocaml/mtasc/std}" \
+  -main -header 500:250:24 PinStub.as -swf PinStub.swf -version 8

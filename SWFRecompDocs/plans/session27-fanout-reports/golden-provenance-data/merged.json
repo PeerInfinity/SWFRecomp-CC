@@ -267,11 +267,28 @@
     "outliers": [
      1407
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 2500,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x102"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm1/define_font_glyph_table_overlap",
@@ -299,11 +316,28 @@
     "outliers": [
      807
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 2500,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x102"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm1/display_object_properties",
@@ -2800,10 +2834,28 @@
     "outliers": [
      30436
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 569,
+    "pixels": 32400,
+    "max": 1,
+    "outliers": [
+     871
+    ],
+    "static": true,
+    "pin": "settled 296x232"
    }
   },
-  "best_mode": "direct",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "near Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "near Flash"
+   }
+  }
  },
  {
   "test": "avm1/movieclip_setmask",
@@ -2851,10 +2903,28 @@
     "outliers": [
      48
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 16,
+    "pixels": 313600,
+    "max": 95,
+    "outliers": [
+     48
+    ],
+    "static": true,
+    "pin": "settled 560x612"
    }
   },
-  "best_mode": "draw",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "not Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "not Flash"
+   }
+  }
  },
  {
   "test": "avm1/netstream_play_flv",
@@ -3300,11 +3370,29 @@
     "outliers": [
      652091
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 218720,
+    "pixels": 220000,
+    "max": 255,
+    "outliers": [
+     650055
+    ],
+    "static": true,
+    "pin": "settled 550x452"
    }
   },
-  "best_mode": "direct",
-  "untestable": "FileReference.save dialog in direct run; direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "untestable": "FileReference.save dialog in direct run",
+  "verdict": "untestable",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "untestable"
+   }
+  }
  },
  {
   "test": "avm2/bitmapdata_copychannel",
@@ -3332,11 +3420,28 @@
     "outliers": [
      48667
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 32768,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x180"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/bitmapdata_copypixels",
@@ -3434,10 +3539,25 @@
      2025,
      1158
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 1237,
+    "pixels": 330000,
+    "max": 255,
+    "outliers": [
+     3583,
+     2396,
+     1544
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "avm2/bitmapdata_draw_alpha_erase",
@@ -3742,11 +3862,28 @@
     "outliers": [
      2196
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 6400,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x132"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/bitmapdata_embedded",
@@ -3970,10 +4107,23 @@
     "outliers": [
      4
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 2,
+    "pixels": 220000,
+    "max": 255,
+    "outliers": [
+     2
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "avm2/bitmapdata_pixeldissolve_image",
@@ -4033,11 +4183,28 @@
     "outliers": [
      4078
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 22500,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x202"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/blend_multiply_alpha",
@@ -4116,10 +4283,23 @@
     "outliers": [
      390
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 87,
+    "pixels": 220000,
+    "max": 255,
+    "outliers": [
+     174
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "avm2/blend_shader_luma_lighten",
@@ -4475,10 +4655,28 @@
     "outliers": [
      63700
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 125000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 500x302"
    }
   },
-  "best_mode": "draw",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/displayobject_mask",
@@ -4790,11 +4988,28 @@
     "outliers": [
      2976
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 5500,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x162"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/edittext_autosize_align",
@@ -4822,11 +5037,28 @@
     "outliers": [
      174162
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 160000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x852"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/edittext_autosize_height_dynamic",
@@ -4885,11 +5117,28 @@
     "outliers": [
      12312
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 40000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x252"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/edittext_get_char_index_at_point",
@@ -5000,11 +5249,28 @@
     "outliers": [
      9729
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 15000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x352"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/error_stack_trace_debug_swf17",
@@ -5185,11 +5451,28 @@
     "outliers": [
      1144
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 400,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x72"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/focus_stage",
@@ -5217,11 +5500,28 @@
     "outliers": [
      900
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 2500,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x102"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/focusrect",
@@ -5802,10 +6102,23 @@
     "outliers": [
      4286
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 28,
+    "pixels": 4500,
+    "max": 255,
+    "outliers": [
+     56
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "avm2/graphics_draw_triangles",
@@ -6087,10 +6400,28 @@
     "outliers": [
      136033
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 56250,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 450x177"
    }
   },
-  "best_mode": "draw",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/loader_jpegxr_alpha",
@@ -6131,10 +6462,28 @@
     "outliers": [
      11574
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 10000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x152"
    }
   },
-  "best_mode": "draw",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "avm2/loader_loadbytes_events",
@@ -7891,11 +8240,29 @@
     "outliers": [
      2556
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 400,
+    "pixels": 5000,
+    "max": 255,
+    "outliers": [
+     1200
+    ],
+    "static": true,
+    "pin": "settled 296x102",
+    "fonts_installed": true
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "not Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "not Flash"
+   }
+  }
  },
  {
   "test": "fonts/device_font_no_ink",
@@ -7923,11 +8290,29 @@
     "outliers": [
      4908
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 5000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x102",
+    "fonts_installed": true
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "fonts/embed_matching/fallback_preferences",
@@ -7955,11 +8340,29 @@
     "outliers": [
      475680
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 25258,
+    "pixels": 550000,
+    "max": 239,
+    "outliers": [
+     75774
+    ],
+    "static": true,
+    "pin": "settled 550x1052"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "untestable": "AVM2 root + quality=low: a direct root can't take it (renders HIGH)",
+  "verdict": "untestable",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "untestable"
+   }
+  }
  },
  {
   "test": "fonts/embed_matching/match_style",
@@ -7987,11 +8390,29 @@
     "outliers": [
      9138
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 3046,
+    "pixels": 220000,
+    "max": 240,
+    "outliers": [
+     9138
+    ],
+    "static": true,
+    "pin": "settled 550x452"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "untestable": "AVM2 root + quality=low: a direct root can't take it (renders HIGH)",
+  "verdict": "untestable",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "untestable"
+   }
+  }
  },
  {
   "test": "fonts/embed_matching/no_font_found",
@@ -8739,10 +9160,23 @@
     "outliers": [
      13754
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 5209,
+    "pixels": 480000,
+    "max": 255,
+    "outliers": [
+     15627
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_gnash/misc-ming.all/shape_test",
@@ -8792,10 +9226,23 @@
     "outliers": [
      3173
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 1071,
+    "pixels": 480000,
+    "max": 255,
+    "outliers": [
+     3213
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_gnash/misc-swfmill.all/background",
@@ -8874,10 +9321,28 @@
     "outliers": [
      80000
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 4,
+    "pixels": 480000,
+    "max": 255,
+    "outliers": [
+     8
+    ],
+    "static": true,
+    "pin": "settled 800x652"
    }
   },
-  "best_mode": "draw",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "not Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "not Flash"
+   }
+  }
  },
  {
   "test": "from_shumway/3_joystick",
@@ -9017,10 +9482,23 @@
     "outliers": [
      8377
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 1197,
+    "pixels": 220000,
+    "max": 255,
+    "outliers": [
+     3523
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_shumway/MaskTest-3",
@@ -10044,10 +10522,43 @@
      85954,
      30880
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 65536,
+    "max": 0,
+    "outliers": [
+     0,
+     0,
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x308"
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 25058,
+    "pixels": 65536,
+    "max": 149,
+    "outliers": [
+     66861,
+     15095,
+     2192
+    ]
    }
   },
-  "best_mode": "draw",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "Flash"
+   },
+   "windows": "fail"
+  }
  },
  {
   "test": "from_shumway/acid/acid-bitmap-fill",
@@ -10920,10 +11431,25 @@
     "outliers": [
      2
     ]
+   },
+   "draw-high": {
+    "pass": true,
+    "exact": false,
+    "diff_pixels": 0,
+    "pixels": 220000,
+    "max": 3,
+    "outliers": [
+     0
+    ]
    }
   },
-  "best_mode": "draw",
-  "verdict": "near Flash"
+  "best_mode": "draw-high",
+  "verdict": "Flash",
+  "round2": {
+   "quality_high": {
+    "old_verdict": "near Flash"
+   }
+  }
  },
  {
   "test": "from_shumway/acid/acid-color-0",
@@ -12021,10 +12547,23 @@
     "outliers": [
      12
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 4,
+    "pixels": 220000,
+    "max": 1,
+    "outliers": [
+     12
+    ]
    }
   },
   "best_mode": "screen",
-  "verdict": "near Flash"
+  "verdict": "near Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_shumway/acid/acid-text-5",
@@ -12074,10 +12613,23 @@
     "outliers": [
      1133829
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 34290,
+    "pixels": 1048576,
+    "max": 254,
+    "outliers": [
+     68543
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_shumway/acid/acid-text-6",
@@ -13179,10 +13731,23 @@
     "outliers": [
      4860
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 1200,
+    "pixels": 220000,
+    "max": 255,
+    "outliers": [
+     2932
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_shumway/clipping",
@@ -13325,11 +13890,29 @@
     "outliers": [
      639
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 213,
+    "pixels": 360000,
+    "max": 15,
+    "outliers": [
+     639
+    ],
+    "static": true,
+    "pin": "settled 600x652"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "untestable": "AVM2 root + quality=low: a direct root can't take it (renders HIGH)",
+  "verdict": "untestable",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "untestable"
+   }
+  }
  },
  {
   "test": "from_shumway/flash_text_TextField2",
@@ -13467,10 +14050,36 @@
     "outliers": [
      7561
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 3,
+    "pixels": 2525,
+    "max": 15,
+    "outliers": [
+     9
+    ]
+   },
+   "draw-high": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 2525,
+    "max": 0,
+    "outliers": [
+     0
+    ]
    }
   },
-  "best_mode": "draw",
-  "verdict": "near Flash"
+  "best_mode": "draw-high",
+  "verdict": "Flash",
+  "round2": {
+   "windows": "fail",
+   "quality_high": {
+    "old_verdict": "near Flash"
+   }
+  }
  },
  {
   "test": "from_shumway/hardwrap",
@@ -13520,10 +14129,23 @@
     "outliers": [
      3891
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 962,
+    "pixels": 220000,
+    "max": 255,
+    "outliers": [
+     2535
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_shumway/invalidClipDepth",
@@ -13624,10 +14246,23 @@
     "outliers": [
      3345
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 993,
+    "pixels": 220000,
+    "max": 182,
+    "outliers": [
+     1555
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "from_shumway/timeline/Timeline3",
@@ -17025,11 +17660,29 @@
      33556,
      48
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 60000,
+    "max": 0,
+    "outliers": [
+     0,
+     0
+    ],
+    "static": true,
+    "pin": "settled 300x252"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/cache_as_bitmap/oversize/swf_9_too_big",
@@ -17335,10 +17988,23 @@
     "outliers": [
      22236
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 6331,
+    "pixels": 66450,
+    "max": 255,
+    "outliers": [
+     18993
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "visual/drawing_api/cursor",
@@ -18787,11 +19453,30 @@
      3072,
      2442
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": false,
+    "diff_pixels": 8,
+    "pixels": 187500,
+    "max": 255,
+    "outliers": [
+     24,
+     15
+    ],
+    "static": true,
+    "pin": "settled 500x427",
+    "fonts_installed": true
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/edittext/edittext_device_transform_small_rotation",
@@ -18881,11 +19566,28 @@
     "outliers": [
      9684
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 11000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x162"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/edittext/edittext_justify",
@@ -18975,11 +19677,28 @@
     "outliers": [
      8113
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 15000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x112"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/edittext/edittext_selection_leading",
@@ -21156,11 +21875,28 @@
     "outliers": [
      800
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 2500,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x102"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/focus_highlight/focus_highlight_move",
@@ -21943,11 +22679,29 @@
     "outliers": [
      23220
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 40000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x252",
+    "fonts_installed": true
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/fonts/leading_embedded_font",
@@ -21975,11 +22729,28 @@
     "outliers": [
      18282
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 40000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x252"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/gradient_issue_9892",
@@ -22132,11 +22903,28 @@
     "outliers": [
      7728
     ]
+   },
+   "direct-pinned": {
+    "pass": true,
+    "exact": true,
+    "diff_pixels": 0,
+    "pixels": 10000,
+    "max": 0,
+    "outliers": [
+     0
+    ],
+    "static": true,
+    "pin": "settled 296x102"
    }
   },
-  "best_mode": "direct",
-  "untestable": "direct run: tick unpinned",
-  "verdict": "untestable"
+  "best_mode": "direct-pinned",
+  "verdict": "Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "untestable",
+    "new_verdict": "Flash"
+   }
+  }
  },
  {
   "test": "visual/opaque_background",
@@ -22742,10 +23530,28 @@
     "outliers": [
      160
     ]
+   },
+   "direct-pinned": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 82,
+    "pixels": 220000,
+    "max": 160,
+    "outliers": [
+     160
+    ],
+    "static": true,
+    "pin": "settled 550x452"
    }
   },
-  "best_mode": "draw",
-  "verdict": "not Flash"
+  "best_mode": "direct-pinned",
+  "verdict": "not Flash",
+  "round2": {
+   "direct_pinned": {
+    "old_verdict": "not Flash",
+    "new_verdict": "not Flash"
+   }
+  }
  },
  {
   "test": "visual/simple_shapes/masks",
@@ -22999,10 +23805,23 @@
     "outliers": [
      10767
     ]
+   },
+   "draw-win": {
+    "pass": false,
+    "exact": false,
+    "diff_pixels": 3589,
+    "pixels": 220000,
+    "max": 192,
+    "outliers": [
+     10767
+    ]
    }
   },
   "best_mode": "draw",
-  "verdict": "not Flash"
+  "verdict": "not Flash",
+  "round2": {
+   "windows": "fail"
+  }
  },
  {
   "test": "visual/simple_shapes/text_field_mask",

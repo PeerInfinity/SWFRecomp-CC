@@ -111,22 +111,46 @@ def capture(test_dir, ticks=None, quality=None, swf_name=None, verbose=False,
     return images, log, reason, info, quality
 
 
-def crop_stage(shot, w, h):
-    """Crop the stage out of a root screenshot. The stage is the projector's
-    GTK drawing area: the smallest viewable non-root window at least w x h.
-    It can be wider than the stage (the menubar forces >= ~296 px); the
-    wrapper sets StageAlign.TOP_LEFT, so the stage is its top-left w x h."""
+def toml_quality(toml):
+    """test.toml player_options.with_renderer.quality (default "high")."""
+    wr = toml.get("player_options", {}).get("with_renderer", {})
+    return wr.get("quality", "high") if isinstance(wr, dict) else "high"
+
+
+def drawing_area(tree):
+    """The projector's GTK drawing area in an xgrab tree dump: the largest
+    viewable child of the "Adobe Flash Player" toplevel, as (x, y, w, h).
+    It can be larger than the visible stage: the menubar keeps it >= ~296 px
+    wide (and ~100 px high) while the toplevel shrinks to the stage width and
+    clips it. Picking "the smallest window >= w x h" instead (the s27 rule)
+    chose the 20x72 toplevel - its menubar - for stages under ~296x100."""
     best = None
-    for line in shot["tree"].splitlines():
+    in_top = False
+    for line in tree.splitlines():
         m = re.search(r"abs=(-?\d+),(-?\d+) size=(\d+)x(\d+)", line)
-        if not m or line.startswith("WIN"):  # skip the root window
+        if not m:
             continue
-        x, y, ww, hh = map(int, m.groups())
-        if ww >= w and hh >= h and (best is None or ww * hh < best[2] * best[3]):
-            best = (x, y, ww, hh)
-    if best is None:
+        depth = (len(line) - len(line.lstrip(" "))) // 2
+        if depth == 1:
+            in_top = "name=Adobe Flash Player" in line
+            continue
+        if in_top and depth == 2:
+            x, y, ww, hh = map(int, m.groups())
+            if best is None or ww * hh > best[2] * best[3]:
+                best = (x, y, ww, hh)
+    return best
+
+
+def crop_stage(shot, w, h, center=False):
+    """Crop the stage out of a root screenshot: the top-left w x h of the
+    drawing area (the wrapper and the pin stub set top-left align), or its
+    centre for an unpinned direct root (show-all, centre align)."""
+    best = drawing_area(shot["tree"])
+    if best is None or best[2] < w or best[3] < h:
         return None, None
     x, y = best[0], best[1]
+    if center:
+        x, y = x + (best[2] - w) // 2, y + (best[3] - h) // 2
     return shot["image"].crop((x, y, x + w, y + h)).convert("RGBA"), (x, y)
 
 

@@ -5,7 +5,7 @@ One-task session, 2026-11-24. Brief: `golden-provenance-prompt.md` (s27-coordina
 `golden-provenance/` (159 PNGs, 2.9 MB; `<test with / → __>__<comparison>[.screen|.direct].png`). Machine-readable
 rows: `golden-provenance-data/merged.json`.
 
-## Summary paragraph for `graphics-fanout-playbook.md` §26
+## Summary paragraph for `graphics-fanout-playbook.md` §26 (round 1; superseded by §Round 2 for the counts and the hitTest rows)
 
 > **s27 golden-provenance sweep (Linux Flash Player 32, 389 image tests / 596 comparisons, `regression/` excluded):**
 > **229 goldens are Flash-made** (184 pixel-exact, 45 within the test's own tolerance), **12 are near-Flash** (fail
@@ -26,6 +26,143 @@ rows: `golden-provenance-data/merged.json`.
 > **Oracle limit found:** the Linux projector's stage window races its startup size (about 640×480 first). Direct
 > runs of SWFs narrower than 640 stay show-all scaled, so coordinate-dependent direct traces are unreliable there.
 > `movieclip_hittest`'s Flash `false` was re-checked and still holds (stable in direct ×2 and in wrapped mode).
+
+## Round 2 (2026-11-24, one-task session `golden-provenance-2`)
+
+Brief: `golden-provenance-2-prompt.md`. Tools changed: `tools/flash-oracle/` (README §"Direct-mode window pin").
+New Flash PNGs in `golden-provenance/`: `*.direct-pinned.png` (root captures behind the pin) and `*.win.png`
+(Windows projector). `golden-provenance-data/merged.json` rows touched in round 2 carry a `round2` key and the new
+modes (`direct-pinned`, `draw-win`, `draw-high`). The full table below is updated in place (`r2:` notes).
+
+### Summary paragraph (replaces the round-1 one for the playbook)
+
+> **s27 golden provenance, round 2.** Direct-mode runs are now **pinned to 1:1**. A root stub (`capture/PinStub.swf`)
+> loads the test into `_level0` only once the X window has settled. The test then runs as the real root from its
+> frame 1, and the harness installs `test.toml` fonts as device fonts. **Both hitTest "RvF candidates" are
+> retired.** `movieclip_hittest` and `displayobject_hittestpoint_boundary` match their goldens at 1:1, in 4/4 pinned
+> runs and on Windows. The round-1 `false`s were the show-all scale race.
+> **Re-graded: 596 comparisons → 255 Flash (+26), 11 near (−1), 142 not Flash (−4), 188 untestable (−21).**
+> - Of the 25 direct-only rows, 20 are Flash. `device_font_kerning` is not Flash on Linux. Three AVM2 rows with
+>   quality=low stay untestable, since a direct root can't take low quality. The FileReference dialog row also stays.
+> - 4 wrapper "not Flash" verdicts were wrapper artifacts and pass as roots: `displayobject_hittestpoint_boundary`,
+>   `loader_jpegxr`, `loader_jpegxr_alpha` and `acid-bitmap-draw_quality_low`.
+> - 2 goldens are Flash at its **default HIGH quality** although `test.toml` says low: `gradientTransform` (exact)
+>   and `acid-color` frame1.
+>
+> **Windows pass:** of the 12 `known_failure` + `.ruffle.png` "Flash references" that Linux rejected, 2 are now Flash
+> on Linux (above) and Windows reproduces none of the rest. The 4 non-text ones are pixel-identical LNX == WIN, so
+> they are not FP32 output on either OS. The 6 text ones render the same Windows font faces as the goldens, but with
+> ClearType fringes against the goldens' grayscale AA (plus a ~3 px layout shift). They look like Windows-Flash
+> captures from a ClearType-off host, which can't be reproduced here without changing a system-wide Windows setting.
+> **No new RvF entries:** no re-graded row has us matching Flash against the golden.
+
+### Goal 1: the window pin (tool)
+
+- **Mechanism:** see README §"Direct-mode window pin".
+  - The pin stub carries the test's RECT, rate and background colour, and sits in a staged copy of the test dir.
+  - `PinGate` waits on X geometry (stable for 0.5 s after leaving 640×520), then drops `__pin_go.txt`.
+  - The stub replaces `_level0`.
+  - Narrow stages (< 296 px) get `Stage.align = TL`.
+  - The crop is now the projector's drawing area: the largest toplevel child.
+  - Xvfb is 2048×2600. `test.toml` `[fonts.*]` files go into `~/.fonts`.
+- **Proof on the named row:** `displayobject_scrollrect`, `movieclip_hittest` and `displayobject_hittestpoint_boundary`,
+  4 parallel runs each (12 runs): pinned **12/12 byte-identical**, unpinned **0/12**. The unpinned scrollrect still
+  shows ×640/550. On the 106 image tests with an `output.txt`, 72 are byte-identical pinned vs 70 unpinned. The only
+  pinned loss was a load flake (`acid-text-x`, serial 3/3 identical), and the time budget is now +2.5 s.
+- **Bugs found on the way (each fixed and verified):**
+
+| Defect | Symptom | Fix |
+|---|---|---|
+| stub not next to the test | relative loads resolve against the FIRST root's dir: `mcl_replace_root_*` empty, `movieclip_state_values` truncated | staged copy of the test dir, stub inside |
+| `Stage.width/height` as the gate | they report the final size from the stub's frame 1, before GTK resizes; the gate was a no-op | X-side `PinGate` |
+| centred narrow stage | area ≥ 296 wide, toplevel stage-wide → content clipped off-window | `align=TL` for width < 296 (the test sees it) |
+| crop = smallest window ≥ w×h | picked the 20×72 toplevel (menubar) on small stages | largest child of the projector toplevel |
+| stub background | white survived the replacement; black-stage `focus_*` rows failed | test's bg stamped into the stub |
+| 1280×1024 Xvfb | 800/1000-px stages clipped | 2048×2600 |
+| test fonts | device-font rows graded host fonts | `[fonts.*]` → temp `~/.fonts` (fontconfig) |
+
+- **Limits that remain (documented in the README):**
+  - `_quality` from the stub reaches an AVM1 root but NOT an AVM2 root (`stage.quality` = HIGH).
+  - Fractional stage sizes are show-all scaled by ~1 % (`gradientTransform` 101.3×25.3).
+  - `missing_bitmap` draws differently as a replaced `_level0` than as a first root. `--no-pin` stays available.
+- **Windows:** the projector has **no** window race. Unpinned Windows direct traces of both hitTest rows are
+  byte-identical, and the pin works there too (released by a 3 s delay; no X tree).
+
+### Goal 2: re-graded rows (1:1)
+
+| Row(s) | Round 1 | Round 2 |
+|---|---|---|
+| 20 of the 25 direct-only rows: `define_font_glyph_table_order`/`_overlap`, `bitmapdata_copychannel`, `bitmapdata_draw_stage`, `bitmapdata_sync`, `edittext_always_show_selection`, `edittext_autosize_align`, `edittext_autosize_lazy_bounds_visual`, `edittext_tag_indent`, `focus_root_movie`, `focus_stage`, `device_font_no_ink`\*, `swf_9_masks`, `edittext_device_transform_negative`\*, `edittext_gutter`, `edittext_selection_font_size`, `focus_highlight_empty_clip`, `leading_device_font`\*, `leading_embedded_font`, `line_vertical_align` | untestable | **Flash** (static captures, 19 exact; \* = with the test fonts installed) |
+| `fonts/device_font_kerning` | untestable | **not Flash (LNX)**: with `TestFont` installed, Linux Flash gives width 40 and glyphs abut; golden width 50 with gaps. Device-font metrics are platform-dependent, so no RvF. |
+| `match_style`, `fallback_preferences`, `flash_text_TextField` | untestable (tick) | untestable: AVM2 root + quality=low (a direct root renders HIGH) |
+| `bitmapdata_colortransform` | untestable | untestable (FileReference dialog) |
+| `displayobject_hittestpoint_boundary` (image), `loader_jpegxr`, `loader_jpegxr_alpha`, `acid-bitmap-draw_quality_low` | not Flash (wrapper `draw()`) | **Flash (exact)** as a root, pinned and unpinned alike. The wrapper result was the artifact: an off-stage child, a Loader child, or the wrapper's forced quality. |
+| `movieclip_methods_with_loaded_image` | not Flash (unpinned direct, mis-cropped 180-px stage) | **near Flash** (569 px, max 1: JPEG rounding) |
+| `movieclip_setmask`, `simple_shapes/layers` | not Flash (draw: 20 020 / 1 079 px) | still not Flash, but as roots only 16 px (max 95) / 82 px (max 160) |
+| `gradientTransform`, `acid-color` frame1 | near Flash | **Flash at quality HIGH** (exact / in tol): golden made at Flash's default quality, not `test.toml`'s low. A `--quality high` wrapper sweep of all 109 non-Flash rows with low/medium toml quality flipped only these two. |
+| `sprite_with_frames` | Flash (direct) | unchanged: a 2-frame loop, which passes at some settle times only |
+| hitTest traces | RvF candidates | retired (table above) |
+
+### Goal 3: Windows projector pass (12 `known_failure` + `.ruffle.png` rows Linux rejected)
+
+| Test | LNX (px over tol) | WIN | Platform of the golden |
+|---|---:|---:|---|
+| `avm2/graphics_draw_path` | 28 | 28 (PNG identical) | not FP32 on either OS |
+| `from_gnash/misc-ming.all/place_object_test` | 5 209 | 5 209 (identical) | not FP32 on either OS |
+| `from_gnash/misc-ming.all/shape_test` | 1 071 | 1 071 (identical) | not FP32 on either OS |
+| `visual/simple_shapes/strokes/scale` | 3 589 | 3 589 (identical) | not FP32 on either OS (wrapper == root too) |
+| `from_shumway/acid/acid-bitmap-draw_quality_low` | 30 511 (wrapper) | 25 058 (wrapper) | **Flash (LNX root, exact)**: the wrapper's forced low quality was wrong |
+| `from_shumway/gradientTransform` | 3 | 3 | **Flash (LNX, quality high, exact)** |
+| `from_shumway/acid/acid-text-4` | 2 (max 1) | 4 (max 1) | near Flash on both; AA rounding |
+| `from_shumway/MaskTest-2` | 3 643 | 1 197 | Windows-like device text, not reproducible (ClearType host) |
+| `from_shumway/acid/acid-text-5` | 54 045 | 34 290 | same |
+| `from_shumway/captions` | 2 479 | 1 200 | same (Arial Bold Italic) |
+| `from_shumway/hardwrap` | 1 337 | 962 | same |
+| `from_shumway/stylesheet` | 1 603 | 993 | same (Times New Roman) |
+
+The 34 `.ruffle.png` pairs now stand at **21 Flash, 1 near, 9 not, 3 untestable**.
+
+### Goal 4: grading decision draft for the 14 board rows with non-Flash goldens (for the coordinator; no goldens swapped)
+
+"Flash capture" = the archived PNG named. "Confirmed" means it is identical on Linux and Windows, and also identical
+between wrapper and root where a root can render the test's quality.
+
+| Row | Flash capture | Ours≠Fl / gold≠Fl / ours-only (px, round 1) | Recommendation |
+|---|---|---|---|
+| `from_shumway/gradientTransform` | the golden itself (Flash at HIGH, exact) | 1 / 3 / 0 | **keep**: now a Flash target. Our miss is 9 px max 11 vs golden; check our quality model |
+| `visual/simple_shapes/strokes/scale` | `…strokes__scale__output.png` (LNX == WIN == root) | 7 797 / 3 589 / 4 252 | **swap** to the Flash capture (confirmed) |
+| `avm2/graphics_draw_path` | `avm2__graphics_draw_path__output.png` (LNX == WIN; AVM2 low-q: wrapper only) | 387 / 28 / 363 | **swap** (small effect: our 363 px are real either way) |
+| `avm2/bitmapdata_opaque` | `avm2__bitmapdata_opaque__output.png` (LNX == WIN) | 4 / 2 / 2 | **swap** (we still fail by 4 px at tol 0) |
+| `avm2/blend_scroll` | `avm2__blend_scroll__output.png` (LNX == WIN) | 195 / 87 / 108 | **swap** |
+| `visual/definefont4` | `visual__definefont4__output.png` (LNX == WIN; embedded DefineFont4) | 5 325 / 6 331 / 2 178 | **swap**: we are closer to Flash than the golden is |
+| `from_gnash/misc-ming.all/place_object_test` | wrapper `…__output.png` / root `…__output.direct-pinned.png` (LNX == WIN; the two disagree by ~600 px) | 15 586 / 5 209 / 12 179 (root: 17 540 / 5 984 / 11 643) | **keep** for now. Our miss is far bigger than the capture disagreement; swap to the ROOT capture once within ~1k px |
+| `from_gnash/misc-ming.all/shape_test` | same pair | 8 508 / 1 071 / 7 625 (root: 8 804 / 1 437 / 7 388) | **keep** for now (same reason) |
+| `avm2/bitmapdata_draw` | wrapper == root, but LNX ≠ WIN by 1 008 px (device-font letter spacing) | 2 051 / 1 110 / 1 104 | **keep**: no host-independent Flash reference; the golden is closer to Flash than we are |
+| `from_shumway/MaskTest-2` | host-dependent (device text) | 2 415 / 2 822 / 705 | **keep + disposition "device text, golden = Windows-like Flash, not reproducible"**. Grade only if the text band is masked |
+| `from_shumway/captions` | host-dependent | 2 134 / 2 278 / 727 | keep + same disposition |
+| `from_shumway/hardwrap` | host-dependent | 1 135 / 1 297 / 298 | keep + same disposition |
+| `from_shumway/stylesheet` | host-dependent | 999 / 1 543 / 32 | keep + same disposition |
+| `from_shumway/acid/acid-text-5` | host-dependent | 63 459 / 53 354 / 35 893 | keep + same disposition |
+
+Net: 5 swaps (strokes/scale, graphics_draw_path, bitmapdata_opaque, blend_scroll, definefont4), 1 keep as a Flash
+target (gradientTransform), 2 deferred swaps (place_object_test, shape_test) and 6 keeps (bitmapdata_draw, plus 5 that
+get the device-text disposition). Swapping needs a per-row golden override in `image_triage.py` or the runner (round-1
+note). Expected flips from the swaps: none to pass. All 5 still miss Flash by more than their tolerance (smallest:
+`bitmapdata_opaque`, 4 px at tol 0). The value of a swap is an honest residual, not a greener board.
+
+### Next slice
+
+1. Coordinator: rule on the goal-4 table (per-row golden override mechanism).
+2. Our quality model: `gradientTransform`'s golden is Flash at HIGH while Ruffle and our runner use `test.toml`
+   low. Check what our runtime does with `with_renderer.quality`, because the 9-px miss may be the AA mode.
+3. Optional, needs Robert's OK because it changes a system-wide Windows setting: re-run the 6 text rows with
+   ClearType off, to prove they are Windows-Flash captures.
+4. Lead (not investigated): the pin makes coordinate traces trustworthy. Pinned Flash (2/2) gives `false` on 3
+   `avm1/movieclip_hittest_shapeflag` lines where the golden says `true`: `clip.hitTest(400, 500 / 500, 400 /
+   400, 300, true)`. That test is ignored with 6 ACCEPTED_DIFFS lines, so check whether our diff lines are these
+   (a Flash-matching RvF) or others.
+5. Tooling: an AVM2-root quality pin is impossible from an AVM1 stub. A Linux-side alternative is to patch the
+   test's DoABC entry point, which is not attempted. Grading AVM2 low-quality direct-only rows stays out of reach.
 
 ## Method
 
@@ -181,9 +318,9 @@ Reading it:
 | Test | Axis | Flash says | Golden says | Ours | Status |
 |---|---|---|---|---|---|
 | `visual/filters/blur_quality` | image | Flash capture == ours (0 px) | 342 229 px off Flash, max 9 | **matches Flash** | **RvF entry written** |
-| `avm1/movieclip_hittest` | trace | `square.hitTest(50, 50)` = `false` | `true` | matches golden (CI pass) | Candidate. Flash is stable across direct ×2 and wrapped runs. A fix toward Flash flips a passing row to an RvF-dispositioned fail: needs a ruling. |
-| `avm2/displayobject_hittestpoint_boundary` | trace + image | wrapped (unscaled): shape-flag hits on the right/top octagon edges are `false` (14 lines) | `true` | matches golden (CI pass) | **Inconclusive.** Direct mode is show-all scaled (500-wide stage) and wrapped tests an off-stage child. Needs a 1:1 root capture. |
-| `from_gnash/misc-swfmill.all/missing_bitmap` | image | a missing-bitmap fill renders as a **solid red 100×100 square** | blank white | row passes vs golden | candidate (one draw capture) |
+| `avm1/movieclip_hittest` | trace | **r2: `true` at 1:1 = golden** | `true` | matches golden (CI pass) | **RETIRED (r2).** The `false` was the show-all scale race. Pinned direct 4/4 byte-identical; Windows direct (no race there) byte-identical pinned and unpinned. The round-1 "wrapped also false" claim doesn't reproduce: wrapped differs only on the `_root._rotation` lines (wrapping changes `_root`). |
+| `avm2/displayobject_hittestpoint_boundary` | trace + image | **r2: golden at 1:1** | `true` | matches golden (CI pass) | **RETIRED (r2).** Pinned root: trace 4/4 byte-identical, image PASS (exact) 2/2; Windows trace byte-identical. The wrapped `false`s were an off-stage child. |
+| `from_gnash/misc-swfmill.all/missing_bitmap` | image | first root and wrapper: a **200×200 red block**; a pinned (replaced-`_level0`) root: a 2×2 red block at (0,0) | blank white | row passes vs golden | still a candidate (r2): the golden is non-Flash in every mode, but the two root modes disagree on the extent, so no clean Flash target. Not an RvF entry: we match the golden, not Flash. |
 | `visual/simple_shapes/gradients/reflect`, `repeat` | image | reflect/repeat phase differs (98 % px) | re-baked in `7b1c101c8` "wgpu: Fix repeat & reflect gradients" | rows pass vs golden | candidate: a Ruffle-made golden; Flash PNG archived |
 | `avm1/mcl_target_jpg` | image | JPEG decode differs (max 79); `mcl_target_png` is max 1, `gif87a`/`gif89a` exact | Ruffle's decoder | row passes vs golden | same mechanism as `getpixel-from-embedded` (ACCEPTED_DIFFS Cat 9) |
 
@@ -232,16 +369,17 @@ The 17 differing traces split as:
    only if local runs need them.)
 2. Coordinator: decide whether non-Flash goldens should be graded against the archived Flash PNGs (a per-row
    override), for the 14 board rows above.
-3. Pin the projector window size in direct mode. Then re-run the 24 direct-only rows, the hitTest candidates and
+3. **(Done in round 2.)** Pin the projector window size in direct mode. Then re-run the 24 direct-only rows, the hitTest candidates and
    `missing_bitmap` at 1:1.
-4. A Windows-projector pass over the 12 `known_failure` "Flash references" that Linux Flash rejects (likely
+4. **(Done in round 2.)** A Windows-projector pass over the 12 `known_failure` "Flash references" that Linux Flash rejects (likely
    Windows-made text/AA).
 
 ## Full table
 
 Columns: "outliers vs Flash" lists each check as `outliers/max_outliers@t<tolerance>`. Max diff and diff px are for
-the best mode. Mode `draw` = wrapper `draw()`, `screen` = Xvfb window, `direct` = root run (tick unpinned).
-Platform is LNX for all rows.
+the best mode. Mode `draw` = wrapper `draw()`, `screen` = Xvfb window, `direct` = root run (tick unpinned), `direct (pinned)` = round-2
+root run behind the window pin (1:1; tick still unpinned, `static` = two grabs 1 s apart agree). Platform is LNX, or
+LNX+WIN where round 2 also ran the Windows projector (its result is in Notes).
 
 | Test | Comparison | Verdict | Outliers vs Flash | Max diff | Diff px | Mode | Platform | Notes |
 |---|---|---|---|---:|---:|---|---|---|
@@ -252,8 +390,8 @@ Platform is LNX for all rows.
 | `avm1/bitmap_data_pixeldissolve_image` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. e74a543ebb "core: Add visual test for 'pixelDissolve()' for AV" |
 | `avm1/bitmapdata_applyfilter_colormatrix` | output | Flash (in tol) | 0/0@t1 | 1 | 22500 | draw | LNX | 1 renderer/core re-bake(s), e.g. 98ce792a5b "avm1: Implement BitmapData.applyFilter()" |
 | `avm1/color` | output | Flash (in tol) | 0/0@t1 | 1 | 20000 | draw | LNX |  |
-| `avm1/define_font_glyph_table_order` | output | untestable | 1407/4@t5 | 255 | 469 | direct | LNX | direct run: tick unpinned |
-| `avm1/define_font_glyph_table_overlap` | output | untestable | 807/4@t5 | 255 | 269 | direct | LNX | direct run: tick unpinned |
+| `avm1/define_font_glyph_table_order` | output | Flash (exact) | 0/4@t5 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
+| `avm1/define_font_glyph_table_overlap` | output | Flash (exact) | 0/4@t5 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `avm1/display_object_properties` | output | Flash (exact) | 0/0@t90 | 0 | 0 | draw | LNX |  |
 | `avm1/edittext_stylesheet` | output | Flash (in tol) | 0/6@t64 | 16 | 2 | draw | LNX |  |
 | `avm1/edittext_tag_indent` | output | Flash (exact) | 0/0@t128 | 0 | 0 | draw | LNX | upstream known_failure (.ruffle.png) |
@@ -310,8 +448,8 @@ Platform is LNX for all rows.
 | `avm1/movieclip_begin_gradient_fill` | output | not Flash | 33800/0@t6 | 255 | 55202 | draw | LNX | 1 renderer/core re-bake(s), e.g. 2894f01d50 "avm1: Implement `MovieClip.lineGradientStyle`" |
 | `avm1/movieclip_create_text_field` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
 | `avm1/movieclip_line_gradient_style` | output | not Flash | 15126/0@t6 | 255 | 20656 | draw | LNX | 1 renderer/core re-bake(s), e.g. 2894f01d50 "avm1: Implement `MovieClip.lineGradientStyle`" |
-| `avm1/movieclip_methods_with_loaded_image` | output | not Flash | 30436/0@t0 | 235 | 14679 | direct | LNX |  |
-| `avm1/movieclip_setmask` | output | not Flash | 40852/0@t0 | 255 | 20020 | draw | LNX |  |
+| `avm1/movieclip_methods_with_loaded_image` | output | near Flash | 871/0@t0 | 1 | 569 | direct (pinned) | LNX | r2: pinned root (static), was not Flash |
+| `avm1/movieclip_setmask` | output | not Flash | 48/0@t0 | 95 | 16 | direct (pinned) | LNX | r2: pinned root (static) |
 | `avm1/netstream_play_flv` | output | untestable | 57444/0@t1 | 255 | 19200 | draw | LNX | video |
 | `avm1/netstream_play_flv_screen` | output | untestable | 44751/0@t1 | 235 | 15856 | draw | LNX | video; 1 renderer/core re-bake(s), e.g. 32524d3abd "core: AVM2 display object allocators always ensure" |
 | `avm2/away3d_advanced_shallow_water_demo` | output | untestable | 6029/400@t30 | 251 | 624750 | direct | LNX | default-font; input.json; stage3d; direct run: tick unpinned; 2 renderer/core re-bake(s), e.g. 1cb24b41b0 "render: Support PixelBender ByteArray/Vector.<Numb"; **on our failing board** |
@@ -322,10 +460,10 @@ Platform is LNX for all rows.
 | `avm2/bitmapdata_applyfilter_destpoint` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct | LNX |  |
 | `avm2/bitmapdata_applyfilter_destpoint_edges` | output | Flash (exact) | 0/35@t1 | 0 | 0 | direct | LNX | upstream known_failure (.ruffle.png) |
 | `avm2/bitmapdata_clone` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
-| `avm2/bitmapdata_colortransform` | output | untestable | 652091/0@t5 | 255 | 219143 | direct | LNX | FileReference.save dialog in direct run; direct run: tick unpinned |
-| `avm2/bitmapdata_copychannel` | output | untestable | 48667/0@t0 | 255 | 20836 | direct | LNX | direct run: tick unpinned |
+| `avm2/bitmapdata_colortransform` | output | untestable | 650055/0@t5 | 255 | 218720 | direct (pinned) | LNX | FileReference.save dialog in direct run (r2 pinned too) |
+| `avm2/bitmapdata_copychannel` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `avm2/bitmapdata_copypixels` | output | Flash (exact) | 0/0@t2 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. e0998642f6 "core: Divide by 255 in blend_over calculation" |
-| `avm2/bitmapdata_draw` | output | not Flash | 3456/5200@t0, 2025/1500@t64, 1158/600@t128 | 255 | 1152 | draw | LNX | 1 renderer/core re-bake(s), e.g. 0f6dae56b5 "core: Improve spacing of device font letters (clos"; **on our failing board** |
+| `avm2/bitmapdata_draw` | output | not Flash | 3456/5200@t0, 2025/1500@t64, 1158/600@t128 | 255 | 1152 | draw | LNX+WIN | 1 renderer/core re-bake(s), e.g. 0f6dae56b5 "core: Improve spacing of device font letters (clos"; **on our failing board**; r2 Windows draw: 1237 px max 255 |
 | `avm2/bitmapdata_draw_alpha_erase` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. 2cd518013c "wgpu: Don't skip alpha/erase blend modes for Bitma" |
 | `avm2/bitmapdata_draw_cab_quality` | output | untestable | — | — | — | — | LNX | stage size (viewport_dimensions / scale_factor) |
 | `avm2/bitmapdata_draw_colortransform` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX |  |
@@ -334,17 +472,17 @@ Platform is LNX for all rows.
 | `avm2/bitmapdata_draw_masks` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
 | `avm2/bitmapdata_draw_rotation` | output | not Flash | 360/0@t0 | 255 | 120 | draw | LNX | 1 renderer/core re-bake(s), e.g. 94e5aa8f34 "core: Fix calculating dirty area of BitmapData.dra" |
 | `avm2/bitmapdata_draw_self_via_graphic` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
-| `avm2/bitmapdata_draw_stage` | output | untestable | 2196/0@t0 | 255 | 1200 | direct | LNX | direct run: tick unpinned |
+| `avm2/bitmapdata_draw_stage` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `avm2/bitmapdata_embedded` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
 | `avm2/bitmapdata_encode_jpeg_visual` | output | Flash (exact) | 0/0@t14 | 0 | 0 | direct | LNX |  |
 | `avm2/bitmapdata_encode_png_visual` | output | Flash (exact) | 0/0@t2 | 0 | 0 | direct | LNX |  |
 | `avm2/bitmapdata_fillrect` | output | not Flash | 45/0@t0 | 255 | 18 | draw | LNX | 2 renderer/core re-bake(s), e.g. e614265c17 "core: Move fill_rect from BitmapData to bitmap_dat" |
 | `avm2/bitmapdata_filter_sourcerect` | output | Flash (exact) | 0/1700@t5 | 0 | 0 | draw | LNX |  |
-| `avm2/bitmapdata_opaque` | output | not Flash | 2/0@t0 | 255 | 2 | draw | LNX | **on our failing board** |
+| `avm2/bitmapdata_opaque` | output | not Flash | 2/0@t0 | 255 | 2 | draw | LNX+WIN | **on our failing board**; r2 Windows draw: 2 px max 255 |
 | `avm2/bitmapdata_pixeldissolve_image` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. 1bd9f82496 "core: Implements `BitmapData.pixelDissolve()` for " |
-| `avm2/bitmapdata_sync` | output | untestable | 4078/0@t0 | 255 | 1364 | direct | LNX | direct run: tick unpinned; 1 renderer/core re-bake(s), e.g. 06bc4e1403 "wgpu: Fix sync issue introduced in #9753 and added" |
+| `avm2/bitmapdata_sync` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | 1 renderer/core re-bake(s), e.g. 06bc4e1403 "wgpu: Fix sync issue introduced in #9753 and added"; r2: pinned root (static), was untestable |
 | `avm2/blend_multiply_alpha` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
-| `avm2/blend_scroll` | output | not Flash | 174/0@t0 | 255 | 87 | draw | LNX | 1 renderer/core re-bake(s), e.g. 455124d3ba "render: Fix blending onto BitmapData contents"; **on our failing board** |
+| `avm2/blend_scroll` | output | not Flash | 174/0@t0 | 255 | 87 | draw | LNX+WIN | 1 renderer/core re-bake(s), e.g. 455124d3ba "render: Fix blending onto BitmapData contents"; **on our failing board**; r2 Windows draw: 87 px max 255 |
 | `avm2/blend_shader_luma_lighten` | output | Flash (exact) | 0/3300@t2, 0/280@t64, 0/0@t180 | 0 | 0 | direct | LNX | 1 renderer/core re-bake(s), e.g. 583caa3389 "avm2: Implement DisplayObject.blendShader (#12238)" |
 | `avm2/blend_transform` | output | near Flash | 7500/0@t0 | 1 | 2500 | draw | LNX | 1 renderer/core re-bake(s), e.g. 455124d3ba "render: Fix blending onto BitmapData contents" |
 | `avm2/context3d_draw_to_bitmap_data` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct | LNX | 1 renderer/core re-bake(s), e.g. b36debbc7d "avm2: Implement Context3D.drawToBitmapData" |
@@ -353,7 +491,7 @@ Platform is LNX for all rows.
 | `avm2/displayobject_colortransform_nested` | output.2 | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. b9645e5e6b "avm2: Set dobj as transformed_by_script on transfo" |
 | `avm2/displayobject_colortransform_nested` | output.3 | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. b9645e5e6b "avm2: Set dobj as transformed_by_script on transfo" |
 | `avm2/displayobject_getbounds_shape` | output | Flash (in tol) | 15/3800@t0 | 191 | 15 | draw | LNX | 1 renderer/core re-bake(s), e.g. b8081ac609 "core: Use actual bounding box of curves instead of" |
-| `avm2/displayobject_hittestpoint_boundary` | output | not Flash | 19420/900@t0 | 255 | 9710 | draw | LNX |  |
+| `avm2/displayobject_hittestpoint_boundary` | output | Flash (exact) | 0/900@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was not Flash |
 | `avm2/displayobject_mask` | output | not Flash | 56/0@t0 | 255 | 28 | draw | LNX |  |
 | `avm2/displayobject_opaque_background` | output | not Flash | 484/0@t1 | 255 | 242 | draw | LNX |  |
 | `avm2/displayobject_scrollrect` | output | not Flash | 428/0@t0 | 255 | 178 | draw | LNX |  |
@@ -361,19 +499,19 @@ Platform is LNX for all rows.
 | `avm2/displayobject_set_matrix_nested` | output.2 | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. b9645e5e6b "avm2: Set dobj as transformed_by_script on transfo" |
 | `avm2/displayobject_set_matrix_nested` | output.3 | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. b9645e5e6b "avm2: Set dobj as transformed_by_script on transfo" |
 | `avm2/displayobject_z` | output | Flash (in tol) | 0/6500@t100, 0/17500@t10 | 1 | 6 | direct | LNX |  |
-| `avm2/edittext_always_show_selection` | output | untestable | 2976/0@t0 | 255 | 992 | direct | LNX | direct run: tick unpinned |
-| `avm2/edittext_autosize_align` | output | untestable | 174162/0@t128 | 255 | 58066 | direct | LNX | direct run: tick unpinned |
+| `avm2/edittext_always_show_selection` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
+| `avm2/edittext_autosize_align` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `avm2/edittext_autosize_height_dynamic` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct | LNX |  |
-| `avm2/edittext_autosize_lazy_bounds_visual` | output | untestable | 12312/0@t128 | 255 | 4105 | direct | LNX | direct run: tick unpinned |
+| `avm2/edittext_autosize_lazy_bounds_visual` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `avm2/edittext_get_char_index_at_point` | output | untestable | — | — | — | — | LNX | stage size (viewport_dimensions / scale_factor) |
 | `avm2/edittext_get_line_index_at_point` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct | LNX |  |
-| `avm2/edittext_tag_indent` | output | untestable | 9729/0@t128 | 255 | 3327 | direct | LNX | direct run: tick unpinned; 1 renderer/core re-bake(s), e.g. 156c3a5c6f "core: Reimplement text wrapping for compatibility " |
+| `avm2/edittext_tag_indent` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | 1 renderer/core re-bake(s), e.g. 156c3a5c6f "core: Reimplement text wrapping for compatibility "; r2: pinned root (static), was untestable |
 | `avm2/error_stack_trace_debug_swf17` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
 | `avm2/error_stack_trace_debug_swf18` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
 | `avm2/error_stack_trace_release_swf17` | output | untestable | 200/0@t0 | 255 | 100 | draw | LNX | mode=Release |
 | `avm2/error_stack_trace_release_swf18` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
-| `avm2/focus_root_movie` | output | untestable | 1144/0@t0 | 255 | 395 | direct | LNX | direct run: tick unpinned |
-| `avm2/focus_stage` | output | untestable | 900/0@t0 | 255 | 900 | direct | LNX | direct run: tick unpinned |
+| `avm2/focus_root_movie` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
+| `avm2/focus_stage` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `avm2/focusrect` | output.01a | untestable | — | — | — | — | LNX | input.json; no capture |
 | `avm2/focusrect` | output.01b | untestable | — | — | — | — | LNX | input.json; no capture |
 | `avm2/focusrect` | output.02a | untestable | — | — | — | — | LNX | input.json; no capture |
@@ -392,15 +530,15 @@ Platform is LNX for all rows.
 | `avm2/graphics_bitmap_fill` | output | Flash (exact) | 0/60@t5 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. e713ab736e "avm2: Use proper scale for GraphicsBitmapFill and " |
 | `avm2/graphics_bitmaps` | output | Flash (exact) | 0/4000@t8, 0/800@t16, 0/600@t32 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. 70cdf1686d "avm2: Implement Graphics.lineBitmapStyle and Graph" |
 | `avm2/graphics_direct_commands` | output | Flash (exact) | 0/6000@t0, 0/4000@t16, 0/1800@t32, 0/300@t64 | 0 | 0 | draw | LNX | 4 renderer/core re-bake(s), e.g. f7cbe3b7cd "avm2: Implement Graphics.copyFrom" |
-| `avm2/graphics_draw_path` | output | not Flash | 56/0@t0 | 255 | 28 | draw | LNX | upstream known_failure (.ruffle.png); 1 renderer/core re-bake(s), e.g. aab4f7122b "avm2: Support non-zero winding rule when drawing p"; **on our failing board** |
+| `avm2/graphics_draw_path` | output | not Flash | 56/0@t0 | 255 | 28 | draw | LNX+WIN | upstream known_failure (.ruffle.png); 1 renderer/core re-bake(s), e.g. aab4f7122b "avm2: Support non-zero winding rule when drawing p"; **on our failing board**; r2 Windows draw: 28 px max 255 |
 | `avm2/graphics_draw_triangles` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
 | `avm2/graphics_gradients` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX | upstream known_failure (.ruffle.png); 1 renderer/core re-bake(s), e.g. 78f9bb13d6 "render: Fix PixelRegion::for_region_i32 for negati"; **on our failing board** |
 | `avm2/graphics_gradients_nulls` | output | Flash (exact) | 0/0@t5 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. d9faefb737 "avm2: Allow null ratios is Graphics gradient APIs" |
 | `avm2/graphics_simple_shapes` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
 | `avm2/loader_events` | output | not Flash | 600/0@t0 | 192 | 300 | direct | LNX | 1 renderer/core re-bake(s), e.g. 86e6983943 "avm2: Partially implement Loader.load" |
 | `avm2/loader_image` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct | LNX | 1 renderer/core re-bake(s), e.g. ad77cb0209 "core: Refactor Loader to properly load images" |
-| `avm2/loader_jpegxr` | output | not Flash | 136033/0@t1 | 204 | 45424 | draw | LNX | 1 renderer/core re-bake(s), e.g. 6fe1731010 "core/render: Add support for loading JPEGXR images" |
-| `avm2/loader_jpegxr_alpha` | output | not Flash | 11574/1500@t48 | 204 | 7478 | draw | LNX | 1 renderer/core re-bake(s), e.g. 6fe1731010 "core/render: Add support for loading JPEGXR images" |
+| `avm2/loader_jpegxr` | output | Flash (exact) | 0/0@t1 | 0 | 0 | direct (pinned) | LNX | 1 renderer/core re-bake(s), e.g. 6fe1731010 "core/render: Add support for loading JPEGXR images"; r2: pinned root (static), was not Flash |
+| `avm2/loader_jpegxr_alpha` | output | Flash (exact) | 0/1500@t48 | 0 | 0 | direct (pinned) | LNX | 1 renderer/core re-bake(s), e.g. 6fe1731010 "core/render: Add support for loading JPEGXR images"; r2: pinned root (static), was not Flash |
 | `avm2/loader_loadbytes_events` | output | not Flash | 600/0@t0 | 192 | 300 | direct | LNX | 1 renderer/core re-bake(s), e.g. ba88b52167 "avm2: Correctly apply 'skip_next_enter_frame' to L" |
 | `avm2/mask_reapply` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX |  |
 | `avm2/mouse_pick_dobj_mask` | output | untestable | 177/0@t1 | 255 | 59 | draw | LNX | input.json; 1 renderer/core re-bake(s), e.g. 715abd8985 "avm2: Use invisible mask descendants for mouse pic" |
@@ -442,10 +580,10 @@ Platform is LNX for all rows.
 | `avm2/stage3d_triangle_index_upload` | output | untestable | 191267/0@t1 | 255 | 64000 | draw | LNX | stage3d; 1 renderer/core re-bake(s), e.g. e488cc9f7a "wgpu: Allow unaligned writes to IndexBuffer3D" |
 | `avm2/stage_scale_factor` | output | untestable | — | — | — | — | LNX | stage size (viewport_dimensions / scale_factor); 1 renderer/core re-bake(s), e.g. 66aad3ebc5 "core: Use a separate matrix for stage alignment an" |
 | `avm2/symbol_class_conflict` | output | not Flash | 5293/0@t0 | 255 | 2103 | draw | LNX | 1 renderer/core re-bake(s), e.g. da6384b30e "Warn instead of panicking" |
-| `fonts/device_font_kerning` | output | untestable | 2556/0@t0 | 255 | 852 | direct | LNX | direct run: tick unpinned |
-| `fonts/device_font_no_ink` | output | untestable | 4908/0@t0 | 255 | 1636 | direct | LNX | direct run: tick unpinned |
-| `fonts/embed_matching/fallback_preferences` | output | untestable | 475680/6@t3 | 255 | 158560 | direct | LNX | direct run: tick unpinned; 1 renderer/core re-bake(s), e.g. 64385efe48 "core: Use correct embedded font fallback order + t" |
-| `fonts/embed_matching/match_style` | output | untestable | 9138/0@t3 | 240 | 3046 | direct | LNX | direct run: tick unpinned; 1 renderer/core re-bake(s), e.g. 64385efe48 "core: Use correct embedded font fallback order + t" |
+| `fonts/device_font_kerning` | output | not Flash | 1200/0@t0 | 255 | 400 | direct (pinned) | LNX | r2: pinned root (static), was untestable; test fonts installed as device fonts |
+| `fonts/device_font_no_ink` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable; test fonts installed as device fonts |
+| `fonts/embed_matching/fallback_preferences` | output | untestable | 75774/6@t3 | 239 | 25258 | direct (pinned) | LNX | 1 renderer/core re-bake(s), e.g. 64385efe48 "core: Use correct embedded font fallback order + t"; r2: pinned root (static); AVM2 root + quality=low: a direct root can't take it (renders HIGH) |
+| `fonts/embed_matching/match_style` | output | untestable | 9138/0@t3 | 240 | 3046 | direct (pinned) | LNX | 1 renderer/core re-bake(s), e.g. 64385efe48 "core: Use correct embedded font fallback order + t"; r2: pinned root (static); AVM2 root + quality=low: a direct root can't take it (renders HIGH) |
 | `fonts/embed_matching/no_font_found` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct | LNX | upstream known_failure (.ruffle.png); 1 renderer/core re-bake(s), e.g. 64385efe48 "core: Use correct embedded font fallback order + t" |
 | `from_gnash/misc-ming.all/BeginBitmapFill` | output | Flash (in tol) | 24/100@t50 | 255 | 8 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
 | `from_gnash/misc-ming.all/GradientFillTest` | output | Flash (in tol) | 37/1070@t34 | 255 | 44404 | draw | LNX |  |
@@ -463,13 +601,13 @@ Platform is LNX for all rows.
 | `from_gnash/misc-ming.all/morph_test1` | frame4 | not Flash | 1563/0@t5 | 255 | 10521 | draw | LNX |  |
 | `from_gnash/misc-ming.all/morph_test1` | frame5 | not Flash | 1563/0@t5 | 255 | 10521 | draw | LNX |  |
 | `from_gnash/misc-ming.all/morph_test1` | frame6 | not Flash | 760/0@t5 | 255 | 320 | draw | LNX |  |
-| `from_gnash/misc-ming.all/place_object_test` | output | not Flash | 15627/0@t50 | 255 | 5209 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
-| `from_gnash/misc-ming.all/shape_test` | output | not Flash | 3213/0@t50 | 255 | 1071 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
+| `from_gnash/misc-ming.all/place_object_test` | output | not Flash | 15627/0@t50 | 255 | 5209 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 5209 px max 255 |
+| `from_gnash/misc-ming.all/shape_test` | output | not Flash | 3213/0@t50 | 255 | 1071 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 1071 px max 255 |
 | `from_gnash/misc-swfmill.all/background` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
-| `from_gnash/misc-swfmill.all/missing_bitmap` | output | not Flash | 80000/0@t0 | 255 | 40000 | draw | LNX |  |
+| `from_gnash/misc-swfmill.all/missing_bitmap` | output | not Flash | 8/0@t0 | 255 | 4 | direct (pinned) | LNX | r2: pinned root (static) |
 | `from_shumway/3_joystick` | output | Flash (in tol) | 0/0@t128, 0/2500@t32 | 15 | 2755 | direct | LNX | upstream: c359e01cc4 "tests: Use Flash Player's output for from_shumway/3_joystick" |
 | `from_shumway/MaskTest` | output | not Flash | 187/0@t0 | 255 | 187 | draw | LNX |  |
-| `from_shumway/MaskTest-2` | output | not Flash | 8377/0@t3 | 253 | 3643 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
+| `from_shumway/MaskTest-2` | output | not Flash | 8377/0@t3 | 253 | 3643 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 1197 px max 255 |
 | `from_shumway/MaskTest-3` | output | Flash (exact) | 0/0@t3 | 0 | 0 | draw | LNX |  |
 | `from_shumway/acid/acid` | output.01 | not Flash | 544/9100@t0, 430/360@t128 | 204 | 272 | draw | LNX |  |
 | `from_shumway/acid/acid` | output.02 | not Flash | 544/12500@t0, 430/360@t128 | 204 | 272 | draw | LNX |  |
@@ -491,7 +629,7 @@ Platform is LNX for all rows.
 | `from_shumway/acid/acid` | output.18 | not Flash | 544/13000@t0, 430/360@t128 | 204 | 272 | draw | LNX |  |
 | `from_shumway/acid/acid-big` | output | Flash (in tol) | 0/20@t50 | 49 | 244608 | draw | LNX |  |
 | `from_shumway/acid/acid-bitmap-draw_quality_high` | output | Flash (exact) | 0/35000@t5, 0/700@t32, 0/0@t64 | 0 | 0 | draw | LNX |  |
-| `from_shumway/acid/acid-bitmap-draw_quality_low` | output | not Flash | 66861/35000@t5, 15095/700@t32, 2192/0@t64 | 149 | 30511 | draw | LNX | upstream known_failure (.ruffle.png) |
+| `from_shumway/acid/acid-bitmap-draw_quality_low` | output | Flash (exact) | 0/35000@t5, 0/700@t32, 0/0@t64 | 0 | 0 | direct (pinned) | LNX+WIN | upstream known_failure (.ruffle.png); r2: pinned root (static), was not Flash; r2 Windows draw: 25058 px max 149 |
 | `from_shumway/acid/acid-bitmap-fill` | output | Flash (in tol) | 49166/70000@t12, 12520/20000@t32, 3637/6000@t64, 30/300@t128 | 154 | 160525 | draw | LNX |  |
 | `from_shumway/acid/acid-bitmap-fill-2` | output | Flash (exact) | 0/9000@t3, 0/0@t32 | 0 | 0 | draw | LNX |  |
 | `from_shumway/acid/acid-bitmapData-copyPixels` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
@@ -511,7 +649,7 @@ Platform is LNX for all rows.
 | `from_shumway/acid/acid-clip-2` | output | Flash (exact) | 0/3000@t0, 0/1300@t32, 0/300@t64, 0/0@t110 | 0 | 0 | draw | LNX |  |
 | `from_shumway/acid/acid-clip-3` | frame3 | not Flash | 552/0@t0 | 255 | 276 | draw | LNX |  |
 | `from_shumway/acid/acid-clip-3` | output | not Flash | 376/0@t0 | 255 | 188 | draw | LNX |  |
-| `from_shumway/acid/acid-color` | frame1 | near Flash | 2/0@t3 | 4 | 86790 | draw | LNX |  |
+| `from_shumway/acid/acid-color` | frame1 | Flash (in tol) | 0/0@t3 | 3 | 0 | draw @ quality high | LNX | r2: golden = Flash at its DEFAULT quality (high), not test.toml's low; was near Flash |
 | `from_shumway/acid/acid-color` | output | near Flash | 675/0@t3 | 6 | 153065 | draw | LNX |  |
 | `from_shumway/acid/acid-color-0` | output | not Flash | 26477/3@t3 | 255 | 155867 | draw | LNX | **on our failing board** |
 | `from_shumway/acid/acid-color-2` | output | Flash (exact) | 0/6400@t0, 0/1500@t32, 0/100@t52, 0/0@t80 | 0 | 0 | draw | LNX |  |
@@ -537,8 +675,8 @@ Platform is LNX for all rows.
 | `from_shumway/acid/acid-text` | output | not Flash | 18522/0@t0 | 255 | 6174 | draw | LNX |  |
 | `from_shumway/acid/acid-text-2` | output | Flash (exact) | 0/0@t128 | 0 | 0 | draw | LNX |  |
 | `from_shumway/acid/acid-text-3` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX |  |
-| `from_shumway/acid/acid-text-4` | output | near Flash | 6/0@t0 | 1 | 2 | screen | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
-| `from_shumway/acid/acid-text-5` | output | not Flash | 162135/6@t0 | 255 | 54045 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
+| `from_shumway/acid/acid-text-4` | output | near Flash | 6/0@t0 | 1 | 2 | screen | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 4 px max 1 |
+| `from_shumway/acid/acid-text-5` | output | not Flash | 162135/6@t0 | 255 | 54045 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 34290 px max 254 |
 | `from_shumway/acid/acid-text-6` | frame5 | not Flash | 327/0@t0 | 255 | 109 | draw | LNX |  |
 | `from_shumway/acid/acid-text-6` | output | not Flash | 13110/0@t0 | 255 | 4370 | draw | LNX |  |
 | `from_shumway/acid/acid-text-escape` | output | not Flash | 13844/0@t0 | 255 | 6922 | draw | LNX |  |
@@ -563,17 +701,17 @@ Platform is LNX for all rows.
 | `from_shumway/button3` | output.2 | untestable | 160265/3500@t0 | 255 | 80132 | draw | LNX | input.json |
 | `from_shumway/button3` | output.3 | untestable | 160265/3500@t0 | 255 | 80132 | draw | LNX | input.json |
 | `from_shumway/button3` | output.4 | untestable | 160265/3500@t0 | 255 | 80132 | draw | LNX | input.json |
-| `from_shumway/captions` | output | not Flash | 6834/0@t3 | 255 | 2479 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
+| `from_shumway/captions` | output | not Flash | 6834/0@t3 | 255 | 2479 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 1200 px max 255 |
 | `from_shumway/clipping` | output | Flash (exact) | 0/0@t2 | 0 | 0 | draw | LNX |  |
 | `from_shumway/doubleAndRegister` | output | not Flash | 772/0@t0 | 255 | 386 | draw | LNX |  |
 | `from_shumway/flash_geom_ColorTransform` | output | Flash (in tol) | 0/0@t1 | 1 | 1200 | draw | LNX |  |
-| `from_shumway/flash_text_TextField` | output | untestable | 639/0@t3 | 15 | 310 | direct | LNX | direct run: tick unpinned; upstream known_failure (.ruffle.png); **on our failing board** |
+| `from_shumway/flash_text_TextField` | output | untestable | 639/0@t3 | 15 | 213 | direct (pinned) | LNX | upstream known_failure (.ruffle.png); **on our failing board**; r2: pinned root (static), still max 15; AVM2 root + quality=low: a direct root can't take it (renders HIGH) |
 | `from_shumway/flash_text_TextField2` | output | Flash (exact) | 0/10@t200, 0/250@t128 | 0 | 0 | draw | LNX |  |
 | `from_shumway/gradient` | output | near Flash | 15897/0@t3 | 9 | 70122 | draw | LNX |  |
-| `from_shumway/gradientTransform` | output | near Flash | 9/0@t3 | 15 | 3 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
-| `from_shumway/hardwrap` | output | not Flash | 3891/0@t3 | 255 | 1337 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
+| `from_shumway/gradientTransform` | output | Flash (exact) | 0/0@t3 | 0 | 0 | draw @ quality high | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 3 px max 15; r2: golden = Flash at its DEFAULT quality (high), not test.toml's low; was near Flash |
+| `from_shumway/hardwrap` | output | not Flash | 3891/0@t3 | 255 | 1337 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 962 px max 255 |
 | `from_shumway/invalidClipDepth` | output | near Flash | 1800/0@t0 | 1 | 1800 | draw | LNX |  |
-| `from_shumway/stylesheet` | output | not Flash | 3345/0@t5 | 255 | 1603 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
+| `from_shumway/stylesheet` | output | not Flash | 3345/0@t5 | 255 | 1603 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 993 px max 182 |
 | `from_shumway/timeline/Timeline3` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
 | `from_shumway/timeline/Timeline4` | output | Flash (exact) | 0/0@t2 | 0 | 0 | draw | LNX |  |
 | `from_shumway/timeline/timeline_as2_5` | output.01 | Flash (exact) | 0/0@t40 | 0 | 0 | draw | LNX |  |
@@ -658,7 +796,7 @@ Platform is LNX for all rows.
 | `visual/cache_as_bitmap/nested_rotation` | output | not Flash | 387/0@t0 | 204 | 129 | draw | LNX | 1 renderer/core re-bake(s), e.g. cc8edb3bf1 "core: Invalidate cacheAsBitmap when various more p" |
 | `visual/cache_as_bitmap/oversize/swf_10_masks` | output | Flash (exact) | 0/200@t64, 0/0@t128 | 0 | 0 | direct | LNX |  |
 | `visual/cache_as_bitmap/oversize/swf_10_too_big` | output | Flash (exact) | 0/0@t1 | 0 | 0 | direct | LNX | upstream known_failure (.ruffle.png) |
-| `visual/cache_as_bitmap/oversize/swf_9_masks` | output | untestable | 33556/200@t64, 48/0@t128 | 129 | 34223 | direct | LNX | direct run: tick unpinned |
+| `visual/cache_as_bitmap/oversize/swf_9_masks` | output | Flash (exact) | 0/200@t64, 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `visual/cache_as_bitmap/oversize/swf_9_too_big` | output | Flash (exact) | 0/0@t1 | 0 | 0 | direct | LNX | upstream known_failure (.ruffle.png) |
 | `visual/cache_as_bitmap/scroll_rect` | output | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX | 2 renderer/core re-bake(s), e.g. 9795fc9311 "core: Invalidate ancestors on scrollRect changes" |
 | `visual/cache_as_bitmap/scroll_rect_scaled` | output | Flash (exact) | 0/2800@t0, 0/900@t64 | 0 | 0 | draw | LNX | upstream: 17eb82b273 "tests: Use Flash Player's output for visual/cache_as_bitmap/" |
@@ -666,7 +804,7 @@ Platform is LNX for all rows.
 | `visual/cache_as_bitmap/text` | output | not Flash | 14862/12000@t0, 9234/1500@t128 | 254 | 4954 | draw | LNX | 3 renderer/core re-bake(s), e.g. 41991da624 "core: Invalidate cacheAsBitmap when texts change" |
 | `visual/color_transform_issue_9698` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. edd7f80341 "wgpu: Fix blown out colors when transforming them " |
 | `visual/define_bits_lossless2_rgb15` | output | Flash (exact) | 0/0@t2 | 0 | 0 | draw | LNX |  |
-| `visual/definefont4` | output | not Flash | 18993/0@t1 | 255 | 6331 | draw | LNX | 2 renderer/core re-bake(s), e.g. f8577a843d "core: Use non-zero winding rule for fonts"; **on our failing board** |
+| `visual/definefont4` | output | not Flash | 18993/0@t1 | 255 | 6331 | draw | LNX+WIN | 2 renderer/core re-bake(s), e.g. f8577a843d "core: Use non-zero winding rule for fonts"; **on our failing board**; r2 Windows draw: 6331 px max 255 |
 | `visual/drawing_api/cursor` | output | not Flash | 798/0@t0 | 255 | 399 | draw | LNX |  |
 | `visual/drawing_api/drawing_order` | output | not Flash | 11831/0@t0 | 255 | 5933 | draw | LNX |  |
 | `visual/drawing_api/fills_and_lines` | output | not Flash | 36154/0@t2 | 255 | 50119 | screen | LNX | 2 renderer/core re-bake(s), e.g. 7b1c101c81 "wgpu: Fix repeat & reflect gradients" |
@@ -701,13 +839,13 @@ Platform is LNX for all rows.
 | `visual/edittext/edittext_caret_multiline` | output.04 | untestable | — | — | — | — | LNX | input.json; no capture |
 | `visual/edittext/edittext_caret_multiline` | output.05 | untestable | — | — | — | — | LNX | input.json; no capture |
 | `visual/edittext/edittext_caret_multiline` | output.06 | untestable | 948/0@t64 | 255 | 316 | direct | LNX | input.json; direct run: tick unpinned |
-| `visual/edittext/edittext_device_transform_negative` | output | untestable | 3072/160@t0, 2442/30@t128 | 255 | 1024 | direct | LNX | direct run: tick unpinned |
+| `visual/edittext/edittext_device_transform_negative` | output | Flash (in tol) | 24/160@t0, 15/30@t128 | 255 | 8 | direct (pinned) | LNX | r2: pinned root (static), was untestable; test fonts installed as device fonts |
 | `visual/edittext/edittext_device_transform_small_rotation` | output | Flash (in tol) | 11/11@t0 | 255 | 11 | draw | LNX |  |
 | `visual/edittext/edittext_device_transform_small_shear` | output | Flash (in tol) | 49/50@t0 | 255 | 49 | draw | LNX |  |
-| `visual/edittext/edittext_gutter` | output | untestable | 9684/0@t128 | 255 | 3276 | direct | LNX | direct run: tick unpinned |
+| `visual/edittext/edittext_gutter` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `visual/edittext/edittext_justify` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct | LNX |  |
 | `visual/edittext/edittext_negative_bounds` | output | Flash (exact) | 0/0@t128 | 0 | 0 | draw | LNX |  |
-| `visual/edittext/edittext_selection_font_size` | output | untestable | 8113/0@t128 | 255 | 4516 | direct | LNX | direct run: tick unpinned |
+| `visual/edittext/edittext_selection_font_size` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `visual/edittext/edittext_selection_leading` | output.01 | untestable | — | — | — | — | LNX | input.json; no capture |
 | `visual/edittext/edittext_selection_leading` | output.02 | untestable | — | — | — | — | LNX | input.json; no capture |
 | `visual/edittext/edittext_selection_leading` | output.03 | untestable | — | — | — | — | LNX | input.json; no capture |
@@ -761,7 +899,7 @@ Platform is LNX for all rows.
 | `visual/focus_highlight/focus_highlight_basic` | output.07_after_focus_change | untestable | 3048/0@t0 | 255 | 1404 | draw | LNX | input.json |
 | `visual/focus_highlight/focus_highlight_basic` | output.08_after_focus_change_and_tab | untestable | 3492/0@t0 | 153 | 1164 | draw | LNX | input.json |
 | `visual/focus_highlight/focus_highlight_basic` | output.09_after_focus_change_without_highlight | untestable | 3048/0@t0 | 255 | 1404 | draw | LNX | input.json |
-| `visual/focus_highlight/focus_highlight_empty_clip` | output | untestable | 800/0@t0 | 255 | 400 | direct | LNX | direct run: tick unpinned |
+| `visual/focus_highlight/focus_highlight_empty_clip` | output | Flash (exact) | 0/0@t0 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `visual/focus_highlight/focus_highlight_move` | output.01 | untestable | 408/0@t0 | 204 | 204 | draw | LNX | input.json |
 | `visual/focus_highlight/focus_highlight_move` | output.02 | untestable | 1749/0@t0 | 255 | 651 | draw | LNX | input.json |
 | `visual/focus_highlight/focus_highlight_move` | output.03 | untestable | 1329/0@t0 | 255 | 471 | draw | LNX | input.json |
@@ -779,13 +917,13 @@ Platform is LNX for all rows.
 | `visual/fonts/font_lookup_as3` | output | untestable | 65160/72@t1 | 255 | 21789 | screen | LNX | default-font; 1 renderer/core re-bake(s), e.g. 0f6dae56b5 "core: Improve spacing of device font letters (clos"; **on our failing board** |
 | `visual/fonts/glyph` | output | not Flash | 1656/0@t0 | 255 | 552 | draw | LNX |  |
 | `visual/fonts/leading_define_font` | output | Flash (in tol) | 0/0@t128 | 16 | 12 | draw | LNX |  |
-| `visual/fonts/leading_device_font` | output | untestable | 23220/0@t128 | 255 | 9096 | direct | LNX | direct run: tick unpinned |
-| `visual/fonts/leading_embedded_font` | output | untestable | 18282/0@t128 | 255 | 6104 | direct | LNX | direct run: tick unpinned |
+| `visual/fonts/leading_device_font` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable; test fonts installed as device fonts |
+| `visual/fonts/leading_embedded_font` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `visual/gradient_issue_9892` | output | Flash (in tol) | 965/2329@t24 | 252 | 76353 | draw | LNX |  |
 | `visual/gradient_nonsequential_ratios` | output | Flash (exact) | 0/1300@t36 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. 9f9a3da4a0 "render: Improve gradient rendering" |
 | `visual/gradient_radial_same_ratios` | output | Flash (in tol) | 3425/3860@t35 | 254 | 23051 | draw | LNX | 1 renderer/core re-bake(s), e.g. 9f9a3da4a0 "render: Improve gradient rendering" |
 | `visual/gradient_same_ratios` | output | Flash (exact) | 0/5130@t37 | 0 | 0 | draw | LNX | 1 renderer/core re-bake(s), e.g. 9f9a3da4a0 "render: Improve gradient rendering" |
-| `visual/layout/line_vertical_align` | output | untestable | 7728/0@t128 | 255 | 2577 | direct | LNX | direct run: tick unpinned |
+| `visual/layout/line_vertical_align` | output | Flash (exact) | 0/0@t128 | 0 | 0 | direct (pinned) | LNX | r2: pinned root (static), was untestable |
 | `visual/opaque_background` | output | not Flash | 6248/0@t1 | 255 | 3124 | draw | LNX | 2 renderer/core re-bake(s), e.g. cdb0774642 "core: Hook up DisplayObject::opaque_background" |
 | `visual/scale_rotation_cache` | output.15 | not Flash | 26624/0@t0 | 255 | 9216 | draw | LNX |  |
 | `visual/scale_rotation_cache` | output.25 | not Flash | 26624/0@t0 | 255 | 9216 | draw | LNX |  |
@@ -798,12 +936,12 @@ Platform is LNX for all rows.
 | `visual/simple_shapes/gradients/reflect` | output | not Flash | 644343/0@t1 | 255 | 215572 | draw | LNX | 1 renderer/core re-bake(s), e.g. 7b1c101c81 "wgpu: Fix repeat & reflect gradients" |
 | `visual/simple_shapes/gradients/repeat` | output | not Flash | 649083/0@t1 | 255 | 216363 | draw | LNX | 1 renderer/core re-bake(s), e.g. 7b1c101c81 "wgpu: Fix repeat & reflect gradients" |
 | `visual/simple_shapes/heavy_tesselation` | output | not Flash | 69352/3@t0 | 155 | 23229 | draw | LNX |  |
-| `visual/simple_shapes/layers` | output | not Flash | 1759/0@t0 | 255 | 1079 | draw | LNX |  |
+| `visual/simple_shapes/layers` | output | not Flash | 160/0@t0 | 160 | 82 | direct (pinned) | LNX | r2: pinned root (static) |
 | `visual/simple_shapes/masks` | output | not Flash | 4119/0@t0 | 255 | 2118 | draw | LNX |  |
 | `visual/simple_shapes/masks_equal_clipdepth` | output | not Flash | 4119/0@t0 | 255 | 2118 | draw | LNX |  |
 | `visual/simple_shapes/overlaps` | output | not Flash | 1792/0@t0 | 255 | 626 | screen | LNX |  |
 | `visual/simple_shapes/scroll_rect_mask` | output | not Flash | 11612/0@t0 | 255 | 5806 | draw | LNX |  |
-| `visual/simple_shapes/strokes/scale` | output | not Flash | 10767/0@t5 | 192 | 3589 | draw | LNX | upstream known_failure (.ruffle.png); **on our failing board** |
+| `visual/simple_shapes/strokes/scale` | output | not Flash | 10767/0@t5 | 192 | 3589 | draw | LNX+WIN | upstream known_failure (.ruffle.png); **on our failing board**; r2 Windows draw: 3589 px max 192 |
 | `visual/simple_shapes/text_field_mask` | output | not Flash | 2378/0@t0 | 255 | 1189 | draw | LNX |  |
 | `visual/simple_shapes/winding_rule` | output | Flash (exact) | 0/0@t0 | 0 | 0 | draw | LNX |  |
 | `visual/static_text_offstage` | output | Flash (exact) | 0/0@t2 | 0 | 0 | draw | LNX |  |

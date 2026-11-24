@@ -27,6 +27,7 @@ import tomllib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import flashenv  # noqa: E402
+import run_image  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -53,20 +54,40 @@ def type_trigger(marker, text, delay_ms=150):
 
 
 def run_direct(test_dir, swf, frames, rate, log_warnings, max_duration=None, max_idle=None,
-               windows=False, triggers=()):
+               windows=False, triggers=(), pin=True, quality=None, fonts=()):
+    """pin: start from capture/PinStub.swf, which loads the test into _level0
+    only once the drawing area is 1:1 (README "Direct-mode window pin")."""
     length = frames / max(rate, 1.0)
-    md = max_duration or (length + 2.0)
+    md = max_duration or (length + 2.0) + ((4.0 if windows else 2.5) if pin else 0)
     mi = max_idle or md
-    if windows:
-        mi = max_idle or 2.5  # idle counts only after the first write
-        env = flashenv.WinPlayerEnv(log_warnings=log_warnings, trust_paths=[test_dir])
-        log = env.run(swf, max_duration=md, max_idle=mi)
-    else:
-        env = flashenv.PlayerEnv(log_warnings=log_warnings, trust_paths=[test_dir])
-        log = env.run(os.path.abspath(swf), max_duration=md, max_idle=mi, cwd=test_dir,
-                      triggers=triggers)
+    stage_tmp = gate = None
+    if pin and not windows:
+        # Flash resolves relative URLs against the FIRST root's directory, so
+        # the stub must sit inside (a staged copy of) the test dir.
+        stage_tmp = tempfile.mkdtemp(prefix="flashpin-")
+        test_dir = os.path.join(stage_tmp, os.path.basename(os.path.abspath(test_dir)))
+        shutil.copytree(os.path.dirname(os.path.abspath(swf)), test_dir)
+        swf = os.path.join(test_dir, os.path.basename(swf))
+    try:
+        if windows:
+            mi = max_idle or 2.5  # idle counts only after the first write
+            root = flashenv.pinned_root(swf, test_dir, quality=quality) if pin else swf
+            gate = flashenv.PinGate(test_dir) if pin else None
+            env = flashenv.WinPlayerEnv(log_warnings=log_warnings, trust_paths=[test_dir])
+            log = env.run(root, max_duration=md, max_idle=mi, pin_gate=gate)
+        else:
+            root = flashenv.pinned_root(swf, test_dir, quality=quality) if pin else os.path.abspath(swf)
+            gate = flashenv.PinGate(test_dir) if pin else None
+            env = flashenv.PlayerEnv(log_warnings=log_warnings, trust_paths=[test_dir], fonts=fonts)
+            log = env.run(root, max_duration=md, max_idle=mi, cwd=test_dir, triggers=triggers,
+                          pin_gate=gate)
+    finally:
+        if stage_tmp:
+            shutil.rmtree(stage_tmp, ignore_errors=True)
     reason = env.stop_reason
     env.cleanup()
+    if gate is not None:
+        reason += f" pin={gate.released}"
     return log, reason
 
 
@@ -107,6 +128,8 @@ def main():
     ap.add_argument("--wrapped", action="store_true")
     ap.add_argument("--windows", action="store_true", help="direct mode on the Windows projector")
     ap.add_argument("--frames", type=int)
+    ap.add_argument("--no-pin", action="store_true", help="direct mode WITHOUT the window pin "
+                    "(test.swf is the projector's first root; show-all scaled for its first frames)")
     ap.add_argument("--swf", default="test.swf")
     ap.add_argument("--max-duration", type=float)
     ap.add_argument("--max-idle", type=float)
@@ -133,17 +156,20 @@ def main():
             stage = os.path.join(work, "test")
             shutil.copytree(d, stage)
             log, reason = run_direct(stage, os.path.join(stage, a.swf), frames, info["rate"], lw,
-                                     a.max_duration, a.max_idle, windows=True)
+                                     a.max_duration, a.max_idle, windows=True, pin=not a.no_pin,
+                                     quality=run_image.toml_quality(toml))
             shutil.rmtree(work, ignore_errors=True)
         else:
             trig = [type_trigger(a.type_after, a.type, a.type_delay_ms)] if a.type else []
             log, reason = run_direct(d, swf, frames, info["rate"], lw, a.max_duration, a.max_idle,
-                                     triggers=trig)
+                                     triggers=trig, pin=not a.no_pin,
+                                     quality=run_image.toml_quality(toml),
+                                     fonts=flashenv.toml_fonts(d, toml))
     if a.output:
         with open(a.output, "w", newline="\n") as f:
             f.write(log)
     print(f"# flash trace: mode={'wrapped' if a.wrapped else 'direct'}"
-          f"{' windows' if a.windows else ''} frames={frames} rate={info['rate']} stop={reason}",
+          f"{' windows' if a.windows else ''}{' unpinned' if a.no_pin and not a.wrapped else ''} frames={frames} rate={info['rate']} stop={reason}",
           file=sys.stderr)
     if a.diff:
         exp_p = os.path.join(d, "output.txt")
