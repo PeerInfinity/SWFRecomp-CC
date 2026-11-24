@@ -1,4 +1,4 @@
-**`draw()` TextField tint rules: device vs embedded, against FLASH** (follow-up to `w2-draw-cx-text`, landing now). Categories: `avm2`, `avm1`, `regression`.
+**`draw()` TextField tint rules: device vs embedded, against FLASH** (follow-up to `w2-draw-cx-text`, landed `85cca4df6`). Categories: `avm2`, `avm1`, `regression`.
 
 Read `session27-fanout-reports/w2-draw-cx-text-report.md`. Flash Player 32 (`SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-draw-cx-text/*/flash.direct.txt`; the AVM2 SWF is mxmlc-built and archived there):
 - `avm2_bitmapdata_draw_text_glyph_cx`: **DEVICE field**: glyphs read neither red nor green under every tint (is the device glyph drawn at all in draw()?), and the box stays ff0000. **EMBEDDED field**: glyphs ARE tinted by the draw ct, a descendant cx and holder+ct, and the box IS tinted (ff00) under every tint. So the landed "box never tinted" rule is **device-only**: implement the embedded rule (box and glyphs tinted) in `bd_draw_tf_box` and the glyph layer.
