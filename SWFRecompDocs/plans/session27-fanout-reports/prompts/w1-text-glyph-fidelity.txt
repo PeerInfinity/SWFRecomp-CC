@@ -1,0 +1,16 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 27 (dual-axis #19), slot `w1-text-glyph-fidelity`, wave 1 (DIAGNOSIS, measured prototypes welcome). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w1-text-glyph-fidelity` (and ONLY that branch; never master, never force-push). Your report on that branch is your only deliverable.
+
+FIRST: read `SWFRecompDocs/plans/session27-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules and Delivery sections exactly. Your branch is `fanout/w1-text-glyph-fidelity`; your report is `SWFRecompDocs/plans/session27-fanout-reports/w1-text-glyph-fidelity-report.md` (plus an optional `w1-text-glyph-fidelity-prototype.patch`). Also read `CLAUDE.md`.
+
+---- YOUR TASK ----
+**Pixels, glyph and text-render fidelity** (playbook §25 "Text and glyphs" minus wordWrap). Categories: `from_shumway`, `visual`, `avm1`, `avm2`, `fonts`, `regression`.
+
+1. **EditText glyph compose rounding for scaled fields** (the field's matrix scales the glyph run; where do we round, and where does Ruffle/Flash: per glyph advance in twips, per line, or at device pixels?). Find rows (shumway acid-text-*, `visual/text/*`, regression fixtures) and price.
+2. **DefineText matrix fidelity in the recompiler (M):** static text record matrices / glyph offsets vs Ruffle's `core/src/display_object/text.rs` (s26 rounded the glyph translation to whole twips in `5f4db0e60`; what still differs?).
+3. **AVM2 static-text and `avm2_render_textbox` colour-transform twins**: AVM1 got EditText/static text under a cxform in s26 (`84e4fefc0`, `5f5304072`). Check the AVM2 render paths for the same gaps and build twin fixtures.
+4. **`draw()` of a tinted EditText** (AVM1 and AVM2 `BitmapData.draw` with a colorTransform or a tinted source).
+5. Re-test the `font_lookup_as3` and `definefont4` NO-GOs (cheap re-run plus mechanism check only).
+
+Prototype any GO, measured, with a render-canary md5 sweep. Siblings: `w1-text-wordwrap` (soft wrap layout), `w1-applyfilter-tail` (draw/filters).

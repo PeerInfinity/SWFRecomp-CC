@@ -1,0 +1,8 @@
+**Trace, browser-WASM AVM1 gaps** (arc §27.4 "Browser AVM1 gaps"). Browser-only, so CI trace cannot see them; they matter for real games in the in-browser player. Categories: `avm1`, `regression`.
+
+1. **`createTextField` and `getInstanceAtDepth` are no-ops in the browser `#else` arms** (the non-`NO_GRAPHICS`/non-`OFFSCREEN_RENDER` builds). First teach `tools/gate_inventory.py` to see no-op arms (an `#else` that returns undefined/does nothing where the other arm does real work), run it, and list EVERY such arm (memory `browser-wasm-gate-inventory`). Read `#ifdef` nesting with `cpp`, not by eye (memory `browser-wasm-loaded-child-parity`).
+2. Implement the browser arms for `createTextField` and `getInstanceAtDepth`, plus `getRGB` (returns undefined; S) and `getBounds` (returns 6710886; M), and any other no-op arm your inventory finds that is cheap.
+3. **Verification without a browser:** the cloud box has no emsdk and you must not download it. Prove each arm natively where the code is shared (the `OFFSCREEN_RENDER` graphics build is what CI grades), and make the browser arm compile under a host-graphics native build if one exists; otherwise state exactly what the coordinator must run locally (emsdk + `SWFRecomp/scripts/` WASM build + a headless probe; memory `browser-child-probe-harness`) under `## LOCAL ORACLE REQUESTS`. The coordinator owns the Pages deploy.
+4. Fixtures: a `regression/` fixture for each behaviour (exporter golden request), so the native legs lock the semantics the browser arm must match.
+
+Siblings: `w1-avm1-leftovers` (`action.c` AVM1 builtins), `w1-text-wordwrap` (text layout). Self-localize.

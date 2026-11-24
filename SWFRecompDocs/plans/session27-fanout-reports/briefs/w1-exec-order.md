@@ -1,0 +1,7 @@
+**Trace, exec-order verification** (arc §27.4 "Exec order"). Categories: `from_gnash`, `avm1`, `regression`. Prior record: `session26-fanout-reports/` (n-exec-order: `SWFRecompDocs/plans/session26-fanout-reports/n-exec-order-prompt.md` and the root-last commit `4e66127cc`; the `_droptarget` fix `7e14f54dd`).
+
+1. **Unverified mode divergence:** `swf.c` (graphics frame loop) marks dynamic MovieClips eligible (for enterFrame / frame scripts) BEFORE the stopped-root SCRIPT drain, while `swf_core.c` (no-graphics) marks them AFTER promote. Determine whether the two orders are observably different (construct a fixture that distinguishes them; exporter-golden request), which one matches Flash/Ruffle, and fix the other. Run every headline in BOTH modes (`--mode=graphics` and default); this touches no-graphics-only code, so say so prominently (the coordinator must run the no-graphics CI leg).
+2. Re-measure the action_order family after root-last (`ActionOrderTest3/4/5`, `PlaceAndRemove`, `action_execution_order_extend_test`, `action_execution_order_test11`): per row, the first diverging line and its mechanism. The per-clip sibling exec-list interleave is a NO-GO until the exec list is flat and instantiation-ordered; price that rewrite (L?) with a phase plan, or refute it.
+3. `RegisterClassTest4` (gnash) — same family? Mechanism only.
+
+Siblings: `w1-per-movie-dl-phase3` (loaded-movie paths in the frame loop), `w1-timers-robustness` (timer goto). Name every function you touch in `swf.c`/`swf_core.c`/`tag.c`.
