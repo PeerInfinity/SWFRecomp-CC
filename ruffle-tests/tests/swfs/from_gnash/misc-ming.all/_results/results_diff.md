@@ -1,20 +1,24 @@
 # Ruffle Test Results Diff
 
-**Previous:** `005bea42a286` (2026-11-24T00:12:43.592175+00:00)
-**Current:** `cceb5133a189` (2026-11-24T07:00:45.717832+00:00)
+**Previous:** `cceb5133a189` (2026-11-24T07:00:45.717832+00:00)
+**Current:** `78fee9e13f85` (2026-11-24T16:56:53.133905+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 70 | 71 | +1 |
+| Passing | 71 | 71 | 0 |
 | Total | 111 | 111 | 0 |
-| Pass rate | 63.1% | 64.0% | +0.9% |
-| Mismatched lines | 959 | 935 | -24 |
-|   Decreased | | | -24 |
+| Pass rate | 64.0% | 64.0% | 0% |
+| Mismatched lines | 935 | 931 | -4 |
+|   Decreased | | | -6 |
+|   Increased | | | +2 |
 
-## Newly Passing (1)
+## Line Count Changed (4)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `init_action/InitActionTest2` | ruffle_matched | 5/29 | 29/29 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `action_order/ActionOrderTest4` | output_mismatch | 11/64 | 14/64 | -3 |
+| `action_order/ActionOrderTest5` | output_mismatch | 5/51 | 7/51 | -2 |
+| `action_order/action_execution_order_extend_test` | output_mismatch | 7/32 | 8/32 | -1 |
+| `action_order/ActionOrderTest3` | output_mismatch | 5/62 | 3/62 | +2 |
