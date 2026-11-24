@@ -1,0 +1,3 @@
+draw(tf)=16711680
+draw(tf,m,ct)=65280
+draw(h)=65280

@@ -2439,6 +2439,10 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
 		et->read_only = (flags & AVM2_ETF_READ_ONLY) != 0;
 		et->no_select = (flags & AVM2_ETF_NO_SELECT) != 0;
 		et->border = (flags & AVM2_ETF_BORDER) != 0;
+		// s27 w1-text-glyph-fidelity: Ruffle EditText::from_swf_tag sets
+		// HAS_BACKGROUND from the tag's BORDER bit (edit_text.rs:306-309);
+		// the SWF tag has no separate background flag.
+		et->background = et->border;
 		et->was_static = (flags & AVM2_ETF_WAS_STATIC) != 0;
 		et->is_html = is_html;
 		et->device_font = (flags & AVM2_ETF_USE_OUTLINES) == 0;

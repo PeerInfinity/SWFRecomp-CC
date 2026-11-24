@@ -3703,7 +3703,28 @@ namespace SWFRecomp
 						// "GAMEOVER" (GAME + OVER on two y-offsets) wrapped as
 						// "GAMEO/VER" because record 1's trailing transform 174
 						// became the position of record 2's first glyph "O".
-						recompileMatrix(temp_matrix, transform_data);
+						// s27 w1-text-glyph-fidelity: Ruffle text.rs render_self
+						// pushes the DefineText TextMatrix, then per glyph
+						// {a=d=height/em, tx/ty=pen}: the glyph matrix is
+						// TextMatrix * glyph. temp_matrix keeps the pen in
+						// text space (translate - TextMatrix translate) and the
+						// height/em scale; compose them through the TextMatrix
+						// linear part (identity TextMatrix: unchanged output).
+						{
+							MATRIX gm = temp_matrix;
+							float gs = temp_matrix.scale_x;
+							float px = (float) (temp_matrix.translate_x - matrix.translate_x);
+							float py = (float) (temp_matrix.translate_y - matrix.translate_y);
+							gm.scale_x = matrix.scale_x * gs;
+							gm.rotateskew_0 = matrix.rotateskew_0 * gs;
+							gm.rotateskew_1 = matrix.rotateskew_1 * gs;
+							gm.scale_y = matrix.scale_y * gs;
+							gm.translate_x = matrix.translate_x
+								+ (s32) lrintf(matrix.scale_x * px + matrix.rotateskew_1 * py);
+							gm.translate_y = matrix.translate_y
+								+ (s32) lrintf(matrix.rotateskew_0 * px + matrix.scale_y * py);
+							recompileMatrix(gm, transform_data);
+						}
 						current_transform += 1;
 
 						temp_matrix.translate_x += advance;

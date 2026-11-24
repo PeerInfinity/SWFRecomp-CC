@@ -1,0 +1,16 @@
+num_ticks = 1
+
+# AVM2 twin of ../avm1_edittext_placed_cxform (same display list; FileAttributes
+# AS3 bit + an empty DoABC, see create_test_swf.py). Golden = that fixture's
+# Ruffle exporter 0ddd12b6a render (HIGH quality); Ruffle renders a script-free
+# timeline identically under AVM1 and AVM2 (confirmation requested, s27
+# w1-text-glyph-fidelity LOCAL ORACLE REQUESTS). The 19 allowed outlier
+# channels are the same 9 Dx12 3/4-covered border-corner pixels as the AVM1
+# fixture. Pins Ruffle draw_text_box's `color_transform * colour` on the box
+# and HAS_BACKGROUND <- BORDER for a DefineEditText (edit_text.rs:306-309).
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 19
+
+[player_options]
+with_renderer = { optional = false }

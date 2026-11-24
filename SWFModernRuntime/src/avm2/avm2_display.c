@@ -19571,12 +19571,37 @@ static void avm2_render_caret(const int32_t c[4], const Mat* world)
 	avm2_draw_border_line(ax, ay, ax + sa, ay + sb, rgb, 1.0);
 }
 
+// s27 w1-text-glyph-fidelity: Ruffle draw_text_box / draw_device_text_box
+// tint the background and border with `transform.color_transform * color`
+// (edit_text.rs:2887/2895/2970/2975). The box goes through cxform slot 0
+// (its geometry is stage twips on the identity slot), so the concatenated
+// node cx (g_avm2_cur_cx, published by avm2_render_node) is applied to the
+// RGB here on the CPU, the AVM1 tf_cx_rgb twin. Alpha keeps riding `alpha`.
+static uint32_t avm2_textbox_cx_rgb(uint32_t rgb)
+{
+	rgb &= 0x00FFFFFFu;
+	if (avm2_cx_is_identity(&g_avm2_cur_cx)) return rgb;
+	uint32_t out = 0;
+	for (int i = 0; i < 3; i++)
+	{
+		int sh = 16 - 8 * i;
+		float v = (float) ((rgb >> sh) & 0xFF) / 255.0f * g_avm2_cur_cx.mult[i]
+		          + g_avm2_cur_cx.add[i];
+		if (v < 0.0f) v = 0.0f;
+		if (v > 1.0f) v = 1.0f;
+		out |= (uint32_t) (v * 255.0f + 0.5f) << sh;
+	}
+	return out;
+}
+
 static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
                                 double alpha)
 {
 	int32_t bb[4];
 	uint32_t flags = 0, bg = 0, bc = 0;
 	if (!avm2_text_box_info(et, bb, &flags, &bg, &bc)) return;
+	bg = avm2_textbox_cx_rgb(bg);
+	bc = avm2_textbox_cx_rgb(bc);
 	int has_bg = (flags & 1u) != 0, has_border = (flags & 2u) != 0;
 	double wpx = (double) bb[2] / 20.0, hpx = (double) bb[3] / 20.0;
 	// s18 w2-gfx-text (H1): every "1px" below is one DEVICE pixel — Ruffle's
