@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-24T01:36:19.194043+00:00",
-    "old_git_sha": "d70f2c0aa67fd0701e0d0fe02ebf2e6c3d7e62c2",
-    "new_timestamp": "2026-11-24T03:17:00.717770+00:00",
-    "new_git_sha": "b8d3b736aaefa1b4dd3c960a140545c307eb2236",
+    "old_timestamp": "2026-11-24T03:17:00.717770+00:00",
+    "old_git_sha": "b8d3b736aaefa1b4dd3c960a140545c307eb2236",
+    "new_timestamp": "2026-11-24T07:25:12.126329+00:00",
+    "new_git_sha": "cceb5133a189db82d8715e3e9afe9ad500af5908",
     "partial": false,
     "same_commit": false
   },
@@ -13,11 +13,11 @@
     "old_effective_pass": 769,
     "old_total": 781,
     "old_pass_rate": 95.6,
-    "new_pass": 747,
+    "new_pass": 751,
     "new_ruffle_matched": 22,
-    "new_effective_pass": 769,
-    "new_total": 781,
-    "new_pass_rate": 95.6,
+    "new_effective_pass": 773,
+    "new_total": 785,
+    "new_pass_rate": 95.7,
     "old_mismatched_lines": 12439,
     "new_mismatched_lines": 12439,
     "increased_mismatches": 0,
@@ -26,8 +26,57 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 781,
-    "added": 0,
+    "added": 4,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "allow_networking_import_assets2__internal",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "allow_networking_import_assets2__none",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "allow_networking_import_assets__internal",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "allow_networking_import_assets__none",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T23:04:23.069671+00:00",
-    "old_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
-    "new_timestamp": "2026-11-24T00:12:43.595588+00:00",
-    "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "old_timestamp": "2026-11-24T00:12:43.595588+00:00",
+    "old_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "new_timestamp": "2026-11-24T07:00:45.724697+00:00",
+    "new_git_sha": "cceb5133a189db82d8715e3e9afe9ad500af5908",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,48 @@
     "new_total": 21,
     "new_pass_rate": 66.7,
     "old_mismatched_lines": 112,
-    "new_mismatched_lines": 112,
+    "new_mismatched_lines": 79,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 33,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 21,
+    "unchanged": 19,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "gotoFrameFromInterval",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "movieclip_destruction_test1",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 50,
+        "expected_lines": 52,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 52,
+        "expected_lines": 52,
+        "matching_lines": 40
+      }
+    }
+  ]
 }
