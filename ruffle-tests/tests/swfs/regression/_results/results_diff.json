@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T19:23:24.390220+00:00",
-    "old_git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
-    "new_timestamp": "2026-11-23T23:04:22.762039+00:00",
-    "new_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
+    "old_timestamp": "2026-11-23T23:04:22.762039+00:00",
+    "old_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
+    "new_timestamp": "2026-11-24T00:12:43.570878+00:00",
+    "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 170,
+    "old_pass": 171,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 170,
-    "old_total": 170,
+    "old_effective_pass": 171,
+    "old_total": 171,
     "old_pass_rate": 100.0,
     "new_pass": 171,
     "new_ruffle_matched": 0,
@@ -25,22 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 170,
-    "added": 1,
+    "unchanged": 171,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1_morph_instances_ratio",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    }
-  ]
+  "changes": []
 }
