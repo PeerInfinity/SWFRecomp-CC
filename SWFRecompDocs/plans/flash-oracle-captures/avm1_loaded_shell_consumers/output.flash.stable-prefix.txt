@@ -1,0 +1,66 @@
+t2
+in:
+ev:undefined sl:undefined sp:movieclip tp:undefined
+t3
+in:b,a,
+ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
+cx
+t4
+in:b,a,
+ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
+cx
+t5
+in:b,a,
+ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
+cx
+t6
+in:b,a,
+ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
+cx
