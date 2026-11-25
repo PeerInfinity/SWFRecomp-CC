@@ -1,0 +1,110 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index e20245043..b48cce67b 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -7929,6 +7929,10 @@ static ActionVar asnativeUnknownMinor(u32 major)
+ 		strncpy(g_asnative_dead.name, "ASnative", 255);
+ 		g_asnative_dead.function_type = 2;
+ 		g_asnative_dead.advanced_func = (Function2Ptr)builtin_noop_func;
++		// Flash natives carry no `prototype` (gnash ASnative.as:323,
++		// `typeof(ASnative(..).prototype) == "undefined"` PASSED in FP32);
++		// a lazily materialised one broke ASnative-v5..v8 (s28 interim #2).
++		g_asnative_dead.no_lazy_prototype = 1;
+ 		g_asnative_dead_init = 1;
+ 	}
+ 	ActionVar r = {0};
+@@ -8597,11 +8601,21 @@ static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar*
+ // "_level0", function -> "[type Function]", new Boolean(false) -> "false").
+ static ASFunction g_string_valueOf_func;
+ static int g_string_valueOf_func_init = 0;
++// s28 w3-interim2-regressions: the exact own_props bag the Function-receiver
++// own-method arm (actionCallMethod, `g_call_this_type = FUNCTION`) passed as
++// `this_obj`. g_call_this_type alone is not a receiver check: it stays FUNCTION
++// for the whole body of a script method called on a Function (e.g. an MTASC
++// static `Test.show(v)`), so an implicit ToPrimitive valueOf inside that body
++// (`"" + new String('blah')`) saw a stale FUNCTION tag and printed
++// "[type Function]" (avm1/boxed_primitives). Pointer identity with the bag
++// the arm actually passed is the receiver check the w1b report asked for.
++static void* g_call_this_fn_bag = NULL;
+ static ActionVar builtin_string_proto_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	ActionVar thisv = {0};
+ 	thisv.type = ACTION_STACK_VALUE_UNDEFINED;
+-	if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_FUNCTION)
++	if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_FUNCTION &&
++	    this_obj == g_call_this_fn_bag)
+ 		return makeStringActionVar(app_context, "[type Function]", 15);
+ 	if (this_obj != NULL && g_this_depth > 0 &&
+ 	    (g_this_stack[g_this_depth - 1].data.numeric_value == (u64) this_obj ||
+@@ -75589,6 +75603,43 @@ static int mcArmCaseMiss(const char* name, u32 len)
+ 	return 0;
+ }
+ 
++// s28 w3-interim2-regressions: the SWF6+/SWF7+ MovieClip.prototype methods
++// (initMovieClipPrototype tags them flash_flags 0x0080 / 0x0400, after
++// Ruffle movie_clip.rs VERSION_6 / VERSION_7) are invisible to SWF5 (and SWF6
++// for the 0x0400 pair) code: `mc.getDepth()` is a call of undefined and
++// yields undefined (FP32, regression/avm1_place_occupied_depth_swf5:
++// "ma.getDepth()= mb.getDepth()="; gnash MovieClip-v5 MovieClip.as:285
++// `mc.getNextHighestDepth() == undefined` PASSED). actionCallMethod's
++// MOVIECLIP arm dispatches these builtins by name and never consulted the
++// tag. Returns 1 when the call must resolve to undefined: the name is one of
++// the tagged stubs, MovieClip.prototype still holds that stub (no script
++// override), the clip has no own override, and the tag hides it at the
++// running version (so an ASSetPropFlags unhide re-exposes it).
++static int mcArmVersionHidden(SWFAppContext* app_context, MovieClip* mc, const char* name, u32 len)
++{
++	static const char* const k_gated[] = {
++		"getDepth", "setMask", "createEmptyMovieClip",
++		"getNextHighestDepth", "getInstanceAtDepth", NULL
++	};
++	if (g_swf_version >= 7) return 0;
++	const char* canon = NULL;
++	for (int i = 0; k_gated[i] != NULL; i++) {
++		if (strlen(k_gated[i]) == len && strncasecmp(k_gated[i], name, len) == 0) { canon = k_gated[i]; break; }
++	}
++	if (canon == NULL) return 0;
++	initMovieClipPrototype(app_context);
++	ASObject* proto = getMovieClipPrototype(g_swf_version);
++	if (proto == NULL) return 0;
++	ASProperty* p = findPropertyRaw(proto, canon, len);
++	if (p == NULL || p->value.type != ACTION_STACK_VALUE_FUNCTION) return 0;
++	ASFunction* f = (ASFunction*)(uintptr_t) p->value.data.numeric_value;
++	if (f < &g_mc_method_funcs[0] || f >= &g_mc_method_funcs[MC_METHOD_COUNT]) return 0;
++	if (!isPropertyHiddenAtVersion(p->flash_flags)) return 0;
++	if (mc != NULL && mc->dynamic_props != NULL &&
++	    findPropertyRaw((ASObject*) mc->dynamic_props, canon, len) != NULL) return 0;
++	return 1;
++}
++
+ // s28 w2-hittest-shape-stale: COMPUTE_GLOBAL_AABB moved to file scope (was
+ // local to actionCallMethod's hitTest arm, unchanged) so the render-time
+ // hitTest bounds snapshot (actionHitTestStaleBounds) can reuse it.
+@@ -77441,11 +77492,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					// The receiver is a Function: tag it so a native generic
+ 					// (builtin_array_method) reads own_props as its `this` bag.
+ 					u8 _op_saved_call_this_type = g_call_this_type;
++					void* _op_saved_fn_bag = g_call_this_fn_bag;
+ 					g_call_this_type = ACTION_STACK_VALUE_FUNCTION;
++					g_call_this_fn_bag = (void*) func->own_props;
+ 					g_call_depth++;
+ 					ActionVar result = own_func->advanced_func(app_context, args, num_args, registers, (void*) func->own_props);
+ 					g_call_depth--;
+ 					g_call_this_type = _op_saved_call_this_type;
++					g_call_this_fn_bag = _op_saved_fn_bag;
+ 					g_current_executing_func = prev_exec_op;
+ 					g_current_context = prev_ctx_op;
+ 					g_this_depth = saved_this_depth_op;
+@@ -78504,6 +78558,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 			if (!_mcm_is_object_method) goto _mc_user_dispatch;
+ 		}
+ 		if (mcArmCaseMiss(method_name, method_name_len)) goto _mc_user_dispatch; // s27 w2 lead 2
++		if (mc != NULL && !MC_IS_TEXTFIELD(mc) && !mc->is_button_mc &&
++		    mcArmVersionHidden(app_context, mc, method_name, method_name_len)) {
++			if (args != NULL) FREE(args);
++			pushUndefined(app_context);
++			return;
++		}
+ 
+ 		if (method_name_len == 11 &&
+ 			(strncasecmp(method_name, "gotoAndStop", 11) == 0 || strncasecmp(method_name, "gotoAndPlay", 11) == 0))
