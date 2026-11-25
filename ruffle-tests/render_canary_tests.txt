@@ -827,3 +827,7 @@ regression/avm2_applyfilter_bevel_sample       # bevel sample offsets, FP32 trac
 # tier=1
 avm1/mcl_target_png                                 # MCL-loaded PNG, holder render      1 cmp
 avm1/movieclip_methods_with_loaded_image            # loadMovie'd image + clip methods   1 cmp
+# s28 w2-text-edit-land: AVM2 selection rect under a field/parent colorTransform (avm2_display.c
+# avm2_render_text); Flash TINTS it (Ruffle does not). Flash golden, tol 48 / 500.
+# tier=1
+regression/avm2_edittext_selection_cxform   # tinted selection rects, 5 rows  1 cmp

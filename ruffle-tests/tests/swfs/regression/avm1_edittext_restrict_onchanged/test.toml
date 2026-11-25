@@ -1,0 +1,5 @@
+num_frames = 8
+
+# s28 w1-text-edit-tail (a) / w2-text-edit-land. Golden: FLASH FP32 (LNX
+# 32,0,0,465, direct, run_trace.py --type X5Y --type-after ready). Flash fires
+# onChanged on a restrict-filtered key and deletes the live selection (== Ruffle).

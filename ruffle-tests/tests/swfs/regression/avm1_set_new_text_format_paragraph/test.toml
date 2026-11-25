@@ -1,0 +1,5 @@
+num_frames = 4
+
+# s28 w1-text-edit-tail (b) / w2-text-edit-land. Golden: FLASH FP32 (LNX
+# 32,0,0,465, direct, run_trace.py --type E --type-after ready); == Ruffle's
+# defer model (paragraph keys parked until the next text= / htmlText=).

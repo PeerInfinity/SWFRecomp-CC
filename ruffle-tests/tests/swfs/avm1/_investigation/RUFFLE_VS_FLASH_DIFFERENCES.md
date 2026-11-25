@@ -1086,3 +1086,26 @@ ours, byte-exact), `avm1/mcl_loadclip` (68-byte target, 5 loads), `avm1/mcl_targ
 `_gif89a` and `avm1/mcl_mislabeled_target` (> 4096 bytes: need a WINDOWS capture). Until fixed these 7 rows grade
 pass → `output_mismatch` against the Ruffle golden.
 
+
+
+## AVM2 TextField selection background is tinted by the field's colour transform (Ruffle draws it untinted)
+
+<!-- image-axis: regression/avm2_edittext_selection_cxform output -->
+
+**Test:** `regression/avm2_edittext_selection_cxform` (hand-assembled ABC; 5 rows of "ababa", setSelection(1,4),
+alwaysShowSelection: control / field cx red / field cx +blue / parent-Sprite cx magenta / focused field cx green).
+
+**Flash Player 32** (LNX 32,0,0,465, direct, tick 2; `draw()` and the `--screen` grab are identical): the selection
+rect is drawn under the field's full concatenated colour transform — the gap pixels read 0xFF0000 / 0x5555FF /
+0xFF00FF / 0x00C800 on rows 1-4 (0x555555 on the control row).
+
+**Ruffle** (`core/src/display_object/edit_text.rs` `render_selection_background_for_line` at `c2f7d24b7`):
+`context.commands.draw_rect(color, selection_box)`; `CommandList::draw_rect` (`render/src/commands.rs`) takes no
+colour transform, so the rect stays 0x555555 (unfocused) / 0x000000 (focused) under any tint.
+
+**Ours:** `avm2_display.c avm2_render_text` draws the rects with the field's concatenated cx (`cxid`) = Flash. Our
+render vs the Flash golden: 230 channels > 48 (glyph raster only); Ruffle's untinted analytic render: 5884 > 48.
+
+**Decision:** match Flash (keep the tint). The fixture's `output.expected.png` is the Flash capture (tolerance 48,
+max_outliers 500), so a regression to Ruffle's untinted rect fails by ~12x the budget.
+

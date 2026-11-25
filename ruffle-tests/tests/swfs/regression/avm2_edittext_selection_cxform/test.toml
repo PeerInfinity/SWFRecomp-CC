@@ -1,0 +1,15 @@
+num_ticks = 2
+
+# s28 w1-text-edit-tail (c) / w2-text-edit-land. Golden: FLASH FP32 (LNX 32,0,0,465,
+# direct, run_image.py --ticks 2, AS3 draw(); the --screen grab is identical 0/0).
+# Flash TINTS the selection rect with the field's concatenated colour transform
+# (Ruffle draws it untinted: RUFFLE_VS_FLASH_DIFFERENCES.md).
+# Budget: our render vs this golden = 230 channels > 48 (max diff 81, glyph
+# raster only); Ruffle's untinted rect = 5884 channels > 48 (max diff 200),
+# so an untinted regression fails by ~11x the budget.
+[image_comparisons.output]
+tolerance = 48
+max_outliers = 500
+
+[player_options]
+with_renderer = { optional = false }

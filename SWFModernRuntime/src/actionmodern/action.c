@@ -30835,7 +30835,15 @@ typedef struct {
 	u32 color;
 	char font[64];
 	s8 bold, italic, underline;
+	// s28 w2-text-edit-land: paragraph keys (leading, leftMargin,
+	// rightMargin, indent, blockIndent, letterSpacing). A clear pmask bit =
+	// "the field base" (getTextFormat keeps the field-wide value).
+	u8 pmask;
+	double para[6];
 } TFPSFmt;
+static const char* const k_tf_ps_para_name[6] = {
+	"leading", "leftMargin", "rightMargin", "indent", "blockIndent", "letterSpacing" };
+static const u32 k_tf_ps_para_len[6] = { 7, 10, 11, 6, 11, 13 };
 typedef struct { u32 len; TFPSFmt f; } TFPSSpan;
 #define TF_PS_MAX_SPANS  64
 #define TF_PS_MAX_TABLES 64
@@ -30887,6 +30895,13 @@ static void tf_ps_merge_from_obj(TFPSFmt* f, ASObject* o)
 	if (p != NULL && p->type == ACTION_STACK_VALUE_BOOLEAN) f->italic = p->data.numeric_value ? 1 : 0;
 	p = getProperty(o, "underline", 9);
 	if (p != NULL && p->type == ACTION_STACK_VALUE_BOOLEAN) f->underline = p->data.numeric_value ? 1 : 0;
+	for (int k = 0; k < 6; k++) {
+		p = getProperty(o, k_tf_ps_para_name[k], k_tf_ps_para_len[k]);
+		if (p != NULL && p->type == ACTION_STACK_VALUE_F64) {
+			double v; memcpy(&v, &p->data.numeric_value, sizeof(double));
+			if (!isnan(v)) { f->para[k] = v; f->pmask |= (u8)(1u << k); }
+		}
+	}
 }
 
 static void tf_ps_from_run(TFPSFmt* f, const TFRun* r)
@@ -30910,6 +30925,9 @@ static void tf_ps_to_run(const TFPSFmt* f, TFRun* r)
 
 static int tf_ps_fmt_eq(const TFPSFmt* a, const TFPSFmt* b)
 {
+	if (a->pmask != b->pmask) return 0;
+	for (int k = 0; k < 6; k++)
+		if ((a->pmask >> k & 1) && a->para[k] != b->para[k]) return 0;
 	return a->size == b->size && a->color == b->color && a->bold == b->bold &&
 	       a->italic == b->italic && a->underline == b->underline && strcmp(a->font, b->font) == 0;
 }
@@ -30931,6 +30949,7 @@ static void tf_ps_base_fmt(SWFAppContext* app_context, MovieClip* mc, TFPSFmt* f
 	strcpy(f->font, "Times New Roman");
 	ASObject* tf = createTextFormatFromField(app_context, mc->ng_textfield_idx, 1, 1, -1);
 	tf_ps_merge_from_obj(f, tf);
+	f->pmask = 0; // s28 w2-text-edit-land: paragraph keys stay "base"
 	if (mc->dynamic_props != NULL) {
 		ActionVar* tc = getProperty((ASObject*)mc->dynamic_props, "textColor", 9);
 		if (tc != NULL && tc->type == ACTION_STACK_VALUE_F64) {
@@ -31093,10 +31112,17 @@ static void tf_ps_set_text_format(SWFAppContext* app_context, MovieClip* mc, u32
 // textWidth/textHeight and getTextFormat(0).size are unchanged, nsize=40; after
 // `text =` size0=40 (regression/avm1_set_new_text_format_instance).
 #define TF_SNF_MAX 16
+// s28 w2-text-edit-land: leading/leftMargin/rightMargin/indent/blockIndent/
+// letterSpacing under setNewTextFormat with text present are parked here with
+// size/font: the existing text keeps them, and they are written field-wide at
+// the next FULL replacement (text= / htmlText=). Typed text carries them in
+// its span (getTextFormat), not the layout. Flash FP32 == Ruffle
+// (regression/avm1_set_new_text_format_paragraph, Flash golden).
 static struct {
 	MovieClip* mc;
 	int has_size; double size;
 	int has_font; char font[128]; int bold, italic;
+	u8 pmask; double para[6];
 } g_tf_snf[TF_SNF_MAX];
 
 static int tf_snf_slot(MovieClip* mc, int create)
@@ -31130,9 +31156,13 @@ static int tf_snf_defer(MovieClip* mc, ASObject* fmt)
 	ActionVar* ft = getProperty(fmt, "font", 4);
 	int have_sz = sz != NULL && sz->type == ACTION_STACK_VALUE_F64;
 	int have_ft = ft != NULL && ft->type == ACTION_STACK_VALUE_STRING && ft->str_size > 0;
-	if (!have_sz && !have_ft) return 1;
+	TFPSFmt pf; memset(&pf, 0, sizeof(pf));
+	tf_ps_merge_from_obj(&pf, fmt);
+	if (!have_sz && !have_ft && pf.pmask == 0) return 1;
 	int i = tf_snf_slot(mc, 1);
 	if (i < 0) return 0;
+	for (int k = 0; k < 6; k++)
+		if (pf.pmask >> k & 1) { g_tf_snf[i].para[k] = pf.para[k]; g_tf_snf[i].pmask |= (u8)(1u << k); }
 	if (have_sz) {
 		double d; memcpy(&d, &sz->data.numeric_value, sizeof(double));
 		if (!isnan(d) && !isinf(d) && d > 0) { g_tf_snf[i].has_size = 1; g_tf_snf[i].size = d; }
@@ -31153,13 +31183,28 @@ static void tf_snf_drop(MovieClip* mc)
 	if (i >= 0) g_tf_snf[i].mc = NULL;
 }
 
-static void tf_snf_apply_pending(SWFAppContext* app_context, MovieClip* mc)
+static void tf_snf_apply_pending(SWFAppContext* app_context, MovieClip* mc, int full)
 {
 	int i = tf_snf_slot(mc, 0);
 	if (i < 0) return;
 	ASObject* props = (ASObject*)mc->dynamic_props;
-	g_tf_snf[i].mc = NULL;
+	if (full || g_tf_snf[i].pmask == 0) g_tf_snf[i].mc = NULL;
 	if (props == NULL) return;
+	if (full && g_tf_snf[i].pmask) {
+		static const char* const keys[6] = { "_tf_leading", "_tf_leftMargin", "_tf_rightMargin",
+		                                     "_tf_indent", "_tf_blockIndent", "_tf_letterSpacing" };
+		for (int k = 0; k < 6; k++) {
+			if (!(g_tf_snf[i].pmask >> k & 1)) continue;
+			ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
+			double d = g_tf_snf[i].para[k];
+			if (k == 0) d = (double)(s16)(d * 20.0);   // _tf_leading is twips
+			VAL(double, &v.data.numeric_value) = d;
+			setProperty(app_context, props, keys[k], (u32)strlen(keys[k]), &v);
+		}
+		g_tf_snf[i].pmask = 0;
+	}
+	// typed (!full): size/font below; the paragraph keys stay parked (the
+	// slot survives; re-applying size/font at the next full one is a no-op).
 	if (g_tf_snf[i].has_size) {
 		ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
 		VAL(double, &v.data.numeric_value) = (double)(u16)(g_tf_snf[i].size * 20.0);
@@ -31183,9 +31228,25 @@ static void tf_ps_set_new_text_format(SWFAppContext* app_context, MovieClip* mc,
 	// base format reads it), so neither getTextFormat nor the render of that
 	// text picks up the new-text colour.
 	tf_ps_ensure_spans(app_context, mc, ps);
+	// s28 w2-text-edit-land: pin the existing spans' paragraph
+	// keys to what getTextFormat reports NOW (tag/createTextField defaults +
+	// the field-wide _tf_indent override), before the caller writes _tf_*.
+	{
+		ASObject* base = createTextFormatFromField(app_context, mc->ng_textfield_idx, 1, 0, -1);
+		ActionVar* ind = mc->dynamic_props ? getProperty((ASObject*)mc->dynamic_props, "_tf_indent", 10) : NULL;
+		if (ind != NULL && ind->type == ACTION_STACK_VALUE_F64) setProperty(app_context, base, "indent", 6, ind);
+		TFPSFmt bf; memset(&bf, 0, sizeof(bf));
+		tf_ps_merge_from_obj(&bf, base);
+		for (u32 i = 0; i < ps->span_count; i++) {
+			TFPSFmt* f = &ps->spans[i].f;
+			for (int k = 0; k < 6; k++)
+				if (!(f->pmask >> k & 1) && (bf.pmask >> k & 1)) { f->para[k] = bf.para[k]; f->pmask |= (u8)(1u << k); }
+		}
+	}
 	double old_size = ps->newfmt.size;
 	tf_ps_merge_from_obj(&ps->newfmt, fmt);
 	if (!(ps->newfmt.size > 0)) ps->newfmt.size = old_size;
+	tf_ps_normalize(ps);
 	ps->force_next = 1;
 	ps->newfmt_set = 1;
 }
@@ -31451,6 +31512,24 @@ static int tf_ps_on_typed(SWFAppContext* app_context, MovieClip* mc, u32 from, u
 	return 1;
 }
 
+// s28 w2-text-edit-land: typing into a PLAIN field (no run
+// table) with a span model. Ruffle TextSpans::replace_text: the inserted text
+// takes the format of the span after the edit, or the new text format at the
+// end. Master let tf_ps_ensure_spans stretch the last span (old format).
+// Call before the `text` store.
+static void tf_ps_on_typed_plain(SWFAppContext* app_context, MovieClip* mc, u32 from, u32 to, u32 ins_len)
+{
+	TFPlainSpans* ps = tf_ps_find(mc);
+	if (ps == NULL || !ps->has_spans) return;
+	tf_ps_ensure_spans(app_context, mc, ps);
+	u32 old_len = tf_ps_text_len(mc);
+	if (from > old_len) from = old_len;
+	if (to > old_len) to = old_len;
+	TFPSFmt f = ps->newfmt;
+	if (to < old_len) { const TFPSFmt* a = tf_ps_fmt_at(ps, to); if (a != NULL) f = *a; }
+	tf_ps_replace(ps, from, to, ins_len, &f);
+}
+
 static u32 tf_cx_rgb(u32 rgb);
 
 // s26 w2-avm1-text-resolve (item 5b): the render colours of a plain (no run
@@ -31543,6 +31622,23 @@ static int tf_ps_overlay_text_format(SWFAppContext* app_context, MovieClip* mc, 
 		ActionVar fv = makeStringActionVar(app_context, first->font, strlen(first->font));
 		setProperty(app_context, tf, "font", 4, &fv);
 	}
+	// s28 w2-text-edit-land: paragraph keys a span carries (pmask bit);
+	// a key no overlapping span carries stays the caller's base value.
+	for (int k = 0; k < 6; k++) {
+		int any = 0, all = 1, mix = 0; double v0 = 0;
+		u32 acc2 = 0;
+		for (u32 i = 0; i < ps->span_count; i++) {
+			u32 s2 = acc2, e2 = acc2 + ps->spans[i].len;
+			acc2 = e2;
+			if (e2 <= begin || s2 >= end) continue;
+			const TFPSFmt* f = &ps->spans[i].f;
+			if (!(f->pmask >> k & 1)) { all = 0; continue; }
+			if (!any) { any = 1; v0 = f->para[k]; } else if (f->para[k] != v0) mix = 1;
+		}
+		if (!any) continue;
+		VAL(double, &v.data.numeric_value) = v0;
+		setProperty(app_context, tf, k_tf_ps_para_name[k], k_tf_ps_para_len[k], (mix || !all) ? &nv : &v);
+	}
 	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN;
 	bv.data.numeric_value = first->bold;
 	setProperty(app_context, tf, "bold", 4, mix_b ? &nv : &bv);
@@ -31572,6 +31668,11 @@ static void tf_ps_overlay_new_text_format(SWFAppContext* app_context, MovieClip*
 	bv.data.numeric_value = f->bold;      setProperty(app_context, tf, "bold", 4, &bv);
 	bv.data.numeric_value = f->italic;    setProperty(app_context, tf, "italic", 6, &bv);
 	bv.data.numeric_value = f->underline; setProperty(app_context, tf, "underline", 9, &bv);
+	for (int k = 0; k < 6; k++) {   // s28 w2-text-edit-land
+		if (!(f->pmask >> k & 1)) continue;
+		VAL(double, &v.data.numeric_value) = f->para[k];
+		setProperty(app_context, tf, k_tf_ps_para_name[k], k_tf_ps_para_len[k], &v);
+	}
 }
 // ---- end s25 w2-edittext-span-model ----
 
@@ -60380,7 +60481,7 @@ void actionSetMember(SWFAppContext* app_context)
 				// including an HTML field's runs; otherwise one span of the new
 				// text format. Runs before the old text is overwritten.
 				int _ps_same = MC_IS_TEXTFIELD(mc) ? tf_ps_text_assign(mc, &value_var) : 0;
-				if (MC_IS_TEXTFIELD(mc) && !_ps_same) tf_snf_apply_pending(app_context, mc); // s27 w2b item 1
+				if (MC_IS_TEXTFIELD(mc) && !_ps_same) tf_snf_apply_pending(app_context, mc, 1); // s27 w2b item 1
 				TFPlainSpans* _ps_nf = MC_IS_TEXTFIELD(mc) ? tf_ps_find(mc) : NULL;
 				// Update length property (str_size is UTF-16 code unit count)
 				u32 _txt_len = 0;
@@ -60703,7 +60804,7 @@ void actionSetMember(SWFAppContext* app_context)
 						ActionVar _rc_one = {0}; _rc_one.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &_rc_one.data.numeric_value) = 1.0;
 						setProperty(app_context, props, "_tf_raw_content", 15, &_rc_one);
-						if (!tf_ps_text_assign(mc, &value_var)) tf_snf_apply_pending(app_context, mc); // s25 span model (text synonym); s27 w2b item 1
+						if (!tf_ps_text_assign(mc, &value_var)) tf_snf_apply_pending(app_context, mc, 1); // s25 span model (text synonym); s27 w2b item 1
 						setProperty(app_context, props, "text", 4, &value_var);
 						ActionVar len_val = {0};
 						len_val.type = ACTION_STACK_VALUE_F64;
@@ -80037,8 +80138,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ActionVar fname_val = makeStringActionVar(app_context, _font_name, strlen(_font_name));
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_fontName", 12, &fname_val);
 				}
+				// s28 w2-text-edit-land: the paragraph keys below are parked
+				// with size/font while text is present (tf_snf_defer).
 				// Store leading (in twips) from TextFormat
-				ActionVar* ld_prop = getProperty(fmt_obj, "leading", 7);
+				ActionVar* ld_prop = _snf_defer ? NULL : getProperty(fmt_obj, "leading", 7);
 				if (ld_prop != NULL && ld_prop->type == ACTION_STACK_VALUE_F64) {
 					double ld; memcpy(&ld, &ld_prop->data.numeric_value, sizeof(double));
 					s16 ld_twips = (s16)(ld * 20.0);
@@ -80050,27 +80153,27 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Store margins and indent (pixels) from TextFormat for word-wrap
 				ActionVar margin_val = {0};
 				margin_val.type = ACTION_STACK_VALUE_F64;
-				ActionVar* lm_prop = getProperty(fmt_obj, "leftMargin", 10);
+				ActionVar* lm_prop = _snf_defer ? NULL : getProperty(fmt_obj, "leftMargin", 10);
 				if (lm_prop != NULL && lm_prop->type == ACTION_STACK_VALUE_F64) {
 					margin_val.data.numeric_value = lm_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_leftMargin", 14, &margin_val);
 				}
-				ActionVar* rm_prop = getProperty(fmt_obj, "rightMargin", 11);
+				ActionVar* rm_prop = _snf_defer ? NULL : getProperty(fmt_obj, "rightMargin", 11);
 				if (rm_prop != NULL && rm_prop->type == ACTION_STACK_VALUE_F64) {
 					margin_val.data.numeric_value = rm_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_rightMargin", 15, &margin_val);
 				}
-				ActionVar* ind_prop = getProperty(fmt_obj, "indent", 6);
+				ActionVar* ind_prop = _snf_defer ? NULL : getProperty(fmt_obj, "indent", 6);
 				if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
 					margin_val.data.numeric_value = ind_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_indent", 10, &margin_val);
 				}
-				ActionVar* bi_prop = getProperty(fmt_obj, "blockIndent", 11);
+				ActionVar* bi_prop = _snf_defer ? NULL : getProperty(fmt_obj, "blockIndent", 11);
 				if (bi_prop != NULL && bi_prop->type == ACTION_STACK_VALUE_F64) {
 					margin_val.data.numeric_value = bi_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_blockIndent", 15, &margin_val);
 				}
-				ActionVar* ls_prop = getProperty(fmt_obj, "letterSpacing", 13);
+				ActionVar* ls_prop = _snf_defer ? NULL : getProperty(fmt_obj, "letterSpacing", 13);
 				if (ls_prop != NULL && ls_prop->type == ACTION_STACK_VALUE_F64) {
 					margin_val.data.numeric_value = ls_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_letterSpacing", 17, &margin_val);
@@ -87376,7 +87479,8 @@ static int tf_replace_selection(SWFAppContext* app_context, ASObject* props,
 	int _typed_in_place = 0;
 	if ((int)u16_len == (int)(del_lo + ins_len + tail_len))
 		_typed_in_place = tf_ps_on_typed(app_context, g_focused_mc, del_lo, del_hi, ins, ins_len);
-	if (ins_len > 0) tf_snf_apply_pending(app_context, g_focused_mc); // s27 w2b item 1
+	if (!_typed_in_place) tf_ps_on_typed_plain(app_context, g_focused_mc, del_lo, del_hi, ins_len);
+	if (ins_len > 0) tf_snf_apply_pending(app_context, g_focused_mc, 0); // s27 w2b item 1
 	// Set text property
 	ActionVar new_text = {0};
 	new_text.type = ACTION_STACK_VALUE_STRING;
@@ -87448,7 +87552,16 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 			u16_to_utf8(r_u16, restrict_prop->str_size, restrict_utf8, (int)sizeof(restrict_utf8));
 			char restricted[8];
 			size_t new_len = apply_restrict_filter(ch_utf8, ch_len, restrict_utf8, restricted, sizeof(restricted));
-			if (new_len == 0) return;  // Character filtered out
+			if (new_len == 0) {
+				// s28 w2-text-edit-land: a typed key that restrict filters
+				// out still edits: the (empty) insertion deletes the live
+				// selection (a no-op at a bare caret) and fires onChanged.
+				// Flash FP32 == Ruffle text_input (filter_allowed -> "" ->
+				// replace_text(sel, "") -> on_changed);
+				// regression/avm1_edittext_restrict_onchanged, Flash golden.
+				tf_replace_selection(app_context, props, NULL, 0);
+				return;
+			}
 			memcpy(ch_utf8, restricted, new_len);
 			ch_len = new_len;
 			ch_utf8[ch_len] = '\0';
