@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-24T17:26:56.740252+00:00",
-    "old_git_sha": "78fee9e13f853501e2dc637877cddb20254a603f",
-    "new_timestamp": "2026-11-25T03:46:34.818579+00:00",
-    "new_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "old_timestamp": "2026-11-25T03:46:34.818579+00:00",
+    "old_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "new_timestamp": "2026-11-25T05:10:12.885548+00:00",
+    "new_git_sha": "7c3cfdcb7bbe810e152c8f8dbf00473db0a4a136",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 243,
+    "old_pass": 254,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 243,
-    "old_total": 243,
+    "old_effective_pass": 254,
+    "old_total": 254,
     "old_pass_rate": 100.0,
     "new_pass": 254,
     "new_ruffle_matched": 0,
@@ -25,158 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 242,
-    "added": 11,
+    "unchanged": 254,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1_bare_depth_methods_v7_gate",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "avm1_bare_depth_methods_v7_gate_swf7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "avm1_bitmap_nearest_tie_stage",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm1_bitmapdata_draw_child_color",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "avm1_bitmapdata_draw_text_glyph_cx",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "avm1_browser_eager_init",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      }
-    },
-    {
-      "test": "avm1_browser_parked_frame",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "avm1_edittext_border_subpixel",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm1_edittext_maxchars_clips_insertion",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "avm1_edittext_tabstops_metric",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "avm1_set_new_text_format_instance",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "avm2_bitmapdata_draw_text_glyph_cx",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
-      }
-    }
-  ]
+  "changes": []
 }

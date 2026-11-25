@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-24T17:26:56.791786+00:00",
-    "old_git_sha": "78fee9e13f853501e2dc637877cddb20254a603f",
-    "new_timestamp": "2026-11-25T03:46:34.858025+00:00",
-    "new_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "old_timestamp": "2026-11-25T03:46:34.858025+00:00",
+    "old_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "new_timestamp": "2026-11-25T05:10:12.914047+00:00",
+    "new_git_sha": "7c3cfdcb7bbe810e152c8f8dbf00473db0a4a136",
     "partial": false,
     "same_commit": false
   },
@@ -18,33 +18,16 @@
     "new_effective_pass": 103,
     "new_total": 111,
     "new_pass_rate": 64.0,
-    "old_mismatched_lines": 931,
+    "old_mismatched_lines": 930,
     "new_mismatched_lines": 930,
     "increased_mismatches": 0,
-    "decreased_mismatches": 1,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 110,
+    "unchanged": 111,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "loading/LoadBitmapTest",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 14
-      },
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 15
-      }
-    }
-  ]
+  "changes": []
 }
