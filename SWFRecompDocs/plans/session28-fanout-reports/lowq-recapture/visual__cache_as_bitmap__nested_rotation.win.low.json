@@ -1,0 +1,27 @@
+{
+ "test": "visual/cache_as_bitmap/nested_rotation",
+ "mode": "draw-win",
+ "num_ticks": 3,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 3,
+   "max_difference": 204,
+   "diff_pixels": 129,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 387,
+     "outlier_pixels": 129
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

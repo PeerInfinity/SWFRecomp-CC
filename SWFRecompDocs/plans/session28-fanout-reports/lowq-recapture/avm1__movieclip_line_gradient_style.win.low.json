@@ -1,0 +1,27 @@
+{
+ "test": "avm1/movieclip_line_gradient_style",
+ "mode": "draw-win",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 20661,
+   "pixels": 158100,
+   "checks": [
+    {
+     "tolerance": 6,
+     "max_outliers": 0,
+     "outliers": 15152,
+     "outlier_pixels": 8238
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

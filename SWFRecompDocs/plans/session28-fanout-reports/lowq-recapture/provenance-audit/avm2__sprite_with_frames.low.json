@@ -1,0 +1,27 @@
+{
+ "test": "avm2/sprite_with_frames",
+ "mode": "draw",
+ "num_ticks": 2,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 2,
+   "max_difference": 255,
+   "diff_pixels": 20295,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 41822,
+     "outlier_pixels": 20295
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

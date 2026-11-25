@@ -1,0 +1,27 @@
+{
+ "test": "visual/filters/drop_shadow_angles",
+ "mode": "draw-win",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 25937,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 2,
+     "max_outliers": 0,
+     "outliers": 68711,
+     "outlier_pixels": 25034
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

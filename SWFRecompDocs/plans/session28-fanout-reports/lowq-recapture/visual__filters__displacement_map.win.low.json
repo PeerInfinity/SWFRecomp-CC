@@ -1,0 +1,33 @@
+{
+ "test": "visual/filters/displacement_map",
+ "mode": "draw-win",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 254,
+   "diff_pixels": 68091,
+   "pixels": 500000,
+   "checks": [
+    {
+     "tolerance": 20,
+     "max_outliers": 72,
+     "outliers": 37843,
+     "outlier_pixels": 17385
+    },
+    {
+     "tolerance": 32,
+     "max_outliers": 160,
+     "outliers": 30529,
+     "outlier_pixels": 15232
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

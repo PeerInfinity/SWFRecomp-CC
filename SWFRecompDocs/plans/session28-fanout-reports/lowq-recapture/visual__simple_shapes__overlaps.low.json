@@ -1,0 +1,27 @@
+{
+ "test": "visual/simple_shapes/overlaps",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 627,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 1795,
+     "outlier_pixels": 627
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

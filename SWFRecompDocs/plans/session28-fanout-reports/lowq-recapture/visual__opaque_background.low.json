@@ -1,0 +1,27 @@
+{
+ "test": "visual/opaque_background",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 3124,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 6248,
+     "outlier_pixels": 3124
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

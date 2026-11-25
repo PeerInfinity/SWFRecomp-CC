@@ -1,0 +1,20 @@
+{
+ "test": "avm2/focus_root_movie",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "high",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "error": "no capture"
+  }
+ },
+ "log_tail": [
+  "#FLASHCAP START LNX 32,0,0,465 Linux 6.18.58.1-microsoft-standard-WSL2 sandbox=localTrusted",
+  "TypeError: Error #1009: Cannot access a property or method of a null object reference.",
+  "\tat Test()[/app/Test.as:24]"
+ ],
+ "stop": [
+  "max_duration"
+ ]
+}

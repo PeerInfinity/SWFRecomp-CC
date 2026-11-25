@@ -1,0 +1,39 @@
+{
+ "test": "from_shumway/acid/acid-bitmap-draw_quality_low",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "high",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 0,
+   "diff_pixels": 0,
+   "pixels": 65536,
+   "checks": [
+    {
+     "tolerance": 5,
+     "max_outliers": 35000,
+     "outliers": 0,
+     "outlier_pixels": 0
+    },
+    {
+     "tolerance": 32,
+     "max_outliers": 700,
+     "outliers": 0,
+     "outlier_pixels": 0
+    },
+    {
+     "tolerance": 64,
+     "max_outliers": 0,
+     "outliers": 0,
+     "outlier_pixels": 0
+    }
+   ],
+   "pass": true,
+   "exact": true
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

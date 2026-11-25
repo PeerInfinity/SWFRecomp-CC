@@ -1,0 +1,27 @@
+{
+ "test": "visual/filters/glow",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 15448,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 2,
+     "max_outliers": 0,
+     "outliers": 31905,
+     "outlier_pixels": 15019
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

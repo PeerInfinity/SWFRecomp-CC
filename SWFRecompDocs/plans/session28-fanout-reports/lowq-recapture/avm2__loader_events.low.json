@@ -1,0 +1,27 @@
+{
+ "test": "avm2/loader_events",
+ "mode": "draw",
+ "num_ticks": 3,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 3,
+   "max_difference": 255,
+   "diff_pixels": 7876,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 15752,
+     "outlier_pixels": 7876
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

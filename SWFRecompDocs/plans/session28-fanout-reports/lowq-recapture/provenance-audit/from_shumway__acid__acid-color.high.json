@@ -1,0 +1,43 @@
+{
+ "test": "from_shumway/acid/acid-color",
+ "mode": "draw",
+ "num_ticks": 10,
+ "quality": "high",
+ "comparisons": {
+  "output": {
+   "trigger": 10,
+   "max_difference": 4,
+   "diff_pixels": 27335,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 3,
+     "max_outliers": 0,
+     "outliers": 4,
+     "outlier_pixels": 3
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame1": {
+   "trigger": 1,
+   "max_difference": 3,
+   "diff_pixels": 11030,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 3,
+     "max_outliers": 0,
+     "outliers": 0,
+     "outlier_pixels": 0
+    }
+   ],
+   "pass": true,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

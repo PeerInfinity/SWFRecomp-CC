@@ -1,0 +1,27 @@
+{
+ "test": "visual/fonts/device-font",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 3537,
+   "pixels": 187500,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 3,
+     "outliers": 10611,
+     "outlier_pixels": 3537
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

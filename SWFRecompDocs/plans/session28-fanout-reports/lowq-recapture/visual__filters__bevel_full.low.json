@@ -1,0 +1,27 @@
+{
+ "test": "visual/filters/bevel_full",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 254,
+   "diff_pixels": 248885,
+   "pixels": 720000,
+   "checks": [
+    {
+     "tolerance": 4,
+     "max_outliers": 18,
+     "outliers": 110141,
+     "outlier_pixels": 50154
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "test": "visual/drawing_api/gradient_focal_point",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 232,
+   "diff_pixels": 71812,
+   "pixels": 176300,
+   "checks": [
+    {
+     "tolerance": 13,
+     "max_outliers": 0,
+     "outliers": 28805,
+     "outlier_pixels": 28805
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

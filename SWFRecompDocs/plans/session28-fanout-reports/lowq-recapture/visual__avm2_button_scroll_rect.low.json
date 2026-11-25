@@ -1,0 +1,27 @@
+{
+ "test": "visual/avm2_button_scroll_rect",
+ "mode": "draw",
+ "num_ticks": 3,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 3,
+   "max_difference": 255,
+   "diff_pixels": 18,
+   "pixels": 40000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 54,
+     "outlier_pixels": 18
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

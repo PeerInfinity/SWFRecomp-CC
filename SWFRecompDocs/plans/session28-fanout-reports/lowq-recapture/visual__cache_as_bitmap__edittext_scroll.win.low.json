@@ -1,0 +1,43 @@
+{
+ "test": "visual/cache_as_bitmap/edittext_scroll",
+ "mode": "draw-win",
+ "num_ticks": 2,
+ "quality": "low",
+ "comparisons": {
+  "output.01": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 330,
+   "pixels": 1400,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 5,
+     "outliers": 986,
+     "outlier_pixels": 330
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "output.02": {
+   "trigger": 2,
+   "max_difference": 255,
+   "diff_pixels": 330,
+   "pixels": 1400,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 5,
+     "outliers": 984,
+     "outlier_pixels": 330
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

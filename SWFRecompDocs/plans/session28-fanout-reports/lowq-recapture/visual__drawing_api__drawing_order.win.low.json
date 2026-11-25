@@ -1,0 +1,27 @@
+{
+ "test": "visual/drawing_api/drawing_order",
+ "mode": "draw-win",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 5933,
+   "pixels": 250000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 11831,
+     "outlier_pixels": 5933
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

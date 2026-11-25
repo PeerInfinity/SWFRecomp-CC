@@ -1,0 +1,27 @@
+{
+ "test": "avm2/mouse_pick_non_interactive_dobj_mask",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 56,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 168,
+     "outlier_pixels": 56
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}
