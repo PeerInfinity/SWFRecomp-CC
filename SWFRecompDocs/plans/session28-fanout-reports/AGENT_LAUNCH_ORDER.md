@@ -25,7 +25,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | 5 | w1-leads | `briefs/w1-leads.md` | session_018CoDi3t5rtjVnrzbpL8LRN — DELIVERED; shapeflag premise refuted, Flash: same-frame stale shape hitTest → w2-hittest-shape-stale; 4 queues + onUnload scope (Flash n=2) → w2-avm1-leads-land; FileReference NO-GO |
 | 6 | w1-loaded-shell-residuals | `briefs/w1-loaded-shell-residuals.md` | session_018CoDi6VXdE1GrhC7pebVyf — launched 2026-11-25 |
 | 7 | w1-render-flash-headroom | `briefs/w1-render-flash-headroom.md` | session_018CoDi3SHpVL9RmKCJ3YhgZ — DELIVERED: quality-harness NO-GO (our LOW is closer to Flash HIGH); Flash occupied-depth keep-both = SWF5 only (captured) → w2-occupied-depth; tie-rule evidence → n-stroke-snap; no swap in reach |
-| 8 | w1-test12-enterframe | `briefs/w1-test12-enterframe.md` | session_018CoDi7N5Bch7zdwEeLUYZ4 — launched 2026-11-25 |
+| 8 | w1-test12-enterframe | `briefs/w1-test12-enterframe.md` | session_018CoDi7N5Bch7zdwEeLUYZ4 — DELIVERED; rule = FP10 keeps a queued enterFrame of a clip removed later that tick; SWF≤7 gate refuted by Flash (v7==v8); corpus goldens Flash → w2-test12-land |
 | 9 | w1-text-edit-tail | `briefs/w1-text-edit-tail.md` | session_018CoDi59FTJJJPfNtJqs7E1 — DELIVERED; Flash: restrict fires+deletes (=Ruffle), SNF defer (=Ruffle), AVM2 selection tinted (=ours, RvF) → w2-text-edit-land |
 | 10 | w1-text-glyph-aa | `briefs/w1-text-glyph-aa.md` | session_018CoDi5Jv8Udc64LppZrHrZ — DELIVERED; Flash snaps glyph outlines to ¼ px (wordwrap 199→23 px vs Flash; 22 Ruffle-golden losses unpriced); rotated residual = border weight; 16-level AA NO-GO L → w2-glyph-quarter-snap |
 

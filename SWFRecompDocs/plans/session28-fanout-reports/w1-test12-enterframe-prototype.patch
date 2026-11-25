@@ -1,0 +1,160 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 5b74145a..75a10356 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -42843,16 +42843,130 @@ static void dispatch_root_dprops_enterframe(SWFAppContext* app_context)
+ }
+ 
+ 
++// s28 w1-test12-enterframe (PROTOTYPE): Flash 10+ runs the onEnterFrame of a
++// clip that was alive at the start of the tick even when the tick's timeline
++// advance (a parent sprite's loop-back, a RemoveObject2 tag) removes it before
++// the enterFrame dispatch. Ruffle's run_actions (player.rs:2175) drops a queued
++// action whose clip was removed after queueing, which is Flash 9's behaviour
++// (gnash action_execution_order_test12 fp9 vs fp10 line 17; FP32 == fp10).
++// We dispatch AFTER the advance, so snapshot the would-fire set before it and
++// fire the entries the advance removed, in their newest-first slot.
++typedef struct { MovieClip* mc; ASFunction* func; int idx; } EfSnapEntry;
++static EfSnapEntry* g_ef_snap = NULL;
++static int g_ef_snap_n = 0, g_ef_snap_cap = 0;
++static size_t g_ef_snap_tick = (size_t)-1;
++
++static int ef_snapshot_enabled(void)
++{
++	// 0 = off (before leg), 1 = unconditional, 2 (default) = SWF <= 7 only.
++	// Mode 1 loses avm1/clip_events and avm1/movieclip_in_removed_button
++	// (Ruffle goldens, SWF 15 / SWF 8, 1-frame clips removed by a root
++	// RemoveObject2): which discriminator Flash uses is the open oracle question.
++	static int s = -1;
++	if (s < 0) { const char* e = getenv("SWF_EF_SNAPSHOT"); s = (e && e[0] >= '0' && e[0] <= '2') ? e[0] - '0' : 2; }
++	if (s == 2) { extern int g_swf_version; return g_swf_version <= 7; }
++	return s;
++}
++
++static int ef_mc_or_ancestor_removed(MovieClip* mc)
++{
++	for (MovieClip* p = mc; p != NULL; p = p->parent)
++		if (p->avm1_removed || p->pending_removal) return 1;
++	return 0;
++}
++
++void actionSnapshotEnterFrameCandidates(void)
++{
++	extern size_t g_tick_count;
++	g_ef_snap_n = 0;
++	g_ef_snap_tick = g_tick_count;
++	if (!ef_snapshot_enabled()) return;
++	for (int i = 0; i < child_mc_count; i++)
++	{
++		MovieClip* mc = child_mc_cache[i];
++		if (mc == NULL || mc->dynamic_props == NULL || mc->is_button_mc) continue;
++		if (ef_mc_or_ancestor_removed(mc)) continue;
++		if (mc->display_obj != NULL && !actionIsLoadedLevelRootMC(mc)) {
++			if (((DisplayObject*)mc->display_obj)->sprite_initialized < 2) continue;
++		} else if (!mc->mc_enterframe_eligible) continue;
++		ActionVar* ef = getPropertyWithPrototype((ASObject*)mc->dynamic_props, "onEnterFrame", 12);
++		if (ef == NULL || ef->type != ACTION_STACK_VALUE_FUNCTION) continue;
++		ASFunction* f = (ASFunction*) ef->data.numeric_value;
++		if (f == NULL) continue;
++		if (g_ef_snap_n >= g_ef_snap_cap) {
++			int nc = g_ef_snap_cap ? g_ef_snap_cap * 2 : 32;
++			EfSnapEntry* nq = (EfSnapEntry*) realloc(g_ef_snap, (size_t)nc * sizeof(EfSnapEntry));
++			if (nq == NULL) return;
++			g_ef_snap = nq; g_ef_snap_cap = nc;
++		}
++		g_ef_snap[g_ef_snap_n].mc = mc;
++		g_ef_snap[g_ef_snap_n].func = f;
++		g_ef_snap[g_ef_snap_n].idx = i;
++		g_ef_snap_n++;
++	}
++}
++
++static void ef_invoke_handler(SWFAppContext* app_context, MovieClip* mc, ASFunction* func)
++{
++	MovieClip* saved_ctx = g_current_context;
++	actionSetCurrentContext(mc);
++	ActionVar _ef_this = {0};
++	_ef_this.type = ACTION_STACK_VALUE_MOVIECLIP;
++	_ef_this.data.numeric_value = (u64)(uintptr_t)mc;
++	MovieClip* ef_saved_base = g_current_context;
++	if (g_swf_version >= 6 && func->base_clip != NULL)
++		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, mc);
++	u32 _ef_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
++	if (func->function_type == 2)
++		_ef_flags |= INV_MC_THIS_NULL_PTR;
++	else
++		_ef_flags |= INV_LOCAL_SCOPE | INV_BIND_THIS;
++	InvokeOpts _ef_opts = { .flags = _ef_flags };
++	g_call_depth++;
++	invokeFunctionValue(app_context, func, &_ef_this, NULL, 0, &_ef_opts);
++	g_call_depth--;
++	g_current_context = ef_saved_base;
++	actionSetCurrentContext(saved_ctx);
++}
++
++// Fire the snapshot entries for cache slot `idx` whose clip the advance removed.
++static void ef_fire_removed_snapshot_slot(SWFAppContext* app_context, int idx)
++{
++	extern size_t g_tick_count;
++	for (int k = g_ef_snap_n - 1; k >= 0; k--)
++	{
++		EfSnapEntry* e = &g_ef_snap[k];
++		if (e->idx != idx) continue;
++		MovieClip* mc = e->mc;
++		int still_live = (idx < child_mc_count && child_mc_cache[idx] == mc && !ef_mc_or_ancestor_removed(mc));
++		if (still_live) continue;               // the normal arm handles it
++		if (mc->ef_fired_tick == g_tick_count) continue;
++		mc->ef_fired_tick = g_tick_count;
++		ef_invoke_handler(app_context, mc, e->func);
++	}
++}
++
+ // Called from tagShowFrame after sprite/button initialization. Iterates the
+ // MC cache in reverse creation order (most recently created = highest depth = front)
+ // to match Flash's front-to-back dispatch order.
+ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
+ {
+ 	g_inside_enterframe_dispatch = 1;
++	// s28 w1-test12-enterframe: snapshot slots may lie above a trimmed
++	// child_mc_count (the advance NULLed and trimmed the removed clip's slot).
++	int _ef_top = child_mc_count;
++	{
++		extern size_t g_tick_count;
++		if (g_ef_snap_tick != g_tick_count) g_ef_snap_n = 0;
++		for (int k = 0; k < g_ef_snap_n; k++)
++			if (g_ef_snap[k].idx + 1 > _ef_top) _ef_top = g_ef_snap[k].idx + 1;
++	}
+ 	// Dispatch children first, then root — Flash fires enterFrame in creation
+ 	// order (children before parents).
+-	for (int i = child_mc_count - 1; i >= 0; i--)
++	for (int i = _ef_top - 1; i >= 0; i--)
+ 	{
++		if (g_ef_snap_n > 0) ef_fire_removed_snapshot_slot(app_context, i);
++		if (i >= child_mc_count) continue;
+ 		MovieClip* mc = child_mc_cache[i];
+ 		if (mc == NULL || mc->dynamic_props == NULL) continue;
+ 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
+diff --git a/SWFModernRuntime/src/libswf/swf.c b/SWFModernRuntime/src/libswf/swf.c
+index e77fa7be..1bffeb68 100644
+--- a/SWFModernRuntime/src/libswf/swf.c
++++ b/SWFModernRuntime/src/libswf/swf.c
+@@ -1054,6 +1054,7 @@ void tagMain(SWFAppContext* app_context)
+ 		// func runs this tick.
+ 		// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
+ 		// nested sprites first, then their root-level parents (Phase 1).
++		{ extern void actionSnapshotEnterFrameCandidates(void); actionSnapshotEnterFrameCandidates(); }  // s28 w1-test12-enterframe
+ 		const int nested_early = exec_order_nested_early();
+ 		if (nested_early)
+ 		{
+diff --git a/SWFModernRuntime/src/libswf/swf_core.c b/SWFModernRuntime/src/libswf/swf_core.c
+index 7df026d3..d3e75d9e 100644
+--- a/SWFModernRuntime/src/libswf/swf_core.c
++++ b/SWFModernRuntime/src/libswf/swf_core.c
+@@ -1207,6 +1207,7 @@ void swfStart(SWFAppContext* app_context)
+ 			// Phase 3: Advance nested children of sprites
+ 			// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
+ 			// nested sprites first, then their root-level parents (Phase 1).
++			{ extern void actionSnapshotEnterFrameCandidates(void); actionSnapshotEnterFrameCandidates(); }  // s28 w1-test12-enterframe
+ 			const int nested_early = exec_order_nested_early();
+ 			if (nested_early)
+ 				advance_nested_sprite_frames(app_context);
