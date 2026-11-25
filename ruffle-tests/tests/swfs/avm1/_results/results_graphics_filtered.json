@@ -6,19 +6,19 @@
     "total_available": 789,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 15,
+    "ignored_count": 12,
     "filtered": true
   },
-  "total": 774,
+  "total": 777,
   "pass": 755,
-  "ruffle_matched": 16,
+  "ruffle_matched": 19,
   "fail": 3,
-  "pass_rate": 97.5,
-  "effective_pass": 771,
+  "pass_rate": 97.2,
+  "effective_pass": 774,
   "effective_pass_rate": 99.6,
   "breakdown": {
     "output_mismatch": 3,
-    "ruffle_matched": 16
+    "ruffle_matched": 19
   },
   "tests": [
     {
@@ -6432,6 +6432,25 @@
       "status": "pass"
     },
     {
+      "test": "form_loader_encoding_4",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 1.274,
+        "run": 0.331
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "duration": 1.61,
+      "ruffle_diff_count": 2,
+      "ours_diff_count": 2,
+      "status": "ruffle_matched",
+      "detail": "diffs 2 \u2286 ruffle 2"
+    },
+    {
       "test": "frame_size_translated_negative",
       "phases": {
         "recomp": 0.003,
@@ -9007,6 +9026,44 @@
       },
       "duration": 3.35,
       "status": "pass"
+    },
+    {
+      "test": "mcl_replace_root_swf7_to_swf5",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.239,
+        "run": 0.432
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 56
+      },
+      "duration": 2.68,
+      "ruffle_diff_count": 1,
+      "ours_diff_count": 1,
+      "status": "ruffle_matched",
+      "detail": "diffs 1 \u2286 ruffle 1"
+    },
+    {
+      "test": "mcl_replace_root_swf7_to_swf6",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 0.761,
+        "run": 0.432
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 52
+      },
+      "duration": 1.21,
+      "ruffle_diff_count": 5,
+      "ours_diff_count": 5,
+      "status": "ruffle_matched",
+      "detail": "diffs 5 \u2286 ruffle 5"
     },
     {
       "test": "mcl_target_gif87a",

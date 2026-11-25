@@ -1,12 +1,15 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 5/7 passing | Graphics: 5/7 passing
+Trace: 7/7 passing | Graphics: 5/7 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (2 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `lzma_length_too_long` | Ruffle Matched | 9/77 lines match |
+| 2 | `swf_length_too_long` | Ruffle Matched | 12/18 lines match |
 
 ## Graphics Improvements (0 tests)
 

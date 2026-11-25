@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-24T16:56:53.133905+00:00",
-    "old_git_sha": "78fee9e13f853501e2dc637877cddb20254a603f",
-    "new_timestamp": "2026-11-25T03:59:19.317495+00:00",
-    "new_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "old_timestamp": "2026-11-25T03:59:19.317495+00:00",
+    "old_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "new_timestamp": "2026-11-25T21:10:43.846612+00:00",
+    "new_git_sha": "10a5b515a03a386400e27a68adeddb628a47bc82",
     "partial": false,
     "same_commit": false
   },
@@ -14,36 +14,52 @@
     "old_total": 111,
     "old_pass_rate": 64.0,
     "new_pass": 71,
-    "new_ruffle_matched": 32,
-    "new_effective_pass": 103,
+    "new_ruffle_matched": 31,
+    "new_effective_pass": 102,
     "new_total": 111,
     "new_pass_rate": 64.0,
-    "old_mismatched_lines": 931,
+    "old_mismatched_lines": 930,
     "new_mismatched_lines": 930,
     "increased_mismatches": 0,
-    "decreased_mismatches": 1,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 110,
+    "newly_failing": 1,
+    "status_changed": 1,
+    "unchanged": 109,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "loading/LoadBitmapTest",
+      "test": "action_order/action_execution_order_extend_test",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "ruffle_matched",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 14
+        "actual_lines": 28,
+        "expected_lines": 32,
+        "matching_lines": 8
       },
       "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 15
+        "actual_lines": 29,
+        "expected_lines": 32,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "action_order/action_execution_order_test4",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 19
+      },
+      "new_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 19
       }
     }
   ]

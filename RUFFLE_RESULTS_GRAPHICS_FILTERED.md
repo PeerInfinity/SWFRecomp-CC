@@ -12,7 +12,7 @@
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 5 | 5 | 100% | [details](ruffle-tests/tests/swfs/audio/_results/results_graphics_filtered.md) |
-| avm1 | 755 | 774 | 97.5% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics_filtered.md) |
+| avm1 | 755 | 777 | 97.2% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics_filtered.md) |
 | avm2 | 1292 | 1312 | 98.5% | [details](ruffle-tests/tests/swfs/avm2/_results/results_graphics_filtered.md) |
 | fonts | 8 | 9 | 88.9% | [details](ruffle-tests/tests/swfs/fonts/_results/results_graphics_filtered.md) |
 | from_avmplus | 1533 | 1572 | 97.5% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_graphics_filtered.md) |
@@ -31,16 +31,16 @@
 | text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_graphics_filtered.md) |
 | timeline | 14 | 17 | 82.4% | [details](ruffle-tests/tests/swfs/timeline/_results/results_graphics_filtered.md) |
 | visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results_graphics_filtered.md) |
-| **Total** | **4569** | **4805** | **95.1%** | |
+| **Total** | **4569** | **4808** | **95.0%** | |
 
-*62 tests ignored.*
+*59 tests ignored.*
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | audio | 24 | 24 | 100% |
-| avm1 | 116,205 | 119,595 | 97.2% |
+| avm1 | 116,314 | 119,712 | 97.2% |
 | avm2 | 157,800 | 159,038 | 99.2% |
 | fonts | 363 | 377 | 96.3% |
 | from_avmplus | 85,556 | 85,970 | 99.5% |
@@ -59,14 +59,14 @@
 | text | 979 | 979 | 100% |
 | timeline | 365 | 371 | 98.4% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **402,567** | **410,258** | **98.1%** |
+| **Total** | **402,676** | **410,375** | **98.1%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | ruffle_matched |
 |-------|-----------------:|----------------:|
 | audio | - | - |
-| avm1 | 3 | 16 |
+| avm1 | 3 | 19 |
 | avm2 | - | 20 |
 | fonts | - | 1 |
 | from_avmplus | - | 39 |
@@ -85,7 +85,7 @@
 | text | - | - |
 | timeline | - | 3 |
 | visual | - | 2 |
-| **Total** | **13** | **223** |
+| **Total** | **13** | **226** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -107,10 +107,10 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ### avm1
 
-- **Pass:** 755/774 (97.5%)
-- **Ignored:** 15 tests
+- **Pass:** 755/777 (97.2%)
+- **Ignored:** 12 tests
 - **Duration:** 1h02m56s across 30 shards
-- **Lines:** 116,205/119,595 matching (97.2%)
+- **Lines:** 116,314/119,712 matching (97.2%)
 - **Avg test duration:** 4.8s — slowest: `netstream_play_flv_screen` (43.8s)
 
 ### avm2
