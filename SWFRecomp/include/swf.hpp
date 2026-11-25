@@ -186,6 +186,10 @@ namespace SWFRecomp
 		u8 end_cap = 0;
 		u8 line_join = 0;
 		double miter_limit = 3.0;
+		// LINESTYLE2 NoHScaleFlag / NoVScaleFlag (DefineShape4). The runtime
+		// sizes the stroke per draw from these (render_webgpu.c hairline_*).
+		u8 no_hscale = 0;
+		u8 no_vscale = 0;
 	};
 	
 	class SWFHeader

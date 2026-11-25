@@ -8274,6 +8274,8 @@ namespace SWFRecomp
 
 				line_styles[i].start_cap = (flags1 >> 6) & 0x03;
 				line_styles[i].line_join = join_style;
+				line_styles[i].no_hscale = (flags1 >> 2) & 0x01;
+				line_styles[i].no_vscale = (flags1 >> 1) & 0x01;
 
 				// Reserved(UB5), NoClose(UB1), EndCapStyle(UB2)
 				line_data.clearFields();
@@ -11454,7 +11456,9 @@ namespace SWFRecomp
 								                << to_string(3*(current_tri + tris_size - tris.size())) << ", "
 								                << to_string(3*tris.size()) << ", "
 								                << to_string(current_stroke_centre) << ", "
-								                << to_string((u32) line_style.width) << ", "
+								                << to_string((u32) line_style.width
+								                             | ((u32) line_style.no_hscale << 30)
+								                             | ((u32) line_style.no_vscale << 31)) << ", "
 								                << to_string(emitted_width) << " }," << endl;
 
 								current_stroke_run += 1;

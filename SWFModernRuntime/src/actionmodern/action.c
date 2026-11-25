@@ -34361,6 +34361,96 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 	#undef _DR_CONTOUR_NEEDS_CLOSE
 }
 
+// lineStyle scale-mode bits on DrawPath/DrawingState line_scale_flags
+// (s28 w2-flash-stroke-width; parsed by drawingParseLineScaleMode).
+#define DRAWING_LS_NO_HSCALE 1u
+#define DRAWING_LS_NO_VSCALE 2u
+
+// s28 w2-flash-stroke-width: size a Drawing-API stroke the way Flash does, for
+// the local->stage 2x2 [[a c],[b d]] it is drawn under. Flash strokes in
+// DEVICE space with ONE scalar width (measured on acid-stroke-0's Flash
+// golden for timeline strokes; render_webgpu.c hairline_restage is the
+// timeline twin): v = M*(1,1); normal -> |v|/sqrt2, NoVScale ("horizontal")
+// -> |v.x|, NoHScale ("vertical") -> |v.y|, both ("none") -> 1; then
+// max(width, 1 px). Round joins/caps are device circles.
+//  - Similarity matrix, normal mode: the old local-space build, verbatim
+//    (max(width, 1/scale) local px), so every uniformly scaled stroke stays
+//    byte-identical.
+//  - Similarity with a scale mode: the same local build at the flag width.
+//  - Anything else: build on the polyline mapped by M (device-shaped space,
+//    uniform half-width), then map the triangles back by M^-1, so the GPU's M
+//    lands them exactly on Flash's device-space stroke.
+static void drawingEnsureFlashStroke(DrawPath* path, float a, float b, float c, float d)
+{
+	const double vx = (double) a + c, vy = (double) b + d;
+	const double det = (double) a * d - (double) b * c;
+	const double mag = fabs(a) + fabs(b) + fabs(c) + fabs(d);
+	const int similar = (fabs((double) a - d) + fabs((double) b + c) <= 1e-6 * mag)
+	                 || (fabs((double) a + d) + fabs((double) b - c) <= 1e-6 * mag);
+	const u8 fl = path->line_scale_flags;
+	if (similar && fl == 0)
+	{
+		float sx = sqrtf(a*a + b*b);
+		float sy = sqrtf(c*c + d*d);
+		float s = (sx > sy) ? sx : sy;                  // max-axis on-screen scale
+		float min_w_px = (s > 1e-6f) ? (1.0f / s) : 1.0f;
+		float eff_w_px = (path->line_width > min_w_px) ? path->line_width : min_w_px;
+		float want_half_w = eff_w_px * 0.5f * 20.0f;
+		if (path->stroke_built_dev || fabsf(want_half_w - path->stroke_built_half_w) > 0.01f) {
+			drawingBuildStroke(path, want_half_w);
+			path->stroke_built_dev = 0;
+		}
+		return;
+	}
+	double sf;
+	if ((fl & DRAWING_LS_NO_HSCALE) && (fl & DRAWING_LS_NO_VSCALE)) sf = 1.0;
+	else if (fl & DRAWING_LS_NO_HSCALE) sf = fabs(vy);
+	else if (fl & DRAWING_LS_NO_VSCALE) sf = fabs(vx);
+	else sf = sqrt((vx * vx + vy * vy) / 2.0);
+	double w_dev = (double) path->line_width * sf;
+	if (w_dev < 1.0) w_dev = 1.0;
+	if (similar || !(fabs(det) > 1e-12))
+	{
+		// Isotropic already: the local build at the device width / scale.
+		const double sc = sqrt(fabs(det));
+		const float want_half_w = (float) ((sc > 1e-6 ? w_dev / sc : w_dev) * 0.5 * 20.0);
+		if (path->stroke_built_dev || fabsf(want_half_w - path->stroke_built_half_w) > 0.01f) {
+			drawingBuildStroke(path, want_half_w);
+			path->stroke_built_dev = 0;
+		}
+		return;
+	}
+	const float want_half_w = (float) (w_dev * 0.5 * 20.0);
+	if (path->stroke_built_dev && path->stroke_built_half_w == want_half_w
+	    && path->stroke_built_m[0] == a && path->stroke_built_m[1] == b
+	    && path->stroke_built_m[2] == c && path->stroke_built_m[3] == d)
+		return;
+	float* src = path->stroke_poly;
+	const u32 n = path->stroke_poly_count;
+	float* tp = (float*) malloc((size_t) (n ? n : 1) * 2 * sizeof(float));
+	if (tp == NULL) return;
+	for (u32 i = 0; i < n; i++)
+	{
+		const float x = src[i * 2], y = src[i * 2 + 1];
+		tp[i * 2]     = a * x + c * y;
+		tp[i * 2 + 1] = b * x + d * y;
+	}
+	path->stroke_poly = tp;
+	drawingBuildStroke(path, want_half_w);
+	path->stroke_poly = src;
+	free(tp);
+	const double ia = d / det, ib = -b / det, ic = -c / det, id = a / det;
+	for (u32 i = 0; path->line_verts != NULL && i < path->line_vert_count; i++)
+	{
+		const double X = path->line_verts[i * 2], Y = path->line_verts[i * 2 + 1];
+		path->line_verts[i * 2]     = (float) (ia * X + ic * Y);
+		path->line_verts[i * 2 + 1] = (float) (ib * X + id * Y);
+	}
+	path->stroke_built_dev = 1;
+	path->stroke_built_m[0] = a; path->stroke_built_m[1] = b;
+	path->stroke_built_m[2] = c; path->stroke_built_m[3] = d;
+}
+
 // Finalize the active path: tessellate to triangles and add to paths array.
 // Each MOVE_TO starts a new contour; tessellation unions all contours under
 // the current fill style (Flash's "all sub-paths share the active fill" rule).
@@ -34451,6 +34541,7 @@ static void drawingFinalizePath(DrawingState* ds)
 	path->line_joints = ds->line_joints;
 	path->line_caps = ds->line_caps;
 	path->line_miter = ds->line_miter;
+	path->line_scale_flags = ds->line_scale_flags;
 	path->line_r = ds->line_r; path->line_g = ds->line_g;
 	path->line_b = ds->line_b; path->line_a = ds->line_a;
 	// Copy gradient fill state
@@ -34622,6 +34713,23 @@ static void drawingParseLineJoinCaps(SWFAppContext* app_context,
 		double m = varToDouble(&args[7]);
 		if (m > 0.0 && !isnan(m)) *out_miter = (float) m;
 	}
+}
+
+// s28 w2-flash-stroke-width: AVM1 `lineStyle(..., noScale, ...)` (arg 5, a
+// String since Flash 8): "none" -> no scaling, "vertical" -> the width scales
+// only vertically (LINESTYLE2 NoHScaleFlag), "horizontal" -> only
+// horizontally (NoVScaleFlag); "normal", anything else, or missing -> 0.
+// Returns DRAWING_LS_NO_HSCALE | DRAWING_LS_NO_VSCALE bits (DrawPath field).
+static u8 drawingParseLineScaleMode(SWFAppContext* app_context,
+	ActionVar* args, u32 num_args)
+{
+	char buf[16];
+	if (num_args < 5 || args[4].type != ACTION_STACK_VALUE_STRING) return 0;
+	int n = varToStringBuf(app_context, &args[4], buf, sizeof(buf));
+	if (n == 4 && strncmp(buf, "none", 4) == 0) return DRAWING_LS_NO_HSCALE | DRAWING_LS_NO_VSCALE;
+	if (n == 8 && strncmp(buf, "vertical", 8) == 0) return DRAWING_LS_NO_HSCALE;
+	if (n == 10 && strncmp(buf, "horizontal", 10) == 0) return DRAWING_LS_NO_VSCALE;
+	return 0;
 }
 
 // lineStyle() ENDS the current stroke and starts a new one at the cursor, so a
@@ -34857,15 +34965,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 				c = transform_data[info->transform_id][4];
 				d = transform_data[info->transform_id][5];
 			}
-			float sx = sqrtf(a*a + b*b);
-			float sy = sqrtf(c*c + d*d);
-			float s = (sx > sy) ? sx : sy;                  // max-axis on-screen scale
-			float min_w_px = (s > 1e-6f) ? (1.0f / s) : 1.0f;
-			float eff_w_px = (path->line_width > min_w_px) ? path->line_width : min_w_px;
-			float want_half_w = eff_w_px * 0.5f * 20.0f;
-			if (fabsf(want_half_w - path->stroke_built_half_w) > 0.01f) {
-				drawingBuildStroke(path, want_half_w);
-			}
+			drawingEnsureFlashStroke(path, a, b, c, d);
 			info->line_verts = path->line_verts;
 			info->line_count = path->has_line ? path->line_vert_count : 0;
 		}
@@ -69079,6 +69179,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					ds->line_joints = ln_joints;
 					ds->line_caps = ln_caps;
 					ds->line_miter = ln_miter;
+					ds->line_scale_flags = drawingParseLineScaleMode(app_context, args, num_args);
 					ds->has_line = 1;
 				}
 			} else if (func_name_len == 5 && strncmp(func_name, "clear", 5) == 0) {
@@ -81106,6 +81207,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ds->line_joints = ln_joints;
 					ds->line_caps = ln_caps;
 					ds->line_miter = ln_miter;
+					ds->line_scale_flags = drawingParseLineScaleMode(app_context, args, num_args);
 					ds->has_line = 1;
 				}
 			}

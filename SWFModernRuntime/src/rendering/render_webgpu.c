@@ -3244,6 +3244,65 @@ static size_t mask_stencil_vert_count(const WebGPURenderContext* ctx,
 static inline void stage_dyn_verts(WebGPURenderContext* ctx, u32 vert_base,
 	const void* verts, u32 vcount);
 
+// s28 w2-flash-stroke-width: one stroke vertex offset d (local twips, from its
+// centreline point) re-expanded to Flash's device-space stroke of half-width
+// hw (device px) under M = [[m00 m01],[m10 m11]] (local twips -> device px).
+// Every vertex the recompiler emits is centre + d with d.n = h_e for the
+// normal(s) n of the edge(s) it offsets:
+//  - |d| = h_e: ONE normal n = d/|d| (a segment side, or a round join/cap arc
+//    point). It goes to the point whose DEVICE offset is hw along the DEVICE
+//    normal N = M^-T n / |M^-T n|, i.e. d' = M^-1 (hw N). On a segment that is
+//    the exact device-space offset line; on an arc, n sweeping n1..n2 maps
+//    monotonically onto N1..N2, so the join/cap becomes a true device circle
+//    of radius hw (Flash) instead of a local circle stretched by M (which
+//    bulged acid-stroke-0's sheared round joins to 115x50 vs Flash's 111x49).
+//  - |d| > h_e: a miter / inner-join vertex with TWO normals, recoverable from
+//    d alone (n = cos(phi) d^ +- sin(phi) d^perp, cos(phi) = h_e/|d|); solve
+//    d'.n_i = hw |M^-T n_i| for both (the intersection of the two device
+//    offset lines).
+static void hairline_flash_offset(double m00, double m01, double m10, double m11,
+                                  double det, double h_e, double hw,
+                                  double* io_dx, double* io_dy)
+{
+	const double dx = *io_dx, dy = *io_dy;
+	const double len = sqrt(dx * dx + dy * dy);
+	if (len < 1e-9) return;
+	const double ux = dx / len, uy = dy / len;
+	const double rr = len / h_e;
+	// |M^-T n| for a unit local normal n (M^-T n = (m11 nx - m10 ny,
+	// -m01 nx + m00 ny) / det).
+	#define HL_NT_X(nx_, ny_) (m11 * (nx_) - m10 * (ny_))
+	#define HL_NT_Y(nx_, ny_) (-m01 * (nx_) + m00 * (ny_))
+	#define HL_NSCALE(nx_, ny_) (hw * sqrt(HL_NT_X(nx_, ny_) * HL_NT_X(nx_, ny_) \
+	                                     + HL_NT_Y(nx_, ny_) * HL_NT_Y(nx_, ny_)) / fabs(det))
+	double ox, oy;
+	if (rr < 1.0 + 1e-3)
+	{
+		// N = M^-T n normalised (the 1/det keeps its sign), then M^-1 (hw N).
+		double qx = HL_NT_X(ux, uy), qy = HL_NT_Y(ux, uy);
+		const double ql = sqrt(qx * qx + qy * qy);
+		if (ql < 1e-18) return;
+		const double sg = (det > 0.0) ? 1.0 : -1.0;
+		qx *= sg * hw / ql; qy *= sg * hw / ql;     // device offset, px
+		ox = ( m11 * qx - m01 * qy) / det;
+		oy = (-m10 * qx + m00 * qy) / det;
+	}
+	else
+	{
+		const double cphi = 1.0 / rr, sphi = sqrt(1.0 - cphi * cphi);
+		const double n1x = cphi * ux - sphi * uy, n1y = cphi * uy + sphi * ux;
+		const double n2x = cphi * ux + sphi * uy, n2y = cphi * uy - sphi * ux;
+		const double t1 = HL_NSCALE(n1x, n1y), t2 = HL_NSCALE(n2x, n2y);
+		const double dd = n1x * n2y - n1y * n2x;
+		if (fabs(dd) < 1e-9) { const double f = HL_NSCALE(ux, uy); ox = ux * f; oy = uy * f; }
+		else { ox = (t1 * n2y - t2 * n1y) / dd; oy = (n1x * t2 - n2x * t1) / dd; }
+	}
+	#undef HL_NSCALE
+	#undef HL_NT_Y
+	#undef HL_NT_X
+	*io_dx = ox; *io_dy = oy;
+}
+
 static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
                                size_t num_verts, u32 transform_id)
 {
@@ -3261,28 +3320,46 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 	}
 	if (lo >= hairline_run_n || hairline_runs[lo][0] >= end) return offset;
 
-	// Local twips -> device px: diag(W/2, H/2) * (stage_to_ndc * xform), the
-	// 2x2 part of the column-major mat4s. Ruffle's matrix is twips -> device
-	// twips, hence the 20.
+	// s28 w2-flash-stroke-width (w1-acid-flash P2): Flash's stroke-width model.
+	// M = local twips -> device px (both y down: the measured M equals the SWF
+	// MATRIX [[a c],[b d]] / 20), the 2x2 part of diag(W/2, -H/2) *
+	// stage_to_ndc * xform.
 	const float* t = &hairline_xform[(size_t) transform_id * 16];
 	const float* p = hairline_stage;
 	const double a = (double) p[0] * t[0] + (double) p[4] * t[1];
 	const double b = (double) p[1] * t[0] + (double) p[5] * t[1];
 	const double c = (double) p[0] * t[4] + (double) p[4] * t[5];
 	const double d = (double) p[1] * t[4] + (double) p[5] * t[5];
-	const double hw = 20.0 * 0.5 * (double) ctx->width;
-	const double hh = 20.0 * 0.5 * (double) ctx->height;
-	const double sx = fabs(hw * (a + c));
-	const double sy = fabs(hh * (b + d));
-	const double scale = sqrt((sx * sx + sy * sy) / 2.0);
-	const double min_twips = (scale > 1e-6) ? 20.0 / scale : 20.0;
+	const double W2 = 0.5 * (double) ctx->width, H2 = 0.5 * (double) ctx->height;
+	const double m00 = W2 * a, m01 = W2 * c, m10 = -H2 * b, m11 = -H2 * d;
+	const double det = m00 * m11 - m01 * m10;
+	if (!(fabs(det) > 1e-18)) return offset;
+	// Flash sizes a stroke in DEVICE space, isotropically, from the local
+	// matrix applied to (1,1): v = M*(1,1), in px
+	// per px (x20). NORMAL: |v|/sqrt2; NoVScale (scale with x only): |v.x|;
+	// NoHScale: |v.y|; both: 1. Then max(width, 1 device px). Measured on
+	// acid-stroke-0's Flash golden (5 line styles x 11 matrices incl. two
+	// mirrored shears, whose widths differ 2.5x: (1,1) vs (1,-1) is not
+	// symmetric). Ruffle (and our static geometry) instead stroke in local
+	// space and let the matrix stretch the stroke anisotropically.
+	const double vx = 20.0 * (m00 + m01), vy = 20.0 * (m10 + m11);
+	const double s_norm = sqrt((vx * vx + vy * vy) / 2.0);
+	const double sigma = 20.0 * sqrt(fabs(det));          // static geometry's scale
+	const double mag = fabs(m00) + fabs(m01) + fabs(m10) + fabs(m11);
+	const int similar = (fabs(m00 - m11) + fabs(m01 + m10) <= 1e-6 * mag)
+	                 || (fabs(m00 + m11) + fabs(m01 - m10) <= 1e-6 * mag);
 
-	int changed = 0;
-	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
+	int changed = !similar;
+	for (u32 r = lo; !changed && r < hairline_run_n && hairline_runs[r][0] < end; r++)
 	{
-		double w = (double) hairline_runs[r][3];
-		if (w < min_twips) w = min_twips;
-		if (fabs(w / (double) hairline_runs[r][4] - 1.0) > 1e-4) { changed = 1; break; }
+		const u32 wf = hairline_runs[r][3];
+		const double width = (double) (wf & 0xFFFFu);
+		const double s = ((wf >> 30) & 1u) ? (((wf >> 31) & 1u) ? 1.0 : fabs(vy))
+		                                   : (((wf >> 31) & 1u) ? fabs(vx) : s_norm);
+		double w_dev = width / 20.0 * s;
+		if (w_dev < 1.0) w_dev = 1.0;
+		const double w_static = (double) hairline_runs[r][4] / 20.0 * sigma;
+		if (fabs(w_dev / w_static - 1.0) > 1e-4) changed = 1;
 	}
 	if (!changed) return offset;
 
@@ -3295,9 +3372,14 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 
 	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
 	{
-		double w = (double) hairline_runs[r][3];
-		if (w < min_twips) w = min_twips;
-		const float k = (float) (w / (double) hairline_runs[r][4]);
+		const u32 wf = hairline_runs[r][3];
+		const double width = (double) (wf & 0xFFFFu);
+		const double s = ((wf >> 30) & 1u) ? (((wf >> 31) & 1u) ? 1.0 : fabs(vy))
+		                                   : (((wf >> 31) & 1u) ? fabs(vx) : s_norm);
+		double w_dev = width / 20.0 * s;
+		if (w_dev < 1.0) w_dev = 1.0;
+		const double h_e = 0.5 * (double) hairline_runs[r][4];   // emitted half-width, twips
+		const double k_sim = w_dev / ((double) hairline_runs[r][4] / 20.0 * sigma);
 		const size_t rs = hairline_runs[r][0], rn = hairline_runs[r][1];
 		for (size_t v = 0; v < rn; v++)
 		{
@@ -3305,11 +3387,20 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 			if (gv < offset || gv >= end) continue;
 			const u32* cen = hairline_centres[hairline_runs[r][2] + v];
 			u32* dst = &verts[(gv - offset) * 4];
-			union { float f; u32 u; } vx, vy, cx, cy;
-			vx.u = dst[0]; vy.u = dst[1]; cx.u = cen[0]; cy.u = cen[1];
-			vx.f = cx.f + k * (vx.f - cx.f);
-			vy.f = cy.f + k * (vy.f - cy.f);
-			dst[0] = vx.u; dst[1] = vy.u;
+			union { float f; u32 u; } vx_, vy_, cx, cy;
+			vx_.u = dst[0]; vy_.u = dst[1]; cx.u = cen[0]; cy.u = cen[1];
+			double dx = (double) vx_.f - cx.f, dy = (double) vy_.f - cy.f;
+			if (similar)
+			{
+				dx *= k_sim; dy *= k_sim;
+			}
+			else
+			{
+				hairline_flash_offset(m00, m01, m10, m11, det, h_e, 0.5 * w_dev, &dx, &dy);
+			}
+			vx_.f = (float) (cx.f + dx);
+			vy_.f = (float) (cy.f + dy);
+			dst[0] = vx_.u; dst[1] = vy_.u;
 		}
 	}
 

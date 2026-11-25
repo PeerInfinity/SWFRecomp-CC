@@ -811,3 +811,7 @@ from_shumway/avm2/flash/display/bitmapdata/bitmapdata-clone   # JPEG3 4:2:0 deco
 # s27 w2b-jpeg-refine: GPU nearest tie rule (render_webgpu.c bitmap_nearest_*), Flash golden, tol 0.
 # tier=1
 regression/avm1_bitmap_nearest_tie_stage   # 0x43 fill at scale 1.5, ties up  1 cmp
+# s28 w2-flash-stroke-width: Flash device-space isotropic stroke width + LINESTYLE2
+# NoHScale/NoVScale flags (render_webgpu.c hairline_restage); Flash golden, KF, tol 0.
+# tier=2
+from_shumway/acid/acid-stroke-0   # 5 line styles x 11 matrices, the width-rule oracle  1 cmp

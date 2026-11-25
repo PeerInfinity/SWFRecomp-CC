@@ -1,0 +1,29 @@
+RENDER CANARY  before=before  after=after   274 tests / 395 comparisons
+
+  IDENTICAL   390
+  DIFFERS       5
+  APPEARED      0   VANISHED 0   NO_RENDER 0
+
+  DIFFERS:
+    from_shumway/acid/acid-scale  output   [DIFFERS]
+        diff_channels 8920/880000  mean 1.5509  max 255   bbox (0,143)-(452,215)
+        image status: pass -> fail    trace: pass -> pass
+    from_shumway/acid/acid-stroke-0  output   [DIFFERS]
+        diff_channels 40968/2097152  mean 4.9814  max 255   bbox (81,11)-(1002,425)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/gradientTransform  output   [DIFFERS]
+        diff_channels 1/10100  mean 0.0001  max 1   bbox (100,12)-(101,13)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/blur_scales_with_screen  output   [DIFFERS]
+        diff_channels 73827/640000  mean 1.826  max 40   bbox (50,60)-(288,300)
+        image status: pass -> fail    trace: pass -> pass
+    visual/simple_shapes/strokes/scale  output   [DIFFERS]
+        diff_channels 11964/880000  mean 2.4159  max 255   bbox (8,119)-(308,377)
+        image status: fail -> fail    trace: pass -> pass
+
+  TRACE STATUS CHANGES: (none)
+  IMAGE STATUS CHANGES:
+    from_shumway/acid/acid-scale  output   pass -> fail        <-- REVIEW
+    visual/filters/blur_scales_with_screen  output   pass -> fail        <-- REVIEW
+
+  before/after PNGs + difference PNGs: /home/user/SWFRecomp-CC/.render_canary/_compare/before__after

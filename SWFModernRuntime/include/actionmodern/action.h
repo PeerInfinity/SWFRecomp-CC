@@ -711,6 +711,13 @@ typedef struct {
 	u8 line_joints;            // 0 round, 1 miter, 2 bevel
 	u8 line_caps;              // 0 round, 1 none (butt), 2 square
 	float line_miter;          // miter limit; <1 degrades to bevel (lyon rule)
+	// s28 w2-flash-stroke-width: lineStyle scale mode (DRAWING_LS_NO_HSCALE |
+	// DRAWING_LS_NO_VSCALE, action.c) and the local->stage 2x2 the line_verts
+	// were built in device space for (stroke_built_dev = 1; see
+	// drawingEnsureFlashStroke). Trailing: zero = old behaviour.
+	u8 line_scale_flags;
+	u8 stroke_built_dev;
+	float stroke_built_m[4];
 } DrawPath;
 
 typedef struct {
@@ -758,6 +765,8 @@ typedef struct {
 	DrawCmd* cmds;
 	u32 cmd_count;
 	u32 cmd_capacity;
+	// s28 w2-flash-stroke-width: current lineStyle scale mode (DrawPath).
+	u8 line_scale_flags;
 } DrawingState;
 
 // Drawing render info (used by tag.c in graphics mode)
