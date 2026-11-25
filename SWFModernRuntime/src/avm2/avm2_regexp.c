@@ -613,6 +613,25 @@ static char* re_preprocess(Avm2Context* ctx, const Avm2String* src,
 			i += 3;
 			continue;
 		}
+		if (c == '(' && i + 3 < len && s[i + 1] == '?' && s[i + 2] == 'P'
+		    && s[i + 3] == '=')
+		{
+			// PCRE named backreference (?P=name) → ES \k<name>
+			// (as3/RegExp/replace, FP32 golden). An unterminated one is
+			// copied verbatim (and fails to compile, as before).
+			uint32_t j = i + 4;
+			while (j < len && s[j] != ')') j++;
+			if (j < len)
+			{
+				out[n++] = '\\';
+				out[n++] = 'k';
+				out[n++] = '<';
+				for (uint32_t k = i + 4; k < j; k++) out[n++] = s[k];
+				out[n++] = '>';
+				i = j + 1;
+				continue;
+			}
+		}
 		if (demote && c == '(' && (i + 1 >= len || s[i + 1] != '?'))
 		{
 			out[n++] = '(';

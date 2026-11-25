@@ -1971,7 +1971,11 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
 		ps->pos++;
 		uint32_t vstart = ps->pos;
 		while (ps->pos < ps->len && ps->p[ps->pos] != quote) ps->pos++;
-		if (ps->pos >= ps->len) err_1090(ps);
+		// An attribute value that runs to the end of the source is FP's
+		// #1095, not #1090 (as3/RuntimeErrors/Error1095XmlUnterminatedAttr,
+		// e4x/XML/misc_errors; FP32 goldens). Ruffle/quick_xml says #1090.
+		if (ps->pos >= ps->len)
+			parse_error(ps, "Error #1095: XML parser failure: Unterminated attribute.", NULL);
 		const Avm2String* value =
 			decode_entities_str(ps, ps->p + vstart, ps->pos - vstart);
 		ps->pos++;
@@ -2195,7 +2199,9 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
 			}
 			ps.pos += 3;
 		}
-		else if (starts_with(&ps, "<![CDATA["))
+		// avmplus XMLParser compares the CDATA keyword caselessly
+		// (e4x/XML/bug_564468: <![cdata[ / <![Cdata[, FP32 golden).
+		else if (starts_with_ci(&ps, "<![CDATA["))
 		{
 			ps.pos += 9;
 			uint32_t start = ps.pos;

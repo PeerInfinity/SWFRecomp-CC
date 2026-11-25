@@ -373,6 +373,9 @@ void avm2_vector_set_index(Avm2Context* ctx, Avm2Object* obj, uint32_t idx, Avm2
 // by falling back (returns 0) for negative indices on SWF10.
 int avm2_vector_name_access(Avm2Context* ctx, Avm2Object* obj, const char* name,
                             uint32_t name_len, Avm2Value* out, Avm2Value set_value);
+int avm2_vector_name_access_rt(Avm2Context* ctx, Avm2Object* obj, const char* name,
+                               uint32_t name_len, Avm2Value* out, Avm2Value set_value,
+                               int numeric_src);
 
 // The avmplus QuickSort shared by Array.sort/sortOn and Vector.sort
 // (Ruffle globals/array.rs qsort).

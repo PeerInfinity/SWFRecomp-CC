@@ -1,0 +1,56 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_array.c b/SWFModernRuntime/src/avm2/avm2_array.c
+index 5fd1725c..53e140d1 100644
+--- a/SWFModernRuntime/src/avm2/avm2_array.c
++++ b/SWFModernRuntime/src/avm2/avm2_array.c
+@@ -822,7 +822,7 @@ static int cmp_string_values(Avm2Context* ctx, Avm2Value a, Avm2Value b, int cas
+ 
+ // Ruffle Value::normalize: canonicalize to Integer only when the value
+ // fits avmplus's 29-bit atom integer range (fits_in_value_integer_i32).
+-static int normalize_to_i32(Avm2Value v, int32_t* out)
++static __attribute__((unused)) int normalize_to_i32(Avm2Value v, int32_t* out)
+ {
+ 	if (v.kind == AVM2_VALUE_INTEGER)
+ 	{
+@@ -846,16 +846,36 @@ static int normalize_to_i32(Avm2Value v, int32_t* out)
+ 	return 0;
+ }
+ 
++// FP32 is a 64-bit player: an int atom carries a 53-bit integer shifted
++// left by 3, and the SWF<11 compare truncates the 64-bit atom DIFFERENCE to
++// int32 (avm2/array_sort_swf10_64bit; the same SWF backs
++// array_sort_swf10_32bit, whose golden is a 32-bit player's).
++static int normalize_to_i53(Avm2Value v, int64_t* out)
++{
++	if (v.kind == AVM2_VALUE_INTEGER) { *out = v.u.i; return 1; }
++	if (v.kind == AVM2_VALUE_NUMBER)
++	{
++		double d = v.u.d;
++		if (d >= -9007199254740992.0 && d < 9007199254740992.0
++		    && d == floor(d) && !(d == 0.0 && signbit(d)))
++		{
++			*out = (int64_t) d;
++			return 1;
++		}
++	}
++	return 0;
++}
++
+ // compare_numeric with the SWF<11 avmplus atom-overflow quirk.
+ static int cmp_numeric_values(Avm2Context* ctx, Avm2Value a, Avm2Value b, int compat)
+ {
+-	int32_t ia;
+-	int32_t ib;
+-	if (compat && normalize_to_i32(a, &ia) && normalize_to_i32(b, &ib))
++	int64_t ia;
++	int64_t ib;
++	if (compat && normalize_to_i53(a, &ia) && normalize_to_i53(b, &ib))
+ 	{
+-		int32_t x = (int32_t) (((uint32_t) ia << 3) | 6u);
+-		int32_t y = (int32_t) (((uint32_t) ib << 3) | 6u);
+-		int32_t diff = (int32_t) ((uint32_t) x - (uint32_t) y);
++		uint64_t x = ((uint64_t) ia << 3) | 6u;
++		uint64_t y = ((uint64_t) ib << 3) | 6u;
++		int32_t diff = (int32_t) (uint32_t) (x - y);
+ 		return diff < 0 ? -1 : (diff > 0 ? 1 : 0);
+ 	}
+ 	double x = avm2_coerce_to_number(ctx, a);

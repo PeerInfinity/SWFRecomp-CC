@@ -1040,6 +1040,17 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 		// that up and read it back through a hole in an instance).
 		Avm2Value pv;
 		if (avm2_array_proto_index(recv.u.obj, idx, &pv)) return pv;
+		// avmplus's interpreter (cinit/script init run interpreted) routes an
+		// int index straight at getUintProperty, which looks the PUBLIC name
+		// up and never consults the site's namespace set: `[]["nonpub"::0]`
+		// is undefined there, not #1081 (avm2/array_access_oob_interpreter,
+		// FP32 golden).
+		if (interp && !avm2_mn_has_public_ns(act->file->data, mn_idx))
+		{
+			char ib[16];
+			int il = snprintf(ib, sizeof(ib), "%u", idx);
+			return avm2_get_public_property(ctx, recv, ib, (uint32_t) il, NULL);
+		}
 		// fall through (holes may be shadowed by dyn/proto)
 	}
 	{
@@ -1057,8 +1068,10 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 	    && (interp || mn_public))
 	{
 		Avm2Value out;
-		if (avm2_vector_name_access(ctx, recv.u.obj, ns->utf8, ns->len,
-		                            &out, avm2_undefined()))
+		if (avm2_vector_name_access_rt(ctx, recv.u.obj, ns->utf8, ns->len,
+		                               &out, avm2_undefined(),
+		                               name_val.kind == AVM2_VALUE_INTEGER
+		                               || name_val.kind == AVM2_VALUE_NUMBER))
 		{
 			return out;
 		}
@@ -1097,6 +1110,20 @@ static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
                              const char* name, uint32_t name_len, Avm2Value value);
 
 // Common write path once resolution is done.
+// avmplus: InitProperty may write a const SLOT only from a method of the
+// class that DECLARED it. A subclass constructor initialising an inherited
+// const (`this.p2 = null` compiles to initproperty) is #1074
+// (misc/bug_508617, FP32 golden). Entries with no recorded declaring class
+// (script/activation slots) and methods with no bound class keep the old
+// permissive rule.
+static int initprop_const_ok(Avm2Activation* act, const Resolved* r)
+{
+	const Avm2PropEntry* e = r->dyn == NULL ? r->entry : NULL;
+	if (e == NULL || e->kind != AVM2_PROP_SLOT || !e->is_const) return 1;
+	if (e->defining_class == NULL || act->bound_class == NULL) return 1;
+	return e->defining_class == act->bound_class;
+}
+
 static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolved* r,
                                  const char* name, uint32_t name_len, Avm2Value value,
                                  int allow_const)
@@ -1316,7 +1343,8 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 		// resolved as miss go to setproperty_miss (below) — resolve_mn
 		// treats in-range holes as unresolved, but writes must still land
 		// in storage, so handle arrays first.
-		setproperty_resolved(act->ctx, recv, &r, name, name_len, value, allow_const);
+		setproperty_resolved(act->ctx, recv, &r, name, name_len, value,
+		                     allow_const && initprop_const_ok(act, &r));
 		return;
 	}
 	uint32_t idx;
@@ -1534,8 +1562,10 @@ static void setproperty_dyn_impl(Avm2Activation* act, Avm2Value recv, uint32_t m
 	int mn_public = avm2_mn_has_public_ns(act->file->data, mn_idx);
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
 	    && (interp || mn_public)
-	    && avm2_vector_name_access(ctx, recv.u.obj, ns->utf8, ns->len,
-	                               NULL, value))
+	    && avm2_vector_name_access_rt(ctx, recv.u.obj, ns->utf8, ns->len,
+	                                  NULL, value,
+	                                  name_val.kind == AVM2_VALUE_INTEGER
+	                                  || name_val.kind == AVM2_VALUE_NUMBER))
 	{
 		return;
 	}
@@ -1551,7 +1581,8 @@ static void setproperty_dyn_impl(Avm2Activation* act, Avm2Value recv, uint32_t m
 			Resolved r2;
 			memset(&r2, 0, sizeof(r2));
 			r2.entry = e;
-			setproperty_resolved(ctx, recv, &r2, ns->utf8, ns->len, value, allow_const);
+			setproperty_resolved(ctx, recv, &r2, ns->utf8, ns->len, value,
+			                     allow_const && initprop_const_ok(act, &r2));
 			return;
 		}
 	}
@@ -3703,8 +3734,13 @@ Avm2Value avm2_op_constructprop(Avm2Activation* act, Avm2Value recv, uint32_t mn
 {
 	// Primitive receivers resolve the ctor LENIENTLY: a miss yields
 	// undefined (→ TypeError 1007 in construct), not 1069 (Ruffle
-	// Value::construct_prop; constructprop_dynamic_primitive).
-	if (recv.kind != AVM2_VALUE_OBJECT && !value_is_null_like(recv))
+	// Value::construct_prop; constructprop_dynamic_primitive). A Namespace
+	// is an atom kind of its own in avmplus and takes the same lenient path:
+	// `new ns.foo()` is #1007, not #1069 (regress/bug_638233, FP32 golden).
+	if ((recv.kind != AVM2_VALUE_OBJECT
+	     || (recv.u.obj != NULL
+	         && recv.u.obj->cls == act->ctx->builtins.namespace_class))
+	    && !value_is_null_like(recv))
 	{
 		const char* name;
 		uint32_t name_len;

@@ -645,6 +645,7 @@ typedef struct
 	int has_year, has_month, has_day, has_time;
 	int has_zone;
 	double zone_ms;  // offset east of UTC, in ms
+	int ampm;        // 0 none, 1 AM, 2 PM
 } ParsedDate;
 
 static int parse_uint_exact(const char* s, size_t len, unsigned* out)
@@ -711,11 +712,13 @@ static int parse_slash_date(const char* s, size_t len, ParsedDate* out)
 		out->month = (double) (b - 1);
 		out->day = (double) c;
 	}
-	else if (plen[0] == 2)
+	else if (plen[0] == 2 || plen[0] == 1)
 	{
-		if (plen[1] != 2 || plen[2] != 4) return 0;
-		if (!parse_uint_exact(part[0], 2, &a) || a == 0) return 0;
-		if (!parse_uint_exact(part[1], 2, &b)) return 0;
+		// M/D/YYYY with 1- or 2-digit month and day: FP accepts
+		// '1/1/1999 12:30 AM' (ecma3/Date/e15_9_4_2_1, FP32 golden).
+		if ((plen[1] != 2 && plen[1] != 1) || plen[2] != 4) return 0;
+		if (!parse_uint_exact(part[0], plen[0], &a) || a == 0) return 0;
+		if (!parse_uint_exact(part[1], plen[1], &b)) return 0;
 		if (!parse_uint_exact(part[2], 4, &c)) return 0;
 		out->year = (double) c;
 		out->month = (double) (a - 1);
@@ -742,6 +745,19 @@ static int parse_slash_date(const char* s, size_t len, ParsedDate* out)
 // HH:MM:SS, each component exactly two digits.
 static int parse_hms(const char* s, size_t len, ParsedDate* out)
 {
+	// H:MM / HH:MM (no seconds) -- FP accepts '12:30' next to AM/PM
+	// (ecma3/Date/e15_9_4_2_1).
+	if ((len == 4 && s[1] == ':') || (len == 5 && s[2] == ':'))
+	{
+		size_t hl = len - 3;
+		unsigned h, m;
+		if (!parse_uint_exact(s, hl, &h)) return 0;
+		if (!parse_uint_exact(s + hl + 1, 2, &m)) return 0;
+		out->hour = (double) h;
+		out->minute = (double) m;
+		out->second = 0.0;
+		return 1;
+	}
 	if (len != 8 || s[2] != ':' || s[5] != ':') return 0;
 	unsigned h, m, sec;
 	if (!parse_uint_exact(s, 2, &h)) return 0;
@@ -784,6 +800,11 @@ static double parse_full_date(const char* s, size_t slen)
 			p.minute = scratch.minute;
 			p.second = scratch.second;
 			p.has_time = 1;
+		}
+		else if (len == 2 && (memcmp(tok, "AM", 2) == 0 || memcmp(tok, "PM", 2) == 0))
+		{
+			if (p.ampm) return NAN;
+			p.ampm = tok[0] == 'A' ? 1 : 2;
 		}
 		else if (is_day_name(tok, len))
 		{
@@ -842,6 +863,13 @@ static double parse_full_date(const char* s, size_t slen)
 	}
 
 	if (!p.has_year || !p.has_month || !p.has_day) return NAN;
+	if (p.ampm)
+	{
+		// 12-hour clock: '13:30 AM' / '13:30 PM' are Invalid Date in FP.
+		if (p.hour > 12.0) return NAN;
+		if (p.hour == 12.0) p.hour = 0.0;
+		if (p.ampm == 2) p.hour += 12.0;
+	}
 
 	double t = make_date(make_day(p.year, p.month, p.day),
 	                     make_time(p.hour, p.minute, p.second, 0.0));

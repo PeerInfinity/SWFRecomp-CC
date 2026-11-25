@@ -539,6 +539,15 @@ static Avm2Value j_deserialize(Avm2Context* ctx, const JVal* v, Avm2Value revive
 					args[0] = avm2_uint_value(i);
 					args[1] = val;
 					val = avm2_call_value(ctx, reviver, avm2_null(), args, 2);
+					// ES5 15.12.2 Walk: an undefined result DELETES the
+					// element, leaving a hole (ecma3/JSON/adhoc, FP32).
+					if (val.kind == AVM2_VALUE_UNDEFINED)
+					{
+						Avm2Value hole;
+						memset(&hole, 0, sizeof(hole));
+						hole.kind = AVM2_VALUE_HOLE;
+						val = hole;
+					}
 				}
 				avm2_array_push(ctx, arr, val);
 			}
@@ -691,6 +700,14 @@ static void sb_json_number(StrBuf* b, double n)
 {
 	char buf[48];
 	int len = avm2_format_number(buf, sizeof(buf), n);
+	// FP serializes a Number with its own ECMA ToString (JSON.stringify of
+	// -1.75e12 is "-1750000000000", ecma3/JSON/adhoc FP32 golden); the
+	// ".0" / "e21" spellings below are Ruffle's serde/ryu text.
+	if (1)
+	{
+		sb_put(b, buf, (uint32_t) len);
+		return;
+	}
 	int has_frac = 0;
 	int epos = -1;
 	for (int i = 0; i < len; i++)
@@ -762,12 +779,21 @@ static void js_newline_indent(JSer* js, StrBuf* b)
 
 static void js_serialize_value(JSer* js, StrBuf* b, Avm2Value v);
 
+static int js_value_is_function(Avm2Value f)
+{
+	return f.kind == AVM2_VALUE_OBJECT && f.u.obj != NULL
+	       && f.u.obj->kind == AVM2_OBJ_FUNCTION;
+}
+
 // toJSON + replacer-function mapping (Ruffle map_value).
 static Avm2Value js_map_value(JSer* js, const char* key, uint32_t key_len, Avm2Value v)
 {
 	Avm2Context* ctx = js->ctx;
+	// ES5 15.12.3 Str step 2b: only a CALLABLE toJSON is invoked; a
+	// non-function value is ignored (ecma3/JSON/Classes `toJSON=true`, FP32).
 	if (v.kind == AVM2_VALUE_OBJECT
-	    && avm2_has_public_property(ctx, v, "toJSON", 6))
+	    && avm2_has_public_property(ctx, v, "toJSON", 6)
+	    && js_value_is_function(avm2_get_public_property(ctx, v, "toJSON", 6, NULL)))
 	{
 		Avm2Value args[1];
 		args[0] = avm2_string(avm2_string_new(ctx, key, key_len));

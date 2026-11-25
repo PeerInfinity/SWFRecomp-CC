@@ -10988,7 +10988,19 @@ static Avm2Value gfx_draw_graphics_data(Avm2Activation* act)
 			Avm2VectorExt* dv = gfx_vec_prop(o, "data", 4);
 			uint32_t ncmd = cv != NULL ? cv->length : 0;
 			uint32_t ndata = dv != NULL ? dv->length : 0;
-			if (ncmd != 0 && (ndata & 1u) != 0) gfx_throw_2004(ctx);
+			if (ncmd != 0 && (ndata & 1u) != 0)
+			{
+				// FP's playerglobal routes a GraphicsPath item through
+				// drawPathObject -> drawPath, and both frames show in the
+				// #2004 trace (FP32 golden; Ruffle omits them).
+				static const Avm2MethodRef draw_path_object =
+					{ NULL, NULL, "flash.display::Graphics/drawPathObject", 0, 0 };
+				static const Avm2MethodRef draw_path =
+					{ NULL, NULL, "flash.display::Graphics/drawPath", 0, 0 };
+				avm2_callstack_push(ctx, &draw_path_object, NULL);
+				avm2_callstack_push(ctx, &draw_path, NULL);
+				gfx_throw_2004(ctx);
+			}
 			if (g == NULL || cv == NULL || dv == NULL || ncmd == 0) continue;
 			gfx_finalize_path(g);
 			const Avm2String* ws =

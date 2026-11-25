@@ -2628,9 +2628,15 @@ namespace abc
 					{
 						AbcTypeModel::InstSlot isl =
 							M.instSlotForStore(C, op.arg1, recv.is_this);
+						// A const slot is init-writable only from a method
+						// of its DECLARING class (avmplus; misc/bug_508617):
+						// a subclass ctor's InitProperty of an inherited
+						// const takes the generic path, which throws #1074.
 						if (isl.ok
 						    && !(isl.is_const
-						         && op.op == IrOpcode::SetPropertyStatic))
+						         && op.op == IrOpcode::SetPropertyStatic)
+						    && !(isl.is_const
+						         && !(recv.is_this && isl.decl_inst == thisCls)))
 						{
 							R.store_slot[i] = isl.K;
 							TV declT = M.typeOfMn(isl.type_mn);

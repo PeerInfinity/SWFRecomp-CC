@@ -6589,6 +6589,9 @@ typedef struct Avm2ContentElementExt
 	const Avm2String* text;    // TextElement; NULL is a real value ("null")
 	Avm2Object* elements;      // GroupElement: Vector.<ContentElement>
 	Avm2Object* text_block;    // set when the element is a TextBlock's content
+	// GroupElement: the last mutation was replaceElements, whose text fold
+	// starts from "" rather than null (groupelement_text, FP32 golden).
+	int group_text_seeded;
 } Avm2ContentElementExt;
 
 static Avm2ContentElementExt* this_ce(Avm2Activation* act)
@@ -6636,7 +6639,7 @@ static const Avm2String* group_text_of(Avm2Context* ctx, Avm2Object* o)
 		? avm2_vector_ext(ce->elements) : NULL;
 	SB sb;
 	sb_init(&sb);
-	int have = 0;   // the fold's `result` is Some(sb) rather than None
+	int have = ce != NULL && ce->group_text_seeded;   // the fold's `result` is Some(sb) rather than None
 	for (uint32_t i = 0; v != NULL && i < v->length; i++)
 	{
 		Avm2Value e = v->elems[i];
@@ -6885,6 +6888,7 @@ static Avm2Value ge_set_elements(Avm2Activation* act)
 		avm2_vector_set_index(ctx, out, i, src->elems[i]);
 	}
 	ce->elements = out;
+	ce->group_text_seeded = 0;
 	return avm2_undefined();
 }
 
@@ -6961,6 +6965,7 @@ static Avm2Value ge_replace_elements(Avm2Activation* act)
 		avm2_vector_set_index(ctx, out, n++, v->elems[i]);
 	}
 	ce->elements = out;
+	ce->group_text_seeded = 1;
 	return avm2_object_value(removed);
 }
 
@@ -8824,6 +8829,22 @@ static Avm2Value txt_get_max_scroll_v(Avm2Activation* act)
 	return avm2_integer(et_maxscroll(act->ctx, et));
 }
 
+// 0-based index of the first line not fully inside the viewport (the raw
+// bottomScrollV before its >= 1 clamp); -1 = every line fits.
+static int64_t et_first_clipped_line(Avm2Context* ctx, Avm2EditTextExt* et)
+{
+	LLayout* l = et_layout(ctx, et);
+	int32_t scroll_offset = 0;
+	uint32_t si = (uint32_t) (et->scroll - 1);
+	if (si < l->line_count) scroll_offset = l->lines[si].y;
+	int32_t target = et->bounds_h + scroll_offset - GUTTER * 2;
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		if (l->lines[i].y + l->lines[i].h > target) return (int64_t) l->lines[i].index;
+	}
+	return -1;
+}
+
 static Avm2Value txt_get_bottom_scroll_v(Avm2Activation* act)
 {
 	Avm2EditTextExt* et = this_et(act);
@@ -9132,6 +9153,15 @@ static Avm2Value txt_get_char_boundaries(Avm2Activation* act)
 	if (li < 0) return avm2_null();
 	// Lines above the viewport return null.
 	if (li + 1 < et->scroll) return avm2_null();
+	// ...and so do lines below it: FP keeps the lines through the first
+	// partially-clipped one, never fewer than scrollV..scrollV+1
+	// (avm2/edittext_getcharboundaries_culling: 300-row FP32 truth table).
+	{
+		int64_t fc = et_first_clipped_line(ctx, et);
+		int64_t last = fc < 0 ? (int64_t) l->line_count : fc;
+		if (last < (int64_t) et->scroll) last = (int64_t) et->scroll;
+		if (fc >= 0 && li > last) return avm2_null();
+	}
 	LLine* line = &l->lines[li];
 	// Find the box containing the position.
 	LBox* box = NULL;
@@ -9148,6 +9178,11 @@ static Avm2Value txt_get_char_boundaries(Avm2Activation* act)
 		}
 	}
 	if (box == NULL) return avm2_null();
+	// An embedFonts field whose font resolved to NO embedded face draws no
+	// glyphs in Flash, and has no char boundaries either
+	// (avm2/edittext_getcharboundaries_missing_embedded_font, FP32 golden;
+	// Ruffle lays it out with the device fallback).
+	if (!et->device_font && box->font.is_device) return avm2_null();
 	uint32_t rel = (uint32_t) index - box->start;
 	if (rel >= box->char_count) return avm2_null();
 	int32_t x_min = box->x + (rel == 0 ? 0 : box->char_end[rel - 1]);

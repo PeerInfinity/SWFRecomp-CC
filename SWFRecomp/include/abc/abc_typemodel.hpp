@@ -438,7 +438,7 @@ namespace abc
 		// chainDefinesMn positive check (the site multiname must match the
 		// declared trait the way avm2_mn_match would).
 		struct InstSlot { bool ok = false; int K = -1; u32 type_mn = 0;
-		                  bool is_const = false; };
+		                  bool is_const = false; int decl_inst = -1; };
 		// `recv_is_this` mirrors the read lever's gate: for a `this` receiver
 		// the subclassRedeclares bail is dropped (a method compiled in `cls`
 		// early-binds to cls's binding — see the GetPropertyStatic lever in
@@ -461,6 +461,7 @@ namespace abc
 			const AbcTrait& t = abc.instances[f.declInst].traits[f.traitIdx];
 			r.ok = true; r.K = K; r.type_mn = t.type_name;
 			r.is_const = t.kind == TraitKindType::Const;
+			r.decl_inst = f.declInst;
 			return r;
 		}
 

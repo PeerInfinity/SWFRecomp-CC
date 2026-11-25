@@ -177,8 +177,28 @@ static int vec_name_as_f64(const char* name, uint32_t len, double* out)
 	return 1;
 }
 
+static int vec_name_access_impl(Avm2Context* ctx, Avm2Object* obj, const char* name,
+                                uint32_t name_len, Avm2Value* out, Avm2Value set_value,
+                                int numeric_src);
+
 int avm2_vector_name_access(Avm2Context* ctx, Avm2Object* obj, const char* name,
                             uint32_t name_len, Avm2Value* out, Avm2Value set_value)
+{
+	return vec_name_access_impl(ctx, obj, name, name_len, out, set_value, 0);
+}
+
+// Runtime-name form: `numeric_src` says the name came from a Number/int
+// value rather than a String.
+int avm2_vector_name_access_rt(Avm2Context* ctx, Avm2Object* obj, const char* name,
+                               uint32_t name_len, Avm2Value* out, Avm2Value set_value,
+                               int numeric_src)
+{
+	return vec_name_access_impl(ctx, obj, name, name_len, out, set_value, numeric_src);
+}
+
+static int vec_name_access_impl(Avm2Context* ctx, Avm2Object* obj, const char* name,
+                                uint32_t name_len, Avm2Value* out, Avm2Value set_value,
+                                int numeric_src)
 {
 	double d;
 	if (!vec_name_as_f64(name, name_len, &d)) return 0;
@@ -191,7 +211,12 @@ int avm2_vector_name_access(Avm2Context* ctx, Avm2Object* obj, const char* name,
 	else if (d >= 4294967295.0) u = 0xFFFFFFFFu;
 	else u = (uint32_t) d;
 
-	if ((double) u == d)
+	// A STRING name is an index only up to 2^32-2 (avmplus
+	// getIndexFromString / the ECMA array-index range); "4294967295" is an
+	// ordinary non-index name (#1069 in v10). A NUMBER 4294967295 still
+	// reaches the uint index path and range-checks (#1125).
+	// avm2/vector_indexing_cutoffs, FP32 golden.
+	if ((double) u == d && !(u == 0xFFFFFFFFu && !numeric_src))
 	{
 		if (out != NULL)
 		{

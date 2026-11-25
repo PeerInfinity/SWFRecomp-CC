@@ -791,6 +791,26 @@ static Avm2Value object_proto_property_is_enumerable(Avm2Activation* act)
 	}
 	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
 	Avm2Object* obj = act->this_val.u.obj;
+	// E4X 13.4.4.30 / 13.5.4.18: an XML reports only "0"; an XMLList reports
+	// its own indices (e4x/XML/e13_4_4_30, e4x/XMLList/e13_5_4_18; FP32).
+	if (avm2_xml_ext_of(act->this_val) != NULL)
+	{
+		return avm2_bool(name->len == 1 && name->utf8[0] == '0');
+	}
+	{
+		Avm2XmlListExt* le = avm2_xmllist_ext_of(act->this_val);
+		if (le != NULL)
+		{
+			uint64_t li = 0;
+			if (name->len == 0 || name->len > 10) return avm2_bool(false);
+			for (uint32_t i = 0; i < name->len; i++)
+			{
+				if (name->utf8[i] < '0' || name->utf8[i] > '9') return avm2_bool(false);
+				li = li * 10 + (uint64_t) (name->utf8[i] - '0');
+			}
+			return avm2_bool(li < le->count);
+		}
+	}
 	// Array index?
 	if (obj->kind == AVM2_OBJ_ARRAY && name->len > 0 && name->len <= 10)
 	{
@@ -1555,11 +1575,42 @@ static Avm2Value uri_encode(Avm2Activation* act, int keep_reserved, const char* 
 {
 	Avm2Context* ctx = act->ctx;
 	const Avm2String* s = uri_arg_string(act);
-	char* out = avm2_alloc(ctx, s->len * 3 + 1);
+	// x6: the SWF<=10 surrogate-pair arm below turns 4 bytes into up to
+	// 7 escaped octets (21 chars).
+	char* out = avm2_alloc(ctx, s->len * 6 + 1);
 	uint32_t n = 0;
 	for (uint32_t i = 0; i < s->len; i++)
 	{
 		unsigned char c = (unsigned char) s->utf8[i];
+		// FP's SWF<=10 surrogate-pair bug (avm2/encode_uri_surrogate_pair_swf10,
+		// FP32-confirmed; Ruffle #21226 does not model it): the pair (hi, lo)
+		// is encoded as the code point ((lo-0xDC00) << 16) + ((hi-0xD800) << 10)
+		// in the 1..6-byte UTF-8 form, followed by a stray %00. SWF11+ encodes
+		// the real astral code point.
+		if (c >= 0xF0 && c <= 0xF4 && i + 3 < s->len && ctx->swf_version <= 10)
+		{
+			uint32_t cp = ((uint32_t) (c & 0x07) << 18)
+			            | ((uint32_t) ((unsigned char) s->utf8[i + 1] & 0x3F) << 12)
+			            | ((uint32_t) ((unsigned char) s->utf8[i + 2] & 0x3F) << 6)
+			            | (uint32_t) ((unsigned char) s->utf8[i + 3] & 0x3F);
+			uint32_t u = cp - 0x10000;
+			uint32_t v = ((u & 0x3FF) << 16) + ((u >> 10) << 10);
+			unsigned char oct[7];
+			uint32_t on;
+			if (v < 0x80) { oct[0] = (unsigned char) v; on = 1; }
+			else
+			{
+				on = v < (1u << 11) ? 2 : v < (1u << 16) ? 3 : v < (1u << 21) ? 4
+				   : v < (1u << 26) ? 5 : 6;
+				for (uint32_t k = on - 1; k > 0; k--) { oct[k] = (unsigned char) (0x80 | (v & 0x3F)); v >>= 6; }
+				oct[0] = (unsigned char) (((0xFF00u >> on) & 0xFF) | v);
+			}
+			oct[on++] = 0;
+			for (uint32_t k = 0; k < on; k++)
+				n += (uint32_t) snprintf(out + n, 4, "%%%02X", oct[k]);
+			i += 3;
+			continue;
+		}
 		// ECMA-262 §15.1.3.1 step 8: an unpaired surrogate is not encodable
 		// and raises URIError. Our storage is WTF-8, so a lone surrogate is
 		// visible right here as ED A0..BF xx — a byte pattern strict UTF-8
