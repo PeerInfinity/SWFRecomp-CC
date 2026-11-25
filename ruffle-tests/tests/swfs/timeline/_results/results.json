@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-25T21:10:43.792335+00:00",
-    "git_sha": "10a5b515a03a386400e27a68adeddb628a47bc82",
-    "duration_seconds": 351.61,
+    "timestamp": "2026-11-25T22:59:03.533436+00:00",
+    "git_sha": "16033a154646a877df742993221eafce207bede1",
+    "duration_seconds": 340.42,
     "total_available": 17,
     "shards": 30,
     "expected_shards": 30
@@ -19,8 +19,8 @@
     {
       "test": "clip_action_no_key_code",
       "phases": {
-        "recomp": 0.005,
-        "compile": 23.236,
+        "recomp": 0.006,
+        "compile": 16.606,
         "run": 0.002
       },
       "num_frames": 16,
@@ -29,14 +29,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 23.25,
+      "duration": 16.62,
       "status": "pass"
     },
     {
       "test": "frame_label_count_oom",
       "phases": {
         "recomp": 0.003,
-        "compile": 18.646,
+        "compile": 18.393,
         "run": 0.001
       },
       "num_frames": 16,
@@ -45,14 +45,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 18.65,
+      "duration": 18.4,
       "status": "pass"
     },
     {
       "test": "frame_script_button_order",
       "phases": {
-        "recomp": 0.01,
-        "compile": 23.036,
+        "recomp": 0.011,
+        "compile": 23.563,
         "run": 0.004
       },
       "num_frames": 20,
@@ -61,7 +61,7 @@
         "expected_lines": 14,
         "matching_lines": 13
       },
-      "duration": 23.06,
+      "duration": 23.58,
       "ruffle_diff_count": 4,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
@@ -70,171 +70,8 @@
     {
       "test": "frame_script_cleanup",
       "phases": {
-        "recomp": 0.012,
-        "compile": 23.532,
-        "run": 0.004
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 23.55,
-      "status": "pass"
-    },
-    {
-      "test": "frame_script_cleanup2",
-      "phases": {
-        "recomp": 0.018,
-        "compile": 25.919,
-        "run": 0.006
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 32,
-        "expected_lines": 32,
-        "matching_lines": 32
-      },
-      "duration": 25.95,
-      "status": "pass"
-    },
-    {
-      "test": "frame_script_cleanup3",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 24.323,
-        "run": 0.004
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 24.34,
-      "status": "pass"
-    },
-    {
-      "test": "frame_script_cleanup_goto",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 23.857,
-        "run": 0.004
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 23.88,
-      "status": "pass"
-    },
-    {
-      "test": "frame_script_cleanup_goto2",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 6.331,
-        "run": 0.004
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 34,
-        "expected_lines": 34,
-        "matching_lines": 34
-      },
-      "duration": 6.35,
-      "status": "pass"
-    },
-    {
-      "test": "frame_script_construct",
-      "phases": {
-        "recomp": 0.011,
-        "compile": 23.767,
-        "run": 0.004
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 25,
-        "expected_lines": 25,
-        "matching_lines": 25
-      },
-      "duration": 23.79,
-      "status": "pass"
-    },
-    {
-      "test": "missing_frame_scripts",
-      "phases": {
-        "recomp": 0.011,
-        "compile": 24.244,
-        "run": 0.004
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 22,
-        "expected_lines": 22,
-        "matching_lines": 22
-      },
-      "duration": 24.26,
-      "status": "pass"
-    },
-    {
-      "test": "scene_count_oom",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 0.967,
-        "run": 0.001
-      },
-      "num_frames": 16,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 0.97,
-      "status": "pass"
-    },
-    {
-      "test": "swf_9_event_goto_frame_script",
-      "phases": {
-        "recomp": 0.011,
-        "compile": 23.108,
-        "run": 0.003
-      },
-      "num_frames": 5,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 3
-      },
-      "duration": 23.13,
-      "ruffle_diff_count": 2,
-      "ours_diff_count": 2,
-      "status": "ruffle_matched",
-      "detail": "diffs 2 \u2286 ruffle 2"
-    },
-    {
-      "test": "swf_9_frame_script_button_order",
-      "phases": {
-        "recomp": 0.011,
-        "compile": 23.027,
-        "run": 0.003
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 23.05,
-      "status": "pass"
-    },
-    {
-      "test": "swf_9_frame_script_cleanup_goto",
-      "phases": {
         "recomp": 0.017,
-        "compile": 6.823,
+        "compile": 25.323,
         "run": 0.005
       },
       "num_frames": 20,
@@ -243,14 +80,62 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 6.85,
+      "duration": 25.35,
       "status": "pass"
     },
     {
-      "test": "swf_9_frame_script_cleanup_goto2",
+      "test": "frame_script_cleanup2",
+      "phases": {
+        "recomp": 0.018,
+        "compile": 27.127,
+        "run": 0.005
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 32,
+        "matching_lines": 32
+      },
+      "duration": 27.16,
+      "status": "pass"
+    },
+    {
+      "test": "frame_script_cleanup3",
       "phases": {
         "recomp": 0.012,
-        "compile": 24.193,
+        "compile": 23.627,
+        "run": 0.004
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 23.65,
+      "status": "pass"
+    },
+    {
+      "test": "frame_script_cleanup_goto",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 24.589,
+        "run": 0.004
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 24.61,
+      "status": "pass"
+    },
+    {
+      "test": "frame_script_cleanup_goto2",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 6.2,
         "run": 0.004
       },
       "num_frames": 20,
@@ -259,15 +144,130 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 24.21,
+      "duration": 6.22,
+      "status": "pass"
+    },
+    {
+      "test": "frame_script_construct",
+      "phases": {
+        "recomp": 0.017,
+        "compile": 30.151,
+        "run": 0.004
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 25,
+        "matching_lines": 25
+      },
+      "duration": 30.18,
+      "status": "pass"
+    },
+    {
+      "test": "missing_frame_scripts",
+      "phases": {
+        "recomp": 0.011,
+        "compile": 23.484,
+        "run": 0.003
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      },
+      "duration": 23.5,
+      "status": "pass"
+    },
+    {
+      "test": "scene_count_oom",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 0.996,
+        "run": 0.001
+      },
+      "num_frames": 16,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 1.0,
+      "status": "pass"
+    },
+    {
+      "test": "swf_9_event_goto_frame_script",
+      "phases": {
+        "recomp": 0.011,
+        "compile": 24.459,
+        "run": 0.004
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 3
+      },
+      "duration": 24.48,
+      "ruffle_diff_count": 2,
+      "ours_diff_count": 2,
+      "status": "ruffle_matched",
+      "detail": "diffs 2 \u2286 ruffle 2"
+    },
+    {
+      "test": "swf_9_frame_script_button_order",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 18.936,
+        "run": 0.004
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "duration": 18.96,
+      "status": "pass"
+    },
+    {
+      "test": "swf_9_frame_script_cleanup_goto",
+      "phases": {
+        "recomp": 0.017,
+        "compile": 6.84,
+        "run": 0.005
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 6.87,
+      "status": "pass"
+    },
+    {
+      "test": "swf_9_frame_script_cleanup_goto2",
+      "phases": {
+        "recomp": 0.013,
+        "compile": 20.716,
+        "run": 0.004
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      },
+      "duration": 20.74,
       "status": "pass"
     },
     {
       "test": "swf_9_frame_script_dynamic_goto",
       "phases": {
-        "recomp": 0.021,
-        "compile": 35.589,
-        "run": 0.006
+        "recomp": 0.011,
+        "compile": 23.846,
+        "run": 0.003
       },
       "num_frames": 20,
       "lines": {
@@ -275,7 +275,7 @@
         "expected_lines": 34,
         "matching_lines": 31
       },
-      "duration": 35.64,
+      "duration": 23.87,
       "ruffle_diff_count": 3,
       "ours_diff_count": 3,
       "status": "ruffle_matched",
@@ -284,8 +284,8 @@
     {
       "test": "swf_9_frame_script_dynamic_goto_2",
       "phases": {
-        "recomp": 0.013,
-        "compile": 20.135,
+        "recomp": 0.012,
+        "compile": 24.664,
         "run": 0.004
       },
       "num_frames": 20,
@@ -294,7 +294,7 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 20.16,
+      "duration": 24.69,
       "status": "pass"
     }
   ]
