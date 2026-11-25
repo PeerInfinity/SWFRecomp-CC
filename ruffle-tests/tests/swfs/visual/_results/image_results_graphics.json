@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-25T03:46:37.699234+00:00",
+    "timestamp": "2026-11-25T05:10:15.966474+00:00",
     "suite": "visual",
     "stem": "results_graphics",
-    "git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "git_sha": "7c3cfdcb7bbe810e152c8f8dbf00473db0a4a136",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45536913308",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45536913308",
+    "run_id": "45547012629",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45547012629",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 148,
@@ -2113,29 +2113,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 16086 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 15975 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 443,
       "height": 150,
       "total_channels": 265800,
-      "diff_channels": 16086,
-      "mean_diff": 15.4324,
+      "diff_channels": 15975,
+      "mean_diff": 15.3259,
       "checks": [
         {
           "tolerance": 1,
           "max_outliers": 0,
-          "outliers": 16086,
+          "outliers": 15975,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 16086,
+      "outliers": 15975,
       "max_outliers": 0,
       "tolerance": 1,
-      "excess_outliers": 16086
+      "excess_outliers": 15975
     },
     {
       "suite": "visual",
@@ -6385,7 +6385,7 @@
       "trace_status": "pass",
       "known_failure": true,
       "status": "fail",
-      "message": "Image comparison failed: 19287 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 23391 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "ruffle_match": false,
@@ -6394,22 +6394,22 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 25329,
-      "mean_diff": 3.8751,
+      "diff_channels": 26409,
+      "mean_diff": 4.1867,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 19287,
+          "outliers": 23391,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 19287,
+      "outliers": 23391,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 19287
+      "excess_outliers": 23391
     },
     {
       "suite": "visual",
