@@ -164,6 +164,32 @@ note). Expected flips from the swaps: none to pass. All 5 still miss Flash by mo
 5. Tooling: an AVM2-root quality pin is impossible from an AVM1 stub. A Linux-side alternative is to patch the
    test's DoABC entry point, which is not attempted. Grading AVM2 low-quality direct-only rows stays out of reach.
 
+## Round 3 (2026-11-24, coordinator): Windows pass with ClearType OFF (Robert's OK, restored afterwards)
+
+Robert allowed the system-wide change on condition it was turned back on. Windows font smoothing was read first
+(smoothing on, type 2 = ClearType) and switched to type 1 (Standard = grayscale) with `SystemParametersInfo`
+(`SPI_SETFONTSMOOTHINGTYPE`, update + broadcast). The 6 text rows were captured sequentially with
+`run_image.py --windows`, and ClearType was restored by an EXIT trap: type 2 again, registry `FontSmoothingType 0x2`.
+Captures: `golden-provenance/cleartype-off/*.win-std.png`.
+
+The setting reached Flash. Colour-fringed pixels: captions 927 → 0, hardwrap 504 → 0, acid-text-5 48 600 → 24 522
+(the rest is coloured text). **It does not reproduce the goldens.** Px over tol vs golden:
+
+| row | ClearType (round 2) | Standard | Standard, best ±4 px shift |
+|---|---:|---:|---:|
+| `MaskTest-2` | 1 197 | 1 317 | 1 317 (0,0) |
+| `acid/acid-text-4` | 4 | 12 | 12 |
+| `acid/acid-text-5` | 34 290 | 28 338 | 28 338 |
+| `captions` | 1 200 | 1 051 | 1 000 (dx −1) |
+| `hardwrap` | 962 | 762 | 627 (dy −2) |
+| `stylesheet` | 993 | 691 | 691 |
+
+**Verdict:** the round-2 hypothesis, "Windows-Flash captures from a ClearType-off host", is **refuted as the whole
+explanation**. Grayscale AA is part of it, but hundreds to thousands of pixels of glyph shape and layout remain, beyond
+any integer shift. The likely cause is another Flash version, other font files, or other DPI/gamma on the host that
+made them. These 5 rows keep their goldens, with the disposition "device text; golden from an unreproducible host; not
+a Flash target". No fix in `ruffle-tests/flash_fixes/` (rule 4 there). `acid-text-4` stays near Flash (max diff 1).
+
 ## Method
 
 - **Scope.** Every dir under `ruffle-tests/tests/swfs/` whose `test.toml` parses with a non-empty

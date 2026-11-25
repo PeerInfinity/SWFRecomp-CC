@@ -1,0 +1,57 @@
+[
+  {
+    "test": "visual/simple_shapes/strokes/scale",
+    "file": "output.expected.png",
+    "upstream_sha256": "ea95bff701d8acb1198b973d4b8b215e1df9b5fc961dce236e20061493745a94",
+    "fix": "visual/simple_shapes/strokes/scale/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/visual__simple_shapes__strokes__scale__output.png (s27 golden-provenance round 2, goal 4)",
+    "reason": "Linux == Windows == root capture. The golden is not FP32 output on either OS (3589 px over tol vs Flash). Ours vs Flash: 7797 px.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
+    "added": "2026-11-24"
+  },
+  {
+    "test": "avm2/graphics_draw_path",
+    "file": "output.expected.png",
+    "upstream_sha256": "fdad28e3dc89021ea36d89e4da7a9cf8d34d67a95edd2a225d2b549b61ab8a5e",
+    "fix": "avm2/graphics_draw_path/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__graphics_draw_path__output.png (s27 golden-provenance round 2, goal 4)",
+    "reason": "Linux == Windows (AVM2 quality=low, so wrapper capture only). Golden 28 px off Flash; ours 387 px.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
+    "added": "2026-11-24"
+  },
+  {
+    "test": "avm2/bitmapdata_opaque",
+    "file": "output.expected.png",
+    "upstream_sha256": "64d77094c4f6643aa68f56ad784ddc4511118ca2b7dfd7cbce846b23d9e4c42b",
+    "fix": "avm2/bitmapdata_opaque/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__bitmapdata_opaque__output.png (s27 golden-provenance round 2, goal 4)",
+    "reason": "Linux == Windows. Golden 2 px off Flash; ours 4 px (tol 0).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
+    "added": "2026-11-24"
+  },
+  {
+    "test": "avm2/blend_scroll",
+    "file": "output.expected.png",
+    "upstream_sha256": "dedbfa9f2b40773c39b73d0848bfd6715c4f0f5e768299ee1583d8aee7670eb8",
+    "fix": "avm2/blend_scroll/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__blend_scroll__output.png (s27 golden-provenance round 2, goal 4)",
+    "reason": "Linux == Windows. Golden 87 px off Flash; ours 195 px.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
+    "added": "2026-11-24"
+  },
+  {
+    "test": "visual/definefont4",
+    "file": "output.expected.png",
+    "upstream_sha256": "54334e53063f5bb4de21238528a9bf1196a7a665341297da2f54ff1fb4d5b3ec",
+    "fix": "visual/definefont4/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/visual__definefont4__output.png (s27 golden-provenance round 2, goal 4)",
+    "reason": "Linux == Windows; embedded DefineFont4. Golden 6331 px off Flash; ours 5325 px (we are closer to Flash than the golden).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
+    "added": "2026-11-24"
+  }
+]

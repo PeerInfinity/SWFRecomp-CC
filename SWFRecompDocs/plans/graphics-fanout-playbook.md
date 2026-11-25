@@ -1557,7 +1557,9 @@ Trace side: `polish-sweep-arc.md` §27.
 **Re-priced board.** The table is in `golden-provenance.md` §"Re-priced pixel board". A row whose golden is not Flash is
 not a Flash target. Price it as headroom against Flash, not against the golden.
 
-**Goal-4 decision, deferred to Robert / s28:**
+**Goal-4 decision: DONE after closeout (Robert, 2026-11-24: "store a set of fixes, and apply the fixes after
+redownloading").** The 5 swaps below are landed as `ruffle-tests/flash_fixes/` (re-applied by `download_tests.sh`;
+RvF "s27 golden swaps"). The rest of the table stands:
 - 5 per-row golden **swaps** to Flash captures: `visual/simple_shapes/strokes/scale`, `avm2/graphics_draw_path`,
   `avm2/bitmapdata_opaque`, `avm2/blend_scroll` and `visual/definefont4` (we are closer to Flash than its golden).
 - `gradientTransform` stays as a Flash target.
@@ -1570,14 +1572,15 @@ mechanism in `image_triage.py` or the runner (S–M; design first).
 
 ### Left on the board (session 28)
 
-- **Goal-4 golden override** (above): design the override, then swap the 5 rows.
+- **Flash fixes** (`ruffle-tests/flash_fixes/`): extend only with FP32-proven goldens; grade each swap by name. Next candidates: `place_object_test` and `shape_test` (root capture), once our miss is under ~1k px.
 - **Quality model:** `gradientTransform`'s golden is Flash at HIGH, while we follow `test.toml` low. The 9-px miss may
   be our AA mode.
 - **Text:**
   - wordwrap render fixture: Flash glyph AA, ~590 channels (it keeps an interim Ruffle golden);
   - `rotated_glyphs`: 1111 px vs Flash;
   - AVM2 selection tint: needs an ADDED_TO_STAGE fixture;
-  - device-text rows: a ClearType-off Windows pass (Robert's OK).
+  - device-text rows: DONE after closeout. The ClearType-off Windows pass does not reproduce the goldens
+    (golden-provenance.md §Round 3), so they keep the "unreproducible host" disposition.
 - **Filters:**
   - applyFilter DropShadow residual and Bevel sample residual;
   - GPU display-filter growth: NO-GO as of record;

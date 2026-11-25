@@ -821,3 +821,43 @@ choice in Flash's quality-low minification (max 186, same in both legs), not dec
 **Decision:** match Flash (user ruling, Flash over Ruffle). The row stays a visible pixel fail; it is not added to
 an ignore list. **Prune criterion:** a Flash-made golden for this row (the capture above, once its whole frame is
 checked against our render), or Ruffle adopting a DCT-scaled decoder.
+
+## s27 golden swaps: five Ruffle image goldens replaced by Flash Player 32 captures (`ruffle-tests/flash_fixes/`)
+
+<!-- image-axis: visual/simple_shapes/strokes/scale output -->
+<!-- image-axis: avm2/graphics_draw_path output -->
+<!-- image-axis: avm2/bitmapdata_opaque output -->
+<!-- image-axis: avm2/blend_scroll output -->
+<!-- image-axis: visual/definefont4 output -->
+
+**Tests (pixel axis):** the five rows below. Their upstream `output.expected.png` is not Flash Player 32 output on
+either OS. The s27 golden-provenance sweep (round 2, goal 4; `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`)
+captured each one with the real FP32 debug projector. The Linux and Windows captures are pixel-identical, and for
+`strokes/scale` the root capture also equals the wrapper capture.
+
+| test | golden vs Flash (px over tol) | ours vs Flash | note |
+|---|---:|---:|---|
+| `visual/simple_shapes/strokes/scale` | 3 589 | 7 797 | stroke scaling |
+| `avm2/graphics_draw_path` | 28 | 387 | AVM2 quality=low: wrapper capture |
+| `avm2/bitmapdata_opaque` | 2 | 4 (tol 0) | the swapped golden is confirmed in the harness: 4 channels, max 128 |
+| `avm2/blend_scroll` | 87 | 195 | |
+| `visual/definefont4` | 6 331 | 5 325 | embedded DefineFont4; we are closer to Flash than the golden |
+
+Px values are round-1 numbers, from the goal-4 table.
+
+**Decision (user, 2026-11-24):** "If we notice problems with the Ruffle tests, then one idea is to store a set of fixes,
+and apply the fixes after redownloading the latest Ruffle tests. The goal is still to match Flash, not to match Ruffle."
+The Flash captures are stored in `ruffle-tests/flash_fixes/` and copied over the downloaded goldens by
+`apply_flash_fixes.py`, which runs at the end of `download_tests.sh`. None of the five flips to pass. Each now fails
+against what Flash actually draws, which is the honest residual.
+
+**Prune criterion:** an entry prints `UPSTREAMED` when upstream ships a Flash golden equal to ours. It prints `STALE`
+when upstream changes the golden; then re-capture with Flash.
+
+**Not swapped, and why:**
+- `place_object_test` and `shape_test`: the wrapper and root Flash captures disagree by ~600 px. Swap to the root
+  capture once our miss is under ~1k px.
+- `bitmapdata_draw`: Linux ≠ Windows (device-font spacing).
+- `MaskTest-2`, `captions`, `hardwrap`, `stylesheet`, `acid-text-5`: device text from an unreproducible host. The
+  2026-11-24 ClearType-off Windows FP32 pass does not reproduce them either (golden-provenance.md §Round 3).
+- `gradientTransform` and `acid-color` frame1: already Flash at quality HIGH.

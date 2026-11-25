@@ -2403,7 +2403,9 @@ def find_data_files(test_dir):
     # accident of the original loadVariables implementation.
     skip_names = {"test.swf", "test.fla", "test.toml", "output.txt",
                    "output.ruffle.txt", "input.json", "test_harness.c"}
-    skip_suffixes = {".swf", ".fla", ".toml", ".json", ".c", ".h", ".py"}
+    # `.upstream` = the downloaded original of a golden that apply_flash_fixes.py
+    # replaced with a Flash capture; never served.
+    skip_suffixes = {".swf", ".fla", ".toml", ".json", ".c", ".h", ".py", ".upstream"}
     data_files = []
 
     def walk(d, prefix):

@@ -322,3 +322,9 @@ done
 
 echo ""
 echo "Done! Total: ${TOTAL_INSTALLED} tests installed."
+
+# Re-apply the stored Flash fixes: goldens that a real Flash Player 32 capture
+# proved wrong get replaced after every download, and the downloaded original
+# is kept as <file>.upstream. The target is Flash, not Ruffle. Manifest and
+# rules: ruffle-tests/flash_fixes/README.md.
+python3 "${SCRIPT_DIR}/apply_flash_fixes.py" --categories "${CATEGORIES[@]}"

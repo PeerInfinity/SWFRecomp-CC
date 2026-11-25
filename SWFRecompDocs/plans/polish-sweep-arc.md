@@ -3659,7 +3659,7 @@ Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-
 
 **Pixels.** See `graphics-fanout-playbook.md` §25.
 
-## 28. Session 27 (2026-11-24) — dual-axis fan-out #19, CLOUD-FIRST, full size, FLASH-ORACLE FIRST: trace 4684 → 4781 eff (4722 → 4819 rows; 97 new rows, all pass), pixels 592 → 626 pass (+2 corpus by name, 35 new fixture comparisons), 0 code regressions; 1 Flash-ward reclassification and 1 priced Flash-over-Ruffle loss
+## 28. Session 27 (2026-11-24) — dual-axis fan-out #19, CLOUD-FIRST, full size, FLASH-ORACLE FIRST: trace 4684 → 4781 eff (4722 → 4819 rows; 97 new rows, all pass), pixels 592 → 626 pass (+2 corpus by name, 35 new fixture comparisons), 1 trace regression vs Flash 32 (gnash test12; booked Flash-ward at closeout, corrected by a Flash 32 capture) and 1 priced Flash-over-Ruffle loss
 
 Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slots), 12 local one-task-session commits (N ladder and browser ladder), 2 golden-provenance rounds, plus docs. Every report, patch, probe and oracle capture is under `session27-fanout-reports/`. The 32 `fanout/*` branches were pruned at closeout, after their report and patch blobs were checked identical on master. Cloud slots: 10 wave-1 diagnosis, 13 wave-2, 7 wave-2b, 2 wave-3 (env "SWFRecomp fan-out", Opus). All 32 delivered and none were lost. Their work landed in those 16 commits, except `w1-browser-avm1-gaps`, which went to the local `browser-arms-land`.
 
@@ -3684,11 +3684,11 @@ Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slot
 **Interim #3's three regressions** were fixed by `w3-interim3-regressions` (`8f4f6e395`), and the final run confirms every fix:
 - `avm1/globals_monkeypatch` output_mismatch → SEGFAULT: `tfCallGlobalCtorOnField` used `INV_SUPER_CTX` with a MovieClip `this`. It is back to its documented output_mismatch.
 - Fixture image `avm1_attached_clip_selfgoto_child_parent` FAIL: `ng_apply_pending_sprite_self_gotos` minted `_root`-parented orphans. It passes, 0 outliers.
-- gnash `action_execution_order_test12` ruffle_matched → output_mismatch: **NOT a regression to fix.** It came from w2b-timers-tail's goto-queued init flush at the call return, and it was predicted. Our output is now byte-identical to Flash's `output.fp9.txt`. The graded golden is the fp10 one, which has an FP10-only enterFrame line. This is the only row that falls vs the baseline (Flash over Ruffle; the options are on the s28 board).
+- gnash `action_execution_order_test12` ruffle_matched → output_mismatch: It came from w2b-timers-tail's goto-queued init flush at the call return, and it was predicted. Our output is now byte-identical to Flash's `output.fp9.txt`, and the graded golden is the fp10 one. At closeout this was booked as "Flash-ward". **Corrected after closeout, 2026-11-24:** real Flash 32 (direct, pinned) prints `output.fp10.txt` byte for byte. Capture: `session27-fanout-reports/flash-oracle-captures/action_execution_order_test12/flash32.lnx.direct.txt`. So the graded golden IS modern Flash, and this row is a real 1-line gap. Line 19 (`asOrder`) now matches Flash 32 (the init flush fixed it). Line 17 (`enterFrameOrder`) does not: FP10+ runs enterFrame once on clips 4 and 5, and we, Ruffle and FP9 don't. It is the only row that falls vs the baseline. The code lead is on the s28 board.
 
 **Final vs baseline, by name.**
 - Trace on the 4722-row intersection:
-  - Effective: +1 (`from_shumway/bitmapdata/getpixel-from-embedded`, from the Flash-modelled IJG JPEG decoder) and −1 (`test12`, Flash-ward), so eff is flat at 4684.
+  - Effective: +1 (`from_shumway/bitmapdata/getpixel-from-embedded`, from the Flash-modelled IJG JPEG decoder) and −1 (`test12`: a real gap vs Flash 32, see above), so eff is flat at 4684.
   - Two ruffle_matched rows were promoted to pass: gnash `InitActionTest2` (timers) and `avm2/goto_framescript_queued/swf13` (w3-drift-2).
 - New rows, all passing in both modes (97):
   - 83 regression fixtures.
@@ -3754,7 +3754,7 @@ Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slot
 ### 28.4 Left on the board (session 28)
 
 **Trace**
-- **`test12`**: rule on one of these: (a) accept the output_mismatch as Flash-ward (RvF); (b) a from_gnash disposition naming the fp9 golden; (c) a harness rule that accepts any Flash variant's `output.fp*.txt`.
+- **`test12` (code, S–M; the only trace row that fell in s27):** implement Flash 10+'s enterFrame on clips 4 and 5 (line 17, `0+1+2+3+1+2+4+3+1+2+5+3+…`). Flash 32 == `output.fp10.txt` (capture archived in `flash-oracle-captures/`), so no disposition is needed. Ruffle also misses it: record an RvF entry when it lands (our line 19 already beats Ruffle's).
 - **N ladder (parked; head = thin-stroke Flash pixel snapping)**: the hairline fixture is parked at `SWFRecompDocs/plans/n-levels-5plus-hairline-fixture/`. Episodes 1–2 native = exporter.
 - **Browser ladder (parked; head = port OFFSCREEN's inline root-goto catch-up)** (`ng_executeGotoCatchUp` / `ng_runPendingRootGoto` from timer and event callbacks; M). Its oracle is `avm1_timer_root_goto_stopped_{gs,nf}` and `avm1_goto_backward_enterframe_once` in child_probe. Then:
   - `ng_apply_pending_sprite_self_gotos` in the browser (S).
