@@ -50,7 +50,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w2-loaded-shell-land | w1-loaded-shell-residuals + Flash | +1 load_cancel_via_unloadmovie; 3 golden swaps; 3 fixtures | session_018CoDi7qCLS9aytBojTChDH — DELIVERED, LANDED A–D `e7afd5ad2` (+1 load_cancel_via_unloadmovie; 3 new Flash rows; 3 goldens → FP32) + E with 7 FP32-Windows flash_fixes |
 | w2-filter-residuals-land | w1-filter-residuals + Flash | ~5 regression rows (Flash goldens), 2 re-goldens; 3 priced RvF losses | session_018CoDi6PJKjrqv8uEn4N9Ga — DELIVERED, LANDED `bc585e9f2` (+4 new image rows, 2 re-goldens to FP32, bevel fit restores 3 held goldens; priced −3: visual/filters/drop_shadow, edittext_scroll .01/.02 — device-font labels, no flash_fix) |
 | w2b-gnash-holds | w1b-rm-gnash + Flash probes | B10/B11/B2/B6/B19 gnash rows | session_018CoDi6GATKmiipHwo2aKVW — launched |
-| w2b-avm2-d2a | w1b-rm-avm2 bucket J | 8 avmplus number→string rows | session_018CoDi6hQzJbibxagXMwR2u — launched |
+| w2b-avm2-d2a | w1b-rm-avm2 bucket J | 8 avmplus number→string rows | session_018CoDi6hQzJbibxagXMwR2u — DELIVERED, LANDED `d8b91ff94` (+9 incl. number_tostring fail→pass; fixes JSON/AS3Types regression; Cat 14 resolved) |
 
 ## Grading runs
 
