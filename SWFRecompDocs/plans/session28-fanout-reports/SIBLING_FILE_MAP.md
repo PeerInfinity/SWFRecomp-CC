@@ -17,3 +17,4 @@
 | w2-loaded-shell-land | `action.c` loaded-movie delivery/advance order, `actionProcessDeferred*`, loaded goto deferral, MCL progress events, unloadMovie cancel; `timer.c` |
 | w2-filter-residuals-land | `tag.c` `filter_shadow_offset_px`, `compose_chain_entry_to_layer`, `render_filtered_core` offset block; `avm2_display.c` filter composer / `avm2_render_filtered`; `avm2_bitmap.c` `fb_glow_amount`, bevel sampling |
 | w2b-gnash-holds | `action.c` with-stack (`actionWithStart`), Selection.setSelection, NaN equality / string compare, SWF5 Function.prototype visibility, SetMember inherited setter |
+| w2b-avm2-d2a | `avm2_number.c` number→string (`avm2_format_number`, toFixed/toExponential/toPrecision/radix) |
