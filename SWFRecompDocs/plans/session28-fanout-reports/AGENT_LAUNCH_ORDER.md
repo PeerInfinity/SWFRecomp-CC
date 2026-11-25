@@ -18,7 +18,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 
 | # | slug | task | session id |
 |---|---|---|---|
-| 1 | w1-acid-flash | `briefs/w1-acid-flash.md` | session_018CoDi6JnxfpNaNRyzuxogB — launched 2026-11-25 |
+| 1 | w1-acid-flash | `briefs/w1-acid-flash.md` | session_018CoDi6JnxfpNaNRyzuxogB — DELIVERED; 0 flips; P1 LOW tie rule (−43 cmp, mostly Flash-ward; folds into the lowq arc), P2 Flash isotropic stroke width (acid-stroke-0 52702→18381) → w2-flash-stroke-width; acid-mask/acid-shapes/acid-textfield NO-GO |
 | 2 | w1-avm2-vector-flash | `briefs/w1-avm2-vector-flash.md` | session_018CoDi3wZhe7zdvykrZukfV — DELIVERED; culling LANDED `958313b73` (draw_triangles 1812→996, 0 flips); Flash LOW sample point (x+.5,y)/paint (x,y+.5) + HIGH = 4×4 SSAA; Flash capture of lowq probe → w2-lowq-sample-point |
 | 3 | w1-drift | `briefs/w1-drift.md` | session_018CoDi5UJfjUtnXKTsT6MEU — DELIVERED (no source): drift −1 eff gnash `test4` (rm→fail: upstream deleted output.ruffle.txt; §27.4 interleave NO-GO), +1 new row `root_onload_loaded_level` pass; no PNG re-bake; Flash: proto onLoad gap → w2-root-onload-proto |
 | 4 | w1-filter-residuals | `briefs/w1-filter-residuals.md` | session_018CoDi5uWF1jhfrRDKG6F9B — launched 2026-11-25 |

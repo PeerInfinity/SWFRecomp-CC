@@ -13,3 +13,4 @@
 | w2-text-edit-land | `action.c` `actionTextFieldInput` restrict branch, setNewTextFormat span model (`tf_snf`), getTextFormat getters; `avm2_display.c` (selection, keep tint) |
 | w2-glyph-quarter-snap | `tag.c` `textfield_glyph_render_cb`, `tf_border_line_segment`; maybe `avm2_display.c` `avm2_render_glyphs`, `avm2_render_textbox` |
 | w2-test12-land | enterFrame snapshot/queue at tick start: `action.c` `actionDispatchEnterFrameHandlers` / `tagFlushPendingEnterFrame` (`tag.c`), `swf.c` frame loop (self-localize; shared with ladders) |
+| w2-flash-stroke-width | recompiler `swf.hpp` `LineStyle`, `swf.cpp` LINESTYLE2 parse + `stroke_run_data` emit; `render_webgpu.c` `hairline_restage` (overlaps local n-stroke-snap: keep separable) |
