@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-25T20:23:13.106090+00:00",
+    "timestamp": "2026-11-25T21:42:13.436893+00:00",
     "suite": "avm1",
     "stem": "results_graphics",
-    "git_sha": "13b40eabb012e64cf6b3efb4ab277114c4169c5c",
+    "git_sha": "10a5b515a03a386400e27a68adeddb628a47bc82",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45687311987",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45687311987",
+    "run_id": "45694673542",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45694673542",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 33,
   "comparisons": 69,
   "ignored": 0,
-  "pass": 69,
-  "fail": 0,
+  "pass": 68,
+  "fail": 1,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 100.0,
+  "pass_rate": 98.6,
   "results": [
     {
       "suite": "avm1",
@@ -58,14 +58,14 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 1",
-      "max_diff": 1,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
       "expected_source": "repo",
       "width": 900,
       "height": 900,
       "total_channels": 3240000,
-      "diff_channels": 6216,
-      "mean_diff": 0.0019,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
       "checks": [
         {
           "tolerance": 2,
@@ -1857,29 +1857,30 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
-      "max_diff": 0,
+      "status": "fail",
+      "message": "Image comparison failed: 3610 outliers exceed limit of 0, max difference 204",
+      "reason": "pixel_mismatch",
+      "max_diff": 204,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 0,
-      "mean_diff": 0.0,
+      "diff_channels": 3610,
+      "mean_diff": 0.8369,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 0,
-          "outliers": 0,
-          "passed": true
+          "outliers": 3610,
+          "passed": false
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 0,
-      "outliers": 0,
+      "failed_checks": 1,
+      "outliers": 3610,
       "max_outliers": 0,
       "tolerance": 0,
-      "excess_outliers": 0
+      "excess_outliers": 3610
     },
     {
       "suite": "avm1",

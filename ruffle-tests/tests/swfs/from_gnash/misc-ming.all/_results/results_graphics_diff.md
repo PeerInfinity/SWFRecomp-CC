@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `7c3cfdcb7bbe` (2026-11-25T05:10:12.914047+00:00)
-**Current:** `13b40eabb012` (2026-11-25T20:23:11.939764+00:00)
+**Previous:** `13b40eabb012` (2026-11-25T20:23:11.939764+00:00)
+**Current:** `10a5b515a03a` (2026-11-25T21:42:12.158861+00:00)
 
 ## Summary
 
@@ -12,8 +12,8 @@
 | Pass rate | 64.0% | 64.0% | 0% |
 | Mismatched lines | 930 | 930 | 0 |
 
-## Status Changed (1)
+## Line Count Changed (1)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `action_order/action_execution_order_test4` | ruffle_matched | output_mismatch | 19/26 | 19/26 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `action_order/action_execution_order_extend_test` | output_mismatch | 8/32 | 8/32 | 0 |

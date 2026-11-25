@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-25T05:10:12.906745+00:00",
-    "old_git_sha": "7c3cfdcb7bbe810e152c8f8dbf00473db0a4a136",
-    "new_timestamp": "2026-11-25T20:23:11.932228+00:00",
-    "new_git_sha": "13b40eabb012e64cf6b3efb4ab277114c4169c5c",
+    "old_timestamp": "2026-11-25T20:23:11.932228+00:00",
+    "old_git_sha": "13b40eabb012e64cf6b3efb4ab277114c4169c5c",
+    "new_timestamp": "2026-11-25T21:42:12.151468+00:00",
+    "new_git_sha": "10a5b515a03a386400e27a68adeddb628a47bc82",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,454 @@
     "old_effective_pass": 240,
     "old_total": 243,
     "old_pass_rate": 60.9,
-    "new_pass": 148,
-    "new_ruffle_matched": 92,
-    "new_effective_pass": 240,
+    "new_pass": 167,
+    "new_ruffle_matched": 68,
+    "new_effective_pass": 235,
     "new_total": 243,
-    "new_pass_rate": 60.9,
+    "new_pass_rate": 68.7,
     "old_mismatched_lines": 7913,
-    "new_mismatched_lines": 7913,
+    "new_mismatched_lines": 7801,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 112,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 243,
+    "newly_failing": 5,
+    "status_changed": 24,
+    "unchanged": 216,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "ASnative-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 72
+      },
+      "new_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 72
+      }
+    },
+    {
+      "test": "ASnative-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 110,
+        "expected_lines": 110,
+        "matching_lines": 70
+      },
+      "new_lines": {
+        "actual_lines": 110,
+        "expected_lines": 110,
+        "matching_lines": 70
+      }
+    },
+    {
+      "test": "ASnative-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 110,
+        "expected_lines": 110,
+        "matching_lines": 70
+      },
+      "new_lines": {
+        "actual_lines": 110,
+        "expected_lines": 110,
+        "matching_lines": 70
+      }
+    },
+    {
+      "test": "ASnative-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 110,
+        "expected_lines": 110,
+        "matching_lines": 70
+      },
+      "new_lines": {
+        "actual_lines": 110,
+        "expected_lines": 110,
+        "matching_lines": 70
+      }
+    },
+    {
+      "test": "HitTest-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 88,
+        "expected_lines": 88,
+        "matching_lines": 80
+      },
+      "new_lines": {
+        "actual_lines": 88,
+        "expected_lines": 88,
+        "matching_lines": 88
+      }
+    },
+    {
+      "test": "HitTest-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 88,
+        "expected_lines": 88,
+        "matching_lines": 80
+      },
+      "new_lines": {
+        "actual_lines": 88,
+        "expected_lines": 88,
+        "matching_lines": 88
+      }
+    },
+    {
+      "test": "HitTest-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 88,
+        "expected_lines": 88,
+        "matching_lines": 79
+      },
+      "new_lines": {
+        "actual_lines": 88,
+        "expected_lines": 88,
+        "matching_lines": 85
+      }
+    },
+    {
+      "test": "String-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 368
+      },
+      "new_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 377
+      }
+    },
+    {
+      "test": "String-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 368
+      },
+      "new_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 377
+      }
+    },
+    {
+      "test": "String-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 368
+      },
+      "new_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 377
+      }
+    },
+    {
+      "test": "TextField-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      }
+    },
+    {
+      "test": "XML-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 449,
+        "expected_lines": 449,
+        "matching_lines": 439
+      },
+      "new_lines": {
+        "actual_lines": 449,
+        "expected_lines": 449,
+        "matching_lines": 440
+      }
+    },
+    {
+      "test": "XML-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 486,
+        "expected_lines": 486,
+        "matching_lines": 483
+      },
+      "new_lines": {
+        "actual_lines": 486,
+        "expected_lines": 486,
+        "matching_lines": 486
+      }
+    },
+    {
+      "test": "XML-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 486,
+        "expected_lines": 486,
+        "matching_lines": 483
+      },
+      "new_lines": {
+        "actual_lines": 486,
+        "expected_lines": 486,
+        "matching_lines": 486
+      }
+    },
+    {
+      "test": "XML-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 486,
+        "expected_lines": 465,
+        "matching_lines": 462
+      },
+      "new_lines": {
+        "actual_lines": 486,
+        "expected_lines": 465,
+        "matching_lines": 465
+      }
+    },
+    {
+      "test": "XMLNode-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 204
+      },
+      "new_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 207
+      }
+    },
+    {
+      "test": "XMLNode-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 204
+      },
+      "new_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 207
+      }
+    },
+    {
+      "test": "XMLNode-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 204
+      },
+      "new_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 207
+      }
+    },
+    {
+      "test": "XMLNode-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 204
+      },
+      "new_lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 207
+      }
+    },
+    {
+      "test": "toString_valueOf-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 137,
+        "expected_lines": 137,
+        "matching_lines": 103
+      },
+      "new_lines": {
+        "actual_lines": 137,
+        "expected_lines": 137,
+        "matching_lines": 105
+      }
+    },
+    {
+      "test": "toString_valueOf-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 155,
+        "expected_lines": 155,
+        "matching_lines": 150
+      },
+      "new_lines": {
+        "actual_lines": 155,
+        "expected_lines": 155,
+        "matching_lines": 155
+      }
+    },
+    {
+      "test": "toString_valueOf-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 155,
+        "expected_lines": 155,
+        "matching_lines": 150
+      },
+      "new_lines": {
+        "actual_lines": 155,
+        "expected_lines": 155,
+        "matching_lines": 155
+      }
+    },
+    {
+      "test": "toString_valueOf-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 155,
+        "expected_lines": 155,
+        "matching_lines": 150
+      },
+      "new_lines": {
+        "actual_lines": 155,
+        "expected_lines": 155,
+        "matching_lines": 155
+      }
+    },
+    {
+      "test": "with-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 46
+      },
+      "new_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 49
+      }
+    },
+    {
+      "test": "with-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 101
+      },
+      "new_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 107
+      }
+    },
+    {
+      "test": "with-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 101
+      },
+      "new_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 107
+      }
+    },
+    {
+      "test": "with-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 101
+      },
+      "new_lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 107
+      }
+    }
+  ]
 }
