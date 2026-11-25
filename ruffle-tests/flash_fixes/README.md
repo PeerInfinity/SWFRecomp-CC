@@ -41,6 +41,7 @@ download.
 | `visual/definefont4` | `output.expected.png` | 2026-11-24 | same (LNX == WIN; embedded DefineFont4) | fails either way; we are closer to Flash (5325) than the old golden was (6331) |
 | `avm1/goto_rewind_movieclip_replace` | `output.txt` | 2026-11-25 | s28 trace-provenance (LNX pinned ×2 == no-pin == WIN) | expected `ruffle_matched` → pass (ours == FP32) |
 | `avm1/movieclip_hittest_shapeflag` | `output.txt` | 2026-11-25 | same | stays `output_mismatch`; 9 lines vs Flash |
+| 33 quality=low image rows (28 tests: 6 avm2, `morph_test1` ×6, 14 `blend_modes`, `cache_as_bitmap/{drawing_api,nested_rotation}`, `gradient_focal_point`, `color_matrix`, `fonts/glyph`, `gradients/focal_radial`, `simple_shapes/layers`) | `*.expected.png` | 2026-11-25 | s28 lowq-recapture: FP32 `--quality low` (LNX ×2 deterministic, WIN == LNX in tol; 4 non-LAYER blends from `--screen`) | **land only together with the w2-lowq-sample-point model.** Without it every row fails vs Flash; with it all fail except `focal_radial` (PASS). Report: `SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture-report.md` §6 |
 
 **Graded** in run `45547012629` at `7c3cfdcb7` (results `e1425f417`) vs `cb14cd063`: 0 status moves in either axis.
 Excess channels vs the new Flash goldens:

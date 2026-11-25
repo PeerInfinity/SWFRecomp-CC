@@ -1141,3 +1141,41 @@ fails every gnash row below (`known_failure`, `output.ruffle.txt` = Ruffle's own
 | B19 SWF6 inherited setter | `a.m = v` calls an inherited addProperty setter hidden by flag 256 or 1024 (not 4096); writing an own property keeps flag 1024 (256/4096 cleared) | visible setters only; write clears all | `Global-v6` |
 
 **Decision:** match Flash (user ruling). Unpinned parts are listed in `w2b-gnash-holds-report.md` §LOCAL ORACLE REQUESTS.
+
+### s28 lowq-recapture: quality=LOW image goldens that are not FP32 at LOW (2026-11-25)
+
+Oracle: Flash Player 32 at `--quality low`, using the wrapper's `draw()`, or `--screen` for the non-LAYER blends
+`alpha_no_layer`, `erase_no_layer`, `layer_alpha` and `layer_erase`. Linux captures were byte-identical over 2 runs.
+Windows `draw()` == Linux within each row's tolerance.
+Captures: `SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/`. Report: `…/lowq-recapture-report.md`.
+
+The Ruffle goldens below are Ruffle renders at quality low: GPU pixel-centre sampling and the hardware-lerp
+gradient ramp. FP32 LOW samples slanted fill edges at the scanline TOP. Its horizontal and vertical edges follow
+the pixel-centre rule, and radial and axis-aligned linear gradients are painted at the pixel corner. The
+w2-lowq-sample-point model reproduces this.
+
+| test | cmp | golden vs FP32-LOW (channels > tol) |
+|---|---|---:|
+| `avm2/displayobject_mask` | output | 56 |
+| `avm2/displayobject_scrollrect` | output | 428 |
+| `avm2/graphics_bad_direct_commands` | output | 588 |
+| `avm2/loader_loadbytes_events` | output | 188 |
+| `avm2/mouse_pick_dobj_mask` / `mouse_pick_non_interactive_dobj_mask` | output | 177 / 168 |
+| `from_gnash/misc-ming.all/morph_test1` | frame1–6 | 393 / 1563 ×4 / 760 |
+| `visual/blend_modes/*` (14) | output | 5 465 – 13 763 |
+| `visual/cache_as_bitmap/drawing_api` / `nested_rotation` | output | 1 798 / 387 |
+| `visual/drawing_api/gradient_focal_point` | output | 28 805 |
+| `visual/filters/color_matrix` | output | 16 717 |
+| `visual/fonts/glyph` | output | 1 656 |
+| `visual/simple_shapes/gradients/focal_radial` | output | 10 366 (ours with the model: 0) |
+| `visual/simple_shapes/layers` | output | 1 759 |
+
+**Decision:** match Flash. The FP32 captures are stored as `flash_fixes` entries on branch `lowq-fixes`, to land
+with the model. Rows not swapped (FP32 platform-dependent, device font, or load timing) are listed in the report, §6.
+
+Also measured: three corpus goldens that an earlier audit counted as Flash at LOW are FP32 at **HIGH**.
+- `from_shumway/gradientTransform`: direct pinned at LOW, 9 channels over tol 3.
+- `from_shumway/acid/acid-color` frame1 and `acid/acid-bitmap-draw_quality_low`: the wrapper at HIGH PASSES; at
+  LOW it does not.
+
+We keep these rows' goldens (test.toml says low; see the report, §5).
