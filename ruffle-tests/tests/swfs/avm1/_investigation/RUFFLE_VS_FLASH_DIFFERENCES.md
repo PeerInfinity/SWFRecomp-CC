@@ -1045,3 +1045,19 @@ The trace row passes and is NOT ignored.
 re-triage the stroke snap.
 
 **Prune criterion:** upstream replaces these goldens with Flash references, or our render drifts off the Flash PNGs.
+
+## Unfiltered cacheAsBitmap: no pixel snap at quality HIGH (s28 w2-lowq-sample-point)
+
+**Capture:** Flash Player 32 LNX, `session28-fanout-reports/w1-local-oracles/w1-avm2-vector-flash/lowq_sample_point.high.png`
+(AS3 probe `w1-avm2-vector-flash-fixtures/lowq_sample_point/Test.as`, cell x 0-40 / y 120-160): a 25x25 shape with
+`cacheAsBitmap = true`, no filters, at (7.5, 127.5).
+- **HIGH:** columns 7 and 32 and rows 127 and 152 are half coverage (`(128, 213, 255)` over white): the cached bitmap is
+  NOT moved to the pixel grid. Ruffle blits every cached bitmap with `PixelSnapping::Always` (rounded origin, so the
+  shape covers 8..32 solid), and so do we (`tag.c cab_snap_delta`).
+- **LOW:** pixels 8..32 solid. Both "snapped" and "not snapped, centre rule with the AS3 .5 tie excluded" fit, so LOW
+  does not decide it.
+**Consequence:** `visual/cache_as_bitmap/avm1_color` (HIGH, golden = Flash, failing 1200) is the no-snap rule (s26:
+1200 → 230 max 1 with the snap dropped for unfiltered entries). The three rows that blocked it in s26/s28
+(`cache_as_bitmap/scroll_rect`, `drawing_api`, `avm2_button`) are all quality LOW, so a HIGH-only no-snap does not touch
+them. **Decision:** not changed in this slot (open lead: drop the unfiltered snap at `MSAA_SAMPLES != 1`, then re-grade
+avm1_color and the HIGH cacheAsBitmap rows).
