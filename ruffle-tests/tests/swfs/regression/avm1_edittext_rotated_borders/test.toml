@@ -1,0 +1,15 @@
+num_ticks = 1
+
+# s28 w2-glyph-quarter-snap. Golden: FLASH PLAYER 32 (LNX, HIGH, direct pinned
+# root; coordinator capture for s28 w1-text-glyph-aa LOCAL ORACLE REQUEST 2).
+# Pins the slanted text-box hairline weight (tag.c tf_border_line_segment):
+# Flash's ink across each slanted edge is 1 + tan(theta)/2 px, centred on the
+# line. Our 4x MSAA cannot reproduce Flash's 16-level coverage, so the check is
+# coarse: the new model leaves 12 channels > 128 (Ruffle's 1-px HALF_PX model:
+# 891); L1 vs Flash 166744 -> 69309.
+[image_comparisons.output]
+tolerance = 128
+max_outliers = 24
+
+[player_options]
+with_renderer = { optional = false }

@@ -911,3 +911,25 @@ decision for the coordinator:
 
 **Prune criterion:** a fix entry prints `UPSTREAMED`/`STALE` from `apply_flash_fixes.py`. Drop a platform-split row if
 upstream re-bakes the golden on Linux.
+
+## s28 w2-glyph-quarter-snap: embedded glyph outlines snap to 1/4 px; slanted text-box borders are heavier and unshifted
+
+**Tests (pixel axis):** FLASH goldens `regression/avm1_edittext_{wordwrap_render, long_text_layout, tab_render,
+tabstops_metric, border_subpixel, rotated_borders, rotated_glyphs}`, `text/br_at_start`. No corpus Ruffle-golden row
+changes status (s28 w2-glyph-quarter-snap report: 330-comparison A/B, 9 moved, 0 pass -> fail outside the two
+regression goldens swapped to Flash).
+
+1. **Glyph outline snap (tag.c `tf_glyph_quarter_snap`).** Flash Player 32 snaps the scaled embedded-font glyph
+   outline, glyph-local, to a 1/4-px (5-twip) grid and places it at the pen rounded to the same grid. A 117.19-twip
+   square glyph draws 115 twips tall at 10 px (235 at 20 px). Ruffle draws the exact outline. Example (px > 2 vs the
+   Flash capture): `avm1_edittext_wordwrap_render` 199 (Ruffle model) -> 23; `avm1_long_text_layout` 30 -> 16.
+   Scope we implement: HIGH quality (MSAA > 1), embedded fonts, identity-matrix fields. Unpinned: quality LOW (the
+   draw()-wrapper captures fit no single rule), scaled/rotated fields, AVM2 and DefineText (FLASH requests F2-F4).
+2. **Slanted border hairline (tag.c `tf_border_line_segment`).** Ruffle draws a rotated/sheared text-box border edge
+   as a 1-px minor-axis quad shifted by HALF_PX. Flash's ink across the edge is 1 + tan(theta)/2 px along the minor
+   axis (15 deg 1.137, shear 26.6 deg 1.255, 30 deg 1.293; exactly 1.0 at 45 deg) and is centred on the line.
+   `avm1_edittext_rotated_borders` L1 vs Flash 166744 -> 69309. Ruffle's own goldens agree better with this too:
+   `visual/edittext/edittext_border_transform` .04/.06 outliers 16/15 -> 0/0 (tolerance 128).
+
+**Decision:** match Flash (user ruling). Both differences are Flash-only fits; the AVM2 twin
+(`avm2_display.c avm2_draw_border_line`) keeps Ruffle's model until a Flash capture of the AVM2 fixture lands.

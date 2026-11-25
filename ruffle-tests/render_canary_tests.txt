@@ -811,3 +811,8 @@ from_shumway/avm2/flash/display/bitmapdata/bitmapdata-clone   # JPEG3 4:2:0 deco
 # s27 w2b-jpeg-refine: GPU nearest tie rule (render_webgpu.c bitmap_nearest_*), Flash golden, tol 0.
 # tier=1
 regression/avm1_bitmap_nearest_tie_stage   # 0x43 fill at scale 1.5, ties up  1 cmp
+# s28 w2-glyph-quarter-snap: Flash's slanted text-box hairline (tag.c tf_border_line_segment,
+# 1 + tan/2 px, no HALF_PX) and rotated/sheared glyph runs; both FLASH goldens.
+# tier=1
+regression/avm1_edittext_rotated_borders   # 15/30/45/60 deg + shear borders vs Flash   1 cmp
+regression/avm1_edittext_rotated_glyphs    # rotated/sheared glyph runs + borders vs Flash  1 cmp

@@ -2,15 +2,15 @@ num_frames = 1
 
 # s27 w2-avm1-text-layout. AVM1 EditText soft wrap in the native painter
 # (tag.c textfield_glyph_render_cb + tf_soft_wrap_breaks). Font rebuilt so
-# Flash can use it (see create_test_swf.py). Goldens (INTERIM, Ruffle):
-# output.txt + output.expected.png = Ruffle exporter 0ddd12b6a (vulkan) on
-# the render-equivalent w1 SWF. The 45 allowed outlier CHANNELS are the 15
-# TL/TR/BL border-corner pixels of the 5 boxes the exporter draws 3/4-covered
-# (64 vs our solid 0; the avm1_edittext_placed_cxform class). Glyphs: 0 px.
-# A FLASH capture of this SWF (trace + image) replaces both when it lands.
+# Flash can use it (see create_test_swf.py). Goldens: FLASH PLAYER 32 (s27
+# w2-local-oracles/w2-avm1-text-layout, flash.txt == output.txt, flash.png),
+# swapped in by s28 w2-glyph-quarter-snap once Flash's 1/4-px glyph outline
+# snap landed (tag.c tf_glyph_quarter_snap: 597 -> 69 channels > 1). The 69
+# allowed channels are the 23 rectangle-corner pixels where Flash's 16-level
+# coverage differs from 4x MSAA (s28 w1-text-glyph-aa report sec. 1).
 [image_comparisons.output]
 tolerance = 1
-max_outliers = 45
+max_outliers = 69
 
 [player_options]
 with_renderer = { optional = false }

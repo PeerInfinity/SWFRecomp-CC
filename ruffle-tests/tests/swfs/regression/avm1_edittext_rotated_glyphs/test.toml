@@ -1,0 +1,14 @@
+num_ticks = 1
+
+# Landed s28 w2-glyph-quarter-snap (HELD since s27 w2-avm1-text-layout).
+# Golden: FLASH PLAYER 32 capture (s27 w2-local-oracles/w2-avm1-text-layout,
+# flash.png). Budget: the residual is Flash's 16-level edge coverage on the
+# glyph diagonals and borders, which 4x MSAA cannot reproduce (s28
+# w1-text-glyph-aa report sec. 3-4). At tolerance 128 ours leaves 12 channels
+# (before the s28 border pen model: 219); L1 vs Flash 59857 -> 40220.
+[image_comparisons.output]
+tolerance = 128
+max_outliers = 24
+
+[player_options]
+with_renderer = { optional = false }

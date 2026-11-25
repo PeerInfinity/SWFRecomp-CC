@@ -7541,7 +7541,27 @@ static void tf_border_line_segment(float ax, float ay, float bx, float by,
 	// y-major -> 1 px along x; x-major (and the exact-45-degree tie) -> along y.
 	float wx = 0.0f, wy = dtw;
 	if (fabsf(dy) > fabsf(dx)) { wx = dtw; wy = 0.0f; }
-	const float half = dtw * 0.5f;
+	float half = dtw * 0.5f;
+#if MSAA_SAMPLES > 1
+	// s28 w2-glyph-quarter-snap: Flash Player 32's SLANTED hairline is heavier
+	// than Ruffle's and is not shifted by HALF_PX. Fitted on the Flash capture
+	// of regression/avm1_edittext_rotated_borders (boxes at 15/30/45/60 deg and
+	// shear c = 0.5): the ink summed across each edge along its MINOR axis is
+	// 1 + tan(theta)/2 px (theta = angle off the major axis): 15 deg 1.137
+	// (model 1.134), 26.6 deg (shear) 1.255 (1.250), 30 deg 1.293 (1.289), and
+	// exactly 1.0 at the 45-degree tie. Its centroid sits on the geometric line
+	// (mean +0.1 px; ours was +0.2..+0.8 from HALF_PX). A 1/16-px offset fitted
+	// best under 4x MSAA. Against that capture: L1 166744 -> 69309, ink mass
+	// 269568 -> 316227 (Flash 318104). Axis-aligned segments keep Ruffle's model
+	// (Flash agrees there: 1.0 px, on the pixel row below the line).
+	if (fabsf(dx) > 0.0f && fabsf(dy) > 0.0f) {
+		const float t = fminf(fabsf(dx), fabsf(dy)) / fmaxf(fabsf(dx), fabsf(dy));
+		const float k = (t < 0.999f) ? 1.0f + 0.5f * t : 1.0f;
+		wx *= k;
+		wy *= k;
+		half = dtw * 0.0625f;
+	}
+#endif
 	float xf[16] = {
 		dx,   dy,   0.0f, 0.0f,
 		wx,   wy,   0.0f, 0.0f,
@@ -8220,6 +8240,50 @@ static float tf_tab_stop(float line_x, s16 ascent, s16 descent, int em, u16 fh, 
 	for (int i = 0; i < n_stops; i++)
 		if ((float)stops[i] > line_x) return (float)stops[i];
 	return line_x;
+}
+
+// s28 w2-glyph-quarter-snap: Flash Player 32's 1/4-px glyph outline snap.
+// Flash snaps the SCALED glyph outline, glyph-local (before the pen/baseline
+// translate), to a 1/4-device-px grid (5 twips at stage scale 1), and places
+// it at the pen rounded to the same grid. Fitted on five Flash goldens (s28
+// w1-text-glyph-aa: a 117.19-twip square glyph draws 115 twips tall at 10 px,
+// 235 at 20 px); px > 2 vs Flash: avm1_edittext_wordwrap_render 199 -> 23,
+// avm1_edittext_tab_render 113 -> 66, avm1_edittext_tabstops_metric 153 -> 86,
+// avm1_edittext_border_subpixel 151 -> 102, text/br_at_start 782 -> 598,
+// avm1_long_text_layout 30 -> 16. Rewrites `xy` (the identity arm's xy_buf,
+// already holding the unsnapped vertices) in place. Scope, each limit measured:
+//  * EMBEDDED fonts only. A device-font field is drawn by the OS font engine
+//    in Flash, not from these outlines; snapping our stand-in face moved 11
+//    Ruffle-golden comparisons (visual/filters/*, edittext_scroll,
+//    String_path_variable_button) with no Flash basis.
+//  * Antialiased builds only (MSAA_SAMPLES > 1). The quality = "low" Flash
+//    captures available (draw() wrapper) fit no single grid/pen rule.
+//  * Identity-matrix arm only: no Flash capture pins the grid for a scaled or
+//    rotated field (a device-space snap measured slightly AWAY from Flash on
+//    regression/avm1_edittext_rotated_glyphs).
+// -DTF_GLYPH_NO_QSNAP compiles it out for A/B.
+static void tf_glyph_quarter_snap(float* xy, const TextFieldGlyphInfo* info,
+	const u32 (*sd)[4], size_t g_offset, size_t g_size, float scale,
+	float x_pos, float y_pos)
+{
+#if !defined(TF_GLYPH_NO_QSNAP) && defined(MSAA_SAMPLES) && MSAA_SAMPLES > 1
+	if (info->device_font) return;
+	const float dscale = (context != NULL && context->stage_scale > 0.0f)
+	                   ? context->stage_scale : 1.0f;
+	const float q = 5.0f / dscale;   // 1/4 device px, in stage twips
+	const float px = rintf(x_pos / q) * q;
+	const float py = rintf(y_pos / q) * q;
+	for (size_t v = 0; v < g_size; v++) {
+		union { u32 u; float f; } vx, vy;
+		vx.u = sd[g_offset + v][0];
+		vy.u = sd[g_offset + v][1];
+		xy[2 * v]     = rintf(vx.f * scale / q) * q + px;
+		xy[2 * v + 1] = rintf(vy.f * scale / q) * q + py;
+	}
+#else
+	(void)xy; (void)info; (void)sd; (void)g_offset; (void)g_size; (void)scale;
+	(void)x_pos; (void)y_pos;
+#endif
 }
 
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
@@ -8918,6 +8982,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				xy_buf[2 * v]     = vx.f * scale + x_pos;
 				xy_buf[2 * v + 1] = vy.f * scale + y_pos;
 			}
+			tf_glyph_quarter_snap(xy_buf, info, _sd, g_offset, g_size, scale, x_pos, y_pos);
 			} else {
 				// s27 w2-avm1-text-layout: stage = M2 * T(lbox origin) *
 				// glyph{a=d=scale, tx=pen, ty=ascent}; each push rounds its

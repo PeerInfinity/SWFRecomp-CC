@@ -1,5 +1,10 @@
 num_frames = 1
 
+# Golden: FLASH PLAYER 32 (s28 w1-text-glyph-aa LOCAL ORACLE REQUEST 1,
+# direct pinned capture; its trace tail matches output.txt), swapped in by s28
+# w2-glyph-quarter-snap with Flash's 1/4-px glyph snap (30 -> 16 px > 2 vs
+# Flash). The 48 allowed channels are 16 glyph-corner pixels where Flash's
+# 16-level coverage differs from 4x MSAA.
 [image_comparisons.output]
 tolerance = 1
-max_outliers = 0
+max_outliers = 48

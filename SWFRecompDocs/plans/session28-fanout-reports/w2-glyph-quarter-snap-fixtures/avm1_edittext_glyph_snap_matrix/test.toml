@@ -1,0 +1,8 @@
+num_ticks = 1
+
+# FLASH request F2 (s28 w2-glyph-quarter-snap): golden must be a Flash Player 32 capture.
+[image_comparisons.output]
+tolerance = 2
+
+[player_options]
+with_renderer = { optional = false }
