@@ -27,7 +27,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | 7 | w1-render-flash-headroom | `briefs/w1-render-flash-headroom.md` | session_018CoDi3SHpVL9RmKCJ3YhgZ — DELIVERED: quality-harness NO-GO (our LOW is closer to Flash HIGH); Flash occupied-depth keep-both = SWF5 only (captured) → w2-occupied-depth; tie-rule evidence → n-stroke-snap; no swap in reach |
 | 8 | w1-test12-enterframe | `briefs/w1-test12-enterframe.md` | session_018CoDi7N5Bch7zdwEeLUYZ4 — launched 2026-11-25 |
 | 9 | w1-text-edit-tail | `briefs/w1-text-edit-tail.md` | session_018CoDi59FTJJJPfNtJqs7E1 — DELIVERED; Flash: restrict fires+deletes (=Ruffle), SNF defer (=Ruffle), AVM2 selection tinted (=ours, RvF) → w2-text-edit-land |
-| 10 | w1-text-glyph-aa | `briefs/w1-text-glyph-aa.md` | session_018CoDi5Jv8Udc64LppZrHrZ — launched 2026-11-25 |
+| 10 | w1-text-glyph-aa | `briefs/w1-text-glyph-aa.md` | session_018CoDi5Jv8Udc64LppZrHrZ — DELIVERED; Flash snaps glyph outlines to ¼ px (wordwrap 199→23 px vs Flash; 22 Ruffle-golden losses unpriced); rotated residual = border weight; 16-level AA NO-GO L → w2-glyph-quarter-snap |
 
 ## Wave 2 (implementation, cloud)
 
