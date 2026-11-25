@@ -6,17 +6,18 @@
     "total_available": 229,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 7,
+    "ignored_count": 6,
     "filtered": true
   },
-  "total": 222,
+  "total": 223,
   "pass": 214,
   "ruffle_matched": 8,
-  "fail": 0,
-  "pass_rate": 96.4,
+  "fail": 1,
+  "pass_rate": 96.0,
   "effective_pass": 222,
-  "effective_pass_rate": 100.0,
+  "effective_pass_rate": 99.6,
   "breakdown": {
+    "output_mismatch": 1,
     "ruffle_matched": 8
   },
   "tests": [
@@ -1941,6 +1942,25 @@
       },
       "duration": 5.7,
       "status": "pass"
+    },
+    {
+      "test": "bitmapdata/getpixel-from-embedded",
+      "phases": {
+        "recomp": 0.016,
+        "compile": 5.783,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "duration": 5.81,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=2, expected=2)",
+      "actual_output": "908a8c\n220a06",
+      "expected_output": "908a8c\n200d04"
     },
     {
       "test": "blendmode/blendmode_1",

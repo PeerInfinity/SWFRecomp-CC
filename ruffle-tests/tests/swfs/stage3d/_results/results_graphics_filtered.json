@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-24T17:26:56.734247+00:00",
-    "git_sha": "78fee9e13f853501e2dc637877cddb20254a603f",
-    "duration_seconds": 94.72,
+    "timestamp": "2026-11-25T03:46:34.814161+00:00",
+    "git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "duration_seconds": 90.29,
     "total_available": 8,
     "shards": 30,
     "expected_shards": 30,
@@ -22,8 +22,8 @@
       "test": "draw_to_bitmap_data_unconfigured",
       "phases": {
         "recomp": 0.004,
-        "compile": 24.21,
-        "run": 0.294
+        "compile": 24.004,
+        "run": 0.332
       },
       "num_frames": 1,
       "lines": {
@@ -31,15 +31,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 24.52,
+      "duration": 24.35,
       "status": "pass"
     },
     {
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.005,
-        "compile": 9.4,
-        "run": 0.297
+        "compile": 8.233,
+        "run": 0.337
       },
       "num_frames": 126,
       "lines": {
@@ -47,15 +47,15 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 9.71,
+      "duration": 8.58,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
         "recomp": 0.004,
-        "compile": 6.842,
-        "run": 0.279
+        "compile": 6.773,
+        "run": 0.314
       },
       "num_frames": 12,
       "lines": {
@@ -63,15 +63,15 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 7.13,
+      "duration": 7.1,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.027,
-        "compile": 12.431,
-        "run": 0.477
+        "recomp": 0.026,
+        "compile": 12.494,
+        "run": 0.529
       },
       "num_frames": 1,
       "lines": {
@@ -79,7 +79,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 13.18,
+      "duration": 13.3,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -119,9 +119,9 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.021,
-        "compile": 11.375,
-        "run": 0.416
+        "recomp": 0.017,
+        "compile": 8.424,
+        "run": 0.355
       },
       "num_frames": 1,
       "lines": {
@@ -129,7 +129,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 12.0,
+      "duration": 8.92,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -170,8 +170,8 @@
       "test": "scissor_rectangle_invalid",
       "phases": {
         "recomp": 0.013,
-        "compile": 8.745,
-        "run": 0.339
+        "compile": 8.712,
+        "run": 0.382
       },
       "num_frames": 1,
       "lines": {
@@ -179,7 +179,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 9.23,
+      "duration": 9.24,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -220,8 +220,8 @@
       "test": "unbound_texture",
       "phases": {
         "recomp": 0.013,
-        "compile": 8.855,
-        "run": 0.346
+        "compile": 8.797,
+        "run": 0.379
       },
       "num_frames": 1,
       "lines": {
@@ -229,7 +229,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.31,
+      "duration": 9.28,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -269,9 +269,9 @@
     {
       "test": "unbound_texture_multiple",
       "phases": {
-        "recomp": 0.014,
-        "compile": 8.924,
-        "run": 0.35
+        "recomp": 0.013,
+        "compile": 8.784,
+        "run": 0.378
       },
       "num_frames": 1,
       "lines": {
@@ -279,7 +279,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.38,
+      "duration": 9.27,
       "image_comparisons": {
         "output": {
           "status": "pass",

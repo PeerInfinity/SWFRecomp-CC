@@ -6,20 +6,26 @@
 
 **Run Duration**: 43m 41s
 
-**Filtered**: 7 tests ignored out of 229 available
+**Filtered**: 6 tests ignored out of 229 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 222 |
-| Passing | **214** (96.4%) |
+| Total tests | 223 |
+| Passing | **214** (96.0%) |
 | Ruffle-matched | 8 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **222** (100.0%) |
-| Failing | 0 |
-| Total expected lines | 2407 |
-| Matching lines | 2361 (98.1%) |
-| Mismatched lines | 46 |
+| Effective pass | **222** (99.6%) |
+| Failing | 1 |
+| Total expected lines | 2409 |
+| Matching lines | 2362 (98.0%) |
+| Mismatched lines | 47 |
+
+### Failure Breakdown
+
+| Category | Count | % of Failures |
+|----------|-------|---------------|
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
@@ -261,9 +267,11 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `bitmapdata/getpixel-from-embedded` | 50.0% | 1 | 2 | 1 |  |
 
 ## Segfaults
 
@@ -279,9 +287,11 @@ No timeouts.
 
 ## All Output Mismatches
 
-**0 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
-No output mismatches.
+| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
+|---|------|------------|----------------|--------|----------|-------|
+| 1 | `bitmapdata/getpixel-from-embedded` | 50.0% | 1/2 | 2 | 2 |  |
 
 ## Investigation Documents
 
@@ -291,4 +301,4 @@ No output mismatches.
 | 2 | [SHUMWAY_AVM1_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) | 11 | 11 | 0 |
 | 3 | [SHUMWAY_AVM1_SUBTREES_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_SUBTREES_PLAN.md) | 1 | 1 | 0 |
 | 4 | [SHUMWAY_FUZZ_TIMELINE_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) | 20 | 20 | 0 |
-| | *(tests not in any document)* | 188 | 180 | 8 |
+| | *(tests not in any document)* | 189 | 180 | 9 |
