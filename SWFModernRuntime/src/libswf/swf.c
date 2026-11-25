@@ -214,6 +214,20 @@ static int g_pending_natural_wrap_promote = 0;
 static int g_wrap_promote_active = 0;
 #endif
 
+#ifndef OFFSCREEN_RENDER
+// Browser root-DoAction entry marker (see the frame-entry gate in tagMain).
+// File scope since s28 browser-root-goto: an inline root goto
+// (ng_executeGotoCatchUp / ng_runPendingRootGoto) runs the target frame's
+// DoAction outside that gate, so it records the target here. Otherwise a
+// gotoAndPlay back to frame N-1 from frame N's script left the marker on N, and
+// the next tick's entry into N looked like a re-entry: its DoAction was
+// suppressed (regression/avm1_goto_backward_enterframe_once skipped "Frame 3").
+static long s_wasm_last_doaction_frame = -1;
+#define NG_NOTE_ROOT_DOACTION_RAN(f) (s_wasm_last_doaction_frame = (long)(f))
+#else
+#define NG_NOTE_ROOT_DOACTION_RAN(f) ((void)0)
+#endif
+
 extern void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame);
 extern void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target_frame);
 extern void actionRewindCleanup(SWFAppContext* app_context);
@@ -278,6 +292,7 @@ static void ng_runPendingRootGoto(SWFAppContext* app_context)
 				{
 					current_frame = target;
 					if (frame_funcs[target]) frame_funcs[target](app_context);
+					NG_NOTE_ROOT_DOACTION_RAN(target);
 				}
 				catch_up_backward = 0;
 				ng_display_cleanup_unplaced_after(app_context, target);
@@ -296,6 +311,7 @@ static void ng_runPendingRootGoto(SWFAppContext* app_context)
 				{
 					current_frame = target;
 					if (frame_funcs[target]) frame_funcs[target](app_context);
+					NG_NOTE_ROOT_DOACTION_RAN(target);
 				}
 			}
 			current_frame = target;
@@ -410,6 +426,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 		actionDrainSuppressEnter();
 		funcs[target](app_context);
 		actionDrainSuppressLeave();
+		NG_NOTE_ROOT_DOACTION_RAN(target);
 		g_tag_skip_mode = saved_tag_skip_phase_e;
 		ng_run_deferred_sprite_init_on_or_after(app_context, target);
 		g_defer_sprite_init = saved_defer_phase_f;
@@ -790,6 +807,11 @@ void tagMain(SWFAppContext* app_context)
 #endif
 
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+		// Tick boundary: clear g_defer_sprite_init, which ng_executeGotoCatchUp
+		// leaves set for the rest of the calling tick (see the OFFSCREEN block
+		// above). The browser reaches the catch-up since s28 browser-root-goto.
+		{ extern int g_defer_sprite_init; g_defer_sprite_init = 0; }
+
 		// Browser-WASM: run the same pending-removal finalize + dead-child cascade
 		// the OFFSCREEN block above runs. Without it, nested timeline-placed
 		// children (auto-named "instanceN") of clips removed via removeMovieClip
@@ -1036,6 +1058,16 @@ void tagMain(SWFAppContext* app_context)
 		g_tick_mouse_released = app_context->mouse.released;
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
+
+		// s28 browser-root-goto: a root goto from one of the input handlers
+		// above (a clip's on(release) `_root.gotoAndStop(n)` ->
+		// ng_executeGotoTagsOnly) runs its target frame now. OFFSCREEN runs it
+		// right after its input pump (ng_runPendingRootGoto after
+		// input_events_pump_tick); here the input is dispatched at the top of the
+		// tick, so without this the frame-func gate below saw manual_next_frame=1
+		// and re-ran the ORIGINAL frame first (Doodle Jump's menu showed for one
+		// tick under the sub-screen's first entries).
+		ng_runPendingRootGoto(app_context);
 #endif
 
 		// Advance root-level sprites BEFORE root frame_func runs, mirroring
@@ -1113,26 +1145,15 @@ void tagMain(SWFAppContext* app_context)
 		// (a clip the script had moved away was placed again, with a second
 		// onClipEvent(load)) -- see the parked tail after this block.
 		// Fixture: regression/avm1_browser_parked_frame (Flash 32 golden).
-		// Browser: also run a frame the playhead has just ENTERED while
-		// stopped. Several browser goto arms (a sprite script's
-		// _root.gotoAndStop(n) on a stopped root, e.g. Pacman's preloader ->
-		// menu) only move current_frame and relied on the per-tick re-run to
-		// execute the target frame; OFFSCREEN runs those through its inline
-		// catch-up instead.
-#ifndef OFFSCREEN_RENDER
-		static long s_browser_last_ran_frame = -1;
-#endif
+		// The browser's "or the playhead ENTERED an un-run frame" term is gone
+		// (s28 browser-root-goto): it existed because the browser root-goto arms
+		// only moved current_frame and left the target frame to this call. They
+		// are the CI arms now (inline ng_executeGotoCatchUp, or
+		// ng_executeGotoTagsOnly + ng_runPendingRootGoto below), so the gate is
+		// the same in every swf.c build.
 		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL
-		    && (is_playing || manual_next_frame
-#ifndef OFFSCREEN_RENDER
-		        || (long)current_frame != s_browser_last_ran_frame
-#endif
-		       )
-		    )
+		    && (is_playing || manual_next_frame))
 		{
-#ifndef OFFSCREEN_RENDER
-			s_browser_last_ran_frame = (long)current_frame;
-#endif
 			g_loopback_replay = g_loopback_replay_armed;
 			g_loopback_replay_armed = 0;
 #ifndef OFFSCREEN_RENDER
@@ -1153,7 +1174,6 @@ void tagMain(SWFAppContext* app_context)
 			// frame_func at all while parked. See [[browser-wasm-frame-func-rerun]].
 			{
 				extern int g_suppress_root_doaction;
-				static long s_wasm_last_doaction_frame = -1;
 				g_suppress_root_doaction =
 				    ((long)current_frame == s_wasm_last_doaction_frame) ? 1 : 0;
 				s_wasm_last_doaction_frame = (long)current_frame;
@@ -1175,7 +1195,8 @@ void tagMain(SWFAppContext* app_context)
 				ng_display_cleanup_unplaced_after(app_context, current_frame);
 			}
 #endif
-#ifdef OFFSCREEN_RENDER
+			// Every swf.c build (s28 browser-root-goto: the browser's root gotos
+			// inline the target frame too).
 			// If a goto inside the script inlined the target frame's body
 			// AND the recompiler-emitted last-frame wrap-back fired
 			// afterward (signature: next_frame=0; manual_next_frame=1),
@@ -1204,7 +1225,6 @@ void tagMain(SWFAppContext* app_context)
 					next_frame = current_frame;
 				}
 			}
-#endif
 		}
 
 #ifndef OFFSCREEN_RENDER
@@ -1290,6 +1310,13 @@ void tagMain(SWFAppContext* app_context)
 			extern void actionMarkDynamicMCsEnterFrameEligible(void);
 			actionMarkDynamicMCsEnterFrameEligible();
 		}
+		// s28 browser-root-goto: a root goto left pending by this tick's scripts
+		// (a sprite script's `_root.gotoAndStop(n)` -> ng_executeGotoTagsOnly, or
+		// a deferred-goto arm) runs its target frame now -- OFFSCREEN's slot
+		// further down, after its input/socket pumps (the browser dispatches
+		// input at the top of the tick). processTimers runs it again after each
+		// batch of timer callbacks (timer.c).
+		ng_runPendingRootGoto(app_context);
 #endif
 #ifdef OFFSCREEN_RENDER
 

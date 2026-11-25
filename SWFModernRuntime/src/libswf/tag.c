@@ -10707,6 +10707,11 @@ void tagShowFrame(SWFAppContext* app_context)
 	// advance / draining LOAD while nested inside a CLIP_RELEASE handler
 	// corrupts global state used by getDisplayListJSON and other consumers.
 	if (catch_up_mode) return;
+	// The scripts-only target replay of an inline root goto
+	// (ng_executeGotoCatchUp, g_tag_skip_mode=1) is no ShowFrame either: the
+	// calling tick's own tagShowFrame runs the per-tick tail once. The CI arm
+	// above returns the same way. s28 browser-root-goto.
+	if (g_tag_skip_mode) return;
 	// Browser-WASM eager placement init (s27 browser-eager-init). tagPlaceObject2
 	// now runs the CI placement path in this build too: ng_on_place_object2,
 	// the INIT/CONSTRUCT/REGISTER_CTOR/LOAD queue and the frame-0 eager build
@@ -12806,9 +12811,9 @@ DisplayObject* ng_findUnderEntryByName(const char* name, int* out_scriptable)
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth, u8 is_replace)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
+	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
 	if (g_tag_skip_mode) return;
-#endif
 	ng_ensureDisplayListSize(app_context, depth);
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
@@ -13779,9 +13784,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count, u8 is_replace)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
+	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
 	if (g_tag_skip_mode) return;
-#endif
 	// Set pending so tagPlaceObject2 attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
@@ -13805,8 +13810,10 @@ void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* cli
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, u8 is_replace)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
+	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
 	if (g_tag_skip_mode) return;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Same Phase-2 contract as tagPlaceObject2: placement is already done.
 	// Without this a script-only replay RE-PLACED the child from scratch
 	// (tagSetInstanceName is a script-only no-op, so it lost its name, and its
@@ -14338,9 +14345,9 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count, u8 is_replace)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
+	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
 	if (g_tag_skip_mode) return;
-#endif
 	// Set pending so tagPlaceObject2Ratio attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
@@ -16335,8 +16342,9 @@ void tagEndFilterList(SWFAppContext* app_context, size_t depth)
 void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth)
 {
 	(void)app_context;
+	if (g_tag_skip_mode) return;  // every build (s28 browser-root-goto)
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	if (g_script_only_mode || g_tag_skip_mode) return;
+	if (g_script_only_mode) return;
 #endif
 	if (depth <= max_depth)
 		display_list[depth].cm_live = 1;
@@ -16351,8 +16359,9 @@ void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth)
 void tagSetColorMatrixFolded(SWFAppContext* app_context, size_t depth, u32 plain_cxform_id)
 {
 	(void)app_context;
+	if (g_tag_skip_mode) return;  // every build (s28 browser-root-goto)
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	if (g_script_only_mode || g_tag_skip_mode) return;
+	if (g_script_only_mode) return;
 #endif
 	if (depth <= max_depth)
 	{
@@ -16378,12 +16387,13 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// In script_only_mode (Phase 2), display list is already set up from Phase 1 — skip.
 	if (g_script_only_mode) return;
+#endif
 	// In tag_skip mode (deferred goto target-script replay), tags are no-ops.
 	// Matches the gate other tag functions use (tagPlaceObject2, tagRemoveObject2,
 	// etc). Without this, the deferred replay of a target frame's tagSetInstanceName
 	// re-renames display entries that survived the rewind, clobbering their name.
+	// Every build since s28 browser-root-goto.
 	if (g_tag_skip_mode) return;
-#endif
 
 	// If the display entry doesn't exist yet (tagSetInstanceName called before tagPlaceObject2),
 	// store as pending so the next PlaceObject at this depth uses it.
@@ -16761,7 +16771,8 @@ int hasClipEnterFrameHandlers(void)
 	return 0;
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Every build since s28 browser-root-goto (ng_executeGotoCatchUp calls the
+// _before / _on_or_after pair, and the browser runs that catch-up now).
 // Run deferred sprite-init with optional frame filter.
 // filter_mode: 0=all, 1=only placed_at_frame < target, 2=only placed_at_frame >= target
 static void ng_run_deferred_sprite_init_impl(SWFAppContext* app_context, int filter_mode, size_t target_frame)
@@ -16804,10 +16815,7 @@ static void ng_run_deferred_sprite_init_impl(SWFAppContext* app_context, int fil
 // Called after attachMovie fires the parent's constructor so that child
 // constructors (e.g. "box" inside an attached "a" clip) fire immediately
 // during the attachMovie call, before any goto catch-up places new sprites.
-// Compiled in all three builds (attachMovie runs everywhere now) — temporarily
-// close + reopen the surrounding NO_GRAPHICS/OFFSCREEN_RENDER block so this
-// symbol exists in browser-WASM where attachMovie now references it.
-#endif // NO_GRAPHICS — opens at line 8163, reopen below
+// Compiled in all three builds (attachMovie runs everywhere now).
 void ng_fire_child_constructors(SWFAppContext* app_context, MovieClip* mc)
 {
 	if (mc == NULL || mc->display_obj == NULL) return;
@@ -16815,7 +16823,6 @@ void ng_fire_child_constructors(SWFAppContext* app_context, MovieClip* mc)
 	if (dobj->sprite_display_list == NULL || dobj->sprite_max_depth == 0) return;
 	fire_eager_constructors(app_context, dobj->sprite_display_list, dobj->sprite_max_depth, mc);
 }
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) // reopen the block
 
 // Fire registered class constructors for ALL pending sprites (root + children),
 // without running Phase 2 scripts. Uses process_sprite_needs_init in constructor_only
@@ -16851,12 +16858,8 @@ void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t 
 	ng_run_deferred_sprite_init_impl(app_context, 2, target_frame);
 }
 
-#endif // NO_GRAPHICS — close of the block opened at line 6968. The
-       // post-catch-up cleanup below is referenced from action_queue.c via
-       // extern, so it must be visible to graphics builds too. The call
-       // site there is gated on `catch_up_backward && g_natural_wrap_cleanup_pending`,
-       // both 0 in graphics mode, so this function is inert at runtime —
-       // but the linker still needs the symbol.
+// The post-catch-up cleanup below is referenced from action_queue.c via
+// extern, so it must be visible to every build.
 
 // Clear display entries whose placed_at_frame is after target_frame.
 // Used by swf_core.c when seeking backward on the main timeline, and by

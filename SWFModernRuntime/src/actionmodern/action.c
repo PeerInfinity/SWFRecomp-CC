@@ -29007,7 +29007,7 @@ static void propagateTargetToDescendants(MovieClip* mc)
 	}
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Every build since s28 browser-root-goto (ng_executeGotoCatchUp's backward arm).
 // Clean up child MCs during backward goto.
 // Removes dynamically created MCs (createEmptyMovieClip) from cache and dynamic_props,
 // and resets swapped depths so the timeline replay restores original positions.
@@ -29158,7 +29158,6 @@ void actionRenameMovieClip(const char* old_name, const char* new_name)
 		return;
 	}
 }
-#endif
 
 // (was: #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) — un-gated for textfield helpers used by tag_stubs.c when compiled in graphics)
 // ==================================================================
@@ -37859,10 +37858,8 @@ void actionPrevFrame(SWFAppContext* app_context)
 {
 	// Suppress unused parameter warning
 	(void)app_context;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// s26 w2: a loaded movie's own frame code -> its own playhead.
 	if (actionChildMovieBareGoto(app_context, 0, -1, 0)) return;
-#endif
 
 	// Access global frame control variables
 	extern size_t current_frame;
@@ -39496,7 +39493,6 @@ void actionNextFrame(SWFAppContext* app_context)
 	extern size_t next_frame;
 	extern int manual_next_frame;
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// s26 w2: a loaded movie's own frame code -> its own playhead.
 	if (actionChildMovieBareGoto(app_context, 0, +1, 0)) return;
 	extern int g_settarget_explicit_root;
@@ -39601,7 +39597,6 @@ void actionNextFrame(SWFAppContext* app_context)
 			return;
 		}
 	}
-#endif
 
 	next_frame = current_frame + 1;
 	manual_next_frame = 1;
@@ -40165,7 +40160,9 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		return;
 	}
 #endif
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Every build since s28 browser-root-goto (the browser had its own copy of
+	// the in-sprite / g_current_context routes below, minus SetTarget("_root")
+	// and the loaded-movie arm).
 	extern int g_settarget_explicit_root;
 	extern int g_settarget_none;
 	// SWF7+ SetTarget2(undefined) sets target to None — GotoFrame is a no-op
@@ -40184,7 +40181,8 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 				next_frame = frame;
 				manual_next_frame = 1;
 				root_movieclip.currentframe = frame + 1;
-#if defined(OFFSCREEN_RENDER) && !defined(NO_GRAPHICS)
+#if !defined(NO_GRAPHICS)
+				// Every swf.c build (graphics-native and, since s28, the browser).
 				// Graphics-native (swf.c) doesn't consume g_deferred_root_goto in
 				// its main loop, so deferring leaves manual_next_frame=1 +
 				// is_playing=1 dangling and the recompiler-emitted last-frame
@@ -40221,39 +40219,6 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		ng_gotoFrameByMC(app_context, g_current_context, frame, 0);
 		return;
 	}
-#endif
-
-	// Browser-WASM: route in-sprite gotos to the current sprite, not root.
-	// Mirrors actionPlay/actionStop's post-98b388e46 widening of the
-	// ng_isInsideSprite() route. Without this, sprite_9's script_3
-	// actionGotoFrame(1) (preloader loop's `gotoAndPlay(2)` — the SWF
-	// frame 2 maps to runtime frame 1) falls through to the root-goto
-	// path below which sets is_playing=0, stopping the root timeline
-	// and freezing Pong's preloader after `_root.play()` had just
-	// kicked it off. exec_sprite_frame in graphics_stubs.c populates
-	// g_current_sprite_obj so ng_isInsideSprite() / ng_gotoFrameCurrentSprite
-	// work the same way they do under OFFSCREEN_RENDER.
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	{
-		extern int g_settarget_none;
-		if (g_settarget_none) return;
-		if (ng_isInsideSprite()) {
-			ng_gotoFrameCurrentSprite(frame);
-			return;
-		}
-		// A tellTarget/with-targeted non-root clip (e.g. `tellTarget(Ghost[g])
-		// { gotoAndStop(1) }`) navigates THAT clip, not the root timeline.
-		// Mirrors the NG/OFFSCREEN g_current_context branch above. Without
-		// this, the bare goto fell through to the root-goto path below and
-		// hijacked the root playhead — Pacman's initVars runs
-		// `tellTarget(Ghost[g]){ gotoAndStop(1) }` for each ghost, which bounced
-		// the whole game off the Ready frame back to the title screen.
-		if (g_current_context != NULL && g_current_context != &root_movieclip) {
-			ng_gotoFrameByMC(app_context, g_current_context, frame, 0);
-			return;
-		}
-	}
-#endif
 
 	extern size_t current_frame;
 	extern size_t next_frame;
@@ -40270,23 +40235,19 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		was_clamped = 1;
 	}
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern int goto_from_action;
-#endif
 
 	// When called from inside an enterFrame handler, skip the goto entirely.
 	// The frame loop will naturally advance on the next tick. The enterFrame
 	// callback (e.g., Dejagnu checker) retries every tick until its condition
 	// is met, so skipping one goto is safe. This prevents the enterFrame goto
 	// from overriding the natural frame advance via manual_next_frame.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	{
 		extern int g_inside_enterframe_dispatch;
 		if (g_inside_enterframe_dispatch) {
 			return;
 		}
 	}
-#endif
 
 	next_frame = frame;
 	manual_next_frame = 1;
@@ -40295,7 +40256,8 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	// Update _currentframe immediately so scripts can read the new value
 	root_movieclip.currentframe = frame + 1;  // 1-indexed
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Every build (s28 browser-root-goto): the target frame runs inline, as in
+	// Flash, instead of on the next tick's frame func.
 	goto_from_action = 1;
 	// Phase E (GOTO_FIFO_UNIFICATION_INCREMENTAL): ng_executeGotoCatchUp now
 	// inlines funcs[target] in scripts-only mode at the end of the call.
@@ -40308,7 +40270,7 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	}
 	extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
 	ng_executeGotoCatchUp(app_context);
-#endif
+
 }
 
 /**
@@ -40421,7 +40383,6 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 		}
 	}
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Sprite-local label resolution. GoToLabel (0x8C, gotoAndStop("name"))
 	// emitted inside a sprite's OWN frame script resolves the label against the
 	// CURRENT sprite's timeline, not the root. findFrameByLabel below only knows
@@ -40450,7 +40411,6 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 			}
 		}
 	}
-#endif
 
 	// Look up frame by label
 	int frame_index = findFrameByLabel(label);
@@ -40467,14 +40427,12 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 		// Update _currentframe immediately so scripts can read the new value
 		root_movieclip.currentframe = frame_index + 1;  // 1-indexed
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern int goto_from_action;
 		goto_from_action = 1;
 
 		// Execute tags-only catch-up inline. Scripts are deferred.
 		extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
 		ng_executeGotoCatchUp(app_context);
-#endif
 	}
 	// If label not found, ignore (per Flash spec - no action taken)
 }
@@ -40619,7 +40577,6 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 			frame_part = colon + 1;
 		}
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Target path support: resolve "/path/:frame" or "path:frame" to a sprite
 		// MovieClip and navigate that sprite. Mirrors actionCall's target-path
 		// handling. Without this, the path was silently stripped and the frame
@@ -40666,7 +40623,6 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 				return;
 			}
 		}
-#endif
 
 		// Check if frame_part is numeric
 		char* endptr;
@@ -40705,7 +40661,6 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	}
 
 	// Navigate: actionGotoFrame uses 0-based
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	{
 		extern int g_settarget_none;
 		if (g_settarget_none) {
@@ -40741,16 +40696,12 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 			return;
 		}
 	}
-#endif
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// s26 w2: a loaded movie's own frame code -> its own playhead (numeric
 	// frames; a label still resolves against the root's label table -- HOLD).
 	if (actionChildMovieBareGoto(app_context, (long)frame_final - 1, 0, play_flag)) return;
-#endif
 	actionGotoFrame(app_context, (u16)(frame_final - 1));
 
 	if (play_flag) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern int g_settarget_explicit_root;
 		if (ng_isInsideSprite() && g_settarget_explicit_root) {
 			is_playing = 1;
@@ -40763,19 +40714,6 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 				display_list[_pd].sprite_is_playing = 1;
 		}
 		else
-#else
-		// browser-WASM: a tellTarget/with-targeted non-root clip was already
-		// navigated by actionGotoFrame's g_current_context branch — set play on
-		// the clip's sprite entry rather than resuming the ROOT timeline.
-		// Mirrors the NG/OFFSCREEN base_clip branch above.
-		if (!ng_isInsideSprite() && g_current_context != NULL &&
-		    g_current_context != &root_movieclip) {
-			size_t _pd = ng_findDisplayEntryByName(g_current_context->name);
-			if (_pd != SIZE_MAX)
-				display_list[_pd].sprite_is_playing = 1;
-		}
-		else
-#endif
 		is_playing = 1;
 	}
 }
@@ -78894,8 +78832,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 				if (frame_num > 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					u16 frame0 = (u16)(frame_num - 1);
+					// Root receiver: the CI arm in every build (s28 browser-root-goto).
+					// The browser used to run only the skipped frames' tags here and
+					// leave the target frame to the next tick's frame func, so a timer
+					// or event callback's `_root.gotoAndStop(n)` on a stopped root ran
+					// frame n's DoAction ticks late (the interval meant to be cleared
+					// there kept firing). ng_executeGotoTagsOnly + the main loop's /
+					// processTimers' ng_runPendingRootGoto run it right after the
+					// calling script, as Flash does. Fixture:
+					// regression/avm1_timer_root_goto_stopped_gs.
 					if (force_root || mc == &root_movieclip) {
 						// Root goto via method call: always inline catch-up
 						// so RemoveObject2 fires synchronously and avm1_removed is set.
@@ -78918,106 +78864,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							}
 						}
 						if (is_play) is_playing = 1;
-					} else if (actionChildMovieGoto(app_context, mc, frame0, is_play)) {
+					}
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+					else if (actionChildMovieGoto(app_context, mc, frame0, is_play)) {
 						// s26: a loaded movie's holder -- its own playhead.
 					} else if (!ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
 						actionGotoFrame(app_context, frame0);
 						if (is_play) is_playing = 1;
 					}
 #else
-					// Browser-WASM root goto: run intermediate frames'
-					// tags so depths placed by frame_0 (and only removed
-					// in frame_1) get cleared before the natural advance
-					// runs the target frame. Without this, gotoAndStop(N>1)
-					// from a clip RELEASE handler leaves frame_0's
-					// PlaceObject2 entries (menu buttons + hero + block)
-					// stacked over the sub-screen. We run frames
-					// original..target-1 with catch_up_mode=1 (tags run,
-					// scripts suppressed via the recompiler-emitted gate);
-					// natural advance (swf.c:334 `current_frame = next_frame`)
-					// runs frame_target itself next tick, so we avoid
-					// double-script-fire from inlining target here.
-					// For backward goto, also clear depths placed at
-					// frames > target (mirrors ng_display_cleanup_unplaced_after,
-					// which IS linkable in graphics — actionRewindCleanup is not).
-					// Key reproducer: Doodle Jump menu Info / Scores /
-					// Options buttons.
-					{
-						u16 frame0 = (u16)(frame_num - 1);
-						if (mc == &root_movieclip && frame0 < g_frame_count) {
-							extern size_t current_frame;
-							extern size_t next_frame;
-							extern int manual_next_frame;
-							extern int catch_up_mode;
-							extern int g_tag_skip_mode;
-							extern size_t g_place_gen;
-							extern frame_func* g_frame_funcs;
-							extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
-
-							size_t saved_current = current_frame;
-							if ((size_t)frame0 != saved_current) {
-								g_place_gen++;
-								int saved_catch_up = catch_up_mode;
-								int saved_tag_skip = g_tag_skip_mode;
-								// We're called from a clip RELEASE handler
-								// (or similar) that already pushed the
-								// clicked MC into g_current_context. The
-								// catch-up frames' tags run at root scope —
-								// in particular, sprite placements queue
-								// CLIP_EVENT_LOAD entries that capture
-								// g_current_context as their parent_mc, then
-								// at drain time resolve the placement's
-								// instance_name against that parent. Leaving
-								// g_current_context as the clicked MC makes
-								// the LOAD bind to a phantom MC instead of
-								// the real depth-N sprite MC — the LOAD
-								// handler's setMember writes onto the
-								// phantom, and the real sprite's button_txt
-								// keeps its default text. Force root here.
-								// Key reproducer: DJ Info-button click,
-								// the back-button label staying "menu"
-								// instead of getting set to "back".
-								MovieClip* saved_ctx = g_current_context;
-								actionSetCurrentContext(&root_movieclip);
-								catch_up_mode = 1;
-								g_tag_skip_mode = 0;
-								if ((size_t)frame0 < saved_current) {
-									// Backward: clear depths placed at
-									// frames > target so the upcoming
-									// frame_target run sees a clean slate.
-									ng_display_cleanup_unplaced_after(app_context, (size_t)frame0);
-									for (size_t f = 0; f < (size_t)frame0 && f < g_frame_count; f++) {
-										current_frame = f;
-										if (g_frame_funcs[f]) g_frame_funcs[f](app_context);
-									}
-								} else {
-									// Forward: run frames between current
-									// and target (exclusive) so their
-									// RemoveObject2 tags execute.
-									for (size_t f = saved_current + 1; f < (size_t)frame0 && f < g_frame_count; f++) {
-										current_frame = f;
-										if (g_frame_funcs[f]) g_frame_funcs[f](app_context);
-									}
-								}
-								catch_up_mode = saved_catch_up;
-								g_tag_skip_mode = saved_tag_skip;
-								actionSetCurrentContext(saved_ctx);
-							}
-							// Land on the target frame so swf.c's
-							// already-passed `current_frame = next_frame`
-							// line (top of THIS tick — we got here from a
-							// mouse-release handler that fires AFTER the
-							// top-of-tick advance) doesn't end up re-running
-							// the original frame (frame_0 menu) at the
-							// pending frame_funcs[current_frame] call later
-							// this tick. Setting current_frame = frame0
-							// makes that call land on frame_target instead.
-							current_frame = (size_t)frame0;
-							next_frame = frame0;
-							manual_next_frame = 1;
-							is_playing = is_play ? 1 : 0;
-							root_movieclip.currentframe = frame0 + 1;
-						} else {
+					else {
+						{
 							// Browser-WASM: MC-targeted gotoAndStop/Play
 							// (mc != &root_movieclip). Do NOT call
 							// actionGotoFrame here — it treats
@@ -79090,7 +78947,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 9 && strncasecmp(method_name, "prevFrame", 9) == 0)
 		{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Every build (s28 browser-root-goto): the browser compiled this method
+			// to a no-op, so `_root.prevFrame()` / `mc.prevFrame()` never moved anything.
 			if (mc) {
 				int cf = mc->currentframe;  // 1-indexed
 				if (cf > 1) {
@@ -79123,14 +78981,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				// If already at frame 1, do nothing (stay at frame 1)
 			}
-#endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 9 && strncasecmp(method_name, "nextFrame", 9) == 0)
 		{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Every build (s28 browser-root-goto): the browser compiled this method
+			// to a no-op, so `_root.nextFrame()` / `mc.nextFrame()` never moved anything.
 			if (mc) {
 				int cf = mc->currentframe;  // 1-indexed
 				u16 frame0 = (u16)cf;  // next frame, 0-indexed (cf is 1-indexed, so cf = next 0-indexed)
@@ -79158,7 +79016,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					actionNextFrame(app_context);
 				}
 			}
-#endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
