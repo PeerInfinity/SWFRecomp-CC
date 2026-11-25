@@ -1,5 +1,9 @@
 num_frames = 3
 
+# s28 w2-filter-residuals-land: golden = FP32 LNX draw() capture (was the Ruffle
+# exporter 0ddd12b6a). Flash-exact at tolerance 2: the fractional DropShadow
+# offset is read bilinearly (tag.c filter_shadow_offset_px); the +-2 left are
+# display-blur levels (Ruffle's scaled-pass GPU kernel vs Flash's floored box).
 [image_comparisons.output]
-tolerance = 1
+tolerance = 2
 max_outliers = 0

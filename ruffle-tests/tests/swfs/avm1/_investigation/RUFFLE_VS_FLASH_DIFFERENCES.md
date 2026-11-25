@@ -981,3 +981,39 @@ the live world matrix and live bounds: `shape=true` in phase B, `true` on the go
 **Decision:** match Flash (`action.c` `actionHitTestStaleBounds`, s28 w2-hittest-shape-stale). The golden is replaced
 by the FP32 capture via `flash_fixes`. The row keeps its 6 ACCEPTED Cat 8 lines (our glyph/morph precision, = FP32 ≠
 ours).
+
+## Display DropShadow at a fractional offset: Flash interpolates, Ruffle snaps to the nearest pixel (s28 w2-filter-residuals-land)
+
+**Ruffle:** `render/wgpu/src/filters/{drop_shadow,glow}.rs` read the blurred layer through
+`get_sampler(false, false)` (NEAREST) at the shadow offset, so a DropShadow at
+`distance · (cos, sin)` lands on whole pixels (`floor(-off + 0.5)`).
+**Flash Player 32:** reads the blurred layer at the FRACTIONAL offset, bilinearly.
+
+**Evidence (FP32 LNX captures, coordinator-run):**
+- `w2b_shadow_shape_a50` (s27 w2-local-oracles/w2b-group-alpha-triggers; now
+  `regression/group_alpha_shadow_shape_a50` + AVM2 twin): DropShadow blur 4, 45°,
+  distance 12 (offset 8.485 px). Nearest offset 8 reproduces our old render; bilinear at
+  8.485 reproduces Flash at 0 px > 1. Row 50, x 105..111: ours (nearest)
+  128/144/176/208/240/255/255, Flash 128/136/160/192/224/248/255. Old render 768 px (max
+  20) off, now 0.
+- `regression/avm1_runtime_filters` case D (8 px at 45°, bbox (43,173)–(168,253)): 1006 px
+  (max 18) off, now 0 (max 1). `regression/avm1_nested_po3_filters`: 2872 channels (max 9)
+  off, now exact at tolerance 2. Both are re-goldened from the Ruffle exporter to FP32.
+
+**Implementation:** `tag.c filter_shadow_offset_px` / `render_filtered_core` /
+`compose_chain_entry_to_layer`, `avm2_display.c avm2_render_filtered` and its chain
+composer. The whole pixels are folded into the blur's pre-shift (floor), and the sub-texel
+remainder goes through the composite's LINEAR sampler.
+
+**Priced losses (Ruffle goldens; graded on the pixels the change moves, vs the archived
+FP32 captures in session28-fanout-reports/w1-local-oracles):**
+
+| row | moved px | vs FP32 direct capture: Σ\|err\| before → after | px closer after / before |
+|---|---|---|---|
+| `visual/filters/drop_shadow` (`output`) | 13260 | 354061 → 280819 | 8769 / 4141 |
+| `visual/cache_as_bitmap/edittext_scroll` `output.01` | 92 | 15200 → 11932 | 62 / 29 |
+| `visual/cache_as_bitmap/edittext_scroll` `output.02` | 91 | 14959 → 11603 | 62 / 29 |
+
+All three move Flash-ward. Both goldens are Ruffle renders that also depend on the
+default font, so they stay far from FP32 in text either way.
+**Decision:** match Flash. These rows are priced losses under this entry.

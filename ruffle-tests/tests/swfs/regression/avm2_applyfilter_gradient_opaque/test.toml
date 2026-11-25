@@ -1,7 +1,7 @@
 # s27 w2-flash-filter-kernels Flash probe, landed by w2b-filter-kernels-residual.
 # output.txt = the FLASH Player 32 capture (session27-fanout-reports/w2-local-oracles/
-# w2-flash-filter-kernels/avm2_applyfilter_gradient_opaque_probe/flash.txt) MINUS the
-# held `gradientbevel full knockout` case's 2 lines (create_test_swf.py HELD).
+# w2-flash-filter-kernels/avm2_applyfilter_gradient_opaque_probe/flash.txt), in FULL
+# since s28 w2-filter-residuals-land restored `gradientbevel full knockout` (fb_bevel_offset).
 # Pins: the Error #2077 opaque-target set, blur onto an opaque target, and the
 # GradientGlow / GradientBevel kernels.
 num_frames = 1

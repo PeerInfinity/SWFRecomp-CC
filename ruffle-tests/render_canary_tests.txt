@@ -816,3 +816,8 @@ regression/avm1_bitmap_nearest_tie_stage   # 0x43 fill at scale 1.5, ties up  1 
 # tier=1
 regression/avm1_edittext_rotated_borders   # 15/30/45/60 deg + shear borders vs Flash   1 cmp
 regression/avm1_edittext_rotated_glyphs    # rotated/sheared glyph runs + borders vs Flash  1 cmp
+# s28 w2-filter-residuals-land: display DropShadow fractional offset read bilinearly (tag.c filter_shadow_offset_px,
+# avm2_display.c avm2_render_filtered) and the applyFilter bevel sample offset (avm2_bitmap.c fb_bevel_offset). FP32 goldens.
+# tier=1
+regression/group_alpha_shadow_shape_a50        # 8.485 px shadow, 50% group alpha, Flash tol 1   1 cmp
+regression/avm2_applyfilter_bevel_sample       # bevel sample offsets, FP32 trace (no image)     0 cmp

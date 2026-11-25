@@ -1,8 +1,7 @@
 # s26 w2-avm2-applyfilter-kernels fixture; landed by s27 w2b-filter-kernels-residual.
 # output.txt = the FLASH Player 32 capture (SWFRecompDocs/plans/flash-oracle-captures/
 # avm2_applyfilter_glow_kernels/output.flash.txt; 3/3 Linux runs, Windows identical)
-# MINUS the lines of the three held bevel cases (create_test_swf.py HELD; each case
-# runs on fresh objects, so the remaining lines are exactly Flash's). The full probe
-# with its Flash output is kept in session27-fanout-reports/w2-held-fixtures/.
+# in FULL since s28 w2-filter-residuals-land restored the three held bevel cases
+# (avm2_bitmap.c fb_bevel_offset; the probe was session27-fanout-reports/w2-held-fixtures/).
 # Flash throws Error #2077 at `glow to opaque`, so the trace ends there.
 num_frames = 1

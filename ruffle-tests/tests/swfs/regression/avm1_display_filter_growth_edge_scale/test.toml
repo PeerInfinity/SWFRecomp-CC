@@ -1,0 +1,15 @@
+# s28 w2-filter-residuals-land: display-filter growth / edge / scale vs FLASH PLAYER 32
+# (output.expected.png = the coordinator's FP32 LNX draw() capture,
+# w1-local-oracles/w1-filter-residuals/avm1_display_filter_growth_edge_scale.flash.png).
+# BUDGETED residual (s28 w2 report, item 4): cases C / E exact; A / B / D are
+# display-blur LEVEL offsets (max 4: our GPU blur is Ruffle's scaled-pass
+# kernel, Flash's is the floored box chain); F is the tail length, Flash
+# x = 82..287 vs ours 79..291 (70 px, 140 channels at 255). Tighten when the
+# GPU display blur runs Flash's q floored box passes.
+num_frames = 1
+
+[image_comparisons.output]
+checks = [{ tolerance = 1, max_outliers = 5000 }, { tolerance = 4, max_outliers = 150 }]
+
+[player_options]
+with_renderer = { optional = false, quality = "high" }

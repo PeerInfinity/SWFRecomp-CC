@@ -1,0 +1,3 @@
+# s28 w2-filter-residuals-land: BevelFilter sample offset vs FLASH PLAYER 32
+# (output.txt = the FP32 capture's lines for the cases kept; see create_test_swf.py).
+num_frames = 1

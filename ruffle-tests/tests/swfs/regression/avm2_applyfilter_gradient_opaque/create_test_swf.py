@@ -13,7 +13,7 @@ try/catch, so one throw does not hide the rest:
   `<label>: ok <getPixel32(10,10)>`  or  `<label>: err <errorID>`,
 and the gradient cases trace rows y=6 and y=10 like glow_kernels.
 
-output.txt is the Flash Player 32 capture (minus the HELD cases, see test.toml).
+output.txt is the Flash Player 32 capture (full since s28; see test.toml).
 """
 import os
 import struct
@@ -164,8 +164,9 @@ CASES = [
 # session27-fanout-reports/w2b-filter-kernels-residual-report.md). Every case
 # runs on fresh objects, so dropping one leaves the others' Flash lines as
 # captured; output.txt is the Flash capture minus the held cases' lines.
-# Set HELD = () to rebuild the full Flash probe.
-HELD = ('gradientbevel full knockout',)
+# Set HELD = () to rebuild the full Flash probe. s28 w2-filter-residuals-land
+# restored the held bevel case(s) (fb_bevel_offset closes them; was ('gradientbevel full knockout',)).
+HELD = ()
 CASES = [c for c in CASES if c[0] not in HELD]
 
 

@@ -15,6 +15,15 @@ placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
   cab          cacheAsBitmap + alpha 128/256                -> PER CHILD
 At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
 (128,128,254)), per child = (128,65,192) for cab.
+  shadow_shape_a50 (s28 w2-filter-residuals-land; the s27 w2b-group-alpha-
+     triggers `w2b_shadow_shape_a50` probe, byte-identical): NOT the sprite
+     scene -- a root red SHAPE (20,20,80,60) with alpha 128/256 and a
+     DropShadow black, blur 4, 45 deg, distance 12, strength 1, q1. The
+     shadow lands at a FRACTIONAL offset (8.485 px): Flash reads the blurred
+     layer there bilinearly (Ruffle snaps to the nearest texel), and the
+     group alpha keeps the shadow from showing through the rect. Golden:
+     session27-fanout-reports/w2-local-oracles/w2b-group-alpha-triggers/
+     w2b_shadow_shape_a50/flash.screen.png.
 
 GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
 1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
@@ -105,6 +114,10 @@ def place3(depth, cid, tx=0, ty=0, cx=None, filters=None, blend=None, cab=False)
     if blend: body += bytes([blend])
     if cab: body += bytes([1])
     return tag(70, body)
+def dropshadow(rgba, b, ang, dist, st, passes=1):
+    fx = lambda v: struct.pack('<i', int(round(v * 65536)))
+    return (bytes([0]) + bytes(rgba) + fx(b) + fx(b) + fx(ang) + fx(dist)
+            + struct.pack('<h', int(round(st * 256))) + bytes([(1 << 5) | passes]))
 def colormatrix(m20):
     return bytes([6]) + struct.pack('<20f', *m20)
 
@@ -129,6 +142,8 @@ PROBES = {
     'multiply':    lambda: scene() + [place3(1, 10, cx=A50, blend=3)],
     'layer_inner': lambda: scene() + [sprite(11, [place3(1, 10, blend=2)]), place3(1, 11, cx=A50)],
     'layer_aadd':  lambda: scene() + [place3(1, 10, cx=cxform_alpha(mult=(256, 256, 256, 256), add=(0, 0, 0, -128)), blend=2)],
+    'shadow_shape_a50': lambda: [shape(1, [(20, 20, 80, 60)], RED),
+                                 place3(1, 1, cx=A50, filters=[dropshadow((0, 0, 0, 255), 4, 0.785398, 12, 1)])],
 }
 
 def build(name):

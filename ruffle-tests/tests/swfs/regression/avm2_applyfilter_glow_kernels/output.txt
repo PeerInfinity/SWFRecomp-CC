@@ -12,6 +12,12 @@ dropshadow hideObject y=6: 0 0 0 0 0 20000ff 80000ff f0000ff 150000ff 190000ff 1
 dropshadow hideObject y=10: 0 0 0 0 0 80000ff 1a0000ff 2d0000ff 430000ff 550000ff 5e0000ff 650000ff 660000ff 5f0000ff 580000ff 480000ff 320000ff 1e0000ff b0000ff 10000ff
 dropshadow inner y=6: 0 0 0 0 0 990c1635 990c1635 990c1635 990c1635 990c1635 990a1635 9908122f 99070d20 99030712 99020307 0 0 0 0 0
 dropshadow inner y=10: 0 0 0 0 0 992548b2 99264dc1 992a53d0 ff000000 ff000000 ff000000 ff000000 9912255c 990c1635 99030712 0 0 0 0 0
+bevel default y=6: 0 0 0 0 0 99d3ddff 99e2e9ff 99dfe7ff 99cdd8ff 99b7c9ff 9997b0ff 997194ff 99527bff 993466ff 992f5de9 0 0 0 0 0
+bevel default y=10: 0 0 0 0 0 99a5bcff 9997b0ff 997999ff ff2d2d2d ff010101 ff000000 ff000000 99173079 9912255a 99112052 0 0 0 0 0
+bevel outer y=6: 2ffffff 17ffffff 3dffffff 64ffffff 91ffffff df7395fe e17597ff e17597ff db7194ff d16a8fff c9648afe ba5781fe a84673ff 993466ff a72f5de9 2d000000 21000000 14000000 7000000 0
+bevel outer y=10: 2ffffff 17ffffff 3cffffff 62ffffff 8affffff d46c90fe c9648afe bd5a83ff ff000000 ff000000 ff000000 ff000000 c8274ec3 d1264aba d92447b3 90000000 64000000 3d000000 17000000 2000000
+bevel full knockout y=6: 0 0 2cff00ff 5fff00ff 7fff00ff 7fff00ff 7bff00ff 5cff00ff 3aff00ff 32ff00ff 2bff00ff 23ff00ff fffff00 5bffff00 a8ffff00 a9ffff00 6dffff00 33ffff00 0 0
+bevel full knockout y=10: 0 0 2cff00ff 5fff00ff 7fff00ff 7fff00ff 7fff00ff 78ff00ff 4aff00ff 11ff00ff 40ffff00 94ffff00 bffefe00 bffefe00 bffefe00 bffefe00 8effff00 42ffff00 0 0
 Error: Error #2077: This filter operation cannot be performed with the specified input parameters.
 	at flash.display::BitmapData/applyFilter()
 	at global$init()

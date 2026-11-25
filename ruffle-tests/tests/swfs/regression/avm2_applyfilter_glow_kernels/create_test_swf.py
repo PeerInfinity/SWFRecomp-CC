@@ -157,8 +157,9 @@ CASES = [
 # session27-fanout-reports/w2b-filter-kernels-residual-report.md). Every case
 # runs on fresh objects, so dropping one leaves the others' Flash lines as
 # captured; output.txt is the Flash capture minus the held cases' lines.
-# Set HELD = () to rebuild the full Flash probe.
-HELD = ('bevel default', 'bevel outer', 'bevel full knockout')
+# Set HELD = () to rebuild the full Flash probe. s28 w2-filter-residuals-land
+# restored the held bevel case(s) (fb_bevel_offset closes them; was ('bevel default', 'bevel outer', 'bevel full knockout')).
+HELD = ()
 CASES = [c for c in CASES if c[0] not in HELD]
 
 

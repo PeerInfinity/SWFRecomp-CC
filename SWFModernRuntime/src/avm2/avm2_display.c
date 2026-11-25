@@ -20570,7 +20570,7 @@ static void avm2_filter_one_in_place(Avm2Context* ctx, const Avm2FilterVal* f)
 	float uvy = fit_y / ((float) context->height * vs);
 	float du, dv;
 	if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
-	else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
+	else { du = xd * uvx; dv = yd * uvy; }   // s28: fractional, bilinear (Flash)
 	float strength = avm2_filter_fixed8(f->strength);
 	if (is_bevel)
 		renderer_compose_filter_to_layer(context, 1, du, dv,
@@ -20786,14 +20786,21 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	// blur tail past the stage edge, so reading the BLUR at +offset cut a
 	// shadow thrown back onto the stage; shifting the blur's INPUT read is exact.
 	int shadow_pre_shifted = 0;
+	float shadow_frac_x = 0.0f, shadow_frac_y = 0.0f;
 	if (is_shadow && n == 1 && !group)
 	{
 		float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
 		float a_ = avm2_filter_fixed16(last->angle);
 		float d_ = avm2_filter_fixed16(last->distance);
-		int sx = (int) floorf(-cosf(a_) * d_ * vs + 0.5f);
-		int sy = (int) floorf(-sinf(a_) * d_ * vs + 0.5f);
-		if (sx != 0 || sy != 0)
+		// s28 w2-filter-residuals-land (tag.c filter_shadow_offset_px): the
+		// whole part is folded into the blur, the sub-texel remainder read
+		// bilinearly by the composite (Flash; Ruffle snaps to the nearest texel).
+		float ox = roundf(-cosf(a_) * d_ * vs * 256.0f) / 256.0f;
+		float oy = roundf(-sinf(a_) * d_ * vs * 256.0f) / 256.0f;
+		int sx = (int) floorf(ox);
+		int sy = (int) floorf(oy);
+		shadow_frac_x = ox - (float) sx; shadow_frac_y = oy - (float) sy;
+		if (sx != 0 || sy != 0 || shadow_frac_x != 0.0f || shadow_frac_y != 0.0f)
 		{
 			renderer_set_blur_shift(context, sx, sy);
 			shadow_pre_shifted = 1;
@@ -20886,9 +20893,8 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 		float uvx = fit_x / ((float) context->width * vs);
 		float uvy = fit_y / ((float) context->height * vs);
 		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
-		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
-		// Already applied inside the blur (shadow_pre_shifted above).
-		if (shadow_pre_shifted) { du = 0.0f; dv = 0.0f; }
+		else { du = xd * uvx; dv = yd * uvy; }   // s28: fractional, bilinear (Flash)
+		if (shadow_pre_shifted) { du = -shadow_frac_x * uvx; dv = -shadow_frac_y * uvy; }
 	}
 	float strength = avm2_filter_fixed8(last->strength);
 	float hi_r = (float) ((last->color2 >> 16) & 0xFF) / 255.0f;

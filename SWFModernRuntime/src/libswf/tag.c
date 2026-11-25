@@ -5037,18 +5037,30 @@ static void cxform_apply_rgba(const float cx[20], double* r, double* g,
 }
 
 // A drop shadow's sampling offset in whole DEVICE pixels: the shadow at x is
-// the blurred layer at x + (sx, sy). Same rounding as the nearest-offset block
-// in render_filtered_object (Ruffle samples NEAREST: floor(-off + 0.5)).
-// Returns 0 when the offset is zero.
+// the blurred layer at x + (sx, sy): the whole-pixel part of the shadow offset
+// (s28: floor; was Ruffle's NEAREST floor(-off + 0.5)), the fraction left in
+// g_shadow_frac_{x,y} for the composite. Returns 0 when the offset is zero.
+static float g_shadow_frac_x = 0.0f, g_shadow_frac_y = 0.0f;
 static int filter_shadow_offset_px(RenderContext* rc, const FilterListEntry* f,
                                    int* sx, int* sy)
 {
 	float vs = (rc != NULL && rc->stage_scale > 0.0f) ? rc->stage_scale : 1.0f;
 	float xd = cosf(f->angle) * f->distance * vs;
 	float yd = sinf(f->angle) * f->distance * vs;
-	*sx = (int) floorf(-xd + 0.5f);
-	*sy = (int) floorf(-yd + 0.5f);
-	return (*sx != 0) || (*sy != 0);
+	// s28 w2-filter-residuals-land: Flash reads the blurred layer at the
+	// FRACTIONAL offset (bilinear; FP32 w2b_shadow_shape_a50 capture, 768 px
+	// -> 0 > 1; regression/avm1_runtime_filters case D and
+	// avm1_nested_po3_filters re-goldened to FP32), not Ruffle's NEAREST texel
+	// (RUFFLE_VS_FLASH_DIFFERENCES.md). Whole part here (floor; the offset is
+	// first rounded to 1/256 so float noise at an integer cannot flip it), the
+	// sub-texel remainder in g_shadow_frac_{x,y}, read bilinearly by the
+	// composite (renderer_compose_filter's LINEAR filter_sampler).
+	float ox = roundf(-xd * 256.0f) / 256.0f, oy = roundf(-yd * 256.0f) / 256.0f;
+	*sx = (int) floorf(ox);
+	*sy = (int) floorf(oy);
+	g_shadow_frac_x = ox - (float) *sx;
+	g_shadow_frac_y = oy - (float) *sy;
+	return (*sx != 0) || (*sy != 0) || g_shadow_frac_x != 0.0f || g_shadow_frac_y != 0.0f;
 }
 
 // Compose a NON-FINAL glow / drop shadow / bevel of a chain back INTO the
@@ -5087,7 +5099,7 @@ static void compose_chain_entry_to_layer(SWFAppContext* app_context,
 	float uvy = fit_y / ((float)app_context->height * vs);
 	float du, dv;
 	if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
-	else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
+	else { du = xd * uvx; dv = yd * uvy; }   // s28: fractional, bilinear (Flash)
 	double c_r = f->color_r, c_g = f->color_g, c_b = f->color_b, c_a = f->color_a;
 	double h_r = f->highlight_r, h_g = f->highlight_g, h_b = f->highlight_b, h_a = f->highlight_a;
 	if (have_obj_cx)
@@ -5480,6 +5492,9 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		&& filter_shadow_offset_px(context, last, &shadow_shift_x, &shadow_shift_y);
 	if (shadow_pre_shifted)
 		renderer_set_blur_shift(context, shadow_shift_x, shadow_shift_y);
+	// Snapshot the sub-texel remainder now (the composite below reads it).
+	float shadow_frac_x = shadow_pre_shifted ? g_shadow_frac_x : 0.0f;
+	float shadow_frac_y = shadow_pre_shifted ? g_shadow_frac_y : 0.0f;
 
 	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
 	// chains for free: N plain blurs are bit-equal to one blur of quality N,
@@ -5617,9 +5632,10 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		float uvx = fit_x / ((float)app_context->width * vs);
 		float uvy = fit_y / ((float)app_context->height * vs);
 		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
-		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
-		// Already applied inside the blur (shadow_pre_shifted above).
-		if (shadow_pre_shifted) { du = 0.0f; dv = 0.0f; }
+		else { du = xd * uvx; dv = yd * uvy; }   // s28: fractional, bilinear (Flash)
+		// Whole part already applied inside the blur (shadow_pre_shifted
+		// above); the sub-texel remainder is read bilinearly here.
+		if (shadow_pre_shifted) { du = -shadow_frac_x * uvx; dv = -shadow_frac_y * uvy; }
 	}
 
 	if (draw_source_before)

@@ -4182,16 +4182,21 @@ static uint32_t fb_glow_composite(const Avm2FilterVal* f, const uint32_t cc[3],
 	return CMK(o[1], o[2], o[3], o[0]);
 }
 
-// The glow amount: floor(min(255, level * strength) * alpha), the colour
-// alpha UNquantised -- (a + 1) / 256 recovers 0.5 and 0.75 from their
-// truncated bytes 127 / 191, which the `glow quality3 alpha.5` row needs
-// (24 * 1.5 * 0.5 = 12, not 11.95 -> 11).
+// The glow amount: round(floor(min(255, level * strength)) * alpha_byte / 255)
+// (s28; was floor(min(255, level * strength) * (a + 1) / 256), s27).
 static uint32_t fb_glow_amount(double amount, uint8_t alpha)
 {
-	double al = alpha == 0 ? 0.0 : ((double) alpha + 1.0) / 256.0;
 	if (amount > 255.0) amount = 255.0;
 	if (amount < 0.0) amount = 0.0;
-	uint32_t ga = (uint32_t) floor(amount * al + 1e-9);
+	// s28 w2-filter-residuals-land: the colour alpha multiplies the
+	// FLOORED amount as an 8-bit byte, rounded: (amt * a + 127) / 255. Fitted
+	// on the FP32 avm1_applyfilter_dropshadow capture (alpha 0.8 -> byte 204;
+	// the old floor(amt * (a + 1) / 256) put 213 px one level low, incl. the
+	// `dt 50,50` probe 0x98 vs Flash 0x99). Every Flash glow / DS / bevel /
+	// gradient row the old rule matched stays exact (glow_kernels, draw_filtered,
+	// gradient_opaque, incl. `glow quality3 alpha.5`: 36 * 127 / 255 -> 18).
+	uint32_t amt = (uint32_t) floor(amount + 1e-9);
+	uint32_t ga = (amt * (uint32_t) alpha + 127u) / 255u;
 	return ga > 255u ? 255u : ga;
 }
 
@@ -4282,6 +4287,39 @@ static uint32_t fb_grad_pixel(const Avm2FilterVal* f, const uint32_t lut[256],
 	return fb_glow_composite(f, cc, CA(e), dr, 1, fb_mul_grad);
 }
 
+// Bevel / GradientBevel sample offset (s28 w2-filter-residuals-land), fitted
+// on the FP32 avm2_bevel_sample_isolation_probe capture (Flash's blurred grid
+// B is byte-identical to ours there, so every residual was the sample
+// position). Flash samples b_l at +o' and b_r at -o', o' per axis in 1/256 px:
+//   * an INTEGRAL component (0 / 90 / 180 / 270 deg, or d * cos landing on a
+//     1/256 step) is exact. Our angle is Fixed16 radians, so cos(90 deg) came
+//     out -2.5e-6 and the floored bilinear sample lost a level on every
+//     gradient texel (a90 rows: 108 / 358 px); snapping the angle to 0.01 deg
+//     and doing the trig in double removes that;
+//   * a fractional component is floor(o * 256 + 1.4): about +0.9/256 toward
+//     +x / +y on the +o side (and the mirror on -o), for either sign of o.
+//     That is the unique window ([1.34, 1.47)) fitting every isolated sample
+//     of d 2 / 3 at 45 / 135 / 200 deg and d 1.5 at 45 / 200 deg.
+// Probe: 2175 px off -> 177 (18 of 30 cases exact). The residual is d 1.5 at
+// 135 deg (137 px: Flash's x lands on round(o), not this rule) and <= 9 px in
+// each of ten other cases; the mechanism behind the constant is unknown. Closes
+// every bevel line of the glow_kernels / draw_filtered / gradient_opaque
+// Flash probes (4 + 2 + 2 lines -> 0).
+static void fb_bevel_offset(const Avm2FilterVal* f, double* ox, double* oy)
+{
+	double deg = (double) f->angle / 65536.0 * (180.0 / 3.14159265358979323846);
+	deg = floor(deg * 100.0 + 0.5) / 100.0;
+	double rad = deg * (3.14159265358979323846 / 180.0);
+	double dist = (double) f->distance / 65536.0;
+	double v[2] = { cos(rad) * dist * 256.0, sin(rad) * dist * 256.0 };
+	for (int i = 0; i < 2; i++)
+	{
+		double r = floor(v[i] + 0.5);
+		v[i] = fabs(v[i] - r) < 1e-6 ? r : floor(v[i] + 1.4);
+	}
+	*ox = v[0] / 256.0; *oy = v[1] / 256.0;
+}
+
 // Glow / DropShadow / Bevel / GradientGlow / GradientBevel over `region`,
 // Flash model. Returns a calloc'd premultiplied grid of the region grown by
 // g[0..3] = left, top, right, bottom.
@@ -4362,8 +4400,10 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 			uint32_t px;
 			if (is_bevel)
 			{
-				int b_l = fb_alpha_level(bl, bw, bh, bx + (double) cx_off, by + (double) cy_off);
-				int b_r = fb_alpha_level(bl, bw, bh, bx - (double) cx_off, by - (double) cy_off);
+				double qx, qy;
+				fb_bevel_offset(f, &qx, &qy);
+				int b_l = fb_alpha_level(bl, bw, bh, bx + qx, by + qy);
+				int b_r = fb_alpha_level(bl, bw, bh, bx - qx, by - qy);
 				px = is_grad ? fb_grad_pixel(f, lut, 0, b_l, b_r, dr)
 				             : fb_bevel_pixel(f, b_l, b_r, dr);
 			}

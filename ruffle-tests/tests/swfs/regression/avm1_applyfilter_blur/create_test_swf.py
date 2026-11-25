@@ -18,7 +18,9 @@ bitmapDataApplyFilter, avm1_filter_kernels.c):
     (getPixel32 0x6B640005 vs the transparent twin's 0x6BEE000C, 0 on the
     grown rim) and displays it ignoring that alpha (black rim);
   - Convolution into an opaque target applies normally.
-The dropshadow / gradientglow / gradientbevel twins (same generator, KINDS
+avm1_applyfilter_dropshadow landed in s28 w2-filter-residuals-land with its
+FP32 golden (the fb_glow_amount quantization order: (floor(amount) * alpha_byte
++ 127) / 255). The gradientglow / gradientbevel twins (same generator, KINDS
 below) are not landed yet: see the w2b-avm1-applyfilter-flash report.
 Regenerate: python3 create_test_swf.py   (writes ../avm1_applyfilter_<kind>/test.swf
 for every kind whose directory exists)
