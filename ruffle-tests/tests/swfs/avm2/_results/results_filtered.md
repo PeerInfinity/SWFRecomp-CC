@@ -6,26 +6,26 @@
 
 **Run Duration**: 212m 39s
 
-**Filtered**: 34 tests ignored out of 1346 available
+**Filtered**: 31 tests ignored out of 1346 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1312 |
-| Passing | **1293** (98.6%) |
-| Ruffle-matched | 18 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1311** (99.9%) |
-| Failing | 1 |
-| Total expected lines | 159038 |
-| Matching lines | 157685 (99.1%) |
-| Mismatched lines | 1353 |
+| Total tests | 1315 |
+| Passing | **1293** (98.3%) |
+| Ruffle-matched | 20 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **1313** (99.8%) |
+| Failing | 2 |
+| Total expected lines | 162518 |
+| Matching lines | 160821 (99.0%) |
+| Mismatched lines | 1697 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Output Mismatch | 2 | 100.0% |
 
 ## Passing Tests
 
@@ -1329,7 +1329,7 @@
 
 ## Ruffle-Matched Tests
 
-**18 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**20 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
@@ -1340,25 +1340,29 @@
 | 5 | `event_handler_exception` | 3 | 3 | 5.9s |  |
 | 6 | `gradient_values_readback` | 12 | 12 | 6.8s |  |
 | 7 | `html_text_img_parsing` | 95 | 95 | 6.5s |  |
-| 8 | `json_parse_numbers` | 4 | 79 | 8.4s |  |
-| 9 | `loader_events_2` | 30 | 30 | 9.2s |  |
-| 10 | `matrix3d_recompose_edge_cases` | 8 | 85 | 6.3s |  |
-| 11 | `number_convert_errors` | 706 | 706 | 5.9s |  |
-| 12 | `number_to_string` | 104 | 104 | 6.1s |  |
-| 13 | `primitive_bound_methods` | 1 | 1 | 5.7s |  |
-| 14 | `textblock_line_changes` | 44 | 44 | 6.9s |  |
-| 15 | `textblock_recreateline` | 137 | 138 | 6.9s |  |
-| 16 | `textblock_releaselines` | 4 | 4 | 7.7s |  |
-| 17 | `textline_atom_index_at_char_index` | 3 | 3 | 7.4s |  |
-| 18 | `uncaught_errors_stringified` | 15 | 15 | 5.9s |  |
+| 8 | `int_toexponential` | 76 | 76 | 5.9s |  |
+| 9 | `json_parse_numbers` | 4 | 79 | 8.4s |  |
+| 10 | `loader_events_2` | 30 | 30 | 9.2s |  |
+| 11 | `matrix3d_recompose_edge_cases` | 8 | 85 | 6.3s |  |
+| 12 | `number_convert_errors` | 706 | 706 | 5.9s |  |
+| 13 | `number_to_string` | 104 | 104 | 6.1s |  |
+| 14 | `primitive_bound_methods` | 1 | 1 | 5.7s |  |
+| 15 | `textblock_line_changes` | 44 | 44 | 6.9s |  |
+| 16 | `textblock_recreateline` | 137 | 138 | 6.9s |  |
+| 17 | `textblock_releaselines` | 4 | 4 | 7.7s |  |
+| 18 | `textline_atom_index_at_char_index` | 3 | 3 | 7.4s |  |
+| 19 | `uint_toexponential` | 100 | 100 | 5.8s |  |
+| 20 | `uncaught_errors_stringified` | 15 | 15 | 5.9s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `number_tostring` | 84.0% | 882 | 1050 | 168 |  |
 
 ## Segfaults
 
@@ -1374,8 +1378,9 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**2 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `audio_computespectrum` | 0.0% | 0/118 | 0 | 118 |  |
+| 1 | `number_tostring` | 84.0% | 882/1050 | 1050 | 1050 |  |
+| 2 | `audio_computespectrum` | 0.0% | 0/118 | 0 | 118 |  |

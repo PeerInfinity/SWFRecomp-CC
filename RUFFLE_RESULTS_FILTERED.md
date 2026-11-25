@@ -13,7 +13,7 @@
 |-------|-----:|------:|-----:|--------|
 | audio | 4 | 5 | 80.0% | [details](ruffle-tests/tests/swfs/audio/_results/results_filtered.md) |
 | avm1 | 766 | 777 | 98.6% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
-| avm2 | 1293 | 1312 | 98.6% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
+| avm2 | 1293 | 1315 | 98.3% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
 | fonts | 8 | 9 | 88.9% | [details](ruffle-tests/tests/swfs/fonts/_results/results_filtered.md) |
 | from_avmplus | 1544 | 1572 | 98.2% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_filtered.md) |
 | from_gnash/actionscript.all | 167 | 240 | 69.6% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) |
@@ -31,9 +31,9 @@
 | text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
 | timeline | 14 | 17 | 82.4% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
 | visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
-| **Total** | **4621** | **4816** | **96.0%** | |
+| **Total** | **4621** | **4819** | **95.9%** | |
 
-*59 tests ignored.*
+*56 tests ignored.*
 
 ## Line-Level Accuracy
 
@@ -41,7 +41,7 @@
 |-------|--------:|---------:|---------:|
 | audio | 18 | 24 | 75.0% |
 | avm1 | 116,605 | 119,712 | 97.4% |
-| avm2 | 157,685 | 159,038 | 99.1% |
+| avm2 | 160,821 | 162,518 | 99.0% |
 | fonts | 363 | 377 | 96.3% |
 | from_avmplus | 85,582 | 85,970 | 99.5% |
 | from_gnash/actionscript.all | 30,707 | 32,104 | 95.6% |
@@ -59,7 +59,7 @@
 | text | 979 | 979 | 100% |
 | timeline | 365 | 371 | 98.4% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **403,075** | **410,447** | **98.2%** |
+| **Total** | **406,211** | **413,927** | **98.1%** |
 
 ## Failure Breakdown
 
@@ -67,7 +67,7 @@
 |-------|-----------------:|----------------:|
 | audio | 1 | - |
 | avm1 | 4 | 7 |
-| avm2 | 1 | 18 |
+| avm2 | 2 | 20 |
 | fonts | - | 1 |
 | from_avmplus | 1 | 27 |
 | from_gnash/actionscript.all | 5 | 68 |
@@ -85,7 +85,7 @@
 | text | - | - |
 | timeline | - | 3 |
 | visual | - | 2 |
-| **Total** | **21** | **174** |
+| **Total** | **22** | **176** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -95,6 +95,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 |-------|------|----------:|
 | from_avmplus | ecma3/JSON/AS3Types | 96% |
 | avm1 | boxed_primitives | 96% |
+| avm2 | number_tostring | 84% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test11 | 81% |
 
 ## Flash-Spec Results
@@ -124,10 +125,10 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm2
 
-- **Pass:** 1293/1312 (98.6%)
-- **Ignored:** 34 tests
+- **Pass:** 1293/1315 (98.3%)
+- **Ignored:** 31 tests
 - **Duration:** 3h32m38s across 30 shards
-- **Lines:** 157,685/159,038 matching (99.1%)
+- **Lines:** 160,821/162,518 matching (99.0%)
 - **Avg test duration:** 9.3s — slowest: `away3d_advanced_shallow_water_demo` (78.6s)
 
 ### fonts

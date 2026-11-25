@@ -6,19 +6,19 @@
     "total_available": 1346,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 34,
+    "ignored_count": 31,
     "filtered": true
   },
-  "total": 1312,
+  "total": 1315,
   "pass": 1293,
-  "ruffle_matched": 18,
-  "fail": 1,
-  "pass_rate": 98.6,
-  "effective_pass": 1311,
-  "effective_pass_rate": 99.9,
+  "ruffle_matched": 20,
+  "fail": 2,
+  "pass_rate": 98.3,
+  "effective_pass": 1313,
+  "effective_pass_rate": 99.8,
   "breakdown": {
-    "output_mismatch": 1,
-    "ruffle_matched": 18
+    "output_mismatch": 2,
+    "ruffle_matched": 20
   },
   "tests": [
     {
@@ -10229,6 +10229,25 @@
       "status": "pass"
     },
     {
+      "test": "int_toexponential",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.922,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1215,
+        "expected_lines": 1215,
+        "matching_lines": 1139
+      },
+      "duration": 5.94,
+      "ruffle_diff_count": 76,
+      "ours_diff_count": 76,
+      "status": "ruffle_matched",
+      "detail": "diffs 76 \u2286 ruffle 76"
+    },
+    {
       "test": "int_tofixed",
       "phases": {
         "recomp": 0.005,
@@ -13989,6 +14008,25 @@
       },
       "duration": 5.73,
       "status": "pass"
+    },
+    {
+      "test": "number_tostring",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.795,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1050,
+        "expected_lines": 1050,
+        "matching_lines": 882
+      },
+      "duration": 5.81,
+      "status": "output_mismatch",
+      "detail": "168 line(s) differ (actual=1050, expected=1050)",
+      "actual_output": "... (301 lines before) ...\n///(radix unspecified)\n12315000000000000000\n///(radix = 2)\n1010101011100111101010110100000010011000111011111000000000000000\n///(radix = 3)\n10001001022011102101012221121002220002210\n///(radix = 4)\n22223213222310002120323320000000\n///(radix = 5)\n1311301203140000000000000000\n///(radix = 6)\n2333214230550124231304220\n///(radix = 7)\n31022401142454651666425\n///(radix = 8)\n1253475264023073700000\n///(radix = 9)\n101038142335847086053\n///(radix = 10)\n12315000000000000000\n///(radix = 11)\n224012757a2912a6a75\n///(radix = 12)\n567389253b42b1b840\n///(radix = 13)\n1567942a101958a619\n///(radix = 14)\n5923913645345288c\n///(radix = 15)\n1d1cae91584744150\n///(radix = 16)\naae7ab4098ef8000\n///(radix = 17)\n452635769eaf283g\n///(radix = 18)\n1ef7847b999ac0gc\n///(radix = 19)\nf7g0igfei24i785\n///(radix = 20)\n7a6bge7a0000000\n///(radix = 21)\n3gf3hd0gbe9di3c\n///(radix = 22)\n1lblib801ca68kg\n///(radix = 23)\n119ll96f4cbhj44\n///(radix = 24)\ne150d1bmd28k80\n///(radix = 25)\n86f73900000000\n... (699 lines after) ...",
+      "expected_output": "... (301 lines before) ...\n///(radix unspecified)\n12315000000000000000\n///(radix = 2)\n1010101011100111101010110100000010011000111011111000000000000000\n///(radix = 3)\n1000100102201110210101222112100222000\u0097000\n///(radix = 4)\n22223213222310002120323320000000\n///(radix = 5)\n1311301203140000000000000000\n///(radix = 6)\n2333214230550124231308000\n///(radix = 7)\n31022401142454651660000\n///(radix = 8)\n1253475264023073700000\n///(radix = 9)\n101038142335847086000\n///(radix = 10)\n12315000000000000000\n///(radix = 11)\n224012757a2912a6g00\n///(radix = 12)\n567389253b42b1b000\n///(radix = 13)\n1567942a101958a000\n///(radix = 14)\n59239136453452800\n///(radix = 15)\n1d1cae91584744000\n///(radix = 16)\naae7ab4098ef8000\n///(radix = 17)\n452635769eaf2800\n///(radix = 18)\n1ef7847b999ac000\n///(radix = 19)\nf7g0igfei24i800\n///(radix = 20)\n7a6bge7a0000000\n///(radix = 21)\n3gf3hd0gbe9dg00\n///(radix = 22)\n1lblib801ca6800\n///(radix = 23)\n119ll96f4cbhk00\n///(radix = 24)\ne150d1bmd28k00\n///(radix = 25)\n86f73900000000\n... (699 lines after) ..."
     },
     {
       "test": "obfuscated_class_names",
@@ -19108,6 +19146,25 @@
       },
       "duration": 5.79,
       "status": "pass"
+    },
+    {
+      "test": "uint_toexponential",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.794,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1215,
+        "expected_lines": 1215,
+        "matching_lines": 1115
+      },
+      "duration": 5.81,
+      "ruffle_diff_count": 100,
+      "ours_diff_count": 100,
+      "status": "ruffle_matched",
+      "detail": "diffs 100 \u2286 ruffle 100"
     },
     {
       "test": "uint_tofixed",
