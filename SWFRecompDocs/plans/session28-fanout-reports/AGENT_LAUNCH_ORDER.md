@@ -40,7 +40,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w2-avm1-leads-land | w1-leads + Flash | 4–5 regression fixtures (Flash goldens) | session_018CoDi4VAVkGy2CQUkCbfQU — launched |
 | w2-hittest-shape-stale | w1-leads + Flash probe | fixture; shapeflag flash_fix (0 flips) | session_018CoDi7pH2PXPvBaoSjSrcd — launched |
 | w2-text-edit-land | w1-text-edit-tail + Flash | 3 regression fixtures (Flash goldens); RvF selection tint | session_018CoDi3oPLgPKaaLnZ4fAEX — launched |
-| w2-glyph-quarter-snap | w1-text-glyph-aa + Flash captures | wordwrap golden → Flash; rotated_borders fixture; priced RvF losses | session_018CoDi7ye6JuqkAj3DtMYv6 — launched |
+| w2-glyph-quarter-snap | w1-text-glyph-aa + Flash captures | wordwrap golden → Flash; rotated_borders fixture; priced RvF losses | session_018CoDi7ye6JuqkAj3DtMYv6 — DELIVERED, LANDED (glyph ¼-px snap embedded+AA only; border pen 1+tan/2; +2 rows, 2 goldens → Flash; 0 corpus moves) |
 | w1b-rm-avm2 | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4K1YrfUyotfKco1y4 — launched (wave 1b) |
 | w1b-rm-gnash | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi7EJcG2PzxYnxubmxh — launched (wave 1b) |
 | w1b-rm-avm1-misc | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4KkhjNDFiySBwY5AV — launched (wave 1b) |
