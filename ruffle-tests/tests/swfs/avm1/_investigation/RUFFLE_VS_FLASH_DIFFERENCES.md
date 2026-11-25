@@ -1061,3 +1061,28 @@ re-triage the stroke snap.
 (`cache_as_bitmap/scroll_rect`, `drawing_api`, `avm2_button`) are all quality LOW, so a HIGH-only no-snap does not touch
 them. **Decision:** not changed in this slot (open lead: drop the unfiltered snap at `MSAA_SAMPLES != 1`, then re-grade
 avm1_color and the HIGH cacheAsBitmap rows).
+
+## s28 w2-loaded-shell-land: MovieClipLoader fires `onLoadProgress` twice per load (2026-11-25)
+
+**Flash:** Windows FP32 fires `onLoadProgress` **twice** per MovieClipLoader load, `bytesLoaded == bytesTotal`
+both times, whatever the target (SWF, text, JPEG). Linux FP32 adds one more event per 4096-byte read (I/O
+chunking; the same Linux-only artifact as shumway `loader-events` in the s28 trace-provenance table).
+**Ruffle:** fires it once for a clip/level target and twice only for a root replacement (`loader.rs`
+`on_success_root_movie`, "For some reason, progress event is dispatched twice here").
+
+| evidence | count |
+|---|---|
+| gnash `actionscript.all/MovieClipLoader-v7/v8`, **Windows** FP32 (`session28-fanout-reports/trace-provenance/*.win1.txt`) | `Number of onLoadProgress runs: 4` over 2 loads (vars.txt, 4387-byte green.jpg); Linux r1: 5 |
+| `avm1/mcl_replace_root_swf7_to_swf5/6` golden (Flash per trace-provenance) | 2 × `loaded=97 total=97` |
+| `avm1/mcl_unloadclip`, Linux FP32 (`w1-local-oracles/w1-loaded-shell-residuals/mcl_unloadclip.flash32.txt`; 118-byte target, below one chunk, so Linux == Windows) | 2 (golden: 1) |
+| `avm1/mcl_target_png`, Linux FP32 (4534-byte target) | 3 (golden: 1); Windows predicted 2 |
+| `regression/avm1_mcl_load_tick`, Linux FP32 (child < 100 bytes) | 2 |
+
+**Ours (since s28 w2-loaded-shell-land):** 2 for every load (`actionFirePendingLoadInits` Phase 1). This
+matches Windows FP32 and every Linux capture below 4096 bytes. **Golden ≠ Flash, flash_fixes candidates** (our
+output, = golden + one more `onLoadProgress` per load, is archived as the predicted golden in
+`session28-fanout-reports/w2-loaded-shell-land-predicted-goldens/`): `avm1/mcl_unloadclip` (Flash capture ==
+ours, byte-exact), `avm1/mcl_loadclip` (68-byte target, 5 loads), `avm1/mcl_target_png`, `_jpg`, `_gif87a`,
+`_gif89a` and `avm1/mcl_mislabeled_target` (> 4096 bytes: need a WINDOWS capture). Until fixed these 7 rows grade
+pass → `output_mismatch` against the Ruffle golden.
+

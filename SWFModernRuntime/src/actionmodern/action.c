@@ -26996,6 +26996,116 @@ static void actionClearChildMovieShellNow(SWFAppContext* app_context, MovieClip*
 	childDLSwapOut(&sw);
 }
 
+// s28 w1-loaded-shell-residuals / w2-loaded-shell-land: a goto issued by a loaded movie's
+// OWN code runs its target frame's DoAction on the NEXT tick, in that movie's
+// slot of actionAdvancePlayingLevels (after the root's scripts). Flash Player 32
+// direct capture of avm1_loaded_bare_goto: `c3` + gotoAndStop(2) -> `p5 ... c2`;
+// `d1` + nextFrame -> `p3 ... d2`. The playhead/tags move immediately.
+typedef struct { MovieClip* mc; MovieEntry* entry; size_t frame0; unsigned born; } ChildDeferredScript;
+#define MAX_CHILD_DEFERRED_SCRIPTS 32
+static ChildDeferredScript g_child_deferred_scripts[MAX_CHILD_DEFERRED_SCRIPTS];
+static int g_child_deferred_script_count = 0;
+#ifdef SWF_AVM2
+static int g_avm1_under_avm2_ready;  // tentative; defined with the dual-VM block
+#endif
+// The AVM1-under-AVM2 tick has no per-tick epoch pass, so nothing would ever
+// drain a deferred script there: keep the old inline run in that mode.
+static int childDeferredScriptsAllowed(void)
+{
+#ifdef SWF_AVM2
+	if (g_avm1_under_avm2_ready) return 0;
+#endif
+	return 1;
+}
+static int childDeferredScriptPush(MovieClip* mc, MovieEntry* entry, size_t frame0)
+{
+	if (!childDeferredScriptsAllowed()) return 0;
+	for (int i = 0; i < g_child_deferred_script_count; i++) {
+		if (g_child_deferred_scripts[i].mc == mc) {
+			// A later goto in the same tick replaces the earlier queued target.
+			g_child_deferred_scripts[i].entry = entry;
+			g_child_deferred_scripts[i].frame0 = frame0;
+			g_child_deferred_scripts[i].born = g_direct_load_epoch;
+			return 1;
+		}
+	}
+	if (g_child_deferred_script_count >= MAX_CHILD_DEFERRED_SCRIPTS) return 0;
+	ChildDeferredScript* d = &g_child_deferred_scripts[g_child_deferred_script_count++];
+	d->mc = mc; d->entry = entry; d->frame0 = frame0; d->born = g_direct_load_epoch;
+	return 1;
+}
+// Pops the due script for mc (queued in an EARLIER tick). Returns 1 if found.
+static int childDeferredScriptTake(MovieClip* mc, MovieEntry* entry, size_t* frame0_out)
+{
+	for (int i = 0; i < g_child_deferred_script_count; i++) {
+		ChildDeferredScript* d = &g_child_deferred_scripts[i];
+		if (d->mc != mc || d->born >= g_direct_load_epoch) continue;
+		int ok = (d->entry == entry);
+		*frame0_out = d->frame0;
+		g_child_deferred_scripts[i] = g_child_deferred_scripts[--g_child_deferred_script_count];
+		return ok;
+	}
+	return 0;
+}
+static void childDeferredScriptsPrune(void)
+{
+	int w = 0;
+	for (int i = 0; i < g_child_deferred_script_count; i++)
+		if (g_child_deferred_scripts[i].born >= g_direct_load_epoch)
+			g_child_deferred_scripts[w++] = g_child_deferred_scripts[i];
+	g_child_deferred_script_count = w;
+}
+// Run frame frame0's DoAction (tags skipped) under the movie's full context.
+static void childMovieRunDeferredScript(SWFAppContext* app_context, MovieClip* mc, MovieEntry* entry, size_t frame0)
+{
+	if (entry == NULL || entry->frame_funcs == NULL || frame0 >= entry->frame_count) return;
+	frame_func fn = entry->frame_funcs[frame0];
+	if (fn == NULL) return;
+	int _saved_ver = g_swf_version;
+	ASObject* _saved_global = global_object;
+	int _saved_child_init = g_child_swf_init;
+	u8 _saved_movie_id = g_current_movie_id;
+	MovieClip* _saved_ctx = g_current_context;
+	g_swf_version = entry->swf_version;
+	g_child_swf_init = 1;
+	g_current_movie_id = entry->movie_id;
+	ensureSecondaryGlobalInit(app_context, entry->swf_version);
+	if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+	else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+	actionSetCurrentContext(mc);
+	DisplayObject* owner = mc->display_obj ? (DisplayObject*)mc->display_obj : actionChildMovieShell(app_context, mc, 1);
+	ChildDLSwap sw;
+	childDLSwapIn(owner, &sw);
+	extern float (*g_active_transform_data)[16];
+	float (*_saved_td)[16] = g_active_transform_data;
+	if (entry->transform_data_ptr != NULL) g_active_transform_data = entry->transform_data_ptr;
+	MovieClip* _saved_child_mc = g_child_movie_advance_mc;
+	g_child_movie_advance_mc = mc;
+	extern int quit_swf;
+	extern int is_playing;
+	extern size_t next_frame;
+	extern int manual_next_frame;
+	extern int g_tag_skip_mode;
+	int _sq = quit_swf, _sp = is_playing, _sm = manual_next_frame;
+	size_t _sn = next_frame;
+	int _sts = g_tag_skip_mode;
+	g_tag_skip_mode = 1;
+	actionDrainSuppressEnter();
+	quit_swf = 0;
+	fn(app_context);
+	actionDrainSuppressLeave();
+	g_tag_skip_mode = _sts;
+	quit_swf = _sq; is_playing = _sp; next_frame = _sn; manual_next_frame = _sm;
+	g_child_movie_advance_mc = _saved_child_mc;
+	g_active_transform_data = _saved_td;
+	childDLSwapOut(&sw);
+	actionSetCurrentContext(_saved_ctx);
+	g_swf_version = _saved_ver;
+	global_object = _saved_global;
+	g_child_swf_init = _saved_child_init;
+	g_current_movie_id = _saved_movie_id;
+}
+
 // holder.gotoAndStop(n) / gotoAndPlay(n) on a loaded movie's holder: move the
 // loaded movie's OWN playhead (the advance entry owns the cursor), not the
 // root's. Tags-only catch-up under the movie's full context swap. Returns 1
@@ -27074,7 +27184,8 @@ int actionChildMovieGoto(SWFAppContext* app_context, MovieClip* mc, size_t frame
 	// A goto issued from the parent (holder.gotoAndStop in a parent frame) keeps
 	// the phase-1 HOLD: draining it here would run unrelated queued parent
 	// scripts under the child's context.
-	if (_saved_child_mc == mc && entry->frame_funcs[frame0] != NULL) {
+	if (_saved_child_mc == mc && entry->frame_funcs[frame0] != NULL
+	    && !childDeferredScriptPush(mc, entry, frame0)) {
 		extern int g_tag_skip_mode;
 		int _sts = g_tag_skip_mode;
 		catch_up_mode = 0;
@@ -27134,20 +27245,49 @@ int actionChildMovieBareGoto(SWFAppContext* app_context, long frame0, int rel, i
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 extern void ng_dispatch_loaded_shell_enterframe(SWFAppContext* app_context);
 #endif
+int g_level_advance_ran_this_tick = 0;
 void actionAdvancePlayingLevels(SWFAppContext* app_context)
 {
+	g_level_advance_ran_this_tick = 1;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_dispatch_loaded_shell_enterframe(app_context);
 #endif
-	if (g_level_advance_count == 0) return;
+	if (g_level_advance_count == 0) { childDeferredScriptsPrune(); return; }
+	// s28 w2-loaded-shell-land: Flash runs loaded movies'
+	// frames NEWEST load first (avm1_loaded_order_create_vs_load: by LOAD, not
+	// by holder creation -- `a1 b2` with h1 created first, loaded last) (avm1_child_timeline_loop: `d1 c1`, `d2 c2` every
+	// tick; avm1_loaded_bare_goto: `d2 c2`). Walk the table reversed, then put
+	// the survivors of the original span back in table order.
+	int _orig_n = g_level_advance_count, _orig_w = -1;
+	for (int i = 0, j = _orig_n - 1; i < j; i++, j--) {
+		LevelAdvanceEntry t = g_level_advance[i];
+		g_level_advance[i] = g_level_advance[j];
+		g_level_advance[j] = t;
+	}
 	int write = 0;
 	for (int read = 0; read < g_level_advance_count; read++) {
+		if (read == _orig_n) _orig_w = write;
 		LevelAdvanceEntry e = g_level_advance[read];
 		if (e.mc == NULL || e.entry == NULL) continue;
 		// Drop entries whose MC has been unloaded or destroyed. `avm1_removed`
 		// covers removeMovieClip on the holder: script execution halts for that
 		// clip, so its loaded movie's timeline must not keep running either.
 		if (e.mc->depth == INT_MIN || e.mc->unloaded || e.mc->avm1_removed) continue;
+		{
+			size_t _df0 = 0;
+			if (childDeferredScriptTake(e.mc, e.entry, &_df0)) {
+				childMovieRunDeferredScript(app_context, e.mc, e.entry, _df0);
+				LevelAdvanceEntry* _lv = childMovieEntryFor(e.mc);
+				if (_lv == NULL) continue;
+				if (_lv->entry != e.entry) { g_level_advance[write++] = *_lv; continue; }
+				e = *_lv;
+				e.armed = 1;
+				// ...and the movie then takes its normal step in the SAME slot:
+				// Flash 32 avm1_loaded_goto_play_deferred prints `c2 c3` every
+				// tick after c3's gotoAndPlay(2) (target script, then the play
+				// advance to frame 3). A stopped movie (gotoAndStop) stays put.
+			}
+		}
 		// The tick that ran the load also ran the movie's frame 1 (the loader
 		// calls frame_funcs[0] itself), and this driver runs in the SAME tick,
 		// immediately after it. Arming here rather than advancing keeps a loaded
@@ -27382,7 +27522,14 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 		// holder.play() has to be able to find it.
 		g_level_advance[write++] = e;
 	}
+	if (_orig_w < 0) _orig_w = write;
+	for (int i = 0, j = _orig_w - 1; i < j; i++, j--) {
+		LevelAdvanceEntry t = g_level_advance[i];
+		g_level_advance[i] = g_level_advance[j];
+		g_level_advance[j] = t;
+	}
 	g_level_advance_count = write;
+	childDeferredScriptsPrune();
 }
 
 #ifdef SWF_AVM2
@@ -28056,17 +28203,69 @@ int actionAvm1LocalConnectionDeliver(SWFAppContext* app_context, const char* key
 #endif  // SWF_AVM2
 
 static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all);
+void actionCancelPendingDirectLoadsFor(MovieClip* mc)
+{
+	int w = 0, n = g_pending_direct_load_count, st = 0;
+	for (int i = 0; i < n; i++) {
+		if (!g_pending_direct_loads[i].is_level && g_pending_direct_loads[i].target == mc) continue;
+		if (i < g_pending_direct_stamped) st++;
+		g_pending_direct_loads[w++] = g_pending_direct_loads[i];
+	}
+	g_pending_direct_load_count = w;
+	g_pending_direct_stamped = st;
+}
+// s28 w2-loaded-shell-land: tick-start stamp (called from
+// actionPromotePendingMCLLoads, the first call of both tick loops). Loads
+// queued after the previous tick's drain (loaded-movie advance, timers, MCL
+// events) keep the s27 next-tick delivery: born = the epoch this tick's drain
+// will run at, so they fire in the NEXT drain.
+// Once per tick: tag.c's mid-tick promote (root stopped) must not re-stamp
+// this tick's own frame-script loads.
+static unsigned g_carried_stamp_epoch = 0;
+void actionStampCarriedDirectLoads(void)
+{
+	if (g_carried_stamp_epoch == g_direct_load_epoch) return;
+	g_carried_stamp_epoch = g_direct_load_epoch;
+	int count = g_pending_direct_load_count;
+	if (g_pending_direct_stamped > count) g_pending_direct_stamped = count;
+	for (int i = g_pending_direct_stamped; i < count; i++)
+		g_pending_direct_loads[i].born = g_direct_load_epoch + 1;
+	g_pending_direct_stamped = count;
+}
+static void actionStampNestedDirectLoads(void)
+{
+	int count = g_pending_direct_load_count;
+	if (g_pending_direct_stamped > count) g_pending_direct_stamped = count;
+	for (int i = g_pending_direct_stamped; i < count; i++)
+		g_pending_direct_loads[i].born = g_direct_load_epoch;
+	g_pending_direct_stamped = count;
+}
 void actionFirePendingDirectLoads(SWFAppContext* app_context)
 {
 	actionFirePendingDirectLoadsImpl(app_context, 0);
+	// Loads queued by the frame 1s this drain just ran deliver next tick.
+	actionStampNestedDirectLoads();
 }
 static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fire_all)
 {
 	int count = g_pending_direct_load_count;
 	if (count == 0) { g_pending_direct_stamped = 0; return; }
 	if (g_pending_direct_stamped > count) g_pending_direct_stamped = count;
-	for (int i = g_pending_direct_stamped; i < count; i++)
-		g_pending_direct_loads[i].born = g_direct_load_epoch;
+	// s28 w2-loaded-shell-land: entries still unstamped here were queued in
+	// THIS tick, before its drain (frame scripts, enterFrame): they deliver in
+	// this drain. Flash 32 avm1_loaded_order_create_vs_load: h1.loadMovie in
+	// root frame 3 -> `a1` before `p4`. The one exception is the root's first
+	// frame: Flash runs it inside the root's own delivery, after that tick's
+	// load pass, so its loads land next tick (`p2 ... b1`; the s27 captures
+	// avm1_loaded_timeline_holder / _bare_goto / _child_timeline_loop all load
+	// from frame 1). Loads carried over from after the previous drain were
+	// stamped at this tick's start (actionStampCarriedDirectLoads) and loads
+	// queued inside this drain are stamped at its end: both wait a tick.
+	{
+		unsigned _born = (g_direct_load_epoch > 2 && !fire_all) ? g_direct_load_epoch - 1 : g_direct_load_epoch;
+		for (int i = g_pending_direct_stamped; i < count; i++)
+			g_pending_direct_loads[i].born = _born;
+	}
 	g_pending_direct_stamped = count;
 	// Copy the due entries out (child scripts may queue more loads and grow the
 	// queue); entries born this epoch stay queued, in order.
@@ -28098,6 +28297,33 @@ static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fir
 			j--;
 		}
 		loads[j] = tmp;
+	}
+	// s28 w2-loaded-shell-land: Flash runs the frame 1s of
+	// clip-target loads delivered together NEWEST first (avm1_loaded_bare_goto:
+	// `e1 d1 c1` for loads issued h, g, k; avm1_child_timeline_loop: `d1 c1`).
+	// Reverse the clip-target subsequence in place (level loads keep their
+	// slots); skipped when one target is loaded twice, where issue order is
+	// what makes the later load win.
+	int _rev_applied = 0;
+	int _adv_n0 = g_level_advance_count;
+	if (!fire_all) {
+		int _dup = 0;
+		for (int a = 0; a < count && !_dup; a++) {
+			if (loads[a].is_level) continue;
+			for (int b = a + 1; b < count; b++)
+				if (!loads[b].is_level && loads[b].target == loads[a].target) { _dup = 1; break; }
+		}
+		if (!_dup) {
+			_rev_applied = 1;
+			int a = 0, b = count - 1;
+			while (1) {
+				while (a < b && loads[a].is_level) a++;
+				while (a < b && loads[b].is_level) b--;
+				if (a >= b) break;
+				PendingDirectLoad t = loads[a]; loads[a] = loads[b]; loads[b] = t;
+				a++; b--;
+			}
+		}
 	}
 
 	for (int i = 0; i < count; i++) {
@@ -28349,6 +28575,16 @@ static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fir
 		global_object = _saved_global;
 		g_child_swf_init = _saved_child_init;
 		g_current_movie_id = _saved_movie_id;
+	}
+	// Frame 1s ran newest first, but the playheads registered in that order;
+	// put the ones this drain appended back in ISSUE order so the advance's
+	// newest-first walk sees the same order on later ticks.
+	if (_rev_applied && g_level_advance_count - _adv_n0 > 1) {
+		for (int a = _adv_n0, b = g_level_advance_count - 1; a < b; a++, b--) {
+			LevelAdvanceEntry t = g_level_advance[a];
+			g_level_advance[a] = g_level_advance[b];
+			g_level_advance[b] = t;
+		}
 	}
 	free(loads);
 }
@@ -41751,6 +41987,7 @@ typedef struct {
     int file_size;       // File size for onLoadProgress
     int is_swf_url;      // 1 if URL ends in .swf (affects error vs init behavior)
     char url[128];       // Requested URL (for _url update on failed loads)
+    u8 cancelled;        // s28: unloadMovie after loadClip -> onLoadStart only
 } PendingMCLLoad;
 // s27 w2-timers-land: the three MCL queues were fixed arrays of
 // MAX_PENDING_MCL_LOADS (16): the 17th loadClip of a tick (a thumbnail
@@ -42019,7 +42256,11 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
     // events, and chained-timer patterns
     // (`avm1/loadmovie_var_persistence`) don't run out of `num_ticks`.
     extern int is_playing;
-    int defer_to_next_tick = is_playing && (current_frame + 1 < g_frame_count);
+    // s28 w2-loaded-shell-land (C'): Flash defers EVERY frame-script loadClip
+    // to the next tick, one-frame loaders included (Flash 32 captures of
+    // avm1_mcl_load_tick / avm1_mcl_holder_totalframes).
+    extern int g_in_process_timers;
+    int defer_to_next_tick = g_in_process_timers ? (is_playing && (current_frame + 1 < g_frame_count)) : 1;
 
     if (defer_to_next_tick && mcl_queue_room(&g_pending_mcl_loads_next_tick,
                                              &g_pending_mcl_loads_next_tick_cap,
@@ -42037,6 +42278,7 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
         snprintf(g_pending_mcl_loads_next_tick[slot].url,
                  sizeof(g_pending_mcl_loads_next_tick[slot].url),
                  "%s", url_utf8);
+        g_pending_mcl_loads_next_tick[slot].cancelled = 0;
         g_pending_mcl_load_count_next_tick++;
         g_pending_mcl_load_count++;
     } else if (mcl_queue_room(&g_pending_mcl_loads_this_tick,
@@ -42055,6 +42297,7 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
         snprintf(g_pending_mcl_loads_this_tick[slot].url,
                  sizeof(g_pending_mcl_loads_this_tick[slot].url),
                  "%s", url_utf8);
+        g_pending_mcl_loads_this_tick[slot].cancelled = 0;
         g_pending_mcl_load_count_this_tick++;
         g_pending_mcl_load_count++;
     }
@@ -42316,8 +42559,22 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 // actionFinalizePendingRemovals, before sprite advance and root frame_func) so
 // that loads queued by the previous tick's loadClip drain at the END of THIS
 // tick — i.e. AFTER the loader's next-frame DoAction has already run.
+// s28 w2-loaded-shell-land: mc.unloadMovie() after a still-queued load of mc CANCELS it.
+// Flash (avm1/load_cancel_via_unloadmovie's Flash golden): a direct loadMovie's
+// child never runs; a loadClip fires onLoadStart only.
+void actionCancelPendingLoadsFor(MovieClip* mc)
+{
+    if (mc == NULL) return;
+    for (int i = 0; i < g_pending_mcl_load_count_this_tick; i++)
+        if (g_pending_mcl_loads_this_tick[i].target == mc) g_pending_mcl_loads_this_tick[i].cancelled = 1;
+    for (int i = 0; i < g_pending_mcl_load_count_next_tick; i++)
+        if (g_pending_mcl_loads_next_tick[i].target == mc) g_pending_mcl_loads_next_tick[i].cancelled = 1;
+    actionCancelPendingDirectLoadsFor(mc);
+}
 void actionPromotePendingMCLLoads(SWFAppContext* app_context)
 {
+    { extern int g_level_advance_ran_this_tick; g_level_advance_ran_this_tick = 0; }
+    { extern void actionStampCarriedDirectLoads(void); actionStampCarriedDirectLoads(); }
     (void)app_context;
     int n = g_pending_mcl_load_count_next_tick;
     if (n == 0) return;
@@ -42376,6 +42633,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
 
     // Pre-phase: Set child SWF URLs and versions on target MCs (before events fire, so mc._url is correct)
     for (int i = 0; i < count; i++) {
+        if (loads[i].cancelled) continue;
         if (loads[i].target != NULL) {
             if (loads[i].entry != NULL) {
                 // Note: dynamic_props clearing already happened in actionLoadClip before FlashVars were set
@@ -42479,6 +42737,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
 
         // onLoadStart(target_mc) — fires in OLD movie context
         fireMCLEvent(app_context, loads[i].mcl, "onLoadStart", &mc_var, 1);
+        if (loads[i].cancelled) continue;
 
         // For root replacement: switch SWF version to child's AFTER onLoadStart
         // This means onLoadProgress/Complete execute under child SWF version rules:
@@ -42534,6 +42793,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     // Phase 2: Run child movie init+frame0 for each load (FIFO)
     for (int i = 0; i < count; i++) {
         if (g_execution_halted) break;
+        if (loads[i].cancelled) continue;
         if (loads[i].entry != NULL && loads[i].entry->swf_version == 0) continue; // Image: no scripts
         if (loads[i].entry != NULL) {
             // Root replacement: update Stage dimensions when loading into root
@@ -42612,7 +42872,14 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             // playhead; mirrors actionFirePendingDirectLoads.
             if (loads[i].target != NULL && loads[i].entry->frame_count > 1
                 && loads[i].entry->frame_funcs != NULL) {
-                actionRegisterLevelAdvance(loads[i].target, loads[i].entry);
+                {
+                    // s28 C': delivered AFTER this tick's advance (the
+                    // end-of-tick MCL site) -> nothing else runs a frame this
+                    // tick, so the next tick's advance must run frame 2.
+                    extern int g_level_advance_ran_this_tick;
+                    actionRegisterChildMovieAdvance(loads[i].target, loads[i].entry,
+                                                    g_level_advance_ran_this_tick);
+                }
             }
             if (loads[i].entry->frame_count > 0 && loads[i].entry->frame_funcs != NULL
                 && loads[i].entry->frame_funcs[0] != NULL) {
@@ -42655,6 +42922,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
         extern size_t g_tick_count;
         for (int i = count - 1; i >= 0; i--) {
             if (!mcl_load_init_room()) break;
+            if (loads[i].cancelled) continue;
             g_pending_load_init_tick[g_pending_load_init_count] = g_tick_count;
             g_pending_load_inits[g_pending_load_init_count++] = loads[i];
         }
@@ -82300,6 +82568,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 11 && strncasecmp(method_name, "unloadMovie", 11) == 0)
 		{
 			// mc.unloadMovie() — unload content and fire onUnload
+			{ extern void actionCancelPendingLoadsFor(MovieClip*); actionCancelPendingLoadsFor(mc); }
 			if (mc != NULL && mc->dynamic_props != NULL) {
 				ActionVar* _ul_h = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
 				if (_ul_h != NULL && _ul_h->type == ACTION_STACK_VALUE_FUNCTION) {

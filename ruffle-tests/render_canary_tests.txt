@@ -821,3 +821,9 @@ regression/avm1_edittext_rotated_glyphs    # rotated/sheared glyph runs + border
 # tier=1
 regression/group_alpha_shadow_shape_a50        # 8.485 px shadow, 50% group alpha, Flash tol 1   1 cmp
 regression/avm2_applyfilter_bevel_sample       # bevel sample offsets, FP32 trace (no image)     0 cmp
+# s28 w2-loaded-shell-land: loaded-movie delivery tick / newest-load-first order /
+# MCL event sequence. Loaded-content renders that move if a load lands a tick
+# early or late, or two loaded movies swap paint order.
+# tier=1
+avm1/mcl_target_png                                 # MCL-loaded PNG, holder render      1 cmp
+avm1/movieclip_methods_with_loaded_image            # loadMovie'd image + clip methods   1 cmp

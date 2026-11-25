@@ -565,7 +565,15 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 
 // Process all active timers. Called from swf_core.c after each frame tick.
 // frame_duration_ms = 1000.0 / fps
+int g_in_process_timers = 0;  // s28 w2-loaded-shell-land (C'): loadClip timing carve-out
+static void processTimersImpl(SWFAppContext* app_context, double frame_duration_ms);
 void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+{
+	g_in_process_timers++;
+	processTimersImpl(app_context, frame_duration_ms);
+	g_in_process_timers--;
+}
+static void processTimersImpl(SWFAppContext* app_context, double frame_duration_ms)
 {
 	// Ruffle Timers::update_timers: advance the clock first (also when no
 	// timer is active, so a later timer is scheduled against the real time).

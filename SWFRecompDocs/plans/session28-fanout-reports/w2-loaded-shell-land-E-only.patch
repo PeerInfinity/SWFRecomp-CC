@@ -1,0 +1,23 @@
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -42476,11 +42476,16 @@
+             progress_args[2].type = ACTION_STACK_VALUE_F64;
+             VAL(double, &progress_args[2].data.numeric_value) = (double)loads[i].file_size;
+             progress_args[2].str_size = 0;
++            // s28 w2-loaded-shell-land: Flash fires onLoadProgress TWICE per
++            // load, bytesLoaded == bytesTotal both times, for every target
++            // (was: root replacement only). Windows FP32 (the corpus golden
++            // platform): gnash MovieClipLoader-v7/v8 `Number of onLoadProgress
++            // runs: 4` over 2 loads (vars.txt, 4387-byte green.jpg);
++            // avm1/mcl_replace_root_* Flash golden (2 x loaded=97 total=97).
++            // Linux FP32 adds one more per 4096-byte read (mcl_target_png 4534 B
++            // -> 3, loader-events), a platform I/O artifact we do not model.
++            fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
+             fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
+-            // Root replacement fires onLoadProgress twice (Ruffle behavior)
+-            if (_phase1_switched) {
+-                fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
+-            }
+         }
+ 
+         // onLoadComplete(target_mc, httpStatus=0)

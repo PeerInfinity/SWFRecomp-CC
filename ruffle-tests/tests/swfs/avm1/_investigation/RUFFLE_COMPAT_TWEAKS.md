@@ -43,6 +43,12 @@ to be conditioned on specific cases.
 
 ## Double onLoadProgress for Root Replacement Loads
 
+> **SUPERSEDED (s28 w2-loaded-shell-land, 2026-11-25): this is FLASH behaviour, for every
+> MovieClipLoader load, not a root-only Ruffle tweak.** Windows FP32 fires `onLoadProgress` twice per
+> load (gnash `MovieClipLoader-v7/v8` Windows capture: 4 runs over 2 loads; the `mcl_replace_root_*`
+> goldens are Flash per s28 trace-provenance). The runtime now fires it twice for all targets; see
+> RUFFLE_VS_FLASH_DIFFERENCES.md "s28 w2-loaded-shell-land". The text below is the historical rationale.
+
 **Affected tests**: `mcl_replace_root_swf7_to_swf5`, `mcl_replace_root_swf7_to_swf6`
 
 **What we did**: When MovieClipLoader replaces the root movie, we fire `onLoadProgress` twice
