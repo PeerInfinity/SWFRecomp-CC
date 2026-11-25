@@ -1,0 +1,9 @@
+# s28 w1-filter-residuals FLASH IMAGE ORACLE PROBE (display-filter growth, edge + scale).
+# output.expected.png is OUR render (provisional) until the Flash capture replaces it.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 1
+
+[player_options]
+with_renderer = { optional = false, quality = "high" }

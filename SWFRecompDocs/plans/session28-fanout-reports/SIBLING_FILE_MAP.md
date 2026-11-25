@@ -15,3 +15,4 @@
 | w2-test12-land | enterFrame snapshot/queue at tick start: `action.c` `actionDispatchEnterFrameHandlers` / `tagFlushPendingEnterFrame` (`tag.c`), `swf.c` frame loop (self-localize; shared with ladders) |
 | w2-flash-stroke-width | recompiler `swf.hpp` `LineStyle`, `swf.cpp` LINESTYLE2 parse + `stroke_run_data` emit; `render_webgpu.c` `hairline_restage` (overlaps local n-stroke-snap: keep separable) |
 | w2-loaded-shell-land | `action.c` loaded-movie delivery/advance order, `actionProcessDeferred*`, loaded goto deferral, MCL progress events, unloadMovie cancel; `timer.c` |
+| w2-filter-residuals-land | `tag.c` `filter_shadow_offset_px`, `compose_chain_entry_to_layer`, `render_filtered_core` offset block; `avm2_display.c` filter composer / `avm2_render_filtered`; `avm2_bitmap.c` `fb_glow_amount`, bevel sampling |

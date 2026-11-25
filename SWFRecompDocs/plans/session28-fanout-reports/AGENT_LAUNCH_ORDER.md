@@ -21,7 +21,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | 1 | w1-acid-flash | `briefs/w1-acid-flash.md` | session_018CoDi6JnxfpNaNRyzuxogB — DELIVERED; 0 flips; P1 LOW tie rule (−43 cmp, mostly Flash-ward; folds into the lowq arc), P2 Flash isotropic stroke width (acid-stroke-0 52702→18381) → w2-flash-stroke-width; acid-mask/acid-shapes/acid-textfield NO-GO |
 | 2 | w1-avm2-vector-flash | `briefs/w1-avm2-vector-flash.md` | session_018CoDi3wZhe7zdvykrZukfV — DELIVERED; culling LANDED `958313b73` (draw_triangles 1812→996, 0 flips); Flash LOW sample point (x+.5,y)/paint (x,y+.5) + HIGH = 4×4 SSAA; Flash capture of lowq probe → w2-lowq-sample-point |
 | 3 | w1-drift | `briefs/w1-drift.md` | session_018CoDi5UJfjUtnXKTsT6MEU — DELIVERED (no source): drift −1 eff gnash `test4` (rm→fail: upstream deleted output.ruffle.txt; §27.4 interleave NO-GO), +1 new row `root_onload_loaded_level` pass; no PNG re-bake; Flash: proto onLoad gap → w2-root-onload-proto |
-| 4 | w1-filter-residuals | `briefs/w1-filter-residuals.md` | session_018CoDi5uWF1jhfrRDKG6F9B — launched 2026-11-25 |
+| 4 | w1-filter-residuals | `briefs/w1-filter-residuals.md` | session_018CoDi5uWF1jhfrRDKG6F9B — DELIVERED; shadow offset = fractional/bilinear in Flash (a50 768→0); glow amount quantization GO; bevel HOLD (probe captured); growth NO-GO re-priced → w2-filter-residuals-land |
 | 5 | w1-leads | `briefs/w1-leads.md` | session_018CoDi3t5rtjVnrzbpL8LRN — DELIVERED; shapeflag premise refuted, Flash: same-frame stale shape hitTest → w2-hittest-shape-stale; 4 queues + onUnload scope (Flash n=2) → w2-avm1-leads-land; FileReference NO-GO |
 | 6 | w1-loaded-shell-residuals | `briefs/w1-loaded-shell-residuals.md` | session_018CoDi6VXdE1GrhC7pebVyf — DELIVERED; A newest-load-first, B next-tick goto scripts, C′ next-tick loadClip, D unloadMovie cancels (+1 rm→pass); Flash re-fit needed (captures) → w2-loaded-shell-land |
 | 7 | w1-render-flash-headroom | `briefs/w1-render-flash-headroom.md` | session_018CoDi3SHpVL9RmKCJ3YhgZ — DELIVERED: quality-harness NO-GO (our LOW is closer to Flash HIGH); Flash occupied-depth keep-both = SWF5 only (captured) → w2-occupied-depth; tie-rule evidence → n-stroke-snap; no swap in reach |
@@ -33,7 +33,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
-| w2-root-onload-proto | w1-drift + Flash captures | 2 new regression rows (Flash goldens, --no-pin) | session_018CoDi891eqd2tntZB6DyKz — launched |
+| w2-root-onload-proto | w1-drift + Flash captures | 2 new regression rows (Flash goldens, --no-pin) | session_018CoDi891eqd2tntZB6DyKz — DELIVERED, LANDED `34177d8fe` (+2 regression rows; Flash variants captured: hidden receiver is a movieclip — typeof residual) |
 | w2-occupied-depth | w1-render-flash-headroom + Flash captures | trace `place_object_test` rm→pass, `place_object_test2` rm→pass; flash_fixes `placeobject_occupied_depth` (warning lines) | session_018CoDi3xRoN7CviWpsxgTey — launched |
 | w2-lowq-sample-point | w1-avm2-vector-flash + Flash lowq probe | Flash-ward vector rows; 0 Flash-golden losses required | session_018CoDi6jKqMzjzZrf6c2R4Y — launched |
 | w2-avm1-leads-land | w1-leads + Flash | 4–5 regression fixtures (Flash goldens) | session_018CoDi4VAVkGy2CQUkCbfQU — launched |
