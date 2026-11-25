@@ -1,0 +1,35 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 28 (dual-axis #20), slot `w2-hittest-shape-stale`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-hittest-shape-stale` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session28-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Your branch is `fanout/w2-hittest-shape-stale`; deliver `SWFRecompDocs/plans/session28-fanout-reports/w2-hittest-shape-stale-report.md` and `SWFRecompDocs/plans/session28-fanout-reports/w2-hittest-shape-stale.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Also read `CLAUDE.md`. Check `SWFRecompDocs/plans/session28-fanout-reports/SIBLING_FILE_MAP.md` (if present) for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+
+**Flash's same-frame stale matrix for `hitTest(x, y, true)` (M).**
+
+Inputs: `w1-leads-report.md` §1 (on master), fixture `w1-leads-fixtures/avm1_hittest_root_stale_matrix/` (SWF +
+generator + `hittest_model_switches.diag.patch`), and the coordinator's Flash 32 captures in
+`w1-local-oracles/w1-leads/` (README). FP32 (pinned == no-pin):
+- In the frame where `_root._x`, `c._x` or `_root._xscale` changes, **shapeFlag=true** hitTest answers differently from
+  ours (phases B, D, F, G), while the **bounds** test (shapeFlag false) and `localToGlobal` use the live matrix; the
+  next frame is consistent again (C, E). Read the full capture: e.g. B `hit(150,150) shape=false bounds=true`, F
+  `hit(250,150) shape=false bounds=true`, G `hit(250,150) shape=true bounds=true`.
+- `avm1/movieclip_hittest_shapeflag`: FP32 ≠ golden on lines 35/37/39 only (`false`; second donut block after
+  `_root._x = 400; _root._xscale = 50` in the same frame). Our 6 ACCEPTED Cat 8 lines (71, 171–177, 296) == golden ==
+  FP32.
+
+Task:
+1. Fit a model that reproduces ALL phases of the probe exactly (e.g. the shape test uses a world matrix cached at the
+   last render for the CLIP but maps the point through the live `_root`?, or uses a cached inverse; try each against
+   every phase). Write extra probe variants (nested parent change, `_rotation`, a clip created this frame) as FLASH
+   requests if one fit isn't unique.
+2. Implement (`action.c` hitTest arm ~80573, plus whatever per-clip render-time matrix snapshot it needs; name
+   every function) so the probe matches FP32 in both modes, and `movieclip_hittest_shapeflag` matches FP32 on 35/37/39.
+3. Gate: every avm1/gnash/shumway row with `hitTest`, `regression` hitTest fixtures, both modes. The coordinator adds
+   the flash_fixes entry for the shapeflag golden + an RvF entry (Ruffle reads the live matrix) at landing: draft both
+   texts in your report. Expected status: the row stays failing on Cat 8 (0 flips) — say so.
+4. Land the probe as `regression/avm1_hittest_shape_stale_matrix` with the FP32 golden.
+5. Also fix the ACCEPTED_DIFFS Cat 8 intro wording (the 6 lines disagree with Flash too, not just Ruffle).
