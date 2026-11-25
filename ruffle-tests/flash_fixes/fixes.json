@@ -97,5 +97,82 @@
     "reason": "FP32 prints '  o2.prop: ' with a trailing space; the upstream golden had trailing spaces stripped. Ours is byte-identical to FP32.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
     "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/mcl_unloadclip",
+    "file": "output.txt",
+    "upstream_sha256": "2fbaa0f1c39ed9c76a67130e37803503ab63ae445bbcb8048bc87b7fbf400f0d",
+    "fix": "avm1/mcl_unloadclip/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_unloadclip.win.txt (Windows, == this file) and mcl_unloadclip.lnx.txt (Linux) (s28 coordinator)",
+    "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/mcl_loadclip",
+    "file": "output.txt",
+    "upstream_sha256": "7dc692b0f02f48a8eaf70da041b054a282367d17b2fcb495fcbec967450e9ecb",
+    "fix": "avm1/mcl_loadclip/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_loadclip.win.txt (Windows, == this file) and mcl_loadclip.lnx.txt (Linux) (s28 coordinator)",
+    "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/mcl_target_png",
+    "file": "output.txt",
+    "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
+    "fix": "avm1/mcl_target_png/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_png.win.txt (Windows, == this file) and mcl_target_png.lnx.txt (Linux) (s28 coordinator)",
+    "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/mcl_target_jpg",
+    "file": "output.txt",
+    "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
+    "fix": "avm1/mcl_target_jpg/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_jpg.win.txt (Windows, == this file) and mcl_target_jpg.lnx.txt (Linux) (s28 coordinator)",
+    "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/mcl_target_gif87a",
+    "file": "output.txt",
+    "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
+    "fix": "avm1/mcl_target_gif87a/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_gif87a.win.txt (Windows, == this file) and mcl_target_gif87a.lnx.txt (Linux) (s28 coordinator)",
+    "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/mcl_target_gif89a",
+    "file": "output.txt",
+    "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
+    "fix": "avm1/mcl_target_gif89a/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_gif89a.win.txt (Windows, == this file) and mcl_target_gif89a.lnx.txt (Linux) (s28 coordinator)",
+    "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/mcl_mislabeled_target",
+    "file": "output.txt",
+    "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
+    "fix": "avm1/mcl_mislabeled_target/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_mislabeled_target.win.txt (Windows, == this file) and mcl_mislabeled_target.lnx.txt (Linux) (s28 coordinator)",
+    "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
+    "added": "2026-11-25"
   }
 ]
