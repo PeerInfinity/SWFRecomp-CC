@@ -1213,7 +1213,7 @@ Identical mechanism and identical ceiling.
 
 ---
 
-## Category 14: Corrupt Upstream Oracle (Flash Player Capture Artifacts)
+## Category 14: Corrupt Upstream Oracle (Flash Player Capture Artifacts) — **s28: its one row, `avm2/number_tostring`, is RESOLVED (the capture was faithful Flash output; see the summary table)**
 
 An `output.txt` is a capture of what real Flash Player printed. Normally that is
 the strongest oracle we have — but a capture can be *wrong*, and upstream Ruffle
@@ -1326,4 +1326,4 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
 | `avm2/loader_applicationDomain` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 4 of 4 | Accept; would require shipping an AVM2 interpreter |
 | `avm2/swz` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 2 of 2 | Accept; same mechanism as `loader_applicationDomain` |
-| `avm2/number_tostring` | Corrupt upstream oracle: 31 impossible base-N digits in the Flash capture; upstream `ignore = true` (Category 14) | 168 of 1050 | Accept; ceiling is 1019/1050 and there is no `output.ruffle.txt`, so neither `pass` nor `ruffle_matched` is reachable. Suite-local ignore only |
+| `avm2/number_tostring` | Corrupt upstream oracle: 31 impossible base-N digits in the Flash capture; upstream `ignore = true` (Category 14) | 168 of 1050 | **RESOLVED s28** (w2b-avm2-d2a): the "impossible digits" ARE Flash's base-N printer, and the exact avmplus D2A port reproduces them: passes (168 → 0). Ignore entry pruned |

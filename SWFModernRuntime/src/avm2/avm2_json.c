@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_e4x.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -391,22 +392,11 @@ static JVal* jp_value(JParser* p)
 			if (p->i >= p->len || p->s[p->i] < '0' || p->s[p->i] > '9') return NULL;
 			while (p->i < p->len && p->s[p->i] >= '0' && p->s[p->i] <= '9') p->i++;
 		}
-		char buf[64];
 		uint32_t nl = p->i - start;
-		if (nl >= sizeof(buf))
-		{
-			// Very long numbers still parse (strtod handles the precision).
-			char* big = jscratch_alloc(p->scratch, nl + 1);
-			memcpy(big, p->s + start, nl);
-			big[nl] = '\0';
-			JVal* v = jv_new(p, 2);
-			v->num = strtod(big, NULL);
-			return v;
-		}
-		memcpy(buf, p->s + start, nl);
-		buf[nl] = '\0';
+		// Any length parses. Flash's reader (avmplus convertStringToDouble), not strtod: it is
+		// not correctly rounded, and json_parse_numbers' FP golden shows it.
 		JVal* v = jv_new(p, 2);
-		v->num = strtod(buf, NULL);
+		v->num = avm2_avmplus_json_number(p->s + start, nl);
 		return v;
 	}
 	if (c == '{')
@@ -793,7 +783,12 @@ static Avm2Value js_map_value(JSer* js, const char* key, uint32_t key_len, Avm2V
 	// non-function value is ignored (ecma3/JSON/Classes `toJSON=true`, FP32).
 	if (v.kind == AVM2_VALUE_OBJECT
 	    && avm2_has_public_property(ctx, v, "toJSON", 6)
-	    && js_value_is_function(avm2_get_public_property(ctx, v, "toJSON", 6, NULL)))
+	    // XML/XMLList: a get of "toJSON" is an E4X child lookup (an empty
+	    // XMLList), not the prototype method, so the callable test cannot
+	    // see XML.prototype.toJSON; call it as before (ecma3/JSON/AS3Types
+	    // "stringify XML object" -> "XML", FP32; regressed by 558c5a8cf).
+	    && (avm2_value_is_xmlish(v)
+	        || js_value_is_function(avm2_get_public_property(ctx, v, "toJSON", 6, NULL))))
 	{
 		Avm2Value args[1];
 		args[0] = avm2_string(avm2_string_new(ctx, key, key_len));

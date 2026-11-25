@@ -1,8 +1,7 @@
 // Avm2Value constructors + coercions + abstract operators (port of Ruffle
 // core/src/avm2/value.rs; helper names 1:1 with Ruffle's methods).
-// Number-to-string follows value.rs's coerce_to_string Number arm:
-// shortest round-trip decimal inside [1e-6, 1e21), MAX_PRECISION (15)
-// exponential outside it.
+// Number-to-string is avmplus's (Flash Player's) convertDoubleToString,
+// ported in avm2_number.c (avm2_d2s).
 
 #include <math.h>
 #include <stdio.h>
@@ -593,273 +592,38 @@ bool avm2_string_to_f64(Avm2Context* ctx, const char* s, uint32_t len, bool stri
 }
 
 // ---------------------------------------------------------------------------
-// Number → string (Ruffle value.rs coerce_to_string Number arm)
+// Number -> string: ECMA ToString(Number) as Flash Player prints it, i.e.
+// avmplus AvmCore::doubleToString = MathUtils::convertDoubleToString(d,
+// DTOSTR_NORMAL, 15). The port lives in avm2_number.c (avm2_d2s), next to
+// toFixed/toExponential/toPrecision, which share its digit generator.
+//
+// This replaced a Ruffle-model formatter (shortest round-trip digits via
+// printf/strtod probes + Rust tie rules + a 16-char exponential mantissa
+// cut). avmplus is the reference both reproduce: its 15-digit truncated
+// exponential mantissa, its full-digit "x.yyye-7" negative arm, the 2^1022 /
+// 2^1023 "1e+308" pair and the subnormal spellings all fall out of D2A.
 // ---------------------------------------------------------------------------
-
-// Exact-midpoint tie-break, Rust-style. glibc's printf is correctly rounded
-// and resolves an exact decimal tie TO-EVEN; Rust's f64 Display (which Ruffle
-// prints through) resolves it AWAY FROM ZERO. They disagree only when the
-// double's exact decimal expansion terminates exactly one digit past the
-// shortest round-tripping precision, with that digit a '5'
-// (e.g. 966.67828369140625 -> glibc "966.6782836914062", Rust
-// "966.6782836914063"). Rewrites digs[0..prec] / *exp10 in place and returns
-// 1 when it re-rounds. `d` is > 0 and finite; only called for prec >= 13, so
-// the big exact-expansion buffer never lands on the hot path.
-#define AVM2_EXACT_PREC 767
-static int tie_round_away_from_zero(double d, int prec, char* digs, int* exp10)
-{
-	// Stage 0 (arithmetic filter, no formatting): a tie needs d's EXACT decimal
-	// expansion to terminate at prec+2 significant digits. Writing d = m * 2^p
-	// with m an odd integer, that expansion is m*5^-p (p < 0) or m*2^p (p >= 0),
-	// so its digit count is computable with one log10. Almost every double is
-	// far too long and exits here, which keeps the two snprintf stages below off
-	// the hot path. One digit of slack absorbs any log10 rounding; stage 2 is
-	// still the authority, so a false accept costs nothing but time.
-	{
-		int e2;
-		double fr = frexp(d, &e2);
-		uint64_t m = (uint64_t) ldexp(fr, 53);
-		int p = e2 - 53;
-		while (m != 0 && (m & 1u) == 0) { m >>= 1; p++; }
-		double lg = log10((double) m)
-		            + (p < 0 ? (-p) * 0.69897000433601880   // log10(5)
-		                     :   p  * 0.30102999566398120); // log10(2)
-		if ((int) floor(lg) + 1 > prec + 3) return 0;
-	}
-
-	// Stage 1 (cheap filter): print one extra significant digit. A true tie
-	// always shows a '5' there; the overwhelming majority of values do not.
-	char probe[64];
-	snprintf(probe, sizeof(probe), "%.*e", prec + 1, d);
-	int seen = 0;
-	char last = 0;
-	for (const char* p = probe; *p != '\0' && *p != 'e' && *p != 'E'; p++)
-	{
-		if (*p >= '0' && *p <= '9') { last = *p; seen++; }
-	}
-	if (seen != prec + 2 || last != '5') return 0;
-
-	// Stage 2: glibc prints a double's EXACT decimal expansion at any
-	// precision, zero-padded. 768 significant digits covers every finite f64
-	// (the longest, 2^-1074, needs 751), so this is exact, not rounded.
-	char ex[AVM2_EXACT_PREC + 32];
-	snprintf(ex, sizeof(ex), "%.*e", AVM2_EXACT_PREC, d);
-	char dig[AVM2_EXACT_PREC + 4];
-	int m = 0;
-	for (const char* q = ex; *q != '\0'; q++)
-	{
-		if (*q >= '0' && *q <= '9') dig[m++] = *q;
-		else if (*q == 'e' || *q == 'E') break;
-	}
-	if (m < prec + 2 || dig[prec + 1] != '5') return 0;
-	for (int i = prec + 2; i < m; i++) if (dig[i] != '0') return 0;
-
-	// Exact midpoint. Away from zero, and d > 0, so round up.
-	char up[24];
-	for (int i = 0; i <= prec; i++) up[i] = dig[i];
-	int carry = 1;
-	for (int i = prec; i >= 0 && carry != 0; i--)
-	{
-		if (up[i] == '9') up[i] = '0';
-		else { up[i]++; carry = 0; }
-	}
-	int e = *exp10;
-	if (carry != 0)
-	{
-		// 99..9 -> 100..0: shift and bump the exponent.
-		for (int i = prec; i > 0; i--) up[i] = up[i - 1];
-		up[0] = '1';
-		e++;
-	}
-
-	// Safety net: Rust only ever emits a representation that round-trips, so
-	// if the away-from-zero neighbour does not, keep glibc's answer.
-	char chk[48];
-	int cn = 0;
-	chk[cn++] = up[0];
-	if (prec > 0)
-	{
-		chk[cn++] = '.';
-		for (int i = 1; i <= prec; i++) chk[cn++] = up[i];
-	}
-	snprintf(chk + cn, sizeof(chk) - (size_t) cn, "e%d", e);
-	if (strtod(chk, NULL) != d) return 0;
-
-	for (int i = 0; i <= prec; i++) digs[i] = up[i];
-	*exp10 = e;
-	return 1;
-}
-#undef AVM2_EXACT_PREC
-
-// Shortest decimal digit string that round-trips `d` (> 0, finite).
-// Writes the significant digits (no dot) to digs (cap >= 20) and the
-// power-of-ten of the first digit to *exp10. Mirrors Rust's f64 Display.
-static int shortest_digits(double d, char* digs, int* exp10)
-{
-	char tmp[48];
-	for (int prec = 0; prec <= 17; prec++)
-	{
-		snprintf(tmp, sizeof(tmp), "%.*e", prec, d);
-		if (strtod(tmp, NULL) == d)
-		{
-			int n = 0;
-			const char* q = tmp;
-			int e = 0;
-			for (; *q != '\0'; q++)
-			{
-				if (*q >= '0' && *q <= '9')
-				{
-					digs[n++] = *q;
-				}
-				else if (*q == 'e' || *q == 'E')
-				{
-					e = atoi(q + 1);
-					break;
-				}
-			}
-			// glibc broke an exact decimal tie to-even; Rust (and so Ruffle)
-			// breaks it away from zero. Re-round when they disagree.
-			if (prec >= 13 && n == prec + 1)
-			{
-				tie_round_away_from_zero(d, prec, digs, &e);
-			}
-			// Trim trailing zeros (keep at least one digit).
-			while (n > 1 && digs[n - 1] == '0') n--;
-			digs[n] = '\0';
-			*exp10 = e;
-			return n;
-		}
-	}
-	// Unreachable: 17 significant digits always round-trip.
-	digs[0] = '0';
-	digs[1] = '\0';
-	*exp10 = 0;
-	return 1;
-}
-
-// Plain (exponent-free) decimal rendering of a positive double, Rust
-// Display style. Takes the shortest round-tripping digits from the caller
-// (which needs them anyway to pick the notation), so the expensive
-// shortest_digits probe loop runs once per format, not twice.
-static int format_plain(char* buf, int buf_size, const char* digs, int n, int e)
-{
-	int pos = 0;
-
-#define PUTC(c) do { if (pos < buf_size - 1) buf[pos] = (c); pos++; } while (0)
-	if (e >= 0)
-	{
-		if (e + 1 >= n)
-		{
-			for (int i = 0; i < n; i++) PUTC(digs[i]);
-			for (int i = 0; i < e + 1 - n; i++) PUTC('0');
-		}
-		else
-		{
-			for (int i = 0; i <= e; i++) PUTC(digs[i]);
-			PUTC('.');
-			for (int i = e + 1; i < n; i++) PUTC(digs[i]);
-		}
-	}
-	else
-	{
-		PUTC('0');
-		PUTC('.');
-		for (int i = 0; i < -e - 1; i++) PUTC('0');
-		for (int i = 0; i < n; i++) PUTC(digs[i]);
-	}
-#undef PUTC
-	int written = pos < buf_size - 1 ? pos : buf_size - 1;
-	buf[written] = '\0';
-	return written;
-}
 
 int avm2_format_number(char* buf, int buf_size, double d)
 {
-	if (isnan(d)) return snprintf(buf, buf_size, "NaN");
-	if (d == 0.0) return snprintf(buf, buf_size, "0");
-	if (d < 0.0)
+	// Hot path (number formatting is ~10% of Seedling's frame self-time,
+	// dominated by integer coordinates/counters): exact integers below 1e15
+	// print as plain decimals, which is what D2A produces for them (checked
+	// over 3M random integers in [0, 1e15) against "%.0f"). -0 prints "0".
+	if (d > -1e15 && d < 1e15 && d == floor(d))
 	{
-		int n = snprintf(buf, buf_size, "-");
-		return n + avm2_format_number(buf + 1, buf_size - 1, -d);
-	}
-	if (isinf(d)) return snprintf(buf, buf_size, "Infinity");
-
-	// Fast path: exact positive integers below 1e15 render as a plain decimal
-	// (the shortest repr of such a value has n <= 15 <= 21, so the fixed branch
-	// below would apply anyway), but
-	// skip shortest_digits' up-to-18 snprintf("%.*e")/strtod round-trip probes —
-	// number formatting is ~10% of Seedling's frame self-time and dominated by
-	// integer coordinates/counters. Integers < 1e15 are exact in f64 (< 2^53),
-	// and this is byte-identical to format_plain (verified over 0..2e6 + edges).
-	if (d < 1e15 && d == floor(d))
-	{
-		uint64_t u = (uint64_t) d;
-		char tmp[20];
+		int64_t v = (int64_t) d;
+		uint64_t u = v < 0 ? (uint64_t) (-v) : (uint64_t) v;
+		char tmp[24];
 		int n = 0;
 		do { tmp[n++] = (char) ('0' + (u % 10)); u /= 10; } while (u != 0);
+		if (v < 0) tmp[n++] = '-';
 		int w = 0;
 		while (n > 0 && w < buf_size - 1) buf[w++] = tmp[--n];
-		buf[w] = '\0';
+		if (buf_size > 0) buf[w] = '\0';
 		return w;
 	}
-
-	// ECMA-262 7.1.12.1 (Number::toString) picks the notation from the decimal
-	// exponent `n` of the SHORTEST round-tripping representation -- the value is
-	// digits x 10^(n-k) -- and uses fixed notation iff -6 < n <= 21.
-	// `floor(log10(d))` is NOT that quantity and disagrees on both boundaries:
-	//   * log10(9.999999999999997e-7) rounds to exactly -6.0 in f64, so the old
-	//     test took the fixed branch where ECMA (and Flash, and Ruffle) take
-	//     exponential -- 10 lines of avm2/number_to_string;
-	//   * 9.999999999999999e20 has n = 21, i.e. fixed ("999999999999999900000"),
-	//     while floor(log10) reports 21, which the old `>= 21.0` test sent to
-	//     exponential -- 2 more lines of the same test.
-	// The whole behavioural delta is 36 doubles: the 5 representable values
-	// immediately below 1e-6 and the 31 immediately below 1e21 (enumerated by
-	// ULP walk over both boundaries; a 600k-value random sweep finds no others).
-	// shortest_digits' exp10 is the power of ten of the FIRST digit, i.e. n-1,
-	// so the test is e10 < -6 || e10 > 20.
-	char digs[24];
-	int e10 = 0;
-	int nd = shortest_digits(d, digs, &e10);
-
-	if (e10 < -6 || e10 > 20)
-	{
-		// Exponential form, Ruffle value.rs::f64_to_string_finite_nonzero:
-		// take the SHORTEST round-tripping decimal and, for a POSITIVE
-		// exponent only, cut the mantissa TEXT to 16 characters ("Flash shows
-		// large numbers with smaller precision for some reason"). A negative
-		// exponent keeps every digit.
-		//
-		// The arithmetic 15-significant-digit truncation this replaced was
-		// the OLD Ruffle rule and it does not survive a round trip: dividing
-		// the truncated value by 10^digits reintroduces error, so 1e40 came
-		// out as the malformed "0.9999999999999999e+40" and 3e50 as
-		// "2.9999999999999996e+50" (avm2/matrix3d_precision grades both).
-		char mant[40];
-		int mp = 0;
-		mant[mp++] = digs[0];
-		if (nd > 1)
-		{
-			mant[mp++] = '.';
-			for (int i = 1; i < nd && mp < (int) sizeof(mant) - 1; i++)
-				mant[mp++] = digs[i];
-		}
-		mant[mp] = '\0';
-		if (e10 > 0)
-		{
-			// Two doubles print as "1e+308" in Flash while their immediate
-			// neighbours print normally (Ruffle carries the same pair).
-			uint64_t bits;
-			memcpy(&bits, &d, sizeof(bits));
-			if (bits == 0x7fe0000000000000ull || bits == 0x7fd0000000000000ull)
-				return snprintf(buf, buf_size, "1e+308");
-			if (mp > 16) { mant[16] = '\0'; mp = 16; }
-		}
-		return snprintf(buf, buf_size, "%se%c%d", mant,
-		                e10 < 0 ? '-' : '+', e10 < 0 ? -e10 : e10);
-	}
-
-	return format_plain(buf, buf_size, digs, nd, e10);
+	return avm2_d2s(buf, buf_size, d, AVM2_DTOSTR_NORMAL, 15, true);
 }
 
 // ---------------------------------------------------------------------------

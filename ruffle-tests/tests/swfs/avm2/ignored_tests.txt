@@ -198,28 +198,25 @@ freestanding_superclass
 #    visible. The cluster is live work — see SWFRecompDocs/plans/
 #    session20-fanout-reports/w1-drift-report.md ss2.)
 graphics_draw_path
-int_toexponential
 simplebutton_childevents_multichild
 simplebutton_childevents_script_order
 slot_holes_fail
 slot_id_exceeds_trait_count
 sprite_dropTarget
 swf_9_goto_in_construct_frame
-uint_toexponential
 weird_superinterface_properties
 
 # --- upstream ignore = true in test.toml (Stage 3 audit, 2026-07-11) ---
 # bytearray_oom currently `pass`, but the entry records an UPSTREAM decision
 # (the test is disabled in its own test.toml), not our own scope call, so the
 # 2026-08-01 prune kept it.
-# number_tostring gained its rationale on 2026-09-04 (s18 w2-avmplus-numerics):
+# number_tostring: RESOLVED s28 (w2b-avm2-d2a avmplus D2A port passes it; entry pruned). Old rationale (2026-09-04, s18):
 # 31 lines of its output.txt carry a digit that cannot exist in the radix its
 # own `///(radix = N)` marker announces (Flash's base-N printer corrupting its
 # buffer — exactly the "extra x, W, and/or degrees symbols" the test.toml
 # comment names). Ceiling 1019/1050, no output.ruffle.txt, so neither `pass`
 # nor `ruffle_matched` is reachable. avm1 ACCEPTED_DIFFS.md Category 14.
 bytearray_oom
-number_tostring
 
 # 2026-08-05 s11 wave-1 triage: recorded won't-dos (need the real Flex
 # framework_*.swz executed under AOT — impossible; see avm2

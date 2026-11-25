@@ -1,0 +1,1565 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_value.h b/SWFModernRuntime/include/avm2/avm2_value.h
+index 436b4bac..5cc9a695 100644
+--- a/SWFModernRuntime/include/avm2/avm2_value.h
++++ b/SWFModernRuntime/include/avm2/avm2_value.h
+@@ -130,11 +130,24 @@ double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool stric
+ bool avm2_string_to_f64(Avm2Context* ctx, const char* s, uint32_t len, bool strict,
+                         double* out_d);
+ 
+-// AVM2 Number.toString() formatting (Ruffle value.rs coerce_to_string
+-// Number arm: shortest round-trip decimal inside [1e-6, 1e21), otherwise
+-// MAX_PRECISION exponential). Returns length written to buf.
++// AVM2 Number.toString() formatting = Flash Player's ECMA ToString(Number)
++// (avmplus doubleToString: convertDoubleToString(d, DTOSTR_NORMAL, 15)).
++// Returns length written to buf.
+ int avm2_format_number(char* buf, int buf_size, double d);
+ 
++// avmplus MathUtils::convertDoubleToString / convertDoubleToStringRadix
++// (avm2_number.c). `bug513039_fixed` = SWF >= 15 (only read by FIXED mode).
++#define AVM2_DTOSTR_NORMAL 0
++#define AVM2_DTOSTR_FIXED 1
++#define AVM2_DTOSTR_PRECISION 2
++#define AVM2_DTOSTR_EXPONENTIAL 3
++int avm2_d2s(char* out, int out_size, double value, int mode, int precision,
++             bool bug513039_fixed);
++int avm2_d2s_radix(char* out, int out_size, double value, int radix);
++// avmplus MathUtils::convertStringToDouble for a validated JSON number token
++// (Flash's JSON.parse reader; not correctly rounded). NaN on failure.
++double avm2_avmplus_json_number(const char* s, uint32_t len);
++
+ // Operators (Ruffle activation.rs op impls / value.rs abstract algorithms).
+ Avm2Value avm2_op_add_values(Avm2Context* ctx, Avm2Value a, Avm2Value b);
+ bool avm2_abstract_eq(Avm2Context* ctx, Avm2Value a, Avm2Value b);
+diff --git a/SWFModernRuntime/src/avm2/avm2_json.c b/SWFModernRuntime/src/avm2/avm2_json.c
+index 1c7d2ccc..37a71ddf 100644
+--- a/SWFModernRuntime/src/avm2/avm2_json.c
++++ b/SWFModernRuntime/src/avm2/avm2_json.c
+@@ -14,6 +14,7 @@
+ #include <string.h>
+ 
+ #include <avm2/avm2_class.h>
++#include <avm2/avm2_e4x.h>
+ #include <avm2/avm2_error.h>
+ #include <avm2/avm2_globals.h>
+ #include <avm2/avm2_main.h>
+@@ -391,22 +392,11 @@ static JVal* jp_value(JParser* p)
+ 			if (p->i >= p->len || p->s[p->i] < '0' || p->s[p->i] > '9') return NULL;
+ 			while (p->i < p->len && p->s[p->i] >= '0' && p->s[p->i] <= '9') p->i++;
+ 		}
+-		char buf[64];
+ 		uint32_t nl = p->i - start;
+-		if (nl >= sizeof(buf))
+-		{
+-			// Very long numbers still parse (strtod handles the precision).
+-			char* big = jscratch_alloc(p->scratch, nl + 1);
+-			memcpy(big, p->s + start, nl);
+-			big[nl] = '\0';
+-			JVal* v = jv_new(p, 2);
+-			v->num = strtod(big, NULL);
+-			return v;
+-		}
+-		memcpy(buf, p->s + start, nl);
+-		buf[nl] = '\0';
++		// Any length parses. Flash's reader (avmplus convertStringToDouble), not strtod: it is
++		// not correctly rounded, and json_parse_numbers' FP golden shows it.
+ 		JVal* v = jv_new(p, 2);
+-		v->num = strtod(buf, NULL);
++		v->num = avm2_avmplus_json_number(p->s + start, nl);
+ 		return v;
+ 	}
+ 	if (c == '{')
+@@ -793,7 +783,12 @@ static Avm2Value js_map_value(JSer* js, const char* key, uint32_t key_len, Avm2V
+ 	// non-function value is ignored (ecma3/JSON/Classes `toJSON=true`, FP32).
+ 	if (v.kind == AVM2_VALUE_OBJECT
+ 	    && avm2_has_public_property(ctx, v, "toJSON", 6)
+-	    && js_value_is_function(avm2_get_public_property(ctx, v, "toJSON", 6, NULL)))
++	    // XML/XMLList: a get of "toJSON" is an E4X child lookup (an empty
++	    // XMLList), not the prototype method, so the callable test cannot
++	    // see XML.prototype.toJSON; call it as before (ecma3/JSON/AS3Types
++	    // "stringify XML object" -> "XML", FP32; regressed by 558c5a8cf).
++	    && (avm2_value_is_xmlish(v)
++	        || js_value_is_function(avm2_get_public_property(ctx, v, "toJSON", 6, NULL))))
+ 	{
+ 		Avm2Value args[1];
+ 		args[0] = avm2_string(avm2_string_new(ctx, key, key_len));
+diff --git a/SWFModernRuntime/src/avm2/avm2_number.c b/SWFModernRuntime/src/avm2/avm2_number.c
+index 9e91a77d..7c4e01f1 100644
+--- a/SWFModernRuntime/src/avm2/avm2_number.c
++++ b/SWFModernRuntime/src/avm2/avm2_number.c
+@@ -15,6 +15,951 @@
+ #include <avm2/avm2_object.h>
+ #include <avm2/avm2_ops.h>
+ 
++// ---------------------------------------------------------------------------
++// avmplus number -> string (exact port of tamarin-redux core/d2a.cpp,
++// core/BigInteger.cpp's semantics and core/MathUtils.cpp
++// convertDoubleToString / convertDoubleToStringRadix).
++//
++// Flash Player's Number formatting is NOT shortest-round-trip and NOT
++// correctly rounded: it is Burger & Dybvig with avmplus's own shortcuts, and
++// every quirk of those shortcuts is observable in FP32 goldens:
++//   * the fast (double) estimate path for values with |e|+prec < 50, rounding
++//     a fixed-width digit string by the NEXT generated digit (> 4);
++//   * the BigInteger path skips that rounding in NORMAL mode, so the
++//     15-digit exponential mantissa is TRUNCATED, and toExponential(0) of
++//     77.1234 is "7e+1";
++//   * fixed-precision modes scale r and s by 10^precision but leave m+/m-
++//     alone, so digit generation runs on after the shortest digits; when it
++//     "finishes" the rest is zero fill (1000000000000000128.toFixed(0) is
++//     "1000000000000000100");
++//   * frexp() normalises subnormals, so their m+/m- are 2^52 too narrow and
++//     they print 17-ish digits;
++//   * 2^1022 and 2^1023 take the asymmetric-boundary arm, whose value*4.0
++//     overflows to Infinity (FP prints "1e+308");
++//   * the SWF < 15 toFixed arm (bugzilla 513039: "-0.", "1.", "0.01").
++// The digit generator is exact integer arithmetic, so any correct bignum
++// reproduces BigInteger; the double fast path is replicated op-for-op.
++// ---------------------------------------------------------------------------
++
++#define D2A_BIG_WORDS 160
++
++typedef struct
++{
++	uint32_t w[D2A_BIG_WORDS];
++	int n; // significant words, >= 1
++} D2aBig;
++
++static void big_trim(D2aBig* b)
++{
++	while (b->n > 1 && b->w[b->n - 1] == 0) b->n--;
++}
++
++static void big_set_u64(D2aBig* b, uint64_t v)
++{
++	b->w[0] = (uint32_t) v;
++	b->w[1] = (uint32_t) (v >> 32);
++	b->n = 2;
++	big_trim(b);
++}
++
++static void big_lshift(D2aBig* b, int k)
++{
++	if (k <= 0) return;
++	int ws = k / 32, bs = k % 32;
++	int nn = b->n + ws + 1;
++	if (nn > D2A_BIG_WORDS) nn = D2A_BIG_WORDS;
++	for (int i = nn - 1; i >= 0; i--)
++	{
++		int src = i - ws;
++		uint64_t hi = (src >= 0 && src < b->n) ? b->w[src] : 0;
++		uint64_t lo = (src - 1 >= 0 && src - 1 < b->n) ? b->w[src - 1] : 0;
++		b->w[i] = bs ? (uint32_t) ((hi << bs) | (lo >> (32 - bs))) : (uint32_t) hi;
++	}
++	b->n = nn;
++	big_trim(b);
++}
++
++static void big_rshift(D2aBig* b, int k)
++{
++	if (k <= 0) return;
++	int ws = k / 32, bs = k % 32;
++	if (ws >= b->n) { b->w[0] = 0; b->n = 1; return; }
++	int nn = b->n - ws;
++	for (int i = 0; i < nn; i++)
++	{
++		uint64_t lo = b->w[i + ws];
++		uint64_t hi = (i + ws + 1 < b->n) ? b->w[i + ws + 1] : 0;
++		b->w[i] = bs ? (uint32_t) ((lo >> bs) | (hi << (32 - bs))) : (uint32_t) lo;
++	}
++	b->n = nn;
++	big_trim(b);
++}
++
++static void big_mul_small(D2aBig* b, uint32_t m)
++{
++	uint64_t carry = 0;
++	for (int i = 0; i < b->n; i++)
++	{
++		uint64_t t = (uint64_t) b->w[i] * m + carry;
++		b->w[i] = (uint32_t) t;
++		carry = t >> 32;
++	}
++	if (carry && b->n < D2A_BIG_WORDS) b->w[b->n++] = (uint32_t) carry;
++}
++
++static void big_mul_big(D2aBig* b, const D2aBig* m)
++{
++	uint32_t out[D2A_BIG_WORDS];
++	int nn = b->n + m->n;
++	if (nn > D2A_BIG_WORDS) nn = D2A_BIG_WORDS;
++	memset(out, 0, sizeof(out));
++	for (int i = 0; i < b->n; i++)
++	{
++		uint64_t carry = 0;
++		for (int j = 0; j < m->n && i + j < nn; j++)
++		{
++			uint64_t t = (uint64_t) b->w[i] * m->w[j] + out[i + j] + carry;
++			out[i + j] = (uint32_t) t;
++			carry = t >> 32;
++		}
++		if (i + m->n < nn) out[i + m->n] = (uint32_t) carry;
++	}
++	memcpy(b->w, out, sizeof(uint32_t) * (size_t) nn);
++	b->n = nn;
++	big_trim(b);
++}
++
++static int big_cmp(const D2aBig* a, const D2aBig* b)
++{
++	if (a->n != b->n) return a->n > b->n ? 1 : -1;
++	for (int i = a->n - 1; i >= 0; i--)
++	{
++		if (a->w[i] != b->w[i]) return a->w[i] > b->w[i] ? 1 : -1;
++	}
++	return 0;
++}
++
++static void big_add(D2aBig* out, const D2aBig* a, const D2aBig* b)
++{
++	int nn = a->n > b->n ? a->n : b->n;
++	uint64_t carry = 0;
++	for (int i = 0; i < nn; i++)
++	{
++		uint64_t t = carry + (i < a->n ? a->w[i] : 0) + (i < b->n ? b->w[i] : 0);
++		out->w[i] = (uint32_t) t;
++		carry = t >> 32;
++	}
++	out->n = nn;
++	if (carry && nn < D2A_BIG_WORDS) out->w[out->n++] = (uint32_t) carry;
++}
++
++// BigInteger::compareOffset: compare (a + off) with b.
++static int big_cmp_offset(const D2aBig* a, const D2aBig* b, const D2aBig* off)
++{
++	D2aBig t;
++	big_add(&t, a, off);
++	return big_cmp(&t, b);
++}
++
++static void big_sub_in_place(D2aBig* a, const D2aBig* b) // a >= b
++{
++	int64_t borrow = 0;
++	for (int i = 0; i < a->n; i++)
++	{
++		int64_t t = (int64_t) a->w[i] - (i < b->n ? b->w[i] : 0) - borrow;
++		borrow = t < 0;
++		a->w[i] = (uint32_t) (t + (borrow ? ((int64_t) 1 << 32) : 0));
++	}
++	big_trim(a);
++}
++
++// r = r % s; returns the (low word of the) quotient, as BigInteger::divBy.
++static uint32_t big_divmod(D2aBig* r, const D2aBig* s)
++{
++	uint32_t q = 0;
++	while (big_cmp(r, s) >= 0)
++	{
++		big_sub_in_place(r, s);
++		q++;
++	}
++	return q;
++}
++
++// MathUtils::frexp (unix/arm/win32 all agree): value = mantissa * 2^e with
++// an integer 53-bit mantissa. Infinity (only reachable through the
++// asymmetric-boundary arm's value*4.0 overflow) follows x86-64: glibc frexp
++// returns inf with *e = 0 and cvttsd2si of inf*2^53 yields 2^63.
++static uint64_t d2a_frexp(double value, int32_t* eptr)
++{
++	if (isinf(value))
++	{
++		*eptr = -53;
++		return 0x8000000000000000ull;
++	}
++	int e = 0;
++	double frac = frexp(value, &e);
++	*eptr = e - 53;
++	return (uint64_t) (frac * (double) (1LL << 53));
++}
++
++// BigInteger::setFromDouble: exact (truncated) integer value.
++static void big_set_double(D2aBig* b, double value)
++{
++	int32_t e;
++	uint64_t m = d2a_frexp(value, &e);
++	big_set_u64(b, m);
++	if (e < 0) big_rshift(b, -e);
++	else big_lshift(b, e);
++}
++
++static const double d2a_pow10_tab[23] = {
++	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11,
++	1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22
++};
++
++// MathUtils::powInt (integer exponent, repeated squaring).
++static double d2a_pow_int(double base, int32_t exponent)
++{
++	double value = 1.0;
++	int32_t orig = exponent;
++	double orig_base = base;
++	if (exponent < 0)
++	{
++		exponent = -exponent;
++		while (exponent)
++		{
++			if (exponent & 1)
++			{
++				value /= base;
++				if (value == 0 && base != 0) return pow(orig_base, (double) orig);
++			}
++			exponent >>= 1;
++			base *= base;
++		}
++	}
++	else
++	{
++		while (exponent)
++		{
++			if (exponent & 1) value *= base;
++			exponent >>= 1;
++			base *= base;
++		}
++	}
++	return value;
++}
++
++static double d2a_quick_pow10(int32_t exp)
++{
++	if (0 <= exp && exp < 23) return d2a_pow10_tab[exp];
++	return d2a_pow_int(10, exp);
++}
++
++static double d2a_quick_pow2(int32_t exp)
++{
++	if (0 < exp && exp < 64) return (double) (1ull << exp);
++	return d2a_pow_int(2, exp);
++}
++
++static void big_pow10(int32_t exp, D2aBig* out)
++{
++	if (0 < exp && exp < 22) big_set_double(out, d2a_pow10_tab[exp]);
++	else if (exp > 0)
++	{
++		big_set_double(out, d2a_pow10_tab[21]);
++		exp -= 21;
++		while (exp-- > 0) big_mul_small(out, 10);
++	}
++	else big_set_double(out, d2a_pow_int(10, exp));
++}
++
++typedef struct
++{
++	int32_t e;
++	uint64_t mantissa;
++	int32_t mantissa_prec;
++	int32_t base10_exp;
++	bool finished;
++	bool fast;
++	bool low_ok, high_ok;
++	D2aBig r, s, mplus, mminus;
++	double dr, ds, dmplus, dmminus;
++} D2a;
++
++static int32_t d2a_fixup(D2a* d, int32_t est)
++{
++	if (d->fast)
++	{
++		if (d->high_ok ? (d->dr + d->dmplus) >= d->ds : d->dr + d->dmplus > d->ds)
++			return est + 1;
++		d->dr *= 10;
++		d->dmplus *= 10;
++		d->dmminus *= 10;
++		return est;
++	}
++	int c = big_cmp_offset(&d->r, &d->s, &d->mplus);
++	if (d->high_ok ? (c != -1) : (c == 1)) return est + 1;
++	big_mul_small(&d->r, 10);
++	big_mul_small(&d->mplus, 10);
++	big_mul_small(&d->mminus, 10);
++	return est;
++}
++
++static int32_t d2a_scale(D2a* d)
++{
++	const double kLog2_10 = 0.30102999566398119521373889472449;
++	int32_t b2 = d->e + d->mantissa_prec - 1;
++	int32_t est = (int32_t) ceil((b2 * kLog2_10) - 0.0000000001);
++	int32_t aest = est > 0 ? est : -est;
++	if (d->fast)
++	{
++		double sc = d2a_quick_pow10(aest);
++		if (est >= 0) d->ds *= sc;
++		else
++		{
++			d->dr *= sc;
++			d->dmplus *= sc;
++			d->dmminus *= sc;
++		}
++		return d2a_fixup(d, est);
++	}
++	D2aBig sc;
++	big_set_u64(&sc, 0);
++	big_pow10(aest, &sc);
++	if (est >= 0) big_mul_big(&d->s, &sc);
++	else
++	{
++		big_mul_big(&d->r, &sc);
++		big_mul_big(&d->mplus, &sc);
++		big_mul_big(&d->mminus, &sc);
++	}
++	return d2a_fixup(d, est);
++}
++
++static void d2a_init(D2a* d, double value, bool fixed, int32_t min_prec)
++{
++	const uint64_t two52 = 1ull << 52;
++	d->finished = false;
++	d->fast = false;
++	d->mantissa = d2a_frexp(value, &d->e);
++	if (fixed) d->low_ok = d->high_ok = true;
++	else d->low_ok = d->high_ok = (d->mantissa & 1) == 0;
++
++	d->mantissa_prec = 53;
++	while (d->mantissa_prec != 0 && (((d->mantissa >> --d->mantissa_prec) & 1) == 0))
++		;
++	d->mantissa_prec++;
++
++	int32_t abs_e = d->e > 0 ? d->e : -d->e;
++	if (abs_e + d->mantissa_prec - 1 < 50) d->fast = true;
++
++	if (d->fast)
++	{
++		if (d->e >= 0)
++		{
++			double be = d2a_quick_pow2(d->e);
++			if (d->mantissa != two52)
++			{
++				d->dr = (double) d->mantissa * be * 2;
++				d->ds = 2;
++				d->dmplus = be;
++				d->dmminus = be;
++			}
++			else
++			{
++				double be1 = be * 2;
++				d->dr = (double) d->mantissa * be1 * 2;
++				d->ds = 4;
++				d->dmplus = be1;
++				d->dmminus = be;
++			}
++		}
++		else if (d->mantissa != two52)
++		{
++			d->dr = (double) d->mantissa * 2.0;
++			d->ds = d2a_quick_pow2(1 - d->e);
++			d->dmplus = 1;
++			d->dmminus = 1;
++		}
++		else
++		{
++			d->dr = (double) d->mantissa * 4.0;
++			d->ds = d2a_quick_pow2(2 - d->e);
++			d->dmplus = 2;
++			d->dmminus = 1;
++		}
++		if (fixed)
++		{
++			double p = d2a_quick_pow10(min_prec);
++			d->ds *= p;
++			d->dr *= p;
++		}
++	}
++	else
++	{
++		if (d->e >= 0)
++		{
++			D2aBig be;
++			big_set_u64(&be, 1);
++			big_lshift(&be, d->e);
++			if (d->mantissa != two52)
++			{
++				big_set_double(&d->r, value);
++				big_lshift(&d->r, 1);
++				big_set_u64(&d->s, 2);
++				d->mplus = be;
++				d->mminus = be;
++			}
++			else
++			{
++				D2aBig be1 = be;
++				big_lshift(&be1, 1);
++				big_set_double(&d->r, value * 4.0);
++				big_set_u64(&d->s, 4);
++				d->mplus = be1;
++				d->mminus = be;
++			}
++		}
++		else if (d->mantissa != two52)
++		{
++			big_set_double(&d->r, (double) (d->mantissa * 2));
++			big_set_u64(&d->s, 2);
++			big_lshift(&d->s, -d->e);
++			big_set_u64(&d->mplus, 1);
++			big_set_u64(&d->mminus, 1);
++		}
++		else
++		{
++			big_set_double(&d->r, (double) (d->mantissa * 4));
++			big_set_u64(&d->s, 2);
++			big_lshift(&d->s, 1 - d->e);
++			big_set_u64(&d->mplus, 2);
++			big_set_u64(&d->mminus, 1);
++		}
++		if (fixed)
++		{
++			D2aBig p;
++			big_set_u64(&p, 0);
++			big_pow10(min_prec, &p);
++			big_mul_big(&d->s, &p);
++			big_mul_big(&d->r, &p);
++		}
++	}
++	d->base10_exp = d2a_scale(d);
++}
++
++static int32_t d2a_next_digit(D2a* d)
++{
++	if (d->finished) return -1;
++	bool within_low, within_high;
++	int32_t q;
++	if (d->fast)
++	{
++		q = (int32_t) (d->dr / d->ds);
++		d->dr = fmod(d->dr, d->ds);
++		within_low = d->low_ok ? (d->dr <= d->dmminus) : (d->dr < d->dmminus);
++		within_high = d->high_ok ? (d->dr + d->dmplus >= d->ds)
++		                         : (d->dr + d->dmplus > d->ds);
++	}
++	else
++	{
++		q = (int32_t) big_divmod(&d->r, &d->s);
++		int cl = big_cmp(&d->r, &d->mminus);
++		within_low = d->low_ok ? (cl != 1) : (cl == -1);
++		int ch = big_cmp_offset(&d->r, &d->s, &d->mplus);
++		within_high = d->high_ok ? (ch != -1) : (ch == 1);
++	}
++	if (q < 0 || q > 9) q = 0;
++	if (!within_low)
++	{
++		if (!within_high)
++		{
++			if (d->fast)
++			{
++				d->dr *= 10;
++				d->dmplus *= 10;
++				d->dmminus *= 10;
++			}
++			else
++			{
++				big_mul_small(&d->r, 10);
++				big_mul_small(&d->mplus, 10);
++				big_mul_small(&d->mminus, 10);
++			}
++		}
++		else
++		{
++			q++;
++			d->finished = true;
++		}
++	}
++	else if (!within_high)
++	{
++		d->finished = true;
++	}
++	else
++	{
++		bool half_less = d->fast ? (d->dr * 2 < d->ds)
++		                         : (big_cmp_offset(&d->r, &d->s, &d->r) == -1);
++		if (!half_less) q++;
++		d->finished = true;
++	}
++	return q;
++}
++
++// MathUtils::convertDoubleToString. `bug513039_fixed` is avmplus's
++// bugzilla513039 compatibility flag (set for SWF >= 15). Returns the length.
++int avm2_d2s(char* out, int out_size, double value, int mode, int precision,
++             bool bug513039_fixed)
++{
++	if (out_size <= 0) return 0;
++	if (isinf(value)) return snprintf(out, (size_t) out_size, value < 0 ? "-Infinity" : "Infinity");
++	if (isnan(value)) return snprintf(out, (size_t) out_size, "NaN");
++
++	if (mode == AVM2_DTOSTR_NORMAL && value > -2147483648.0 && value < 2147483648.0)
++	{
++		int32_t iv = (int32_t) value;
++		if (value == (double) iv) return snprintf(out, (size_t) out_size, "%d", iv);
++	}
++
++	char buffer[1400];
++	char* s = buffer;
++	const bool negative = value < 0.0;
++	const bool zero = value == 0.0;
++	const bool no_fraction = precision == 0;
++	bool round = true;
++	if (negative)
++	{
++		value = -value;
++		s++;
++	}
++	D2a dd;
++	D2a* d2a = &dd;
++	d2a_init(d2a, value, mode != AVM2_DTOSTR_NORMAL, precision);
++	int32_t exp10 = d2a->base10_exp - 1;
++	char* const sentinel = s;
++
++	enum { kNormal, kExponential, kFraction, kFixedFraction } format;
++	switch (mode)
++	{
++		case AVM2_DTOSTR_FIXED:
++			if (exp10 < 0) format = kFixedFraction;
++			else { format = kNormal; precision++; }
++			break;
++		case AVM2_DTOSTR_PRECISION:
++			if (exp10 < 0) format = kFraction;
++			else if (exp10 >= precision) format = kExponential;
++			else format = kNormal;
++			break;
++		case AVM2_DTOSTR_EXPONENTIAL:
++			format = kExponential;
++			precision++;
++			break;
++		default:
++			if (exp10 < 0 && exp10 > -7)
++			{
++				if (exp10 < -precision) exp10 = -precision - 1;
++				format = kFraction;
++			}
++			else if (exp10 > 20) format = kExponential;
++			else format = kNormal;
++			break;
++	}
++
++	bool wrote_decimal = false;
++	switch (format)
++	{
++		case kNormal:
++		{
++			int32_t digits = 0, digit;
++			*s++ = '0';
++			digit = d2a_next_digit(d2a);
++			if (digit > 0) *s++ = (char) (digit + '0');
++			while (exp10 > 0)
++			{
++				digit = d2a->finished ? 0 : d2a_next_digit(d2a);
++				*s++ = (char) (digit + '0');
++				exp10--;
++				digits++;
++			}
++			if (mode == AVM2_DTOSTR_FIXED) digits = 0;
++			if (mode == AVM2_DTOSTR_NORMAL)
++			{
++				if (!d2a->finished)
++				{
++					*s++ = '.';
++					wrote_decimal = true;
++					while (!d2a->finished) *s++ = (char) (d2a_next_digit(d2a) + '0');
++				}
++			}
++			else if (digits < precision - 1)
++			{
++				*s++ = '.';
++				wrote_decimal = true;
++				for (; digits < precision - 1; digits++)
++				{
++					digit = d2a->finished ? 0 : d2a_next_digit(d2a);
++					*s++ = (char) (digit + '0');
++				}
++			}
++			break;
++		}
++		case kFixedFraction:
++		{
++			*s++ = '0';
++			*s++ = '0';
++			*s++ = '.';
++			wrote_decimal = true;
++			int32_t digits = 0;
++			if (exp10 > 0)
++			{
++				while (++exp10 < 10 && digits < precision)
++				{
++					*s++ = '0';
++					digits++;
++				}
++			}
++			else if (exp10 < 0)
++			{
++				if (bug513039_fixed)
++				{
++					while ((exp10 < -1) && (precision > 0))
++					{
++						exp10++;
++						precision--;
++						*s++ = '0';
++					}
++					if (precision == 0 && exp10 != 0) round = false;
++				}
++				else
++				{
++					while ((++exp10 < 0) && (precision-- > 0)) *s++ = '0';
++				}
++			}
++			for (; digits < precision; digits++)
++			{
++				if (d2a->finished)
++				{
++					if (mode == AVM2_DTOSTR_NORMAL) break;
++					*s++ = '0';
++				}
++				else *s++ = (char) (d2a_next_digit(d2a) + '0');
++			}
++			exp10 = 0;
++			break;
++		}
++		case kFraction:
++		{
++			*s++ = '0';
++			*s++ = '0';
++			*s++ = '.';
++			wrote_decimal = true;
++			if (!zero)
++			{
++				for (int32_t i = exp10; i < -1; i++) *s++ = '0';
++			}
++			int32_t i = 0;
++			while (!d2a->finished)
++			{
++				*s++ = (char) (d2a_next_digit(d2a) + '0');
++				if (mode != AVM2_DTOSTR_NORMAL && ++i >= precision) break;
++			}
++			if (mode == AVM2_DTOSTR_PRECISION)
++			{
++				while (i++ < precision)
++					*s++ = (char) (d2a->finished ? '0' : d2a_next_digit(d2a) + '0');
++			}
++			exp10 = 0;
++			break;
++		}
++		case kExponential:
++		{
++			int32_t digit = d2a->finished ? 0 : d2a_next_digit(d2a);
++			*s++ = (char) (digit + '0');
++			if (((mode == AVM2_DTOSTR_NORMAL) && !d2a->finished)
++			    || ((mode != AVM2_DTOSTR_NORMAL) && precision > 1))
++			{
++				*s++ = '.';
++				wrote_decimal = true;
++				for (int32_t i = 0; i < precision - 1; i++)
++				{
++					if (d2a->finished)
++					{
++						if (mode == AVM2_DTOSTR_NORMAL) break;
++						*s++ = '0';
++					}
++					else *s++ = (char) (d2a_next_digit(d2a) + '0');
++				}
++			}
++			break;
++		}
++	}
++
++	if (round && (d2a->fast || mode == AVM2_DTOSTR_FIXED || mode == AVM2_DTOSTR_PRECISION))
++	{
++		if (d2a_next_digit(d2a) > 4)
++		{
++			for (char* p = s - 1; p >= sentinel; p--)
++			{
++				if (*p == '.') continue;
++				*p = (char) (*p + 1);
++				if (*p != ('9' + 1)) break;
++				*p = '0';
++			}
++		}
++		if (mode == AVM2_DTOSTR_NORMAL && wrote_decimal)
++		{
++			while (*(s - 1) == '0') s--;
++			if (*(s - 1) == '.') s--;
++		}
++	}
++
++	if (exp10)
++	{
++		char* first_nz = sentinel;
++		while (first_nz < s && *first_nz == '0') first_nz++;
++		if (s == first_nz)
++		{
++			*s++ = '1';
++			exp10++;
++		}
++		else if (!zero)
++		{
++			char* last_nz = s;
++			while (last_nz > first_nz && *--last_nz == '0')
++				;
++			if (first_nz == last_nz)
++			{
++				exp10 += (int32_t) (s - first_nz - 1);
++				s = last_nz + 1;
++			}
++		}
++		*s++ = 'e';
++		if (exp10 > 0) *s++ = '+';
++		s += sprintf(s, "%d", (int) exp10);
++	}
++
++	int32_t len = (int32_t) (s - buffer);
++	s = sentinel;
++	if (sentinel[0] == '0' && sentinel[1] != '.')
++	{
++		s = sentinel + 1;
++		len--;
++	}
++	if (negative) *--s = '-';
++
++	if (bug513039_fixed && mode == AVM2_DTOSTR_FIXED && no_fraction && wrote_decimal)
++	{
++		char* p;
++		for (p = s + len - 1; *p != '.'; p--)
++			;
++		len = (int32_t) (p - s);
++	}
++
++	if (len > out_size - 1) len = out_size - 1;
++	memcpy(out, s, (size_t) len);
++	out[len] = '\0';
++	return len;
++}
++
++// MathUtils::convertDoubleToStringRadix: the integer part only, built from
++// the bottom with double floor/divide (so digits past 2^53 are whatever the
++// doubles leave, typically zero fill), and any |value| < 1 -- including a
++// negative one -- is "0" with no sign.
++int avm2_d2s_radix(char* out, int out_size, double value, int radix)
++{
++	char tmp[1100];
++	char* src = tmp + sizeof(tmp) - 1;
++	char* end = src;
++	bool negative = value < 0;
++	if (negative) value = -value;
++	if (value < 1)
++	{
++		*src-- = '0';
++	}
++	else
++	{
++		double u = floor(value);
++		while (u != 0 && src > tmp + 1)
++		{
++			double j = u;
++			u = floor(u / radix);
++			j -= (u * radix);
++			*src-- = (char) ((j < 10) ? ((int32_t) j + '0') : ((int32_t) j + ('a' - 10)));
++		}
++		if (negative) *src-- = '-';
++	}
++	int len = (int) (end - src);
++	if (len > out_size - 1) len = out_size - 1;
++	memcpy(out, src + 1, (size_t) len);
++	out[len] = '\0';
++	return len;
++}
++
++// BigInteger::doubleValueOf: top 53 bits, round-half-even on bit 54 + rest.
++static double big_double_value(const D2aBig* b)
++{
++	if (b->n == 1) return (double) b->w[0];
++	int bits_top = 1;
++	for (uint32_t t = b->w[b->n - 1]; t > 1; t >>= 1) bits_top++;
++	int next = b->n - 1;
++	bool bit53 = false, bit54 = false, rest = false;
++	uint64_t mant = 0, w = 0;
++	int pos = 53, bits = bits_top, wshift = 0;
++	while (pos > 0)
++	{
++		w = b->w[next--];
++		mant |= (w >> wshift);
++		pos -= bits;
++		if (pos > 0)
++		{
++			if (next > -1)
++			{
++				bits = (pos > 31) ? 32 : pos;
++				wshift = (pos > 31) ? 0 : 32 - bits;
++				mant <<= bits;
++			}
++			else break;
++		}
++	}
++	if (pos <= 0)
++	{
++		bit53 = (mant & 1) != 0;
++		if (bits == 32)
++		{
++			if (next > -1)
++			{
++				w = b->w[next--];
++				bit54 = (w & (1ull << 31)) != 0;
++				rest = (w & ((1ull << 31) - 1)) != 0;
++			}
++		}
++		else
++		{
++			bit54 = (w & (1ull << (wshift - 1))) != 0;
++			if (wshift > 1) rest = (w & ((1ull << (wshift - 1)) - 1)) != 0;
++			if (next > -1) rest = rest || (b->w[next--] != 0);
++		}
++	}
++	if (bit54 && (bit53 || rest)) mant += 1;
++	uint32_t lg2 = (uint32_t) (b->n - 1) * 32;
++	for (uint32_t t = b->w[b->n - 1]; t > 1; t >>= 1) lg2++;
++	int32_t e2 = (int32_t) lg2 + 1 - 53;
++	double result = (double) mant;
++	if (e2 > 0)
++	{
++		if (e2 < 64) result *= (double) (1ull << e2);
++		else result *= d2a_pow_int(2, e2);
++	}
++	return result;
++}
++
++// MathUtils.cpp's own quickPowTen (note: 0 goes through pow, = 1).
++static double s2d_pow10(int32_t exp)
++{
++	if (exp < 23 && exp > 0) return d2a_pow10_tab[exp];
++	return d2a_pow_int(10, exp);
++}
++
++// avmplus MathUtils::convertStringToDouble for an already-validated JSON
++// number token ([-]digits[.digits][(e|E)[+-]digits]); JSONParser::parseFloat
++// maps a failure to NaN. Flash's reader is NOT correctly rounded: up to 15
++// digits it accumulates in a double and scales by a (pow-computed) power of
++// ten; past 15 it builds the exact integer, multiplies it by a DOUBLE 10^k
++// (inexact for k >= 23) and divides by another. So
++// "1.7976931348623157e308" overflows to Infinity and "1.1754944e-38" lands one
++// ulp low (avm2/json_parse_numbers, Flash-captured).
++double avm2_avmplus_json_number(const char* s, uint32_t len)
++{
++	uint32_t i = 0;
++	bool negate = false;
++	if (i < len && (s[i] == '-' || s[i] == '+'))
++	{
++		negate = s[i] == '-';
++		i++;
++	}
++	uint32_t start = i;
++	int32_t num_digits = 0, exp10 = 0;
++	while (i < len && s[i] >= '0' && s[i] <= '9') { num_digits++; i++; }
++	if (i < len && s[i] == '.')
++	{
++		i++;
++		while (i < len && s[i] >= '0' && s[i] <= '9') { num_digits++; i++; }
++	}
++	uint32_t limit = i;
++	if (i < len && (s[i] == 'e' || s[i] == 'E'))
++	{
++		i++;
++		bool negexp = false;
++		if (i < len && (s[i] == '-' || s[i] == '+')) { negexp = s[i] == '-'; i++; }
++		uint32_t num = 0;
++		while (i < len && s[i] >= '0' && s[i] <= '9') { num = num * 10u + (uint32_t) (s[i] - '0'); i++; }
++		exp10 += negexp ? -(int32_t) num : (int32_t) num;
++	}
++	if (num_digits == 0) return NAN;
++	double result = 0;
++	int32_t decimal_digits = -1;
++	if (num_digits > 15)
++	{
++		D2aBig x;
++		big_set_u64(&x, 0);
++		for (uint32_t k = start; k < limit; k++)
++		{
++			if (decimal_digits != -1) decimal_digits++;
++			if (s[k] != '.')
++			{
++				big_mul_small(&x, 10);
++				D2aBig dg;
++				big_set_u64(&dg, (uint64_t) (s[k] - '0'));
++				big_add(&x, &x, &dg);
++			}
++			else decimal_digits = 0;
++		}
++		if (decimal_digits > 0) exp10 -= decimal_digits;
++		if (exp10 > 0)
++		{
++			D2aBig f;
++			big_set_double(&f, s2d_pow10(exp10));
++			if (x.n + f.n > 128 + 2) return NAN;
++			big_mul_big(&x, &f);
++			exp10 = 0;
++		}
++		result = big_double_value(&x);
++		if (exp10 < 0)
++		{
++			if (exp10 < -307)
++			{
++				int32_t diff = exp10 + 307;
++				result /= s2d_pow10(-diff);
++				exp10 -= diff;
++			}
++			result /= s2d_pow10(-exp10);
++		}
++	}
++	else
++	{
++		for (uint32_t k = start; k < limit; k++)
++		{
++			if (decimal_digits != -1) decimal_digits++;
++			if (s[k] != '.') result = result * 10 + (double) (unsigned char) s[k] - '0';
++			else decimal_digits = 0;
++		}
++		if (decimal_digits > 0) exp10 -= decimal_digits;
++		if (exp10 >= 0) result *= s2d_pow10(exp10);
++		else
++		{
++			if (exp10 < -307)
++			{
++				int32_t diff = exp10 + 307;
++				result /= s2d_pow10(-diff);
++				exp10 -= diff;
++			}
++			result /= s2d_pow10(-exp10);
++		}
++	}
++	return negate ? -result : result;
++}
++
+ static double this_number(Avm2Activation* act)
+ {
+ 	return avm2_coerce_to_number(act->ctx, act->this_val);
+@@ -47,36 +992,36 @@ _Noreturn static void throw_1002(Avm2Context* ctx)
+ 	                 "20. Specified value is not within expected range.");
+ }
+ 
+-// print_with_radix (Ruffle number.rs): radix 10 → normal coercion.
++// Number$/_numberToString (avmplus NumberClass.cpp): radix 10, NaN and
++// +-Infinity print through doubleToString BEFORE the radix range check (so
++// NaN.toString(1) is "NaN"); any other radix prints the integer part only,
++// via convertDoubleToStringRadix.
+ static const Avm2String* print_with_radix(Avm2Context* ctx, double number, int radix)
+ {
+-	char buf[420];
+-	if (radix == 10)
++	char buf[1100];
++	if (radix == 10 || isnan(number) || isinf(number))
+ 	{
+ 		avm2_format_number(buf, sizeof(buf), number);
+ 		return avm2_string_from_literal(ctx, buf);
+ 	}
+-	if (isnan(number)) return avm2_string_from_literal(ctx, "NaN");
+-	if (isinf(number))
++	int n = avm2_d2s_radix(buf, sizeof(buf), number, radix);
++	// avmplus builds this string with newStringLatin1, and past 2^53 its
++	// double digit `j` can fall outside [0, radix): the "digit" is then any
++	// byte ('W', '(', ' ', 0x97, ...). Those are deterministic (avm2/
++	// number_tostring pins 31 of them), so re-encode the bytes as Latin-1.
++	char u8[2200];
++	int m = 0;
++	for (int i = 0; i < n; i++)
+ 	{
+-		return avm2_string_from_literal(ctx, number < 0 ? "-Infinity" : "Infinity");
++		unsigned char c = (unsigned char) buf[i];
++		if (c < 0x80) u8[m++] = (char) c;
++		else
++		{
++			u8[m++] = (char) (0xC0 | (c >> 6));
++			u8[m++] = (char) (0x80 | (c & 0x3F));
++		}
+ 	}
+-	static const char DIGIT_CHARS[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+-	char digits[1200];
+-	int n = 0;
+-	int neg = number < 0.0;
+-	number = fabs(number);
+-	do
+-	{
+-		double digit = fmod(number, (double) radix);
+-		number /= (double) radix;
+-		digits[n++] = DIGIT_CHARS[(int) digit];
+-	} while (number >= 1.0 && n < (int) sizeof(digits) - 2);
+-	if (neg) digits[n++] = '-';
+-	// Reverse.
+-	char out[1204];
+-	for (int i = 0; i < n; i++) out[i] = digits[n - 1 - i];
+-	return avm2_string_new(ctx, out, (uint32_t) n);
++	return avm2_string_new(ctx, u8, (uint32_t) m);
+ }
+ 
+ static Avm2Value number_to_string(Avm2Activation* act)
+@@ -84,7 +1029,7 @@ static Avm2Value number_to_string(Avm2Activation* act)
+ 	Avm2Context* ctx = act->ctx;
+ 	double number = this_number(act);
+ 	int32_t radix = act->argc > 0 ? avm2_coerce_to_i32(ctx, act->args[0]) : 10;
+-	if (radix < 2 || radix > 36)
++	if (radix != 10 && !isnan(number) && !isinf(number) && (radix < 2 || radix > 36))
+ 	{
+ 		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+ 		                 "Error #1003: The radix argument must be between 2 and 36; "
+@@ -185,26 +1130,22 @@ DEFINE_NUMBER_PROTO_SHIMS(int, int_class, "int",
+ DEFINE_NUMBER_PROTO_SHIMS(uint, uint_class, "uint",
+                           NUM_RECV_ANY, NUM_RECV_UINT)
+ 
++// Number$/_convert (avmplus NumberClass.cpp): range check, then
++// MathUtils::convertDoubleToString in the requested mode (port above).
++static Avm2Value number_convert(Avm2Context* ctx, double number, int digits, int mode)
++{
++	char buf[1400];
++	int n = avm2_d2s(buf, sizeof(buf), number, mode, digits, ctx->swf_version >= 15);
++	return avm2_string(avm2_string_new(ctx, buf, (uint32_t) n));
++}
++
+ static Avm2Value number_to_fixed(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+ 	double number = this_number(act);
+ 	int32_t digits = act->argc > 0 ? avm2_coerce_to_i32(ctx, act->args[0]) : 0;
+ 	if (digits < 0 || digits > 20) throw_1002(ctx);
+-	char buf[400];
+-	if (isnan(number)) return avm2_string(avm2_string_from_literal(ctx, "NaN"));
+-	if (isinf(number))
+-	{
+-		return avm2_string(avm2_string_from_literal(
+-			ctx, number < 0 ? "-Infinity" : "Infinity"));
+-	}
+-	// ECMA-262 toFixed only emits "-" for x < 0, and -0 is not < 0, so
+-	// (-0).toFixed(2) is "0.00". C's %f prints the sign bit, so normalize
+-	// negative zero away first (avm2/number_convert_edge_cases, whose -0 block
+-	// pins all eight toFixed rows).
+-	if (number == 0.0) number = 0.0;
+-	snprintf(buf, sizeof(buf), "%.*f", (int) digits, number);
+-	return avm2_string(avm2_string_from_literal(ctx, buf));
++	return number_convert(ctx, number, digits, AVM2_DTOSTR_FIXED);
+ }
+ 
+ static Avm2Value number_to_exponential(Avm2Activation* act)
+@@ -213,95 +1154,7 @@ static Avm2Value number_to_exponential(Avm2Activation* act)
+ 	double number = this_number(act);
+ 	int32_t digits = act->argc > 0 ? avm2_coerce_to_i32(ctx, act->args[0]) : 0;
+ 	if (digits < 0 || digits > 20) throw_1002(ctx);
+-	char buf[80];
+-	if (number == 0.0)
+-	{
+-		// Ruffle quirk-for-quirk: 0.toExponential(0) = "1e-15",
+-		// 0.toExponential(d) = "0.000...e-16".
+-		if (digits == 0)
+-		{
+-			return avm2_string(avm2_string_from_literal(ctx, "1e-15"));
+-		}
+-		int n = snprintf(buf, sizeof(buf), "0.");
+-		for (int i = 0; i < digits && n < (int) sizeof(buf) - 6; i++) buf[n++] = '0';
+-		snprintf(buf + n, sizeof(buf) - n, "e-16");
+-		return avm2_string(avm2_string_from_literal(ctx, buf));
+-	}
+-	if (isnan(number)) return avm2_string(avm2_string_from_literal(ctx, "NaN"));
+-	if (isinf(number))
+-	{
+-		return avm2_string(avm2_string_from_literal(
+-			ctx, number < 0 ? "-Infinity" : "Infinity"));
+-	}
+-	// C %.*e gives "d.ddde±XX" (2+ exponent digits); Rust gives "e±X" with
+-	// no zero padding and drops "e+0" entirely.
+-	char tmp[80];
+-	snprintf(tmp, sizeof(tmp), "%.*e", (int) digits, number);
+-	char* e = strchr(tmp, 'e');
+-	int exp_val = atoi(e + 1);
+-	*e = '\0';
+-	if (exp_val == 0)
+-	{
+-		snprintf(buf, sizeof(buf), "%s", tmp);
+-	}
+-	else
+-	{
+-		snprintf(buf, sizeof(buf), "%se%+d", tmp, exp_val);
+-	}
+-	return avm2_string(avm2_string_from_literal(ctx, buf));
+-}
+-
+-// FP's Number$/_convert, precision form.
+-//
+-// This was a port of Ruffle's number.rs, which rounds with floor(x*scale)/scale
+-// and then prints the result with the SHORTEST round-trip formatter — so every
+-// trailing zero the precision asked for was dropped ("123".toPrecision(19) came
+-// out "123", not "123.0000000000000000") and zero came out "0" for every digit
+-// count. avm2/number_convert_edge_cases pins 18 such rows.
+-//
+-// The rule FP actually uses (`e` = the decimal exponent of the value already
+-// rounded to `wanted_digits` significant digits):
+-//   * non-finite            -> "NaN" / "±Infinity" (AFTER the range check:
+-//                              NaN.toPrecision(0) is still #1002)
+-//   * zero                  -> exactly what toFixed(p) prints, "0." + p zeros
+-//                              (ECMA would give "0" at p == 1; FP does not)
+-//   * wanted_digits <= e    -> exponential, wanted_digits-1 fraction digits
+-//   * otherwise             -> FIXED, wanted_digits-1-e fraction digits
+-// Note the last arm has no ECMA-style "e < -6 switches to exponential" escape:
+-// (1.2315e-8).toPrecision(1) is "0.00000001", not "1e-8" (avm2/number_toprecision).
+-static const Avm2String* print_with_precision(Avm2Context* ctx, double number,
+-                                              int wanted_digits)
+-{
+-	char buf[512];
+-	if (isnan(number)) return avm2_string_from_literal(ctx, "NaN");
+-	if (isinf(number))
+-	{
+-		return avm2_string_from_literal(ctx, number < 0 ? "-Infinity" : "Infinity");
+-	}
+-	if (number == 0.0)
+-	{
+-		snprintf(buf, sizeof(buf), "%.*f", wanted_digits, 0.0);
+-		return avm2_string_from_literal(ctx, buf);
+-	}
+-	// Read the exponent back out of %e so the rounding that decides
+-	// 9.99 -> 1e+1 is printf's, not a log10 approximation.
+-	char tmp[512];
+-	snprintf(tmp, sizeof(tmp), "%.*e", wanted_digits - 1, number);
+-	char* ep = strchr(tmp, 'e');
+-	int e = (ep != NULL) ? atoi(ep + 1) : 0;
+-	if (wanted_digits <= e)
+-	{
+-		if (ep != NULL) *ep = '\0';
+-		// FP spells the exponent unpadded and always signed ("1.2e+2"),
+-		// unlike C's two-digit "e+02".
+-		snprintf(buf, sizeof(buf), "%se%+d", tmp, e);
+-		return avm2_string_from_literal(ctx, buf);
+-	}
+-	int frac = wanted_digits - 1 - e;
+-	if (frac < 0) frac = 0;
+-	if (frac > 400) frac = 400;
+-	snprintf(buf, sizeof(buf), "%.*f", frac, number);
+-	return avm2_string_from_literal(ctx, buf);
++	return number_convert(ctx, number, digits, AVM2_DTOSTR_EXPONENTIAL);
+ }
+ 
+ static Avm2Value number_to_precision(Avm2Activation* act)
+@@ -320,7 +1173,10 @@ static Avm2Value number_to_precision(Avm2Activation* act)
+ 	}
+ 	int32_t digits = avm2_coerce_to_i32(ctx, act->args[0]);
+ 	if (digits < 1 || digits > 21) throw_1002(ctx);
+-	return avm2_string(print_with_precision(ctx, number, digits));
++	// avmplus DTOSTR_PRECISION: exponent >= precision goes exponential, any
++	// negative exponent stays fixed ((1.2315e-8).toPrecision(1) is
++	// "0.00000001", avm2/number_toprecision), and zero is "0." + p zeros.
++	return number_convert(ctx, number, digits, AVM2_DTOSTR_PRECISION);
+ }
+ 
+ static Avm2Value number_construct(Avm2Context* ctx, Avm2Class* cls,
+diff --git a/SWFModernRuntime/src/avm2/avm2_value.c b/SWFModernRuntime/src/avm2/avm2_value.c
+index 611e787c..14b2df7b 100644
+--- a/SWFModernRuntime/src/avm2/avm2_value.c
++++ b/SWFModernRuntime/src/avm2/avm2_value.c
+@@ -1,8 +1,7 @@
+ // Avm2Value constructors + coercions + abstract operators (port of Ruffle
+ // core/src/avm2/value.rs; helper names 1:1 with Ruffle's methods).
+-// Number-to-string follows value.rs's coerce_to_string Number arm:
+-// shortest round-trip decimal inside [1e-6, 1e21), MAX_PRECISION (15)
+-// exponential outside it.
++// Number-to-string is avmplus's (Flash Player's) convertDoubleToString,
++// ported in avm2_number.c (avm2_d2s).
+ 
+ #include <math.h>
+ #include <stdio.h>
+@@ -593,273 +592,38 @@ bool avm2_string_to_f64(Avm2Context* ctx, const char* s, uint32_t len, bool stri
+ }
+ 
+ // ---------------------------------------------------------------------------
+-// Number → string (Ruffle value.rs coerce_to_string Number arm)
++// Number -> string: ECMA ToString(Number) as Flash Player prints it, i.e.
++// avmplus AvmCore::doubleToString = MathUtils::convertDoubleToString(d,
++// DTOSTR_NORMAL, 15). The port lives in avm2_number.c (avm2_d2s), next to
++// toFixed/toExponential/toPrecision, which share its digit generator.
++//
++// This replaced a Ruffle-model formatter (shortest round-trip digits via
++// printf/strtod probes + Rust tie rules + a 16-char exponential mantissa
++// cut). avmplus is the reference both reproduce: its 15-digit truncated
++// exponential mantissa, its full-digit "x.yyye-7" negative arm, the 2^1022 /
++// 2^1023 "1e+308" pair and the subnormal spellings all fall out of D2A.
+ // ---------------------------------------------------------------------------
+ 
+-// Exact-midpoint tie-break, Rust-style. glibc's printf is correctly rounded
+-// and resolves an exact decimal tie TO-EVEN; Rust's f64 Display (which Ruffle
+-// prints through) resolves it AWAY FROM ZERO. They disagree only when the
+-// double's exact decimal expansion terminates exactly one digit past the
+-// shortest round-tripping precision, with that digit a '5'
+-// (e.g. 966.67828369140625 -> glibc "966.6782836914062", Rust
+-// "966.6782836914063"). Rewrites digs[0..prec] / *exp10 in place and returns
+-// 1 when it re-rounds. `d` is > 0 and finite; only called for prec >= 13, so
+-// the big exact-expansion buffer never lands on the hot path.
+-#define AVM2_EXACT_PREC 767
+-static int tie_round_away_from_zero(double d, int prec, char* digs, int* exp10)
+-{
+-	// Stage 0 (arithmetic filter, no formatting): a tie needs d's EXACT decimal
+-	// expansion to terminate at prec+2 significant digits. Writing d = m * 2^p
+-	// with m an odd integer, that expansion is m*5^-p (p < 0) or m*2^p (p >= 0),
+-	// so its digit count is computable with one log10. Almost every double is
+-	// far too long and exits here, which keeps the two snprintf stages below off
+-	// the hot path. One digit of slack absorbs any log10 rounding; stage 2 is
+-	// still the authority, so a false accept costs nothing but time.
+-	{
+-		int e2;
+-		double fr = frexp(d, &e2);
+-		uint64_t m = (uint64_t) ldexp(fr, 53);
+-		int p = e2 - 53;
+-		while (m != 0 && (m & 1u) == 0) { m >>= 1; p++; }
+-		double lg = log10((double) m)
+-		            + (p < 0 ? (-p) * 0.69897000433601880   // log10(5)
+-		                     :   p  * 0.30102999566398120); // log10(2)
+-		if ((int) floor(lg) + 1 > prec + 3) return 0;
+-	}
+-
+-	// Stage 1 (cheap filter): print one extra significant digit. A true tie
+-	// always shows a '5' there; the overwhelming majority of values do not.
+-	char probe[64];
+-	snprintf(probe, sizeof(probe), "%.*e", prec + 1, d);
+-	int seen = 0;
+-	char last = 0;
+-	for (const char* p = probe; *p != '\0' && *p != 'e' && *p != 'E'; p++)
+-	{
+-		if (*p >= '0' && *p <= '9') { last = *p; seen++; }
+-	}
+-	if (seen != prec + 2 || last != '5') return 0;
+-
+-	// Stage 2: glibc prints a double's EXACT decimal expansion at any
+-	// precision, zero-padded. 768 significant digits covers every finite f64
+-	// (the longest, 2^-1074, needs 751), so this is exact, not rounded.
+-	char ex[AVM2_EXACT_PREC + 32];
+-	snprintf(ex, sizeof(ex), "%.*e", AVM2_EXACT_PREC, d);
+-	char dig[AVM2_EXACT_PREC + 4];
+-	int m = 0;
+-	for (const char* q = ex; *q != '\0'; q++)
+-	{
+-		if (*q >= '0' && *q <= '9') dig[m++] = *q;
+-		else if (*q == 'e' || *q == 'E') break;
+-	}
+-	if (m < prec + 2 || dig[prec + 1] != '5') return 0;
+-	for (int i = prec + 2; i < m; i++) if (dig[i] != '0') return 0;
+-
+-	// Exact midpoint. Away from zero, and d > 0, so round up.
+-	char up[24];
+-	for (int i = 0; i <= prec; i++) up[i] = dig[i];
+-	int carry = 1;
+-	for (int i = prec; i >= 0 && carry != 0; i--)
+-	{
+-		if (up[i] == '9') up[i] = '0';
+-		else { up[i]++; carry = 0; }
+-	}
+-	int e = *exp10;
+-	if (carry != 0)
+-	{
+-		// 99..9 -> 100..0: shift and bump the exponent.
+-		for (int i = prec; i > 0; i--) up[i] = up[i - 1];
+-		up[0] = '1';
+-		e++;
+-	}
+-
+-	// Safety net: Rust only ever emits a representation that round-trips, so
+-	// if the away-from-zero neighbour does not, keep glibc's answer.
+-	char chk[48];
+-	int cn = 0;
+-	chk[cn++] = up[0];
+-	if (prec > 0)
+-	{
+-		chk[cn++] = '.';
+-		for (int i = 1; i <= prec; i++) chk[cn++] = up[i];
+-	}
+-	snprintf(chk + cn, sizeof(chk) - (size_t) cn, "e%d", e);
+-	if (strtod(chk, NULL) != d) return 0;
+-
+-	for (int i = 0; i <= prec; i++) digs[i] = up[i];
+-	*exp10 = e;
+-	return 1;
+-}
+-#undef AVM2_EXACT_PREC
+-
+-// Shortest decimal digit string that round-trips `d` (> 0, finite).
+-// Writes the significant digits (no dot) to digs (cap >= 20) and the
+-// power-of-ten of the first digit to *exp10. Mirrors Rust's f64 Display.
+-static int shortest_digits(double d, char* digs, int* exp10)
+-{
+-	char tmp[48];
+-	for (int prec = 0; prec <= 17; prec++)
+-	{
+-		snprintf(tmp, sizeof(tmp), "%.*e", prec, d);
+-		if (strtod(tmp, NULL) == d)
+-		{
+-			int n = 0;
+-			const char* q = tmp;
+-			int e = 0;
+-			for (; *q != '\0'; q++)
+-			{
+-				if (*q >= '0' && *q <= '9')
+-				{
+-					digs[n++] = *q;
+-				}
+-				else if (*q == 'e' || *q == 'E')
+-				{
+-					e = atoi(q + 1);
+-					break;
+-				}
+-			}
+-			// glibc broke an exact decimal tie to-even; Rust (and so Ruffle)
+-			// breaks it away from zero. Re-round when they disagree.
+-			if (prec >= 13 && n == prec + 1)
+-			{
+-				tie_round_away_from_zero(d, prec, digs, &e);
+-			}
+-			// Trim trailing zeros (keep at least one digit).
+-			while (n > 1 && digs[n - 1] == '0') n--;
+-			digs[n] = '\0';
+-			*exp10 = e;
+-			return n;
+-		}
+-	}
+-	// Unreachable: 17 significant digits always round-trip.
+-	digs[0] = '0';
+-	digs[1] = '\0';
+-	*exp10 = 0;
+-	return 1;
+-}
+-
+-// Plain (exponent-free) decimal rendering of a positive double, Rust
+-// Display style. Takes the shortest round-tripping digits from the caller
+-// (which needs them anyway to pick the notation), so the expensive
+-// shortest_digits probe loop runs once per format, not twice.
+-static int format_plain(char* buf, int buf_size, const char* digs, int n, int e)
+-{
+-	int pos = 0;
+-
+-#define PUTC(c) do { if (pos < buf_size - 1) buf[pos] = (c); pos++; } while (0)
+-	if (e >= 0)
+-	{
+-		if (e + 1 >= n)
+-		{
+-			for (int i = 0; i < n; i++) PUTC(digs[i]);
+-			for (int i = 0; i < e + 1 - n; i++) PUTC('0');
+-		}
+-		else
+-		{
+-			for (int i = 0; i <= e; i++) PUTC(digs[i]);
+-			PUTC('.');
+-			for (int i = e + 1; i < n; i++) PUTC(digs[i]);
+-		}
+-	}
+-	else
+-	{
+-		PUTC('0');
+-		PUTC('.');
+-		for (int i = 0; i < -e - 1; i++) PUTC('0');
+-		for (int i = 0; i < n; i++) PUTC(digs[i]);
+-	}
+-#undef PUTC
+-	int written = pos < buf_size - 1 ? pos : buf_size - 1;
+-	buf[written] = '\0';
+-	return written;
+-}
+-
+ int avm2_format_number(char* buf, int buf_size, double d)
+ {
+-	if (isnan(d)) return snprintf(buf, buf_size, "NaN");
+-	if (d == 0.0) return snprintf(buf, buf_size, "0");
+-	if (d < 0.0)
+-	{
+-		int n = snprintf(buf, buf_size, "-");
+-		return n + avm2_format_number(buf + 1, buf_size - 1, -d);
+-	}
+-	if (isinf(d)) return snprintf(buf, buf_size, "Infinity");
+-
+-	// Fast path: exact positive integers below 1e15 render as a plain decimal
+-	// (the shortest repr of such a value has n <= 15 <= 21, so the fixed branch
+-	// below would apply anyway), but
+-	// skip shortest_digits' up-to-18 snprintf("%.*e")/strtod round-trip probes —
+-	// number formatting is ~10% of Seedling's frame self-time and dominated by
+-	// integer coordinates/counters. Integers < 1e15 are exact in f64 (< 2^53),
+-	// and this is byte-identical to format_plain (verified over 0..2e6 + edges).
+-	if (d < 1e15 && d == floor(d))
+-	{
+-		uint64_t u = (uint64_t) d;
+-		char tmp[20];
++	// Hot path (number formatting is ~10% of Seedling's frame self-time,
++	// dominated by integer coordinates/counters): exact integers below 1e15
++	// print as plain decimals, which is what D2A produces for them (checked
++	// over 3M random integers in [0, 1e15) against "%.0f"). -0 prints "0".
++	if (d > -1e15 && d < 1e15 && d == floor(d))
++	{
++		int64_t v = (int64_t) d;
++		uint64_t u = v < 0 ? (uint64_t) (-v) : (uint64_t) v;
++		char tmp[24];
+ 		int n = 0;
+ 		do { tmp[n++] = (char) ('0' + (u % 10)); u /= 10; } while (u != 0);
++		if (v < 0) tmp[n++] = '-';
+ 		int w = 0;
+ 		while (n > 0 && w < buf_size - 1) buf[w++] = tmp[--n];
+-		buf[w] = '\0';
++		if (buf_size > 0) buf[w] = '\0';
+ 		return w;
+ 	}
+-
+-	// ECMA-262 7.1.12.1 (Number::toString) picks the notation from the decimal
+-	// exponent `n` of the SHORTEST round-tripping representation -- the value is
+-	// digits x 10^(n-k) -- and uses fixed notation iff -6 < n <= 21.
+-	// `floor(log10(d))` is NOT that quantity and disagrees on both boundaries:
+-	//   * log10(9.999999999999997e-7) rounds to exactly -6.0 in f64, so the old
+-	//     test took the fixed branch where ECMA (and Flash, and Ruffle) take
+-	//     exponential -- 10 lines of avm2/number_to_string;
+-	//   * 9.999999999999999e20 has n = 21, i.e. fixed ("999999999999999900000"),
+-	//     while floor(log10) reports 21, which the old `>= 21.0` test sent to
+-	//     exponential -- 2 more lines of the same test.
+-	// The whole behavioural delta is 36 doubles: the 5 representable values
+-	// immediately below 1e-6 and the 31 immediately below 1e21 (enumerated by
+-	// ULP walk over both boundaries; a 600k-value random sweep finds no others).
+-	// shortest_digits' exp10 is the power of ten of the FIRST digit, i.e. n-1,
+-	// so the test is e10 < -6 || e10 > 20.
+-	char digs[24];
+-	int e10 = 0;
+-	int nd = shortest_digits(d, digs, &e10);
+-
+-	if (e10 < -6 || e10 > 20)
+-	{
+-		// Exponential form, Ruffle value.rs::f64_to_string_finite_nonzero:
+-		// take the SHORTEST round-tripping decimal and, for a POSITIVE
+-		// exponent only, cut the mantissa TEXT to 16 characters ("Flash shows
+-		// large numbers with smaller precision for some reason"). A negative
+-		// exponent keeps every digit.
+-		//
+-		// The arithmetic 15-significant-digit truncation this replaced was
+-		// the OLD Ruffle rule and it does not survive a round trip: dividing
+-		// the truncated value by 10^digits reintroduces error, so 1e40 came
+-		// out as the malformed "0.9999999999999999e+40" and 3e50 as
+-		// "2.9999999999999996e+50" (avm2/matrix3d_precision grades both).
+-		char mant[40];
+-		int mp = 0;
+-		mant[mp++] = digs[0];
+-		if (nd > 1)
+-		{
+-			mant[mp++] = '.';
+-			for (int i = 1; i < nd && mp < (int) sizeof(mant) - 1; i++)
+-				mant[mp++] = digs[i];
+-		}
+-		mant[mp] = '\0';
+-		if (e10 > 0)
+-		{
+-			// Two doubles print as "1e+308" in Flash while their immediate
+-			// neighbours print normally (Ruffle carries the same pair).
+-			uint64_t bits;
+-			memcpy(&bits, &d, sizeof(bits));
+-			if (bits == 0x7fe0000000000000ull || bits == 0x7fd0000000000000ull)
+-				return snprintf(buf, buf_size, "1e+308");
+-			if (mp > 16) { mant[16] = '\0'; mp = 16; }
+-		}
+-		return snprintf(buf, buf_size, "%se%c%d", mant,
+-		                e10 < 0 ? '-' : '+', e10 < 0 ? -e10 : e10);
+-	}
+-
+-	return format_plain(buf, buf_size, digs, nd, e10);
++	return avm2_d2s(buf, buf_size, d, AVM2_DTOSTR_NORMAL, 15, true);
+ }
+ 
+ // ---------------------------------------------------------------------------

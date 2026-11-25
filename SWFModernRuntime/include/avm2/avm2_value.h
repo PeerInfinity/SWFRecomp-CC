@@ -130,10 +130,23 @@ double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool stric
 bool avm2_string_to_f64(Avm2Context* ctx, const char* s, uint32_t len, bool strict,
                         double* out_d);
 
-// AVM2 Number.toString() formatting (Ruffle value.rs coerce_to_string
-// Number arm: shortest round-trip decimal inside [1e-6, 1e21), otherwise
-// MAX_PRECISION exponential). Returns length written to buf.
+// AVM2 Number.toString() formatting = Flash Player's ECMA ToString(Number)
+// (avmplus doubleToString: convertDoubleToString(d, DTOSTR_NORMAL, 15)).
+// Returns length written to buf.
 int avm2_format_number(char* buf, int buf_size, double d);
+
+// avmplus MathUtils::convertDoubleToString / convertDoubleToStringRadix
+// (avm2_number.c). `bug513039_fixed` = SWF >= 15 (only read by FIXED mode).
+#define AVM2_DTOSTR_NORMAL 0
+#define AVM2_DTOSTR_FIXED 1
+#define AVM2_DTOSTR_PRECISION 2
+#define AVM2_DTOSTR_EXPONENTIAL 3
+int avm2_d2s(char* out, int out_size, double value, int mode, int precision,
+             bool bug513039_fixed);
+int avm2_d2s_radix(char* out, int out_size, double value, int radix);
+// avmplus MathUtils::convertStringToDouble for a validated JSON number token
+// (Flash's JSON.parse reader; not correctly rounded). NaN on failure.
+double avm2_avmplus_json_number(const char* s, uint32_t len);
 
 // Operators (Ruffle activation.rs op impls / value.rs abstract algorithms).
 Avm2Value avm2_op_add_values(Avm2Context* ctx, Avm2Value a, Avm2Value b);
