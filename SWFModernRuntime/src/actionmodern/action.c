@@ -23328,7 +23328,7 @@ extern size_t ng_findDisplayEntryByName(const char* name);
 // Search for a named child within a named parent's display list
 extern size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name);
 // Update ng_display depth for a named root-level entry (used by swapDepths)
-extern void ng_updateDisplayDepth(const char* name, int new_as_depth);
+extern void ng_updateDisplayDepth(SWFAppContext* app_context, const char* name, int new_as_depth);
 // Swap ng_display depths of two named root-level entries (used by swapDepths)
 extern void ng_swapDisplayDepths(const char* name1, const char* name2);
 #endif
@@ -79693,9 +79693,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							size_t _d1 = ng_findDisplayEntryByName(mc->name);
 							size_t _d2 = ng_findDisplayEntryByName(_target->name);
 							if (_d1 != SIZE_MAX && (int)_d1 - 16384 != mc->depth)
-								ng_updateDisplayDepth(mc->name, mc->depth);
+								ng_updateDisplayDepth(app_context, mc->name, mc->depth);
 							if (_d2 != SIZE_MAX && (int)_d2 - 16384 != _target->depth)
-								ng_updateDisplayDepth(_target->name, _target->depth);
+								ng_updateDisplayDepth(app_context, _target->name, _target->depth);
 						}
 						// Sync clone-depth table for each MC that has an entry
 						{
@@ -79784,7 +79784,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			mc->depth = _new_depth;
 			mc->depth_swapped = 1;
 			if (mc->name[0])
-				ng_updateDisplayDepth(mc->name, _new_depth);
+				ng_updateDisplayDepth(app_context, mc->name, _new_depth);
 			// Keep the clone-depth table in sync so survives_rewind uses the
 			// post-swap SWF depth. No-op for timeline MCs (not registered).
 			{

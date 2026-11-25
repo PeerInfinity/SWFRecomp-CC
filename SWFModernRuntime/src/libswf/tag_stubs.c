@@ -2189,7 +2189,7 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
 // Depth manipulation (swapDepths, updateDepth)
 // ---------------------------------------------------------------------------
 
-void ng_updateDisplayDepth(const char* name, int new_as_depth)
+void ng_updateDisplayDepth(SWFAppContext* app_context, const char* name, int new_as_depth)
 {
 	size_t new_swf_depth = (size_t)(new_as_depth + 16384);
 
@@ -2211,16 +2211,30 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 	DisplayObject* udd_old_dl = display_list;
 	if (new_swf_depth >= display_list_capacity)
 	{
-		// Grow display_list using HCALLOC (copy + free old)
-		size_t new_cap = new_swf_depth + 64;
-		DisplayObject* new_dl = (DisplayObject*) calloc(new_cap, sizeof(DisplayObject));
-		if (new_dl == NULL) return;
-		memcpy(new_dl, display_list, (max_depth + 1) * sizeof(DisplayObject));
-		// Note: can't FREE the original HCALLOC'd list safely here,
-		// but we need to update the pointer. In practice swapDepths
-		// to very high depths is rare and the old memory will leak.
-		display_list = new_dl;
-		display_list_capacity = new_cap;
+		if (new_swf_depth < AVM_CLONE_SLOT_CAP)
+		{
+			// Grow with the aliased-pointer rebase (g_root_dl_backup, MC
+			// display_obj, queued payloads, ...; tag.c). The old raw calloc
+			// grow rebased nothing, so a swapDepths(>= 0) from a sprite script
+			// was undone at the end of the script (s27 browser-parked-frame).
+			extern void ng_displayListGrowKeepOld(SWFAppContext* app_context, size_t new_cap);
+			ng_displayListGrowKeepOld(app_context, new_swf_depth + 64);
+			if (new_swf_depth >= display_list_capacity) return;  // OOM
+		}
+		else
+		{
+			// Huge depths (AS depth >= 16384, up to 2130690044): the custom
+			// heap exits on a multi-GB request, so keep the pre-s27 raw calloc,
+			// which simply fails for those and leaves the entry where it is
+			// (avm1/movieclip_depth_methods: swapDepths(2130690044)).
+			size_t new_cap = new_swf_depth + 64;
+			DisplayObject* new_dl = (DisplayObject*) calloc(new_cap, sizeof(DisplayObject));
+			if (new_dl == NULL) return;
+			memcpy(new_dl, display_list, (max_depth + 1) * sizeof(DisplayObject));
+			// The old HCALLOC'd list leaks (cannot be FREEd safely here).
+			display_list = new_dl;
+			display_list_capacity = new_cap;
+		}
 	}
 
 	if (display_list[new_swf_depth].char_id != 0)
@@ -2281,10 +2295,33 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 		memset(&display_list[old_depth], 0, sizeof(DisplayObject));
 	}
 
+	// The entries moved, so every MovieClip.display_obj aimed at either slot
+	// follows its entry (s27 browser-parked-frame). Before the rebasing grow,
+	// a move past the capacity left these pointing into the leaked pre-grow
+	// buffer, which still held the entry at its old slot -- right by accident
+	// for the mover, and still wrong for in-capacity moves (negative depths).
+	{
+		extern int child_mc_count;
+		extern MovieClip* child_mc_cache[];
+		DisplayObject* udd_a = &display_list[old_depth];
+		DisplayObject* udd_b = &display_list[new_swf_depth];
+		for (int _ci = 0; _ci < child_mc_count; _ci++)
+		{
+			MovieClip* _m = child_mc_cache[_ci];
+			if (_m == NULL) continue;
+			if (_m->display_obj == (void*)udd_a) _m->display_obj = udd_b;
+			else if (_m->display_obj == (void*)udd_b) _m->display_obj = udd_a;
+		}
+	}
+
 	// Update max_depth
 	if (new_swf_depth > max_depth) max_depth = new_swf_depth;
 	// Shrink max_depth if we just cleared the last entry
 	while (max_depth > 0 && display_list[max_depth].char_id == 0) max_depth--;
+	{
+		extern void ng_rootDLBackupNoteMax(const DisplayObject* dl, size_t new_max);
+		ng_rootDLBackupNoteMax(display_list, max_depth);
+	}
 
 	// The grow above strands the root sentinel (root_movieclip.display_obj,
 	// ng_shared.c) on the OLD buffer, which is leaked, not freed, and still
@@ -2298,7 +2335,12 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 		extern void* ng_get_root_display_obj(void);
 		extern void ng_sync_root_display_obj(void);
 		DisplayObject* udd_root = (DisplayObject*)ng_get_root_display_obj();
-		if (udd_root != NULL && udd_root->sprite_display_list == udd_old_dl)
+		// The rebasing grow (s27 browser-parked-frame) already repointed the
+		// sentinel's base at the new buffer, but not its sprite_max_depth:
+		// re-sync either way, or name lookups through the sentinel stop at
+		// the pre-move max depth and the moved clip resolves to undefined.
+		if (udd_root != NULL && (udd_root->sprite_display_list == udd_old_dl
+		                         || udd_root->sprite_display_list == display_list))
 			ng_sync_root_display_obj();
 	}
 }

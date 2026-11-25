@@ -327,6 +327,16 @@ static int g_sprite_init_depth = 0;
 
 int ng_isInsideSpriteInit(void) { return g_sprite_init_depth > 0; }
 
+// s27 browser-parked-frame: a script that changes the BACKED-UP list's extent
+// in place (ng_updateDisplayDepth: swapDepths moves an entry past max_depth)
+// keeps the backup's max_depth in step, or ng_unbumpSpriteInitDepth restores
+// the pre-move max and every name walk stops short of the moved clip.
+void ng_rootDLBackupNoteMax(const DisplayObject* dl, size_t new_max)
+{
+	if (g_sprite_init_depth > 0 && dl == g_root_dl_backup)
+		g_root_dl_max_backup = new_max;
+}
+
 // Phase 7b: exposed for aq_dispatch_sprite_script so sprite DoAction scripts
 // drained at the root-level SHOW_FRAME pre-drain still report "inside sprite
 // init" — pre-7b ran them inside process_sprite_init_at_depth which kept
@@ -14127,6 +14137,9 @@ static int ng_pending_finalize_count = 0;
 
 static DisplayObject* g_dlr_old_base;
 static DisplayObject* g_dlr_new_base;
+// ng_displayListGrowKeepOld: rebase every tracked holder but leave the old
+// buffer allocated (see there).
+static int g_dlr_keep_old = 0;
 static size_t g_dlr_old_cap;
 static size_t g_dlr_new_cap;
 
@@ -14270,7 +14283,27 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
 		}
 	}
 
-	FREE(old_base);
+	if (!g_dlr_keep_old)
+		FREE(old_base);
+}
+
+// Grow the ACTIVE display_list (root or a swapped-in sprite list) to new_cap
+// for swapDepths (ng_updateDisplayDepth), rebasing every holder
+// ng_spriteDLRealloc tracks, but WITHOUT freeing the old buffer. The old raw
+// calloc grow rebased nothing: a swapDepths to any AS depth >= 0 from a sprite
+// script (the sprite-init bump saves g_root_dl_backup) was undone when
+// ng_unbumpSpriteInitDepth restored the pre-grow base, and the moved clip
+// reappeared at its old timeline depth (fixture regression/
+// avm1_browser_parked_frame, `c.swapDepths(100)` from the ticker sprite;
+// Flash 32 golden). The old buffer stays allocated, as it always did here,
+// because ~40 C-stack `saved` copies of display_list are restored after
+// script calls: freed, they would be use-after-free; leaked, they read the
+// stale-but-valid pre-grow list (the pre-existing behaviour on those paths).
+void ng_displayListGrowKeepOld(SWFAppContext* app_context, size_t new_cap)
+{
+	g_dlr_keep_old = 1;
+	ng_spriteDLRealloc(app_context, &display_list, &display_list_capacity, new_cap);
+	g_dlr_keep_old = 0;
 }
 
 // Freed-buffer scrub: NULL every cached MC display_obj pointing into a

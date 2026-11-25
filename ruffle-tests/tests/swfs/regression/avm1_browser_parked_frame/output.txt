@@ -1,0 +1,7 @@
+root f1 d1=movieclip d2=movieclip d3=undefined a=movieclip ax=10 b=movieclip c=undefined e=undefined
+c load
+t1 d1=movieclip d2=undefined d3=movieclip a=movieclip ax=10 b=undefined c=movieclip e=undefined
+root f2 d1=movieclip d2=movieclip d3=undefined a=movieclip ax=50 b=undefined c=movieclip e=movieclip
+t2 d1=movieclip d2=movieclip d3=undefined a=movieclip ax=50 b=undefined c=movieclip e=movieclip
+t3 d1=undefined d2=movieclip d3=undefined a=movieclip ax=50 b=undefined c=undefined e=movieclip
+t4 d1=undefined d2=movieclip d3=undefined a=movieclip ax=50 b=undefined c=undefined e=movieclip
