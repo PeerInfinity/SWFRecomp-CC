@@ -26,3 +26,8 @@ replaced `_level0`, whose RECT origin offset Flash may not apply at all). The ri
 SWF at HIGH via `draw()` == the golden exactly (0 / 0). So Flash does not render a sub-pixel root-RECT offset
 (rounded or ignored); the per-offset AA question is unanswerable with this harness (`--no-pin` would show-all-scale a
 101 px stage). Direct-pinned is 1 px left of draw() at the right/bottom ring (372 px / max 39 vs the golden).
+
+**CORRECTION (coordinator, later 2026-11-25):** "Flash never prints `Warning: Failed to place object …`" holds only
+WITHOUT ErrorReportingEnable. Flash's debug player prints it with `--log-warnings` (Ruffle's corpus convention;
+FP32 == `avm1/placeobject_occupied_depth`'s golden). Captures: `../w2-occupied-depth/*.logwarn.txt`. The gnash goldens
+were made without ErrorReporting; they grade with `log_warnings = false` via flash_fixes.
