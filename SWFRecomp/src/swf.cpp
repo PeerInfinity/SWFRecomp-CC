@@ -1508,6 +1508,14 @@ namespace SWFRecomp
 						  << "{" << endl
 						  << (current_stroke_centre ? stroke_centre_data.str() : "\t{0}\n")
 						  << "};" << endl;
+		context.out_draws << "u32 stroke_run_flags[" << to_string(current_stroke_run ? current_stroke_run : 1) << "] =" << endl
+						  << "{" << endl
+						  << (current_stroke_run ? stroke_run_flags.str() : "\t0\n")
+						  << "};" << endl
+						  << "unsigned char stroke_snap_data[" << to_string(current_stroke_centre ? current_stroke_centre : 1) << "] =" << endl
+						  << "{" << endl
+						  << (current_stroke_centre ? stroke_snap_data.str() : "\t0\n")
+						  << "};" << endl;
 
 		// Static bitmap descriptors ({offset, size, w, h} per slot) — see
 		// SWF::recordBitmapDesc. Always emitted, so a movie with no bitmaps
@@ -8274,6 +8282,9 @@ namespace SWFRecomp
 
 				line_styles[i].start_cap = (flags1 >> 6) & 0x03;
 				line_styles[i].line_join = join_style;
+				line_styles[i].scale_flags = (u8) ((flags1 & 0x01)          // pixelHinting
+				                                 | (((flags1 >> 2) & 1) << 1)  // noHScale
+				                                 | (((flags1 >> 1) & 1) << 2)); // noVScale
 
 				// Reserved(UB5), NoClose(UB1), EndCapStyle(UB2)
 				line_data.clearFields();
@@ -11459,12 +11470,45 @@ namespace SWFRecomp
 
 								current_stroke_run += 1;
 
+								stroke_run_flags << "\t" << std::dec << (u32) line_style.scale_flags << "," << endl;
+
+								// Axis flags of every path vertex: does it end a
+								// vertical (bit 0) / horizontal (bit 1) segment?
+								// Flash pixel-snaps thin axis-aligned strokes in
+								// device space (s28 n-stroke-snap); the runtime
+								// snaps a centre's x / y only when it carries the
+								// matching flag, so curves and diagonals never
+								// collapse onto the pixel grid.
+								const std::vector<Vertex>& pv = paths[i].verts;
+								std::vector<u8> pv_flags(pv.size(), 0);
+								for (size_t k = 1; k < pv.size(); ++k)
+								{
+									const double x0 = strokeX(pv[k - 1]), y0 = strokeY(pv[k - 1]);
+									const double x1 = strokeX(pv[k]), y1 = strokeY(pv[k]);
+									u8 f = 0;
+									if (x0 == x1 && y0 != y1) f = 1;
+									else if (y0 == y1 && x0 != x1) f = 2;
+									pv_flags[k - 1] |= f;
+									pv_flags[k] |= f;
+								}
+
 								for (const Tri& ct : centre_tris)
 								{
 									for (int j = 0; j < 3; ++j)
 									{
 										float cx_f = (float) strokeX(ct.verts[j]);
 										float cy_f = (float) ((double) FRAME_HEIGHT - strokeY(ct.verts[j]));
+
+										u32 snap_f = 0;
+										const double cxd = strokeX(ct.verts[j]), cyd = strokeY(ct.verts[j]);
+										for (size_t k = 0; k < pv.size(); ++k)
+										{
+											if (strokeX(pv[k]) == cxd && strokeY(pv[k]) == cyd)
+											{
+												snap_f |= pv_flags[k];
+											}
+										}
+										stroke_snap_data << snap_f << ",";
 
 										stroke_centre_data << "\t{ "
 										                   << std::hex << std::uppercase
@@ -11474,6 +11518,7 @@ namespace SWFRecomp
 									}
 								}
 
+								stroke_snap_data << endl;
 								current_stroke_centre += 3*centre_tris.size();
 							}
 						}

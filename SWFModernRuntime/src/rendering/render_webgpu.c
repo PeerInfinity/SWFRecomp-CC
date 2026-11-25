@@ -1924,11 +1924,19 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
 extern u32 __attribute__((weak)) stroke_run_count;
 extern u32 __attribute__((weak)) stroke_run_data[][5];
 extern u32 __attribute__((weak)) stroke_centre_data[][2];
+// s28 n-stroke-snap: per run LINESTYLE2 flags (bit 0 pixelHinting, bit 1
+// noHScale, bit 2 noVScale); per centre vertex axis flags (bit 0 = ends a
+// vertical segment, bit 1 = a horizontal one). Older generated code lacks
+// them: no snapping, the historical min-1px pass only.
+extern u32 __attribute__((weak)) stroke_run_flags[];
+extern unsigned char __attribute__((weak)) stroke_snap_data[];
 #endif
 
 static u32 hairline_run_n = 0;
 static const u32 (*hairline_runs)[5] = NULL;
 static const u32 (*hairline_centres)[2] = NULL;
+static const u32* hairline_run_flags = NULL;
+static const unsigned char* hairline_snap = NULL;
 // CPU copy of every xform_buffer slot and of the current stage_to_ndc uniform,
 // i.e. the matrices the vertex shader composes for a draw.
 static float* hairline_xform = NULL;
@@ -1961,6 +1969,12 @@ static void hairline_init(WebGPURenderContext* ctx)
 		memcpy(hairline_stage, ctx->stage_to_ndc, sizeof(hairline_stage));
 	hairline_runs = (const u32 (*)[5]) stroke_run_data;
 	hairline_centres = (const u32 (*)[2]) stroke_centre_data;
+	hairline_run_flags = (&stroke_run_flags[0] != NULL) ? stroke_run_flags : NULL;
+	hairline_snap = (&stroke_snap_data[0] != NULL) ? stroke_snap_data : NULL;
+	{
+		const char* e = getenv("SWF_STROKE_SNAP");
+		if (e != NULL && e[0] == '0') { hairline_run_flags = NULL; hairline_snap = NULL; }
+	}
 	hairline_run_n = stroke_run_count;
 #else
 	(void) ctx;
@@ -3244,6 +3258,25 @@ static size_t mask_stencil_vert_count(const WebGPURenderContext* ctx,
 static inline void stage_dyn_verts(WebGPURenderContext* ctx, u32 vert_base,
 	const void* verts, u32 vcount);
 
+// Flash Player 32's stroke rule in device pixels (s28 n-stroke-snap; pinned
+// with the Flash oracle, SWFRecompDocs/plans/n-stroke-snap-report.md):
+//   u = round(4 * device width)             (width in quarter pixels)
+//   pixelHinting: SNAP, W = max(1, u / 4)
+//   else:         SNAP when u <= 4 (W = 1) or u == 8 (W = 2) or u == 12 (W = 3)
+//                 otherwise plain AA at width 2*floor(u/2)/4 (min 1 px)
+// A SNAPPED stroke covers whole pixels: an edge at device e (quarter-pixel
+// E = round(4e)) becomes the band [L, L + W), L = floor((E - 2W + 2) / 4).
+// Only segments that are exactly horizontal / vertical in device space
+// snap; curves and diagonals stay AA. Applies to the x (resp. y) of every
+// centre flagged as ending a vertical (resp. horizontal) path segment, so a
+// rect's joins snap with both of its edges.
+static inline double stroke_snap_centre(double e, int W)
+{
+	const double E = floor(4.0 * e + 0.5);
+	const double L = floor((E - 2.0 * W + 2.0) / 4.0);
+	return L + 0.5 * W;
+}
+
 static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
                                size_t num_verts, u32 transform_id)
 {
@@ -3261,9 +3294,8 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 	}
 	if (lo >= hairline_run_n || hairline_runs[lo][0] >= end) return offset;
 
-	// Local twips -> device px: diag(W/2, H/2) * (stage_to_ndc * xform), the
-	// 2x2 part of the column-major mat4s. Ruffle's matrix is twips -> device
-	// twips, hence the 20.
+	// Local twips -> device px: diag(W/2, -H/2) * (stage_to_ndc * xform) plus
+	// the viewport offset, from the column-major mat4s.
 	const float* t = &hairline_xform[(size_t) transform_id * 16];
 	const float* p = hairline_stage;
 	const double a = (double) p[0] * t[0] + (double) p[4] * t[1];
@@ -3274,15 +3306,35 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 	const double hh = 20.0 * 0.5 * (double) ctx->height;
 	const double sx = fabs(hw * (a + c));
 	const double sy = fabs(hh * (b + d));
-	const double scale = sqrt((sx * sx + sy * sy) / 2.0);
+	const double scale = sqrt((sx * sx + sy * sy) / 2.0);  // device twips per local twip
 	const double min_twips = (scale > 1e-6) ? 20.0 / scale : 20.0;
 
-	int changed = 0;
-	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
+	// Device px affine (x_d = Ax*x + Bx*y + Cx, y_d = Ay*x + By*y + Cy).
+	const double Wh = 0.5 * (double) ctx->width, Hh = 0.5 * (double) ctx->height;
+	const double Ax = Wh * a, Bx = Wh * c;
+	const double Cx = Wh * ((double) p[0] * t[12] + (double) p[4] * t[13] + (double) p[12] + 1.0);
+	const double Ay = -Hh * b, By = -Hh * d;
+	const double Cy = Hh * (1.0 - ((double) p[1] * t[12] + (double) p[5] * t[13] + (double) p[13]));
+	const double det = Ax * By - Bx * Ay;
+	const double ax_x = fabs(Ax) + fabs(Bx), ax_y = fabs(Ay) + fabs(By);
+	// 0 = no snapping (rotated / skewed / singular), 1 = axis-aligned, 2 = 90deg.
+	int axis = 0;
+	if (hairline_snap != NULL && fabs(det) > 1e-12)
+	{
+		if (fabs(Bx) <= 1e-6 * ax_x && fabs(Ay) <= 1e-6 * ax_y) axis = 1;
+		else if (fabs(Ax) <= 1e-6 * ax_x && fabs(By) <= 1e-6 * ax_y) axis = 2;
+	}
+	// Stage-only scale (noScale strokes): device twips per stage twip.
+	const double stage_scale = sqrt(((hw * p[0]) * (hw * p[0]) + (hh * p[5]) * (hh * p[5])) / 2.0);
+
+	// With the snap tables every stroke run may move (snap or width
+	// quantisation); without them only the historical min-1px re-expansion.
+	int changed = (hairline_snap != NULL);
+	for (u32 r = lo; !changed && r < hairline_run_n && hairline_runs[r][0] < end; r++)
 	{
 		double w = (double) hairline_runs[r][3];
 		if (w < min_twips) w = min_twips;
-		if (fabs(w / (double) hairline_runs[r][4] - 1.0) > 1e-4) { changed = 1; break; }
+		if (fabs(w / (double) hairline_runs[r][4] - 1.0) > 1e-4) changed = 1;
 	}
 	if (!changed) return offset;
 
@@ -3295,20 +3347,90 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 
 	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
 	{
-		double w = (double) hairline_runs[r][3];
-		if (w < min_twips) w = min_twips;
-		const float k = (float) (w / (double) hairline_runs[r][4]);
+		const double emitted = (double) hairline_runs[r][4];
 		const size_t rs = hairline_runs[r][0], rn = hairline_runs[r][1];
+		const u32 rf = hairline_run_flags ? hairline_run_flags[r] : 0;
+
+		if (hairline_snap == NULL)
+		{
+			double w = (double) hairline_runs[r][3];
+			if (w < min_twips) w = min_twips;
+			const float k = (float) (w / emitted);
+			for (size_t v = 0; v < rn; v++)
+			{
+				const size_t gv = rs + v;
+				if (gv < offset || gv >= end) continue;
+				const u32* cen = hairline_centres[hairline_runs[r][2] + v];
+				u32* dst = &verts[(gv - offset) * 4];
+				union { float f; u32 u; } vx, vy, cx, cy;
+				vx.u = dst[0]; vy.u = dst[1]; cx.u = cen[0]; cy.u = cen[1];
+				vx.f = cx.f + k * (vx.f - cx.f);
+				vy.f = cy.f + k * (vy.f - cy.f);
+				dst[0] = vx.u; dst[1] = vy.u;
+			}
+			continue;
+		}
+
+		// Device width in px. noHScale + noVScale ("none"): the stage scale
+		// only; a single no*Scale flag keeps the normal scale (Flash scales a
+		// uniformly scaled noHScale / noVScale stroke; measured).
+		const int no_scale = (rf & 6u) == 6u;
+		const double dev_per_twip = (no_scale ? stage_scale : scale) / 20.0;
+		const double w_px = (double) hairline_runs[r][3] * dev_per_twip;
+		const int u = (int) floor(4.0 * w_px + 0.5);
+		int W = 0;  // snapped integer width, 0 = AA
+		if (rf & 1u) W = (u / 4 < 1) ? 1 : u / 4;
+		else if (u <= 4) W = 1;
+		else if (u == 8) W = 2;
+		else if (u == 12) W = 3;
+		double target_px = W ? (double) W : 2.0 * floor(u / 2.0) / 4.0;
+		if (target_px < 1.0) target_px = 1.0;
+		// Uniform re-expansion factor (emitted local width -> target device).
+		const double k_uni = target_px / (emitted * (scale / 20.0));
+		const int snap_ok = (W != 0 && axis != 0);
+		if (fabs(det) <= 1e-12)
+		{
+			// Singular matrix: nothing visible to place; keep the emitted geometry.
+			continue;
+		}
+		// Per device axis: px per local twip along that axis.
+		const double sdx = sqrt(Ax * Ax + Bx * Bx), sdy = sqrt(Ay * Ay + By * By);
+		const double kx = (sdx > 1e-12) ? target_px / (emitted * sdx) : k_uni;
+		const double ky = (sdy > 1e-12) ? target_px / (emitted * sdy) : k_uni;
+
 		for (size_t v = 0; v < rn; v++)
 		{
 			const size_t gv = rs + v;
 			if (gv < offset || gv >= end) continue;
-			const u32* cen = hairline_centres[hairline_runs[r][2] + v];
+			const size_t ci = hairline_runs[r][2] + v;
+			const u32* cen = hairline_centres[ci];
 			u32* dst = &verts[(gv - offset) * 4];
 			union { float f; u32 u; } vx, vy, cx, cy;
 			vx.u = dst[0]; vy.u = dst[1]; cx.u = cen[0]; cy.u = cen[1];
-			vx.f = cx.f + k * (vx.f - cx.f);
-			vy.f = cy.f + k * (vy.f - cy.f);
+			const unsigned char sf = hairline_snap[ci];
+			const int fx = (axis == 1) ? (sf & 1) : (sf >> 1) & 1;  // device-x snappable
+			const int fy = (axis == 1) ? (sf >> 1) & 1 : (sf & 1);  // device-y snappable
+			// Device centre and offset. Flash strokes in DEVICE space: one
+			// scalar width whatever the matrix, so on an axis-aligned matrix
+			// the offset is re-expanded per device axis (a 2x1-scaled stroke
+			// is as wide horizontally as vertically); otherwise uniformly.
+			double cdx = Ax * cx.f + Bx * cy.f + Cx;
+			double cdy = Ay * cx.f + By * cy.f + Cy;
+			const double ox = vx.f - cx.f, oy = vy.f - cy.f;
+			double odx = Ax * ox + Bx * oy;
+			double ody = Ay * ox + By * oy;
+			if (axis != 0) { odx *= kx; ody *= ky; }
+			else { odx *= k_uni; ody *= k_uni; }
+			// Flash rasterises on a quarter-pixel grid: centres land on it
+			// (with the half width a multiple of 1/4, so do the edges).
+			cdx = floor(4.0 * cdx + 0.5) * 0.25;
+			cdy = floor(4.0 * cdy + 0.5) * 0.25;
+			if (snap_ok && fx) cdx = stroke_snap_centre(cdx, W);
+			if (snap_ok && fy) cdy = stroke_snap_centre(cdy, W);
+			const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
+			// Back to local.
+			vx.f = (float) (( By * ndx - Bx * ndy) / det);
+			vy.f = (float) ((-Ay * ndx + Ax * ndy) / det);
 			dst[0] = vx.u; dst[1] = vy.u;
 		}
 	}

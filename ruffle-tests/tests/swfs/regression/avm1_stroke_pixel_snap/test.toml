@@ -1,0 +1,8 @@
+# Golden = Flash Player 32 (LNX) oracle, tick 1 (s28 n-stroke-snap). Residual 75 px =
+# round-join corner pixels of the snapped 2/3 px rects + 1.5 px row +-1 rounding
+# (Flash truncates coverage colours). Before the snap pass: 2904 px.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 240

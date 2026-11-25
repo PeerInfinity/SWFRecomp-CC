@@ -186,6 +186,10 @@ namespace SWFRecomp
 		u8 end_cap = 0;
 		u8 line_join = 0;
 		double miter_limit = 3.0;
+		// LINESTYLE2 PixelHintingFlag (bit 0), NoHScaleFlag (bit 1),
+		// NoVScaleFlag (bit 2). Read by the runtime's device-space stroke
+		// pass (stroke_run_flags; s28 n-stroke-snap). 0 before DefineShape4.
+		u8 scale_flags = 0;
 	};
 	
 	class SWFHeader
@@ -266,6 +270,11 @@ namespace SWFRecomp
 		// stroke vertex in that run.
 		std::stringstream stroke_run_data;
 		std::stringstream stroke_centre_data;
+		// Per stroke run: LineStyle::scale_flags. Per centre vertex: bit 0 =
+		// its path vertex ends a VERTICAL segment (x snappable), bit 1 = a
+		// HORIZONTAL one (y snappable). See render_webgpu.c stroke_snap.
+		std::stringstream stroke_run_flags;
+		std::stringstream stroke_snap_data;
 		size_t current_stroke_run = 0;
 		size_t current_stroke_centre = 0;
 
