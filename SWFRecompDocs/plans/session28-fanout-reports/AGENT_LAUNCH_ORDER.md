@@ -26,7 +26,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | 6 | w1-loaded-shell-residuals | `briefs/w1-loaded-shell-residuals.md` | session_018CoDi6VXdE1GrhC7pebVyf — launched 2026-11-25 |
 | 7 | w1-render-flash-headroom | `briefs/w1-render-flash-headroom.md` | session_018CoDi3SHpVL9RmKCJ3YhgZ — DELIVERED: quality-harness NO-GO (our LOW is closer to Flash HIGH); Flash occupied-depth keep-both = SWF5 only (captured) → w2-occupied-depth; tie-rule evidence → n-stroke-snap; no swap in reach |
 | 8 | w1-test12-enterframe | `briefs/w1-test12-enterframe.md` | session_018CoDi7N5Bch7zdwEeLUYZ4 — launched 2026-11-25 |
-| 9 | w1-text-edit-tail | `briefs/w1-text-edit-tail.md` | session_018CoDi59FTJJJPfNtJqs7E1 — launched 2026-11-25 |
+| 9 | w1-text-edit-tail | `briefs/w1-text-edit-tail.md` | session_018CoDi59FTJJJPfNtJqs7E1 — DELIVERED; Flash: restrict fires+deletes (=Ruffle), SNF defer (=Ruffle), AVM2 selection tinted (=ours, RvF) → w2-text-edit-land |
 | 10 | w1-text-glyph-aa | `briefs/w1-text-glyph-aa.md` | session_018CoDi5Jv8Udc64LppZrHrZ — launched 2026-11-25 |
 
 ## Wave 2 (implementation, cloud)
@@ -38,3 +38,4 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w2-lowq-sample-point | w1-avm2-vector-flash + Flash lowq probe | Flash-ward vector rows; 0 Flash-golden losses required | session_018CoDi6jKqMzjzZrf6c2R4Y — launched |
 | w2-avm1-leads-land | w1-leads + Flash | 4–5 regression fixtures (Flash goldens) | session_018CoDi4VAVkGy2CQUkCbfQU — launched |
 | w2-hittest-shape-stale | w1-leads + Flash probe | fixture; shapeflag flash_fix (0 flips) | session_018CoDi7pH2PXPvBaoSjSrcd — launched |
+| w2-text-edit-land | w1-text-edit-tail + Flash | 3 regression fixtures (Flash goldens); RvF selection tint | session_018CoDi3oPLgPKaaLnZ4fAEX — launched |
