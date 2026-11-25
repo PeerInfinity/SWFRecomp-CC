@@ -1,0 +1,28 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 28 (dual-axis #20), slot `w1-loaded-shell-residuals`, wave 1 (DIAGNOSIS, measured prototypes welcome). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w1-loaded-shell-residuals` (and ONLY that branch; never master, never force-push). Your report on that branch is your only deliverable.
+
+FIRST: read `SWFRecompDocs/plans/session28-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules and Delivery sections exactly. Your branch is `fanout/w1-loaded-shell-residuals`; your report is `SWFRecompDocs/plans/session28-fanout-reports/w1-loaded-shell-residuals-report.md` (plus an optional `w1-loaded-shell-residuals-prototype.patch`). Also read `CLAUDE.md`.
+
+---- YOUR TASK ----
+
+**Loaded-shell residuals (M): `regression/avm1_child_timeline_loop`, `regression/avm1_mcl_holder_totalframes`,
+`regression/avm1_mcl_load_tick`, child frame-1 order (`e1 d1 c1`), the s26 `avm1_loaded_bare_goto` held axes (now `regression/avm1_loaded_bare_goto_seq`).**
+
+Record: `session27-fanout-reports/w1-per-movie-dl-phase3-report.md`, `w2-loaded-shell-land-report.md` (§3, §4 "HOLD,
+priced": child frame-1 order inside one delivery + goto target script inside a loaded movie deferred to the next
+tick), `w2b-timers-tail-report.md`. Flash delivers a loadMovie one tick later than the Feb-2026 Ruffle runner; Flash
+confirmed 3 of 5 re-goldened loaded-shell fixtures exactly, 2 only moved toward Flash.
+
+Task:
+1. Read each fixture's current golden provenance (Flash capture vs exporter) and its status at `e1425f417` (all pass?).
+   State, per fixture, the remaining gap vs FLASH (the Flash captures are archived under
+   `session27-fanout-reports/w2-local-oracles/` and `flash-oracle-captures/`; grep for the fixture names). Some of these
+   pass against a non-Flash golden: those are the real residuals.
+2. Child frame-1 order: one drain delivers c/d/e in issue order; Flash runs `e1 d1 c1` (newest holder first). Find the
+   owner (`action.c` `actionProcessDeferred*` / delivery drain, `ng_rootDLEnter/Leave`, `childDLSwapIn`) and prototype
+   the Flash order. Same for the goto-target script deferred to the next tick in a loaded movie.
+3. Gate: all `regression/avm1_*load*`/`mcl*`/`child*` fixtures, avm1 + gnash + shumway rows with `loadMovie`/
+   `MovieClipLoader`/`loadClip` (grep the SWF dirs' `test.toml`/names), both modes (these arms are shared with NG).
+4. Every golden you propose changing needs a FLASH trace request (direct mode — loadMovie children work in direct).
+Deliver a measured prototype or priced NO-GO per item.
