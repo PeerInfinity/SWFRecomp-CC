@@ -45,3 +45,4 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w1b-rm-avm1-misc | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4KkhjNDFiySBwY5AV — launched (wave 1b) |
 | w2-test12-land | w1-test12-enterframe + Flash | trace test12 → pass; fixtures (Flash) | session_018CoDi5LgngECdcoyMmk6s1 — launched |
 | w2-flash-stroke-width | w1-acid-flash P2 + Flash | acid-stroke-0, strokes/scale bands; acid-scale priced RvF | session_018CoDi3n6SdtqTQpBCokufu — launched |
+| w2-loaded-shell-land | w1-loaded-shell-residuals + Flash | +1 load_cancel_via_unloadmovie; 3 golden swaps; 3 fixtures | session_018CoDi7qCLS9aytBojTChDH — launched |
