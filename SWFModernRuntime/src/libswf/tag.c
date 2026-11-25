@@ -10573,6 +10573,25 @@ void tagShowFrame(SWFAppContext* app_context)
 	// (after event delivery), and per-mouse-event from input_events_deliver().
 #ifndef NO_GRAPHICS
 	{
+#ifndef OFFSCREEN_RENDER
+		// A press AND its release inside one tick (s27 browser-parked-frame,
+		// goal 3): the state machine below samples mouse.button_down, which
+		// already reads 0, so the button never saw a down state and
+		// on(press)/on(release) never fired (Pacman PLAY GAME on an instant
+		// click). Replay the tap as a down pass, then the normal (up) pass.
+		// swf.c latches the edges before it clears them; consumed here once.
+		extern int g_tick_mouse_clicked, g_tick_mouse_released;
+		const int _tick_tap = g_tick_mouse_clicked && g_tick_mouse_released
+		                      && !app_context->mouse.button_down;
+		const int _tick_edge = g_tick_mouse_clicked || g_tick_mouse_released;
+		g_tick_mouse_clicked = 0;
+		g_tick_mouse_released = 0;
+		if (_tick_tap) {
+			app_context->mouse.button_down = 1;
+			ng_update_button_states(app_context);
+			app_context->mouse.button_down = 0;
+		}
+#endif
 #ifdef __EMSCRIPTEN__
 		// Browser-WASM perf gate. The button-state hover walk
 		// (ng_update_button_states + _attached) recursively hit-tests interactive
@@ -10594,7 +10613,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		int _cbtn = app_context->mouse.button_down;
 		int _mouse_changed = !s_pm_init || _cmx != s_pm_x || _cmy != s_pm_y ||
 		                     _cbtn != s_pm_btn || app_context->mouse.clicked ||
-		                     app_context->mouse.released;
+		                     app_context->mouse.released || _tick_edge;
 		s_pm_init = 1; s_pm_x = _cmx; s_pm_y = _cmy; s_pm_btn = _cbtn;
 		if (_mouse_changed) {
 			int any_hover = ng_update_button_states(app_context);
@@ -14247,7 +14266,8 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
 		display_list = new_base;
 		display_list_capacity = new_cap;
 	}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Every build (s27 browser-parked-frame): both backups are compiled in
+	// every build since s27 browser-eager-init ungated the frame helpers.
 	if (g_root_dl_backup == old_base) {
 		g_root_dl_backup = new_base;
 		g_root_dl_cap_backup = new_cap;
@@ -14256,7 +14276,6 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
 		g_rootdl_stash = new_base;
 		g_rootdl_stash_cap = new_cap;
 	}
-#endif
 	for (size_t j = 0; j < BTN_STATE_SNAP_MAX; j++) {
 		if (g_btn_state_old_sprite_dl[j] == old_base) {
 			g_btn_state_old_sprite_dl[j] = new_base;
@@ -14821,7 +14840,6 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Defer removal during catch_up_mode for entries with UNLOAD handlers
 		// (same rationale as tagRemoveObject2 — see comment there).
 		if (catch_up_mode)
@@ -14841,11 +14859,9 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 			}
 			if (has_unload_cu) return;
 		}
-#endif
 		// Queue accumulated clip actions (from prior Remove+Replace cycle) first.
 		// Snapshot the action_fn pointer (recompiler-emitted static code) so
 		// dropping the accumulated_clip_actions array reference is safe.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		MovieClip* _ro_parent_mc1 = NULL;
 		if (display_list[depth].instance_name != NULL) {
 			// Owner of the current display list (sprite MC inside a sprite frame,
@@ -14854,9 +14870,6 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 			MovieClip* _ro_p1 = g_current_context ? g_current_context : &root_movieclip;
 			_ro_parent_mc1 = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _ro_p1);
 		}
-#else
-		MovieClip* _ro_parent_mc1 = NULL;
-#endif
 		if (display_list[depth].accumulated_clip_action_count > 0)
 		{
 			for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++)
@@ -14874,7 +14887,6 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 					actionQueueClipActionUnload(display_list[depth].clip_actions[a].action, _ro_parent_mc1);
 			}
 		}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// See tagRemoveObject2 for the rationale.
 		int _ro1_has_unload = 0;
 		MovieClip* _ro1_mc = _ro_parent_mc1;
@@ -14894,11 +14906,6 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 			}
 			clear_display_entry(app_context, depth);
 		}
-#else
-		// Browser-WASM: defer invalidate + clear to tagShowFrame fallback or
-		// same-tick Place reclaim. See tagRemoveObject2 for the full rationale.
-		display_list[depth].pending_remove = 1;
-#endif
 	}
 #ifndef NO_GRAPHICS
 	(void)app_context;
@@ -14907,12 +14914,9 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
-#endif
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// During backward catch-up, the replay loop runs frames 0..target. PlaceObject2
 		// at frame X re-asserts entries; RemoveObject2 at frame Y > X must take effect
 		// so the post-replay display list reflects target's actual state. Only protect
@@ -15011,8 +15015,6 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			}
 			if (has_child_unload_cu) return;
 		}
-#endif
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		MovieClip* _remove_parent_mc = NULL;
 		if (display_list[depth].instance_name != NULL) {
 			// Owner of the current display list (sprite MC inside a sprite frame,
@@ -15022,9 +15024,6 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			MovieClip* _rm_p = g_current_context ? g_current_context : &root_movieclip;
 			_remove_parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _rm_p);
 		}
-#else
-		MovieClip* _remove_parent_mc = NULL;
-#endif
 		// Queue accumulated clip actions (from prior Remove+Replace cycle) first.
 		if (display_list[depth].accumulated_clip_action_count > 0)
 		{
@@ -15035,7 +15034,6 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			}
 		}
 		// Queue CLIP_EVENT_UNLOAD for children first (recursive, depth-first)
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
 		{
 			fire_recursive_child_unloads(app_context,
@@ -15051,7 +15049,6 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		// case1).
 		if (_remove_parent_mc != NULL)
 			actionQueueDynamicChildUnloads(_remove_parent_mc);
-#endif
 		// Queue current onUnload clip actions
 		if (display_list[depth].clip_action_count > 0)
 		{
@@ -15061,7 +15058,6 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 					actionQueueClipActionUnload(display_list[depth].clip_actions[a].action, _remove_parent_mc);
 			}
 		}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Compute has_unload to decide finalization path:
 		//  - has_unload=1: queue AS-level handler (lookup at queue time);
 		//    defer Mark to post-drain finalize so the MC stays !pending_removal
@@ -15092,25 +15088,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			}
 			clear_display_entry(app_context, depth);
 		}
-#else
-		// Browser-WASM frame_func re-run protection. The browser-WASM main
-		// loop re-runs frame_funcs every tick (no `is_playing` gate), so the
-		// recompiler-emitted tagRemoveObject2 + tagPlaceObject2(Ratio) pair
-		// for a stopped frame would invalidate + recreate the cached MC every
-		// tick — leaking ~1 MC/tick into child_mc_cache until
-		// MAX_CHILD_MOVIECLIPS=128 caps it (Doodle Jump gameplay frame_1
-		// depth 2 'container' via the same-(char,ratio) RemoveObject2 +
-		// PlaceObject2Ratio pair). Defer invalidate + clear by marking
-		// pending_remove=1; subsequent same-tick Place at the same depth
-		// reclaims via the modify-detect path in tagPlaceObject2 /
-		// tagPlaceObject2Ratio (consume_pending_remove). Unreclaimed
-		// entries are finalized at tagShowFrame's fallback walk. Preserves
-		// the orphan-text fix from c2147d58e because the deferred
-		// invalidate still fires before render (tagShowFrame → render).
-		display_list[depth].pending_remove = 1;
-#endif
 	}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	else
 	{
 		// Display list slot is empty. A duplicateMovieClip clone swapped
@@ -15125,7 +15103,6 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		extern void actionInvalidateMCAtASDepth(SWFAppContext*, int);
 		actionInvalidateMCAtASDepth(app_context, (int)depth - 16384);
 	}
-#endif
 #ifndef NO_GRAPHICS
 	(void)app_context;
 #endif

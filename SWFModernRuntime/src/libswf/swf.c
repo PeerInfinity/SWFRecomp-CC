@@ -153,6 +153,12 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present
 
 int quit_swf;
 int is_playing = 1;
+#ifndef OFFSCREEN_RENDER
+// This tick's mouse edges, latched before swf.c clears mouse.clicked/released
+// (read + consumed by tagShowFrame's button pass).
+int g_tick_mouse_clicked = 0;
+int g_tick_mouse_released = 0;
+#endif
 int bad_poll;
 size_t current_frame;
 size_t next_frame;
@@ -1021,6 +1027,13 @@ void tagMain(SWFAppContext* app_context)
 			actionFlushDeferredRollEvents(app_context);
 		}
 
+		// Latch this tick's edges for tagShowFrame's DefineButton state
+		// machine before clearing them (s27 browser-parked-frame, goal 3):
+		// it samples the button_down LEVEL, so a press and release that both
+		// land between two ticks (Playwright mouse.click, a fast tap) never
+		// showed it a down state and on(release) never fired.
+		g_tick_mouse_clicked = app_context->mouse.clicked;
+		g_tick_mouse_released = app_context->mouse.released;
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
 #endif
@@ -1036,10 +1049,9 @@ void tagMain(SWFAppContext* app_context)
 		// tagShowFrame, i.e. AFTER the root DoAction, so from tick 2 a root
 		// frame script read its sprites' previous playheads and their frame
 		// scripts ran after the root's (Flash/Ruffle/CI run them before).
-		// Fixture: regression/avm1_browser_eager_init (root f2/f3 rows). The
-		// browser still re-runs a parked root frame func every tick (tags +
-		// tagShowFrame, root DoAction suppressed) -- that no longer advances
-		// anything; this is the one per-tick advance in every build.
+		// Fixture: regression/avm1_browser_eager_init (root f2/f3 rows). This is
+		// the one per-tick advance in every build, whether or not the root frame
+		// func runs this tick.
 		// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
 		// nested sprites first, then their root-level parents (Phase 1).
 		const int nested_early = exec_order_nested_early();
@@ -1093,21 +1105,41 @@ void tagMain(SWFAppContext* app_context)
 			g_enterframe_flush_pending = 1;
 		}
 
-		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL
-#ifdef OFFSCREEN_RENDER
-		    && (is_playing || manual_next_frame)
+		// Every swf.c build gates the root frame func on the playhead (s27
+		// browser-parked-frame): the browser used to re-run
+		// frame_funcs[current_frame] every tick while the root was stopped, so
+		// the parked frame's PlaceObject/RemoveObject tags re-executed each tick
+		// (a clip the script had moved away was placed again, with a second
+		// onClipEvent(load)) -- see the parked tail after this block.
+		// Fixture: regression/avm1_browser_parked_frame (Flash 32 golden).
+		// Browser: also run a frame the playhead has just ENTERED while
+		// stopped. Several browser goto arms (a sprite script's
+		// _root.gotoAndStop(n) on a stopped root, e.g. Pacman's preloader ->
+		// menu) only move current_frame and relied on the per-tick re-run to
+		// execute the target frame; OFFSCREEN runs those through its inline
+		// catch-up instead.
+#ifndef OFFSCREEN_RENDER
+		static long s_browser_last_ran_frame = -1;
 #endif
+		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL
+		    && (is_playing || manual_next_frame
+#ifndef OFFSCREEN_RENDER
+		        || (long)current_frame != s_browser_last_ran_frame
+#endif
+		       )
 		    )
 		{
+#ifndef OFFSCREEN_RENDER
+			s_browser_last_ran_frame = (long)current_frame;
+#endif
 			g_loopback_replay = g_loopback_replay_armed;
 			g_loopback_replay_armed = 0;
 #ifndef OFFSCREEN_RENDER
-			// Browser-WASM Flash-accurate frame-entry gate. This loop re-runs
-			// frame_funcs[current_frame] every tick (no is_playing gate — that
-			// gate is OFFSCREEN_RENDER-only) because tagShowFrame, which pumps
-			// rendering + sprite advance + button hover, lives inside the
-			// frame_func body. But a frame's root DoAction must run only ONCE,
-			// when the playhead ENTERS the frame — not on every parked re-run.
+			// Browser-WASM frame-entry gate. A parked root no longer re-runs its
+			// frame func (gate above, s27 browser-parked-frame), but a PLAYING
+			// root can still re-enter the frame it is on (a 1-frame root loops
+			// onto itself every tick). A frame's root DoAction must run only
+			// ONCE, when the playhead ENTERS the frame.
 			// Otherwise a Stop() on a stopped frame re-fires each tick and
 			// clobbers a sprite-driven _root.play() (Pong court sprite_54's
 			// script_11 _root.play() vs frame_3's script_10 Stop; identical to
@@ -1174,6 +1206,23 @@ void tagMain(SWFAppContext* app_context)
 #endif
 		}
 
+#ifndef OFFSCREEN_RENDER
+		else if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL)
+		{
+			// Parked root (s27 browser-parked-frame): the frame's tags and root
+			// DoAction ran when the playhead entered it. Run only the per-tick
+			// tail the frame func carries after them -- the ENTER_FRAME flush,
+			// the queue drain (sprite scripts, clip events) and tagShowFrame
+			// (Phase-2 init, attached pump, button states, render) -- which the
+			// browser needs every tick to keep drawing. OFFSCREEN runs the
+			// flush and drains below but no tagShowFrame (no per-tick present).
+			extern void tagFlushPendingEnterFrame(SWFAppContext*);
+			extern void tagShowFrame(SWFAppContext*);
+			tagFlushPendingEnterFrame(app_context);
+			actionDrainAllInPriorityOrder(app_context);
+			tagShowFrame(app_context);
+		}
+#endif
 #ifdef OFFSCREEN_RENDER
 		// Safety net: if the frame_func gate above declined to run (root
 		// stopped / past-last-frame), the deferred promotion's close-out
