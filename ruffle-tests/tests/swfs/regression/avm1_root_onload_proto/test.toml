@@ -1,0 +1,8 @@
+# s28 w2-root-onload-proto. Golden = Flash Player 32 (LNX 32,0,0,465) trace,
+# tools/flash-oracle run_trace.py DIRECT mode with --no-pin (the test is the
+# projector's FIRST root movie). The default pinned harness loads the test over
+# _level0 via getURL, and Flash fires NO frame-1 onLoad for a replaced _level0
+# (w1-local-oracles/w1-drift/root_onload.pinned.txt is empty), so a pinned
+# capture of this row is invalid. Capture archived at
+# SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-drift/.
+num_ticks = 4

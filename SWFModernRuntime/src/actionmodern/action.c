@@ -43102,6 +43102,8 @@ int actionHasEnterFrameHandlers(void)
 	return 0;
 }
 
+static void actionInvokeMCOnLoadFunc(SWFAppContext* app_context, MovieClip* mc, ASFunction* func);
+
 // Dispatch onLoad for a MovieClip (walks __proto__ chain for onLoad handler).
 // Used for root MC (once after first frame), dynamically-attached MCs, and
 // timeline-placed RegisterClass sprites.
@@ -43125,7 +43127,14 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 			func = (ASFunction*) ol->data.numeric_value;
 	}
 	if (func == NULL) return;
+	actionInvokeMCOnLoadFunc(app_context, mc, func);
+}
 
+// Invoke a resolved onLoad handler on `mc` (split out of actionDispatchMCOnLoad
+// by s28 w2-root-onload-proto so actionDispatchRootOnLoad can call a handler it
+// resolved through MovieClip.prototype; the body is unchanged).
+static void actionInvokeMCOnLoadFunc(SWFAppContext* app_context, MovieClip* mc, ASFunction* func)
+{
 	MovieClip* saved_ctx = g_current_context;
 	actionSetCurrentContext(mc);
 
@@ -43378,6 +43387,51 @@ int actionHasPendingOnLoads(void)
 	return (int) actionActionQueuePending();
 }
 
+// s28 w2-root-onload-proto: the extra Flash call of a MovieClip.prototype
+// onLoad at the initial root's load event (see actionDispatchRootOnLoad).
+// Flash 32 (direct, --no-pin) prints `proto onLoad _global` BEFORE
+// `proto onLoad _level0` for a frame-1 `MovieClip.prototype.onLoad` that
+// traces `"proto onLoad " + this` (regression/avm1_root_onload_proto).
+// The receiver is not the `_global` object: `"x" + _global` gives
+// "x undefined" (no toString/valueOf on _global, Global.as:72), and _global
+// has no __proto__, so it cannot reach MovieClip.prototype.onLoad. It is a
+// receiver that inherits MovieClip.prototype and stringifies as "_global"
+// (the root's own `this.onLoad` fires once only, avm1/root_onload, so it is
+// not a second dispatch on _level0). Its identity is not yet measured
+// (LOCAL ORACLE REQUESTS in w2-root-onload-proto-report.md); until then we
+// model only what Flash shows: one call of the prototype handler with
+// `this` = the string "_global", ahead of the root's own load event.
+static void rootOnLoadProtoPseudoReceiver(SWFAppContext* app_context, ASFunction* func)
+{
+	PUSH_STR("_global", 7);
+	ActionVar _pr_this;
+	popVar(app_context, &_pr_this);
+	u32 _pr_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_VERSION_SWITCH;
+	u8 _pr_act = 0;
+	InvokeOpts _pr_opts = {0};
+	if (func->function_type == 2)
+	{
+		// A primitive receiver reaches a DefineFunction2 preload-this through
+		// g_override_this (the ABI this_obj is NULL for a string), the same
+		// route Function.call/apply use for a primitive thisArg.
+		_pr_act = INV_ACT_THIS;
+		_pr_flags |= INV_OVERRIDE_THIS;
+		_pr_opts.override_this = &_pr_this;
+	}
+	else
+		_pr_flags |= INV_FORCE_CAPTURED_WITH | INV_THIS_STACK | INV_BIND_THIS;
+	MovieClip* _pr_saved = g_current_context;
+	extern MovieClip root_movieclip;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, &root_movieclip);
+	_pr_opts.flags = _pr_flags;
+	_pr_opts.act_flags = _pr_act;
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &_pr_this, NULL, 0, &_pr_opts);
+	g_call_depth--;
+	g_current_context = _pr_saved;
+}
+
 // Dispatch _root.onLoad (fires once after first frame).
 static int g_root_onload_fired = 0;
 void actionDispatchRootOnLoad(SWFAppContext* app_context)
@@ -43386,7 +43440,42 @@ void actionDispatchRootOnLoad(SWFAppContext* app_context)
 	g_root_onload_fired = 1;
 
 	extern MovieClip root_movieclip;
-	actionDispatchMCOnLoad(app_context, &root_movieclip);
+	// s28 w2-root-onload-proto: resolve `MovieClip.prototype.onLoad` for the
+	// root. The root's dynamic_props are allocated lazily, so a root that never
+	// got an own property has no __proto__ link for actionDispatchMCOnLoad's
+	// chain walk, and a frame-1 `MovieClip.prototype.onLoad = f` never fired on
+	// _level0 (Flash 32 prints `proto onLoad _level0`). Same lazy-slot fallback
+	// as actionDispatchMCOnConstruct. Own handlers (dynamic_props chain, then
+	// the root's timeline var map) still win: actionDispatchMCOnLoad runs them.
+	int root_ver = root_movieclip.swf_version ? root_movieclip.swf_version : g_swf_version;
+	ASObject* mc_proto = getMovieClipPrototype(root_ver);
+	ASFunction* proto_fn = NULL;
+	if (mc_proto != NULL)
+	{
+		ActionVar* pol = getPropertyWithPrototype(mc_proto, "onLoad", 6);
+		if (pol != NULL && pol->type == ACTION_STACK_VALUE_FUNCTION)
+			proto_fn = (ASFunction*) pol->data.numeric_value;
+	}
+	if (proto_fn != NULL)
+		rootOnLoadProtoPseudoReceiver(app_context, proto_fn);
+
+	ASFunction* own_fn = NULL;
+	if (root_movieclip.dynamic_props != NULL)
+	{
+		ActionVar* ol = getPropertyWithPrototype((ASObject*) root_movieclip.dynamic_props, "onLoad", 6);
+		if (ol != NULL && ol->type == ACTION_STACK_VALUE_FUNCTION)
+			own_fn = (ASFunction*) ol->data.numeric_value;
+	}
+	if (own_fn == NULL)
+	{
+		ActionVar* ol = getVariable("onLoad", 6);
+		if (ol != NULL && ol->type == ACTION_STACK_VALUE_FUNCTION)
+			own_fn = (ASFunction*) ol->data.numeric_value;
+	}
+	if (own_fn == NULL && proto_fn != NULL)
+		actionInvokeMCOnLoadFunc(app_context, &root_movieclip, proto_fn);
+	else
+		actionDispatchMCOnLoad(app_context, &root_movieclip);
 }
 
 // Dispatch onKeyDown/onKeyUp to all Key listeners.

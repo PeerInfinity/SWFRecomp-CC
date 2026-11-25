@@ -1,0 +1,397 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 5b74145a..21a8f79c 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -43102,6 +43102,8 @@ int actionHasEnterFrameHandlers(void)
+ 	return 0;
+ }
+ 
++static void actionInvokeMCOnLoadFunc(SWFAppContext* app_context, MovieClip* mc, ASFunction* func);
++
+ // Dispatch onLoad for a MovieClip (walks __proto__ chain for onLoad handler).
+ // Used for root MC (once after first frame), dynamically-attached MCs, and
+ // timeline-placed RegisterClass sprites.
+@@ -43125,7 +43127,14 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
+ 			func = (ASFunction*) ol->data.numeric_value;
+ 	}
+ 	if (func == NULL) return;
++	actionInvokeMCOnLoadFunc(app_context, mc, func);
++}
+ 
++// Invoke a resolved onLoad handler on `mc` (split out of actionDispatchMCOnLoad
++// by s28 w2-root-onload-proto so actionDispatchRootOnLoad can call a handler it
++// resolved through MovieClip.prototype; the body is unchanged).
++static void actionInvokeMCOnLoadFunc(SWFAppContext* app_context, MovieClip* mc, ASFunction* func)
++{
+ 	MovieClip* saved_ctx = g_current_context;
+ 	actionSetCurrentContext(mc);
+ 
+@@ -43378,6 +43387,51 @@ int actionHasPendingOnLoads(void)
+ 	return (int) actionActionQueuePending();
+ }
+ 
++// s28 w2-root-onload-proto: the extra Flash call of a MovieClip.prototype
++// onLoad at the initial root's load event (see actionDispatchRootOnLoad).
++// Flash 32 (direct, --no-pin) prints `proto onLoad _global` BEFORE
++// `proto onLoad _level0` for a frame-1 `MovieClip.prototype.onLoad` that
++// traces `"proto onLoad " + this` (regression/avm1_root_onload_proto).
++// The receiver is not the `_global` object: `"x" + _global` gives
++// "x undefined" (no toString/valueOf on _global, Global.as:72), and _global
++// has no __proto__, so it cannot reach MovieClip.prototype.onLoad. It is a
++// receiver that inherits MovieClip.prototype and stringifies as "_global"
++// (the root's own `this.onLoad` fires once only, avm1/root_onload, so it is
++// not a second dispatch on _level0). Its identity is not yet measured
++// (LOCAL ORACLE REQUESTS in w2-root-onload-proto-report.md); until then we
++// model only what Flash shows: one call of the prototype handler with
++// `this` = the string "_global", ahead of the root's own load event.
++static void rootOnLoadProtoPseudoReceiver(SWFAppContext* app_context, ASFunction* func)
++{
++	PUSH_STR("_global", 7);
++	ActionVar _pr_this;
++	popVar(app_context, &_pr_this);
++	u32 _pr_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_VERSION_SWITCH;
++	u8 _pr_act = 0;
++	InvokeOpts _pr_opts = {0};
++	if (func->function_type == 2)
++	{
++		// A primitive receiver reaches a DefineFunction2 preload-this through
++		// g_override_this (the ABI this_obj is NULL for a string), the same
++		// route Function.call/apply use for a primitive thisArg.
++		_pr_act = INV_ACT_THIS;
++		_pr_flags |= INV_OVERRIDE_THIS;
++		_pr_opts.override_this = &_pr_this;
++	}
++	else
++		_pr_flags |= INV_FORCE_CAPTURED_WITH | INV_THIS_STACK | INV_BIND_THIS;
++	MovieClip* _pr_saved = g_current_context;
++	extern MovieClip root_movieclip;
++	if (g_swf_version >= 6 && func->base_clip != NULL)
++		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, &root_movieclip);
++	_pr_opts.flags = _pr_flags;
++	_pr_opts.act_flags = _pr_act;
++	g_call_depth++;
++	(void) invokeFunctionValue(app_context, func, &_pr_this, NULL, 0, &_pr_opts);
++	g_call_depth--;
++	g_current_context = _pr_saved;
++}
++
+ // Dispatch _root.onLoad (fires once after first frame).
+ static int g_root_onload_fired = 0;
+ void actionDispatchRootOnLoad(SWFAppContext* app_context)
+@@ -43386,7 +43440,42 @@ void actionDispatchRootOnLoad(SWFAppContext* app_context)
+ 	g_root_onload_fired = 1;
+ 
+ 	extern MovieClip root_movieclip;
+-	actionDispatchMCOnLoad(app_context, &root_movieclip);
++	// s28 w2-root-onload-proto: resolve `MovieClip.prototype.onLoad` for the
++	// root. The root's dynamic_props are allocated lazily, so a root that never
++	// got an own property has no __proto__ link for actionDispatchMCOnLoad's
++	// chain walk, and a frame-1 `MovieClip.prototype.onLoad = f` never fired on
++	// _level0 (Flash 32 prints `proto onLoad _level0`). Same lazy-slot fallback
++	// as actionDispatchMCOnConstruct. Own handlers (dynamic_props chain, then
++	// the root's timeline var map) still win: actionDispatchMCOnLoad runs them.
++	int root_ver = root_movieclip.swf_version ? root_movieclip.swf_version : g_swf_version;
++	ASObject* mc_proto = getMovieClipPrototype(root_ver);
++	ASFunction* proto_fn = NULL;
++	if (mc_proto != NULL)
++	{
++		ActionVar* pol = getPropertyWithPrototype(mc_proto, "onLoad", 6);
++		if (pol != NULL && pol->type == ACTION_STACK_VALUE_FUNCTION)
++			proto_fn = (ASFunction*) pol->data.numeric_value;
++	}
++	if (proto_fn != NULL)
++		rootOnLoadProtoPseudoReceiver(app_context, proto_fn);
++
++	ASFunction* own_fn = NULL;
++	if (root_movieclip.dynamic_props != NULL)
++	{
++		ActionVar* ol = getPropertyWithPrototype((ASObject*) root_movieclip.dynamic_props, "onLoad", 6);
++		if (ol != NULL && ol->type == ACTION_STACK_VALUE_FUNCTION)
++			own_fn = (ASFunction*) ol->data.numeric_value;
++	}
++	if (own_fn == NULL)
++	{
++		ActionVar* ol = getVariable("onLoad", 6);
++		if (ol != NULL && ol->type == ACTION_STACK_VALUE_FUNCTION)
++			own_fn = (ASFunction*) ol->data.numeric_value;
++	}
++	if (own_fn == NULL && proto_fn != NULL)
++		actionInvokeMCOnLoadFunc(app_context, &root_movieclip, proto_fn);
++	else
++		actionDispatchMCOnLoad(app_context, &root_movieclip);
+ }
+ 
+ // Dispatch onKeyDown/onKeyUp to all Key listeners.
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 104a6e52..53279797 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -178,3 +178,5 @@ arms cannot be reached any other way.
+ | `avm1_bitmap_nearest_tie_stage` | **On-stage (GPU) nearest-sampling tie rule of a non-smoothed bitmap fill: ties take the UPPER texel** (s27 `w2b-jpeg-refine`, `render_webgpu.c` `bitmap_nearest_clamp` / `bitmap_nearest_repeat`). SWF8, 8x8 lossless bitmap with unique texels, 0x43 fill at scale exactly 1.5, so every third pixel centre is a tie (80 px separate ties-up from ties-down). Golden = **Flash Player 32** `draw()` capture (equals the ties-up prediction at 0 px). Before: lavapipe's Nearest sampler resolved the ties neither way (52 px, max 32) |
+ | `avm1_edittext_tabstops_metric` | **TextField.textWidth with TABs uses Flash's default stops, and the painter honours explicit `TextFormat.tabStops`** (s27 `n-levels-5plus`; `ng_shared.c ng_next_tab_stop` / `ng_set_tab_font`, `tag.c tf_tab_stop` / `TF_TAB_REF`). Default stops: multiples of 2·(⌊asc⌋+⌊desc⌋) from the field edge (gutter + leftMargin + indent); explicit stops from the text origin, no advance past the last. Golden = **Flash Player 32** trace + image (Ruffle's 2.7·size stops are NOT a golden) |
+ | `avm1_edittext_border_subpixel` | **An unscaled bordered EditText at a fractional-pixel position draws its box on whole pixels** (s27 `n-levels-5plus`; `tag.c textfield_render_cb` unit-scale snap, `trunc((t + 2 twips) / 1 px)`). Golden = **Flash Player 32** image (Ruffle straddles two rows at half coverage) |
++| `avm1_root_onload_proto` | **The initial root's load event resolves `MovieClip.prototype.onLoad`** (s28 `w2-root-onload-proto`, `action.c actionDispatchRootOnLoad` + `rootOnLoadProtoPseudoReceiver`). Root f1 defines only `MovieClip.prototype.onLoad`; Flash prints `proto onLoad _global` then `proto onLoad _level0` after `root f1`, and nothing for the plain timeline clips `a`/`b`. The root's lazily-allocated `dynamic_props` had no `__proto__` link, so we printed neither. The `_global` receiver is unidentified (modelled as the string `"_global"`; Flash variant requests in the s28 report). Golden = **Flash Player 32** trace, `--no-pin` (a pinned run replaces `_level0` and fires no frame-1 onLoad) |
++| `avm1_root_onload_child_order` | **Root onLoad position** relative to a frame-1 child's construct/load/f1 events and the root's own frame-1 actions (`kid construct, kid load, kid f1, root f1, root onLoad, kid enterFrame, …`; s28 `w1-drift` fixture, landed by `w2-root-onload-proto`). Already matched before; a position lock. Golden = **Flash Player 32** trace, `--no-pin`, cut to 4 ticks |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/create_test_swf.py
+new file mode 100644
+index 00000000..2dfaa994
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/create_test_swf.py
+@@ -0,0 +1,83 @@
++#!/usr/bin/env python3
++"""Builds BOTH regression/avm1_root_onload_proto and
++regression/avm1_root_onload_child_order (s28 w1-drift fixtures, landed by
++s28 w2-root-onload-proto with Flash Player 32 --no-pin goldens). Pins:
++  proto       -> actionDispatchRootOnLoad resolves MovieClip.prototype.onLoad
++                 for the initial root (`proto onLoad _level0`), preceded by the
++                 Flash-observed extra call whose receiver prints `_global`.
++  child_order -> the root onLoad sits after the root's frame-1 actions and
++                 after the frame-1 child's construct/load/f1 events.
++Usage from regression/: python3 avm1_root_onload_proto/create_test_swf.py .
++s28 w1-drift: where does the INITIAL root's load event (_root.onLoad) sit
++relative to frame-1 children's construct/load/frame-1 actions?
++Ruffle fa93ad79f (2026-11-24) moved it to right after the root's own frame-1
++actions; SWFRecomp fires it once at the end of the first tagShowFrame.
++Usage: create_test_swfs.py <fixtures_dir>   (writes <variant>/test.swf)
++  avm1_root_onload_child_order: root f1 places `kid` (onClipEvent load +
++      construct + enterFrame), root f1 DoAction defines this.onLoad;
++      kid f1/f2 DoActions trace.
++  avm1_root_onload_proto: root f1 DoAction defines MovieClip.prototype.onLoad
++      (no own root onLoad); `a` placed in f1, `b` placed in f2."""
++import struct, sys, os
++def tag(code, data):
++    if len(data) < 63: return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++def s(x): return x.encode() + b'\0'
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str): b += b'\x00' + s(it)
++        elif isinstance(it, int): b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++GETVAR=b'\x1c'; SETMEM=b'\x4f'; GETMEM=b'\x4e'; ADD2=b'\x47'; TRACE=b'\x26'; STOP=b'\x07'
++def deffunc(body):
++    d = s('') + struct.pack('<H', 0) + struct.pack('<H', len(body))
++    return b'\x9b' + struct.pack('<H', len(d)) + d + body
++def tr(msg): return push(msg) + TRACE
++def tr_this(prefix):  # trace(prefix + this)
++    return push(prefix, 'this') + GETVAR + ADD2 + TRACE
++def doaction(a): return tag(12, a + b'\0')
++SHOW = tag(1, b'')
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++def place(depth, cid, name, clip_events=None):
++    flags = 0x02 | 0x20 | (0x80 if clip_events else 0)
++    d = bytes([flags]) + struct.pack('<HH', depth, cid) + s(name)
++    if clip_events:
++        allf = 0
++        recs = b''
++        for f, acts in clip_events:
++            allf |= f
++            a = acts + b'\0'
++            recs += struct.pack('<II', f, len(a)) + a
++        d += struct.pack('<HI', 0, allf) + recs + struct.pack('<I', 0)
++    return tag(26, d)
++EV_LOAD = 0x01; EV_EF = 0x02; EV_CONSTRUCT = 0x00040000  # byte2 bit 0x04
++def movie(path, frames, defs=b''):
++    body = (tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in frames) + tag(0, b''))
++    nb = 13
++    bits = '{:05b}'.format(nb) + ''.join('{:013b}'.format(v) for v in (0, 4000, 0, 3000))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++    hdr_rest = rect + struct.pack('<HH', 30 << 8, len(frames))
++    total = 8 + len(hdr_rest) + len(body)
++    os.makedirs(os.path.dirname(path), exist_ok=True)
++    open(path, 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
++
++out = sys.argv[1]
++# --- variant A ---
++kid = sprite(2, [doaction(tr('kid f1')), doaction(tr('kid f2') + STOP)])
++kid_ev = [(EV_CONSTRUCT, tr('kid construct')), (EV_LOAD, tr('kid load')), (EV_EF, tr('kid enterFrame'))]
++f1 = (place(1, 2, 'kid', kid_ev)
++      + doaction(tr('root f1') + push('this') + GETVAR + push('onLoad') + deffunc(tr('root onLoad')) + SETMEM))
++movie(f'{out}/avm1_root_onload_child_order/test.swf',
++      [f1, doaction(tr('root f2')), doaction(tr('root f3 stop') + STOP)], kid)
++# --- variant B ---
++kid = sprite(2, [doaction(tr_this('f1 of ')), doaction(STOP)])
++f1 = (place(1, 2, 'a')
++      + doaction(tr('root f1') + push('MovieClip') + GETVAR + push('prototype') + GETMEM
++                 + push('onLoad') + deffunc(tr_this('proto onLoad ')) + SETMEM))
++f2 = place(2, 2, 'b') + doaction(tr('root f2'))
++movie(f'{out}/avm1_root_onload_proto/test.swf', [f1, f2, doaction(tr('root f3 stop') + STOP)], kid)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/output.txt b/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/output.txt
+new file mode 100644
+index 00000000..e6d7597e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/output.txt
+@@ -0,0 +1,11 @@
++kid construct
++kid load
++kid f1
++root f1
++root onLoad
++kid enterFrame
++kid f2
++root f2
++kid enterFrame
++root f3 stop
++kid enterFrame
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/test.swf b/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..52b8755cca39d99670a9e183aed091109614c255
+GIT binary patch
+literal 288
+zcmYL^F%E)26hsFW6--b`uro?Uuhu3c8Y>eE3u^)xh{_sRud<Du7x5xqz*FE~5&gwv
+z^ZxAY?0Ua5Jq<`P3D9~1V}_Ljnx$S<)yvYM!)DS1j#=y-rtlG<_Xjih9U{P^9g*HO
+z@{^N}3<jwImsIxa`w`DeQCuTIG4v`3Lw4)kiH9*^ozPI>L5-7KB*nT2&j~HnESR)_
+xf^+eyBin#Tvl1g!lII&0b89K518IMqU+!<~_P+qCPsC-i*F?^}Qt(Ujt2edyIS&8;
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/test.toml b/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/test.toml
+new file mode 100644
+index 00000000..4fc1cde0
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_root_onload_child_order/test.toml
+@@ -0,0 +1,9 @@
++# s28 w2-root-onload-proto. Golden = Flash Player 32 (LNX 32,0,0,465) trace,
++# tools/flash-oracle run_trace.py DIRECT mode with --no-pin (the test is the
++# projector's FIRST root movie), cut to the first 11 lines (= 4 ticks; direct
++# mode overruns num_frames and keeps printing `kid enterFrame`). The default
++# pinned harness loads the test over _level0 via getURL, and Flash fires NO
++# frame-1 onLoad for a replaced _level0, so a pinned capture of this row is
++# invalid. Capture archived at
++# SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-drift/.
++num_ticks = 4
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/create_test_swf.py
+new file mode 100644
+index 00000000..2dfaa994
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/create_test_swf.py
+@@ -0,0 +1,83 @@
++#!/usr/bin/env python3
++"""Builds BOTH regression/avm1_root_onload_proto and
++regression/avm1_root_onload_child_order (s28 w1-drift fixtures, landed by
++s28 w2-root-onload-proto with Flash Player 32 --no-pin goldens). Pins:
++  proto       -> actionDispatchRootOnLoad resolves MovieClip.prototype.onLoad
++                 for the initial root (`proto onLoad _level0`), preceded by the
++                 Flash-observed extra call whose receiver prints `_global`.
++  child_order -> the root onLoad sits after the root's frame-1 actions and
++                 after the frame-1 child's construct/load/f1 events.
++Usage from regression/: python3 avm1_root_onload_proto/create_test_swf.py .
++s28 w1-drift: where does the INITIAL root's load event (_root.onLoad) sit
++relative to frame-1 children's construct/load/frame-1 actions?
++Ruffle fa93ad79f (2026-11-24) moved it to right after the root's own frame-1
++actions; SWFRecomp fires it once at the end of the first tagShowFrame.
++Usage: create_test_swfs.py <fixtures_dir>   (writes <variant>/test.swf)
++  avm1_root_onload_child_order: root f1 places `kid` (onClipEvent load +
++      construct + enterFrame), root f1 DoAction defines this.onLoad;
++      kid f1/f2 DoActions trace.
++  avm1_root_onload_proto: root f1 DoAction defines MovieClip.prototype.onLoad
++      (no own root onLoad); `a` placed in f1, `b` placed in f2."""
++import struct, sys, os
++def tag(code, data):
++    if len(data) < 63: return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++def s(x): return x.encode() + b'\0'
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str): b += b'\x00' + s(it)
++        elif isinstance(it, int): b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++GETVAR=b'\x1c'; SETMEM=b'\x4f'; GETMEM=b'\x4e'; ADD2=b'\x47'; TRACE=b'\x26'; STOP=b'\x07'
++def deffunc(body):
++    d = s('') + struct.pack('<H', 0) + struct.pack('<H', len(body))
++    return b'\x9b' + struct.pack('<H', len(d)) + d + body
++def tr(msg): return push(msg) + TRACE
++def tr_this(prefix):  # trace(prefix + this)
++    return push(prefix, 'this') + GETVAR + ADD2 + TRACE
++def doaction(a): return tag(12, a + b'\0')
++SHOW = tag(1, b'')
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++def place(depth, cid, name, clip_events=None):
++    flags = 0x02 | 0x20 | (0x80 if clip_events else 0)
++    d = bytes([flags]) + struct.pack('<HH', depth, cid) + s(name)
++    if clip_events:
++        allf = 0
++        recs = b''
++        for f, acts in clip_events:
++            allf |= f
++            a = acts + b'\0'
++            recs += struct.pack('<II', f, len(a)) + a
++        d += struct.pack('<HI', 0, allf) + recs + struct.pack('<I', 0)
++    return tag(26, d)
++EV_LOAD = 0x01; EV_EF = 0x02; EV_CONSTRUCT = 0x00040000  # byte2 bit 0x04
++def movie(path, frames, defs=b''):
++    body = (tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in frames) + tag(0, b''))
++    nb = 13
++    bits = '{:05b}'.format(nb) + ''.join('{:013b}'.format(v) for v in (0, 4000, 0, 3000))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++    hdr_rest = rect + struct.pack('<HH', 30 << 8, len(frames))
++    total = 8 + len(hdr_rest) + len(body)
++    os.makedirs(os.path.dirname(path), exist_ok=True)
++    open(path, 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
++
++out = sys.argv[1]
++# --- variant A ---
++kid = sprite(2, [doaction(tr('kid f1')), doaction(tr('kid f2') + STOP)])
++kid_ev = [(EV_CONSTRUCT, tr('kid construct')), (EV_LOAD, tr('kid load')), (EV_EF, tr('kid enterFrame'))]
++f1 = (place(1, 2, 'kid', kid_ev)
++      + doaction(tr('root f1') + push('this') + GETVAR + push('onLoad') + deffunc(tr('root onLoad')) + SETMEM))
++movie(f'{out}/avm1_root_onload_child_order/test.swf',
++      [f1, doaction(tr('root f2')), doaction(tr('root f3 stop') + STOP)], kid)
++# --- variant B ---
++kid = sprite(2, [doaction(tr_this('f1 of ')), doaction(STOP)])
++f1 = (place(1, 2, 'a')
++      + doaction(tr('root f1') + push('MovieClip') + GETVAR + push('prototype') + GETMEM
++                 + push('onLoad') + deffunc(tr_this('proto onLoad ')) + SETMEM))
++f2 = place(2, 2, 'b') + doaction(tr('root f2'))
++movie(f'{out}/avm1_root_onload_proto/test.swf', [f1, f2, doaction(tr('root f3 stop') + STOP)], kid)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/output.txt b/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/output.txt
+new file mode 100644
+index 00000000..31a8d4a8
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/output.txt
+@@ -0,0 +1,7 @@
++f1 of _level0.a
++root f1
++proto onLoad _global
++proto onLoad _level0
++f1 of _level0.b
++root f2
++root f3 stop
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/test.swf b/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..8b3f8ece8f99a013ba683d14593dc1b9d9a0077f
+GIT binary patch
+literal 231
+zcmYL@&k6xi6o)@^^Dm_oE8=D`dprO|Z2VbRSXdF0DLE52<q5pO-FP)yd5m$#D4SEi
+zbAG4q8?TmyH*laeAp3--VpMSphF%=UucC)XP1!O89W8+da|kaqCO!i^m3I^Fxpv0&
+zHuTlnMO%ckh|xg@-<Dt|*Kj{Ph7pY<MrSc%Zqc5(Er6V+vf1&-x>xGh+OMJ0gZ?8I
+cj^<d2)0VRObGjrt)vsqt?&*t>2tO7406R%BwEzGB
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/test.toml b/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/test.toml
+new file mode 100644
+index 00000000..5a12ab73
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_root_onload_proto/test.toml
+@@ -0,0 +1,8 @@
++# s28 w2-root-onload-proto. Golden = Flash Player 32 (LNX 32,0,0,465) trace,
++# tools/flash-oracle run_trace.py DIRECT mode with --no-pin (the test is the
++# projector's FIRST root movie). The default pinned harness loads the test over
++# _level0 via getURL, and Flash fires NO frame-1 onLoad for a replaced _level0
++# (w1-local-oracles/w1-drift/root_onload.pinned.txt is empty), so a pinned
++# capture of this row is invalid. Capture archived at
++# SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-drift/.
++num_ticks = 4
