@@ -1,0 +1,23 @@
+frame 1 end
+onData m0 a=1
+onData m1 a=1
+onData m2 a=1
+onData m3 a=1
+onData m4 a=1
+onData m5 a=1
+onData m6 a=1
+onData m7 a=1
+onData m8 a=1
+onData m9 a=1
+onData m10 a=1
+onData m11 a=1
+onData m12 a=1
+onData m13 a=1
+onData m14 a=1
+onData m15 a=1
+onData m16 a=1
+onData m17 a=1
+onData m18 a=1
+onData m19 a=1
+frame 2
+frame 3

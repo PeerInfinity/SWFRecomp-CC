@@ -1,0 +1,11 @@
+kid construct
+kid load
+kid f1
+root f1
+root onLoad
+kid enterFrame
+kid f2
+root f2
+kid enterFrame
+root f3 stop
+kid enterFrame

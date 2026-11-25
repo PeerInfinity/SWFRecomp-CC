@@ -1,0 +1,25 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 5b74145a..86686f33 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -80573,6 +80573,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					double rrty = (double)root_movieclip.y * 20.0;
+ 					double ptx = round(rra * ptx_local + rrc * pty_local + rrtx);
+ 					double pty = round(rrb * ptx_local + rrd * pty_local + rrty);
++					if (getenv("HT_STAGE")) { ptx = round(ptx_local); pty = round(pty_local); }
++					if (getenv("HT_DOUBLE")) { double qx = rra * ptx_local + rrc * pty_local + rrtx, qy = rrb * ptx_local + rrd * pty_local + rrty; ptx = round(rra * qx + rrc * qy + rrtx); pty = round(rrb * qx + rrd * qy + rrty); }
+ 
+ 					// Check bounding box first (fast reject)
+ 					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
+@@ -80640,6 +80642,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 							_hwtx *= 20.0; _hwty *= 20.0; // pixels→twips
+ 							hit = ng_hitTestShapeFromDL(_htdl, _htm,
+ 								_hwa, _hwb, _hwc, _hwd, _hwtx, _hwty, ptx, pty);
++							{ static int _scan_done = 0; if (getenv("HT_SCAN") && !_scan_done) { _scan_done = 1;
++								fprintf(stderr, "SCAN clip m=%g %g %g %g %g %g\n", _hwa,_hwb,_hwc,_hwd,_hwtx,_hwty);
++								for (int sx = 0; sx <= 800; sx += 5) { fprintf(stderr, "%d", ng_hitTestShapeFromDL(_htdl,_htm,_hwa,_hwb,_hwc,_hwd,_hwtx,_hwty, sx*20.0, 400*20.0)); } fprintf(stderr, " <- y=400 x0..800/5\n");
++								for (int sy = 0; sy <= 800; sy += 5) { fprintf(stderr, "%d", ng_hitTestShapeFromDL(_htdl,_htm,_hwa,_hwb,_hwc,_hwd,_hwtx,_hwty, 400*20.0, sy*20.0)); } fprintf(stderr, " <- x=400 y0..800/5\n");
++								for (int sd = 0; sd <= 800; sd += 5) { fprintf(stderr, "%d", ng_hitTestShapeFromDL(_htdl,_htm,_hwa,_hwb,_hwc,_hwd,_hwtx,_hwty, sd*20.0, sd*20.0)); } fprintf(stderr, " <- diag\n"); } }
+ 						}
+ 						// Also check drawing API shapes
+ 						if (!hit && mc != NULL && mc->draw_has_bounds && mc->drawing_state != NULL) {

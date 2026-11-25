@@ -1,0 +1,7 @@
+frame 1 fields placed
+frame 2 holder vars set
+frame 3 bound=70
+t0.text=val0
+t63.text=val63
+t64.text=val64
+t69.text=val69

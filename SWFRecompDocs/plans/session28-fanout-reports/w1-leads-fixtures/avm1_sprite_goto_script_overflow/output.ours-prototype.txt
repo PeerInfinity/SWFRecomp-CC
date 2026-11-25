@@ -1,0 +1,65 @@
+L self-goto wave issued k=20
+root tellTarget wave issued
+root method wave issued
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+L2 L
+L3 L
+f2 s0
+f2 s1
+f2 s2
+f2 s3
+f2 s4
+f2 s5
+f2 s6
+f2 s7
+f2 s8
+f2 s9
+f2 s10
+f2 s11
+f2 s12
+f2 s13
+f2 s14
+f2 s15
+f2 s16
+f2 s17
+f2 s18
+f2 s19
+f3 s0
+f3 s1
+f3 s2
+f3 s3
+f3 s4
+f3 s5
+f3 s6
+f3 s7
+f3 s8
+f3 s9
+f3 s10
+f3 s11
+f3 s12
+f3 s13
+f3 s14
+f3 s15
+f3 s16
+f3 s17
+f3 s18
+f3 s19
+root frame 2
+root frame 3
