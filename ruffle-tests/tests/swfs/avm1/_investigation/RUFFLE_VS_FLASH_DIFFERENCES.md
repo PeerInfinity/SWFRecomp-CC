@@ -861,3 +861,53 @@ when upstream changes the golden; then re-capture with Flash.
 - `MaskTest-2`, `captions`, `hardwrap`, `stylesheet`, `acid-text-5`: device text from an unreproducible host. The
   2026-11-24 ClearType-off Windows FP32 pass does not reproduce them either (golden-provenance.md §Round 3).
 - `gradientTransform` and `acid-color` frame1: already Flash at quality HIGH.
+
+## s28 trace-provenance: Ruffle trace goldens checked against Flash Player 32 (2026-11-25)
+
+The s28 trace-provenance sweep (`SWFRecompDocs/plans/session28-fanout-reports/trace-provenance.md`) ran the real FP32 debug
+projector (`tools/flash-oracle/run_trace.py`, pinned direct mode, cross-checked `--no-pin`, a 20 s cap and the Windows
+projector) over every non-passing and `ruffle_matched` trace row at results `e1425f417`. The Ruffle≠Flash trace
+differences it confirmed are below. FP32 captures are in `session28-fanout-reports/trace-provenance/`.
+
+**Golden ≠ Flash, fixed through `ruffle-tests/flash_fixes/`** (Linux pinned ×2 == `--no-pin` == Windows):
+
+| test | golden vs FP32 | ours vs FP32 | note |
+|---|---|---|---|
+| `avm1/goto_rewind_movieclip_replace` | golden has 1 extra last line, `Child A frame 1` | **0** (byte-identical) | After the frame-3 `gotoAndStop(1)` rewind re-places Child A at the same depth, FP32 does not run Child A's frame-1 script again. FP32 == `output.ruffle.txt`, so Ruffle is right and the golden is wrong. Expected move: `ruffle_matched` → pass. |
+| `avm1/movieclip_hittest_shapeflag` | 3 lines: `hitTest(400,500,true)`, `(500,400,true)`, `(400,300,true)` are `false` in FP32, `true` in the golden | 9 lines (difflib) | The stage is 800 px and the points are on-stage. The cloud slot `w2-hittest-shape-stale` is implementing the same-frame stale shape-hitTest matrix behind it. The row stays `output_mismatch`, now graded against Flash. |
+
+**Golden ≠ Flash, documented and not fixed.** These depend on the uncaught-error log convention, which is a harness
+decision for the coordinator:
+- `avm2/slot_holes_fail`, `avm2/slot_id_exceeds_trait_count`: the golden is empty, because Ruffle's test framework does
+  not compare uncaught errors (see the test.toml notes). FP32 logs `VerifyError: Error #1107: The ABC data is corrupt…`.
+  `slot_id_exceeds_trait_count` also logs `ReferenceError: Error #1065: Variable SlotTest is not defined.` Each error
+  is followed by a blank line.
+- `avm2/swz`, `avm2/loader_applicationDomain`: FP32 refuses an unsigned `.swz` with `Error #2044: Unhandled
+  securityError:. text=Error #2046: The loaded file did not have a valid signature.` plus a stack trace. The golden
+  instead lists the classes loaded from it (Ruffle loads unsigned SWZ). Our output is empty.
+- `avm2/verify_method_info_duplicate`: equal except for the blank line Flash logs after each uncaught error.
+
+**Platform splits (the golden is Windows FP32; Linux FP32 differs).** No fix: the golden is a Flash target.
+- `from_avmplus/as3/Types/Number/cos`: `cos(Number.MAX_VALUE)` follows the host libm. Linux == `output.ruffle.txt`.
+- avmplus `e15_9_5_10_10`, `e15_9_5_10_11`, `e15_9_5_35_1`: for pre-2007 dates, Windows FP32 applies current US DST
+  rules and Linux applies historical tz rules.
+- gnash `Math-v5..8`: Linux == Ruffle's output.
+- gnash `ASnative-v5..8`, `MovieClip-v8` (blendMode `darken` vs `normal`), `TextFormat-v8`,
+  `MovieClipLoader-v7/8`, `argstest-v6`, and `Microphone-v6..8` / `Sound-v6..8` / `soundchannel_soundcomplete` (no
+  audio or mic device on the Xvfb host).
+- `html_text_img_parsing` (#2124 vs #2035), `uncaught_errors_stringified`, `loader-events` (Linux adds 4096/8192
+  progress chunks), `flash_text_TextField2`, `asnative_instrument`.
+
+**Version variant:** gnash `Date-v5..8` grade `output.fp10.txt`. FP32 (Linux == Windows) prints
+`-6.77681005679424e+19` where FP10 printed `…748e+19`, on 3 lines.
+
+**Harness artifacts, not Flash differences.** Recorded so they are not booked as RvF:
+- The pinned stub leaks `_global._quality` / `_global.PinStub` into `_global`-enumerating tests.
+- A replaced `_level0` drops the frame-1 `_root.onLoad` (s28-coordinator finding).
+- `_url` shows temp-dir paths.
+- Single-frame dumps get cut at num_frames/fps + 2 s.
+- Goldens made with `ErrorReportingEnable=1` need `--log-warnings` (`set_property_values/swf4`, `global_proto_decls*`),
+  although their test.toml has no `log_warnings`.
+
+**Prune criterion:** a fix entry prints `UPSTREAMED`/`STALE` from `apply_flash_fixes.py`. Drop a platform-split row if
+upstream re-bakes the golden on Linux.

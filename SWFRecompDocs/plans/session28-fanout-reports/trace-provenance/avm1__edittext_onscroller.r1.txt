@@ -1,0 +1,2 @@
+onScroller2: _level0.tf
+  tf.scroll=1

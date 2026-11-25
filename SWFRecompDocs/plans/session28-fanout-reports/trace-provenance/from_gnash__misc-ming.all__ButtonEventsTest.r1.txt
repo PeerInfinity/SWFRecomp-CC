@@ -1,0 +1,58 @@
+PASSED: typeof(square1.button)  ==  'object' [ButtonEventsTest.c:480]
+PASSED: square1.button instanceOf Button [ButtonEventsTest.c:481]
+PASSED: typeof(square1.button.useHandCursor)  ==  'boolean' [ButtonEventsTest.c:482]
+PASSED: square1.button.useHandCursor  ==  true [ButtonEventsTest.c:483]
+tabIndex
+blendMode
+cacheAsBitmap
+filters
+scale9Grid
+getDepth
+enabled
+useHandCursor
+onKeyUp
+onKeyDown
+onSetFocus
+onReleaseOutside
+onRelease
+onPress
+onRollOut
+onRollOver
+instance6
+instance5
+tabIndex
+blendMode
+cacheAsBitmap
+filters
+scale9Grid
+getDepth
+enabled
+useHandCursor
+onKeyUp
+onKeyDown
+onSetFocus
+onReleaseOutside
+onRelease
+onPress
+onRollOut
+onRollOver
+instance6
+instance5
+PASSED: typeof(_root.buttonChild)  ==  'object' [ButtonEventsTest.c:563]
+PASSED: _root.buttonChild instanceof Array [ButtonEventsTest.c:564]
+PASSED: _root.buttonChild.realLength()  ==  2 [ButtonEventsTest.c:565]
+PASSED: typeof(_root.buttonChild[10])  ==  'object' [ButtonEventsTest.c:568]
+PASSED: (_root.buttonChild[10].nam)  ==  '_level0.square1.button.instance5' [ButtonEventsTest.c:569]
+PASSED: (_root.buttonChild[10].exe)  ==  1 [ButtonEventsTest.c:570]
+PASSED: (_root.buttonChild[10].uld)  ==  0 [ButtonEventsTest.c:571]
+PASSED: typeof(_root.buttonChild[12])  ==  'object' [ButtonEventsTest.c:574]
+PASSED: (_root.buttonChild[12].nam)  ==  '_level0.square1.button.instance6' [ButtonEventsTest.c:575]
+PASSED: (_root.buttonChild[12].exe)  ==  1 [ButtonEventsTest.c:576]
+PASSED: (_root.buttonChild[12].uld)  ==  0 [ButtonEventsTest.c:577]
+PASSED: _level0.square1.button.instance6._name  ==  'instance6' [ButtonEventsTest.c:578]
+PASSED: _level0.square1.button.instance6.getDepth()  ==  -16371 [ButtonEventsTest.c:579]
+PASSED: typeof(_root.buttonChild[11])  ==  'undefined' [ButtonEventsTest.c:582]
+PASSED: typeof(_root.buttonChild[13])  ==  'undefined' [ButtonEventsTest.c:585]
+0. Roll over and out the red square, not touching the small dark-red square in it.
+   The cursor should turn to an hand while on the square.
+PASSED: _level0.square1.hitTest(60,60,true) [ButtonEventsTest.c:597]

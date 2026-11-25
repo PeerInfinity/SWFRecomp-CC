@@ -53,5 +53,27 @@
     "reason": "Linux == Windows; embedded DefineFont4. Golden 6331 px off Flash; ours 5325 px (we are closer to Flash than the golden).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
     "added": "2026-11-24"
+  },
+  {
+    "test": "avm1/goto_rewind_movieclip_replace",
+    "file": "output.txt",
+    "upstream_sha256": "47c3531ee1336ed94fef41d559ead837f790bf30899cf52406b1664b6598b8f5",
+    "fix": "avm1/goto_rewind_movieclip_replace/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__goto_rewind_movieclip_replace.{r1,r2,np1,L1,win1}.txt (s28 trace-provenance)",
+    "reason": "Linux pinned x2, --no-pin, 20 s cap and Windows all agree: FP32 does not re-run \"Child A frame 1\" after the frame-3 gotoAndStop(1) rewind (the golden's last line). FP32 == output.ruffle.txt == our output.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/movieclip_hittest_shapeflag",
+    "file": "output.txt",
+    "upstream_sha256": "471626e6071f4f73a7223c72f37de8c8d02dc1c79ef44baf4bcd573ff05c349d",
+    "fix": "avm1/movieclip_hittest_shapeflag/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__movieclip_hittest_shapeflag.{r1,r2,np1,L1,win1}.txt (s28 trace-provenance)",
+    "reason": "Linux pinned x2, --no-pin, 20 s cap and Windows all agree: hitTest(400,500,true), (500,400,true), (400,300,true) are false in FP32 (golden says true). Ours vs FP32: 7 lines.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
+    "added": "2026-11-25"
   }
 ]

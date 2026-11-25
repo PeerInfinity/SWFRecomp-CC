@@ -1,0 +1,5 @@
+///var silence = new Silence();
+///var silence_channel = silence.play();
+///silence_channel.position
+TypeError: Error #1009: Cannot access a property or method of a null object reference.
+	at test_fla::MainTimeline/frame10()[test_fla.MainTimeline::frame10:11]

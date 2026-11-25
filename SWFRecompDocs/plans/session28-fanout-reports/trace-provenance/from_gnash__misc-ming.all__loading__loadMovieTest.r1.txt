@@ -1,0 +1,5 @@
+PASSED: movieclip == movieclip
+PASSED: movieclip == movieclip
+0.0: Click on the first image. Wait for it to appear on the right, then click on it.
+PASSED: true
+PASSED: true

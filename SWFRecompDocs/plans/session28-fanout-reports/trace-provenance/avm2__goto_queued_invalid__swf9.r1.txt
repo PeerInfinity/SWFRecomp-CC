@@ -1,0 +1,2 @@
+Entered frame 1
+// gotoAndStop(0)

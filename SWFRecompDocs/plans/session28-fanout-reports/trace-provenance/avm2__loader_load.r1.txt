@@ -1,0 +1,73 @@
+Test 0
+// request.url
+http://localhost:8000
+
+// request.data
+foo
+
+// request.method
+POST
+
+// loader.load(request)
+undefined
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+
+Test 1
+// request.url
+http://localhost:8000
+
+// request.data
+baz
+
+// request.method
+POST
+
+// loader.load(request)
+undefined
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+
+Test 2
+// request.url
+http://localhost:8000
+
+// request.data
+foo=bar
+
+// request.method
+POST
+
+// loader.load(request)
+undefined
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+
+Test 3
+// request.url
+http://localhost:8000
+
+// request.data
+cccc=true&aaa=bbb
+
+// request.method
+POST
+
+// loader.load(request)
+undefined
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+
+Test 4
+// request.url
+http://localhost:8000
+
+// request.data
+a=b
+
+// request.method
+POST
+
+// loader.load(request)
+undefined
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+
+Test 5
+TypeError: Error #1034: Type Coercion failed: cannot convert Object@26ad4fe8d311 to flash.net.URLRequest.
+	at Test/onFrame()[Z:\tests\tests\swfs\avm2\loader_load\Test.as:63]
