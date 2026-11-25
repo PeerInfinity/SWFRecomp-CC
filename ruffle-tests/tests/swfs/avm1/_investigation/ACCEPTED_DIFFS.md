@@ -458,7 +458,12 @@ differences in font glyph outlines, morph boundary precision, and Drawing API
 stroke tessellation accuracy. 332/338 lines pass; the remaining **6** (lines 71,
 171–177 and 296; was 9 — corrected s26 `w1-trace-tail-audit` §5, first flagged s24
 `w1-avm1-tail` lead 3) are at exact geometric boundaries where our implementation
-disagrees with Ruffle's.
+disagrees with Ruffle's golden AND with real Flash: the s28 FP32 capture
+(`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/movieclip_hittest_shapeflag.pinned.txt`)
+prints the golden's value on all 6 lines, so they are our own inaccuracy, not a
+Ruffle-vs-Flash question. (FP32 differs from the Ruffle golden only on lines
+35/37/39, the same-frame stale-bounds quirk; see the s28 `w2-hittest-shape-stale`
+RvF entry and flash_fixes.)
 
 ### `movieclip_hittest_shapeflag` — Noto Sans vs Flash device font glyph outlines (5 diff lines; was 7)
 

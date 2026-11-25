@@ -190,6 +190,19 @@ struct MovieClip {
 	// s27 w1-exec-order: g_tick_count of this clip's last onEnterFrame
 	// dispatch (Flash/Ruffle run exactly one per clip per frame).
 	size_t ef_fired_tick;
+	// s28 w2-hittest-shape-stale: Flash's `hitTest(x, y, true)` prefilters the
+	// point against the clip's world bounds as of the LAST RENDER (a cache
+	// that a same-frame _x/_xscale/... change on the clip or any ancestor does
+	// not refresh); the exact shape test then uses the live matrix. Snapshot
+	// (global twips, same space as the live AABB) owned by action.c's
+	// actionHitTestStaleBounds / actionRefreshHitTestSnapshots. ht_snap_has:
+	// 0 = none (first shape query uses + caches the live box), 1 = valid box,
+	// 2 = valid "no bounds". ht_snap_query_tick: g_tick_count of the last
+	// shape query (the refresh drops clips idle for HT_SNAP_IDLE_TICKS).
+	u8 ht_snap_has;
+	u8 ht_snap_registered;
+	size_t ht_snap_query_tick;
+	double ht_snap_box[4];
 };
 
 // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d

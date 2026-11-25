@@ -960,3 +960,25 @@ non-unload action whose clip is `avm1_removed()` or `avm1_pending_removal()`, wh
 Flash also runs a clip's onClipEvent(enterFrame) in the same exec-list walk as the onEnterFrame methods (the fixture's
 `t EF, n EF, c clipEvent(enterFrame), s EF`).
 **Decision:** match Flash 32 (s28 w2-test12-land: action.c `ef_removal_keeps_enterframe` + tag.c clip-event interleave).
+
+```markdown
+## s28: `hitTest(x, y, true)` uses the clip's last-RENDERED bounds in the frame its transform changes
+
+**Tests:** `avm1/movieclip_hittest_shapeflag` (lines 35/37/39), `regression/avm1_hittest_shape_stale_matrix`;
+corroborated by gnash `actionscript.all/HitTest-v6/v7/v8` (`HitTest.as:66/67/73/140/141/142`, Flash-derived
+expectations Ruffle fails).
+**Evidence:** FP32 LNX debug projector, direct, pinned (== no-pin for the 640x520 probe):
+`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/`.
+
+**Flash:** in the frame where `_root._x`, `_root._xscale` or the clip's own `_x` changes, `clip.hitTest(x, y, true)`
+first rejects the (root-local → global, live `_root` matrix) point against the clip's world bounds as of the last
+render, then runs the exact shape test with the live matrix. `hitTest(x, y, false)` and `localToGlobal` use the live
+matrix. The next frame is consistent again. Probe phase B (`_root._x = 100`, square at root (100,100)-(200,200)):
+`hit(150,150) shape=false bounds=true`.
+
+**Ruffle:** `movie_clip.rs` `hit_test` maps the point through `_root`'s live matrix and calls `hit_test_shape` with
+the live world matrix and live bounds: `shape=true` in phase B, `true` on the golden's lines 35/37/39.
+
+**Decision:** match Flash (`action.c` `actionHitTestStaleBounds`, s28 w2-hittest-shape-stale). The golden is replaced
+by the FP32 capture via `flash_fixes`. The row keeps its 6 ACCEPTED Cat 8 lines (our glyph/morph precision, = FP32 ≠
+ours).

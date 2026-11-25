@@ -25697,6 +25697,12 @@ void actionDeferDpropsRelease(SWFAppContext* app_context, MovieClip* mc)
 
 void actionDrainDpropsReleases(SWFAppContext* app_context)
 {
+	// s28 w2-hittest-shape-stale: tick boundary = just after the last render;
+	// refresh the render-time hitTest bounds snapshots here (both modes).
+	{
+		extern void actionRefreshHitTestSnapshots(void);
+		actionRefreshHitTestSnapshots();
+	}
 	for (int i = 0; i < g_dprops_release_count; i++)
 		releaseObject(app_context, g_dprops_release_queue[i]);
 	g_dprops_release_count = 0;
@@ -75112,6 +75118,172 @@ static int mcArmCaseMiss(const char* name, u32 len)
 	return 0;
 }
 
+// s28 w2-hittest-shape-stale: COMPUTE_GLOBAL_AABB moved to file scope (was
+// local to actionCallMethod's hitTest arm, unchanged) so the render-time
+// hitTest bounds snapshot (actionHitTestStaleBounds) can reuse it.
+extern DisplayObject* display_list;
+extern size_t max_depth;
+extern int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
+	double ma, double mb, double mc, double md, double mtx, double mty,
+	int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
+// Helper: compute global AABB for a MovieClip (in _root twips space)
+// This finds the MC's sprite_display_list, computes local bounds,
+// then transforms by the MC's world matrix.
+#define COMPUTE_GLOBAL_AABB(the_mc, out_has, out_xmin, out_ymin, out_xmax, out_ymax) do { \
+	out_has = 0; \
+	/* Find MC's sprite_display_list */ \
+	DisplayObject* _hmc_dl = NULL; size_t _hmc_max = 0; \
+	if (the_mc == &root_movieclip) { \
+		_hmc_dl = display_list; _hmc_max = max_depth; \
+	} \
+	else if (the_mc != NULL && the_mc->display_obj != NULL) { \
+		DisplayObject* _hdobj = (DisplayObject*)the_mc->display_obj; \
+		if (_hdobj->sprite_display_list != NULL) { \
+			_hmc_dl = _hdobj->sprite_display_list; _hmc_max = _hdobj->sprite_max_depth; \
+		} \
+	} \
+	if (_hmc_dl == NULL && the_mc != NULL && the_mc->name[0] != '\0') { \
+		MovieClip* _hch[16]; int _hcl = 0; \
+		for (MovieClip* _hcur = the_mc; _hcur && _hcur != &root_movieclip && _hcl < 16; _hcur = _hcur->parent) \
+			_hch[_hcl++] = _hcur; \
+		DisplayObject* _hdl = display_list; size_t _hm = max_depth; \
+		for (int _hi = _hcl - 1; _hi >= 0; _hi--) { \
+			size_t _hfd = SIZE_MAX; \
+			for (size_t _hd = 1; _hd <= _hm; _hd++) { \
+				if (_hdl[_hd].char_id == 0) continue; \
+				if (_hdl[_hd].instance_name && strcmp(_hdl[_hd].instance_name, _hch[_hi]->name) == 0) \
+					{ _hfd = _hd; break; } \
+			} \
+			if (_hfd == SIZE_MAX) break; \
+			if (_hi == 0) { \
+				if (_hdl[_hfd].sprite_display_list) { \
+					_hmc_dl = _hdl[_hfd].sprite_display_list; _hmc_max = _hdl[_hfd].sprite_max_depth; \
+				} \
+			} else { \
+				if (!_hdl[_hfd].sprite_display_list) break; \
+				_hm = _hdl[_hfd].sprite_max_depth; _hdl = _hdl[_hfd].sprite_display_list; \
+			} \
+		} \
+	} \
+	/* Compute local bounds */ \
+	double _hlxmin=0, _hlymin=0, _hlxmax=0, _hlymax=0; \
+	if (_hmc_dl != NULL) { \
+		ng_computeBoundsFromDL_matrix(_hmc_dl, _hmc_max, \
+			1.0, 0.0, 0.0, 1.0, 0.0, 0.0, \
+			&out_has, &_hlxmin, &_hlymin, &_hlxmax, &_hlymax); \
+	} \
+	/* Include drawing bounds */ \
+	if (the_mc != NULL && the_mc->draw_has_bounds) { \
+		double _hdxmin = the_mc->draw_xmin * 20.0, _hdxmax = the_mc->draw_xmax * 20.0; \
+		double _hdymin = the_mc->draw_ymin * 20.0, _hdymax = the_mc->draw_ymax * 20.0; \
+		if (!out_has) { _hlxmin=_hdxmin; _hlxmax=_hdxmax; _hlymin=_hdymin; _hlymax=_hdymax; out_has=1; } \
+		else { if (_hdxmin<_hlxmin) _hlxmin=_hdxmin; if (_hdxmax>_hlxmax) _hlxmax=_hdxmax; \
+			   if (_hdymin<_hlymin) _hlymin=_hdymin; if (_hdymax>_hlymax) _hlymax=_hdymax; } \
+	} \
+	/* Transform through world matrix to global (stage) space */ \
+	/* Uses getConcatMatrixForMC which handles AS-set _x/_y/etc. */ \
+	if (out_has) { \
+		double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0; \
+		getConcatMatrixForMC(the_mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty); \
+		/* getConcatMatrixForMC returns tx/ty in pixels; convert to twips */ \
+		_hwtx *= 20.0; _hwty *= 20.0; \
+		double _hcorners[4][2] = { \
+			{_hlxmin, _hlymin}, {_hlxmax, _hlymin}, {_hlxmin, _hlymax}, {_hlxmax, _hlymax} \
+		}; \
+		for (int _hci = 0; _hci < 4; _hci++) { \
+			double _hpx = _hcorners[_hci][0], _hpy = _hcorners[_hci][1]; \
+			/* Round to integer twips per Ruffle's `Matrix * Point<Twips>` */ \
+			double _hox = round(_hwa*_hpx + _hwc*_hpy + _hwtx); \
+			double _hoy = round(_hwb*_hpx + _hwd*_hpy + _hwty); \
+			if (_hci == 0) { out_xmin=out_xmax=_hox; out_ymin=out_ymax=_hoy; } \
+			else { if (_hox<out_xmin) out_xmin=_hox; if (_hox>out_xmax) out_xmax=_hox; \
+				   if (_hoy<out_ymin) out_ymin=_hoy; if (_hoy>out_ymax) out_ymax=_hoy; } \
+		} \
+	} \
+} while(0)
+
+// s28 w2-hittest-shape-stale: Flash's render-time hitTest bounds cache.
+//
+// FP32 (session28 w1-local-oracles/w1-leads, probe
+// regression/avm1_hittest_shape_stale_matrix): in the frame where `_root._x`,
+// `c._x` or `_root._xscale` changes, `c.hitTest(x, y, true)` first rejects the
+// point against c's world bounds AS OF THE LAST RENDER (stale), then runs the
+// exact shape test with the LIVE matrix; `hitTest(x, y, false)` and
+// localToGlobal read the live matrix. The next frame is consistent again.
+// This one model reproduces all 7 probe phases (A-G) and the 3 FP32-false
+// lines (35/37/39) of avm1/movieclip_hittest_shapeflag; "stale clip matrix"
+// and "stage-global point" each miss phases B/D/F.
+//
+// Snapshot lifetime: a clip gets a snapshot on its first shape query (= the
+// live box at that moment: a clip created / first queried this frame has no
+// older render to be stale against; probe phase A) and joins
+// g_ht_snap_clips; actionRefreshHitTestSnapshots, run at every tick boundary
+// (actionDrainDpropsReleases, i.e. right after the previous tick's render in
+// both modes), recomputes the box of every clip queried in the last
+// HT_SNAP_IDLE_TICKS ticks and drops the rest (bounding the per-tick cost).
+// MovieClip structs are never freed, so the registry's pointers stay valid.
+#define HT_SNAP_IDLE_TICKS 256
+static MovieClip** g_ht_snap_clips = NULL;
+static int g_ht_snap_count = 0;
+static int g_ht_snap_capacity = 0;
+
+static void htSnapCompute(MovieClip* mc)
+{
+	int has = 0;
+	double x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+	COMPUTE_GLOBAL_AABB(mc, has, x0, y0, x1, y1);
+	mc->ht_snap_has = has ? 1 : 2;
+	mc->ht_snap_box[0] = x0; mc->ht_snap_box[1] = y0;
+	mc->ht_snap_box[2] = x1; mc->ht_snap_box[3] = y1;
+}
+
+void actionRefreshHitTestSnapshots(void)
+{
+	extern size_t g_tick_count;
+	int w = 0;
+	for (int i = 0; i < g_ht_snap_count; i++) {
+		MovieClip* mc = g_ht_snap_clips[i];
+		if (g_tick_count - mc->ht_snap_query_tick > HT_SNAP_IDLE_TICKS) {
+			mc->ht_snap_has = 0;
+			mc->ht_snap_registered = 0;
+			continue;
+		}
+		htSnapCompute(mc);
+		g_ht_snap_clips[w++] = mc;
+	}
+	g_ht_snap_count = w;
+}
+
+// The prefilter box for a shape hitTest on `mc` (global twips). Returns 0 when
+// the snapshot holds no bounds (the caller then keeps the live box: a clip that
+// was empty at the last render and drew this frame). First query: caches the
+// live box passed in and registers the clip.
+static int actionHitTestStaleBounds(MovieClip* mc, int live_has,
+	double lx0, double ly0, double lx1, double ly1, double out[4])
+{
+	extern size_t g_tick_count;
+	if (mc == NULL) return 0;
+	mc->ht_snap_query_tick = g_tick_count;
+	if (!mc->ht_snap_registered) {
+		if (g_ht_snap_count >= g_ht_snap_capacity) {
+			int ncap = g_ht_snap_capacity ? g_ht_snap_capacity * 2 : 32;
+			MovieClip** nv = (MovieClip**) realloc(g_ht_snap_clips, (size_t)ncap * sizeof(MovieClip*));
+			if (nv == NULL) return 0;   // OOM: live box (pre-s28 behaviour)
+			g_ht_snap_clips = nv;
+			g_ht_snap_capacity = ncap;
+		}
+		g_ht_snap_clips[g_ht_snap_count++] = mc;
+		mc->ht_snap_registered = 1;
+		mc->ht_snap_has = live_has ? 1 : 2;
+		mc->ht_snap_box[0] = lx0; mc->ht_snap_box[1] = ly0;
+		mc->ht_snap_box[2] = lx1; mc->ht_snap_box[3] = ly1;
+	}
+	if (mc->ht_snap_has != 1) return 0;
+	out[0] = mc->ht_snap_box[0]; out[1] = mc->ht_snap_box[1];
+	out[2] = mc->ht_snap_box[2]; out[3] = mc->ht_snap_box[3];
+	return 1;
+}
+
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
@@ -80971,81 +81143,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
 				GEN_EXTERN_TRANSFORM_DATA;
 
-				// Helper: compute global AABB for a MovieClip (in _root twips space)
-				// This finds the MC's sprite_display_list, computes local bounds,
-				// then transforms by the MC's world matrix.
-				#define COMPUTE_GLOBAL_AABB(the_mc, out_has, out_xmin, out_ymin, out_xmax, out_ymax) do { \
-					out_has = 0; \
-					/* Find MC's sprite_display_list */ \
-					DisplayObject* _hmc_dl = NULL; size_t _hmc_max = 0; \
-					if (the_mc == &root_movieclip) { \
-						_hmc_dl = display_list; _hmc_max = max_depth; \
-					} \
-					else if (the_mc != NULL && the_mc->display_obj != NULL) { \
-						DisplayObject* _hdobj = (DisplayObject*)the_mc->display_obj; \
-						if (_hdobj->sprite_display_list != NULL) { \
-							_hmc_dl = _hdobj->sprite_display_list; _hmc_max = _hdobj->sprite_max_depth; \
-						} \
-					} \
-					if (_hmc_dl == NULL && the_mc != NULL && the_mc->name[0] != '\0') { \
-						MovieClip* _hch[16]; int _hcl = 0; \
-						for (MovieClip* _hcur = the_mc; _hcur && _hcur != &root_movieclip && _hcl < 16; _hcur = _hcur->parent) \
-							_hch[_hcl++] = _hcur; \
-						DisplayObject* _hdl = display_list; size_t _hm = max_depth; \
-						for (int _hi = _hcl - 1; _hi >= 0; _hi--) { \
-							size_t _hfd = SIZE_MAX; \
-							for (size_t _hd = 1; _hd <= _hm; _hd++) { \
-								if (_hdl[_hd].char_id == 0) continue; \
-								if (_hdl[_hd].instance_name && strcmp(_hdl[_hd].instance_name, _hch[_hi]->name) == 0) \
-									{ _hfd = _hd; break; } \
-							} \
-							if (_hfd == SIZE_MAX) break; \
-							if (_hi == 0) { \
-								if (_hdl[_hfd].sprite_display_list) { \
-									_hmc_dl = _hdl[_hfd].sprite_display_list; _hmc_max = _hdl[_hfd].sprite_max_depth; \
-								} \
-							} else { \
-								if (!_hdl[_hfd].sprite_display_list) break; \
-								_hm = _hdl[_hfd].sprite_max_depth; _hdl = _hdl[_hfd].sprite_display_list; \
-							} \
-						} \
-					} \
-					/* Compute local bounds */ \
-					double _hlxmin=0, _hlymin=0, _hlxmax=0, _hlymax=0; \
-					if (_hmc_dl != NULL) { \
-						ng_computeBoundsFromDL_matrix(_hmc_dl, _hmc_max, \
-							1.0, 0.0, 0.0, 1.0, 0.0, 0.0, \
-							&out_has, &_hlxmin, &_hlymin, &_hlxmax, &_hlymax); \
-					} \
-					/* Include drawing bounds */ \
-					if (the_mc != NULL && the_mc->draw_has_bounds) { \
-						double _hdxmin = the_mc->draw_xmin * 20.0, _hdxmax = the_mc->draw_xmax * 20.0; \
-						double _hdymin = the_mc->draw_ymin * 20.0, _hdymax = the_mc->draw_ymax * 20.0; \
-						if (!out_has) { _hlxmin=_hdxmin; _hlxmax=_hdxmax; _hlymin=_hdymin; _hlymax=_hdymax; out_has=1; } \
-						else { if (_hdxmin<_hlxmin) _hlxmin=_hdxmin; if (_hdxmax>_hlxmax) _hlxmax=_hdxmax; \
-							   if (_hdymin<_hlymin) _hlymin=_hdymin; if (_hdymax>_hlymax) _hlymax=_hdymax; } \
-					} \
-					/* Transform through world matrix to global (stage) space */ \
-					/* Uses getConcatMatrixForMC which handles AS-set _x/_y/etc. */ \
-					if (out_has) { \
-						double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0; \
-						getConcatMatrixForMC(the_mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty); \
-						/* getConcatMatrixForMC returns tx/ty in pixels; convert to twips */ \
-						_hwtx *= 20.0; _hwty *= 20.0; \
-						double _hcorners[4][2] = { \
-							{_hlxmin, _hlymin}, {_hlxmax, _hlymin}, {_hlxmin, _hlymax}, {_hlxmax, _hlymax} \
-						}; \
-						for (int _hci = 0; _hci < 4; _hci++) { \
-							double _hpx = _hcorners[_hci][0], _hpy = _hcorners[_hci][1]; \
-							/* Round to integer twips per Ruffle's `Matrix * Point<Twips>` */ \
-							double _hox = round(_hwa*_hpx + _hwc*_hpy + _hwtx); \
-							double _hoy = round(_hwb*_hpx + _hwd*_hpy + _hwty); \
-							if (_hci == 0) { out_xmin=out_xmax=_hox; out_ymin=out_ymax=_hoy; } \
-							else { if (_hox<out_xmin) out_xmin=_hox; if (_hox>out_xmax) out_xmax=_hox; \
-								   if (_hoy<out_ymin) out_ymin=_hoy; if (_hoy>out_ymax) out_ymax=_hoy; } \
-						} \
-					} \
-				} while(0)
 
 				if (num_args >= 2) {
 					// Point hitTest: hitTest(x, y [, shapeFlag])
@@ -81100,6 +81197,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 					// Check bounding box first (fast reject)
 					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
+					// s28 w2-hittest-shape-stale: the SHAPE arity rejects against
+					// the render-time bounds (see actionHitTestStaleBounds); the
+					// bounds arity keeps the live box.
+					if (shape_flag) {
+						double _hsb[4];
+						if (actionHitTestStaleBounds(mc, has_bounds, gxmin, gymin, gxmax, gymax, _hsb))
+							hit = (ptx >= _hsb[0] && ptx <= _hsb[2] && pty >= _hsb[1] && pty <= _hsb[3]);
+					}
 
 					// AVM hitTest skips masks — but ONLY on the SHAPE arity.
 					// Ruffle's `hit_test` (core/src/avm1/globals/movie_clip.rs:246-251)

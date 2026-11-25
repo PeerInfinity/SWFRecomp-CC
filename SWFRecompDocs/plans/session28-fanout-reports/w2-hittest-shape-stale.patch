@@ -1,0 +1,681 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index 2c22ba2d..acf7e626 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -190,6 +190,19 @@ struct MovieClip {
+ 	// s27 w1-exec-order: g_tick_count of this clip's last onEnterFrame
+ 	// dispatch (Flash/Ruffle run exactly one per clip per frame).
+ 	size_t ef_fired_tick;
++	// s28 w2-hittest-shape-stale: Flash's `hitTest(x, y, true)` prefilters the
++	// point against the clip's world bounds as of the LAST RENDER (a cache
++	// that a same-frame _x/_xscale/... change on the clip or any ancestor does
++	// not refresh); the exact shape test then uses the live matrix. Snapshot
++	// (global twips, same space as the live AABB) owned by action.c's
++	// actionHitTestStaleBounds / actionRefreshHitTestSnapshots. ht_snap_has:
++	// 0 = none (first shape query uses + caches the live box), 1 = valid box,
++	// 2 = valid "no bounds". ht_snap_query_tick: g_tick_count of the last
++	// shape query (the refresh drops clips idle for HT_SNAP_IDLE_TICKS).
++	u8 ht_snap_has;
++	u8 ht_snap_registered;
++	size_t ht_snap_query_tick;
++	double ht_snap_box[4];
+ };
+ 
+ // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 5b74145a..6451310e 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -25522,6 +25522,12 @@ void actionDeferDpropsRelease(SWFAppContext* app_context, MovieClip* mc)
+ 
+ void actionDrainDpropsReleases(SWFAppContext* app_context)
+ {
++	// s28 w2-hittest-shape-stale: tick boundary = just after the last render;
++	// refresh the render-time hitTest bounds snapshots here (both modes).
++	{
++		extern void actionRefreshHitTestSnapshots(void);
++		actionRefreshHitTestSnapshots();
++	}
+ 	for (int i = 0; i < g_dprops_release_count; i++)
+ 		releaseObject(app_context, g_dprops_release_queue[i]);
+ 	g_dprops_release_count = 0;
+@@ -74598,6 +74604,172 @@ static int mcArmCaseMiss(const char* name, u32 len)
+ 	return 0;
+ }
+ 
++// s28 w2-hittest-shape-stale: COMPUTE_GLOBAL_AABB moved to file scope (was
++// local to actionCallMethod's hitTest arm, unchanged) so the render-time
++// hitTest bounds snapshot (actionHitTestStaleBounds) can reuse it.
++extern DisplayObject* display_list;
++extern size_t max_depth;
++extern int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
++	double ma, double mb, double mc, double md, double mtx, double mty,
++	int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
++// Helper: compute global AABB for a MovieClip (in _root twips space)
++// This finds the MC's sprite_display_list, computes local bounds,
++// then transforms by the MC's world matrix.
++#define COMPUTE_GLOBAL_AABB(the_mc, out_has, out_xmin, out_ymin, out_xmax, out_ymax) do { \
++	out_has = 0; \
++	/* Find MC's sprite_display_list */ \
++	DisplayObject* _hmc_dl = NULL; size_t _hmc_max = 0; \
++	if (the_mc == &root_movieclip) { \
++		_hmc_dl = display_list; _hmc_max = max_depth; \
++	} \
++	else if (the_mc != NULL && the_mc->display_obj != NULL) { \
++		DisplayObject* _hdobj = (DisplayObject*)the_mc->display_obj; \
++		if (_hdobj->sprite_display_list != NULL) { \
++			_hmc_dl = _hdobj->sprite_display_list; _hmc_max = _hdobj->sprite_max_depth; \
++		} \
++	} \
++	if (_hmc_dl == NULL && the_mc != NULL && the_mc->name[0] != '\0') { \
++		MovieClip* _hch[16]; int _hcl = 0; \
++		for (MovieClip* _hcur = the_mc; _hcur && _hcur != &root_movieclip && _hcl < 16; _hcur = _hcur->parent) \
++			_hch[_hcl++] = _hcur; \
++		DisplayObject* _hdl = display_list; size_t _hm = max_depth; \
++		for (int _hi = _hcl - 1; _hi >= 0; _hi--) { \
++			size_t _hfd = SIZE_MAX; \
++			for (size_t _hd = 1; _hd <= _hm; _hd++) { \
++				if (_hdl[_hd].char_id == 0) continue; \
++				if (_hdl[_hd].instance_name && strcmp(_hdl[_hd].instance_name, _hch[_hi]->name) == 0) \
++					{ _hfd = _hd; break; } \
++			} \
++			if (_hfd == SIZE_MAX) break; \
++			if (_hi == 0) { \
++				if (_hdl[_hfd].sprite_display_list) { \
++					_hmc_dl = _hdl[_hfd].sprite_display_list; _hmc_max = _hdl[_hfd].sprite_max_depth; \
++				} \
++			} else { \
++				if (!_hdl[_hfd].sprite_display_list) break; \
++				_hm = _hdl[_hfd].sprite_max_depth; _hdl = _hdl[_hfd].sprite_display_list; \
++			} \
++		} \
++	} \
++	/* Compute local bounds */ \
++	double _hlxmin=0, _hlymin=0, _hlxmax=0, _hlymax=0; \
++	if (_hmc_dl != NULL) { \
++		ng_computeBoundsFromDL_matrix(_hmc_dl, _hmc_max, \
++			1.0, 0.0, 0.0, 1.0, 0.0, 0.0, \
++			&out_has, &_hlxmin, &_hlymin, &_hlxmax, &_hlymax); \
++	} \
++	/* Include drawing bounds */ \
++	if (the_mc != NULL && the_mc->draw_has_bounds) { \
++		double _hdxmin = the_mc->draw_xmin * 20.0, _hdxmax = the_mc->draw_xmax * 20.0; \
++		double _hdymin = the_mc->draw_ymin * 20.0, _hdymax = the_mc->draw_ymax * 20.0; \
++		if (!out_has) { _hlxmin=_hdxmin; _hlxmax=_hdxmax; _hlymin=_hdymin; _hlymax=_hdymax; out_has=1; } \
++		else { if (_hdxmin<_hlxmin) _hlxmin=_hdxmin; if (_hdxmax>_hlxmax) _hlxmax=_hdxmax; \
++			   if (_hdymin<_hlymin) _hlymin=_hdymin; if (_hdymax>_hlymax) _hlymax=_hdymax; } \
++	} \
++	/* Transform through world matrix to global (stage) space */ \
++	/* Uses getConcatMatrixForMC which handles AS-set _x/_y/etc. */ \
++	if (out_has) { \
++		double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0; \
++		getConcatMatrixForMC(the_mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty); \
++		/* getConcatMatrixForMC returns tx/ty in pixels; convert to twips */ \
++		_hwtx *= 20.0; _hwty *= 20.0; \
++		double _hcorners[4][2] = { \
++			{_hlxmin, _hlymin}, {_hlxmax, _hlymin}, {_hlxmin, _hlymax}, {_hlxmax, _hlymax} \
++		}; \
++		for (int _hci = 0; _hci < 4; _hci++) { \
++			double _hpx = _hcorners[_hci][0], _hpy = _hcorners[_hci][1]; \
++			/* Round to integer twips per Ruffle's `Matrix * Point<Twips>` */ \
++			double _hox = round(_hwa*_hpx + _hwc*_hpy + _hwtx); \
++			double _hoy = round(_hwb*_hpx + _hwd*_hpy + _hwty); \
++			if (_hci == 0) { out_xmin=out_xmax=_hox; out_ymin=out_ymax=_hoy; } \
++			else { if (_hox<out_xmin) out_xmin=_hox; if (_hox>out_xmax) out_xmax=_hox; \
++				   if (_hoy<out_ymin) out_ymin=_hoy; if (_hoy>out_ymax) out_ymax=_hoy; } \
++		} \
++	} \
++} while(0)
++
++// s28 w2-hittest-shape-stale: Flash's render-time hitTest bounds cache.
++//
++// FP32 (session28 w1-local-oracles/w1-leads, probe
++// regression/avm1_hittest_shape_stale_matrix): in the frame where `_root._x`,
++// `c._x` or `_root._xscale` changes, `c.hitTest(x, y, true)` first rejects the
++// point against c's world bounds AS OF THE LAST RENDER (stale), then runs the
++// exact shape test with the LIVE matrix; `hitTest(x, y, false)` and
++// localToGlobal read the live matrix. The next frame is consistent again.
++// This one model reproduces all 7 probe phases (A-G) and the 3 FP32-false
++// lines (35/37/39) of avm1/movieclip_hittest_shapeflag; "stale clip matrix"
++// and "stage-global point" each miss phases B/D/F.
++//
++// Snapshot lifetime: a clip gets a snapshot on its first shape query (= the
++// live box at that moment: a clip created / first queried this frame has no
++// older render to be stale against; probe phase A) and joins
++// g_ht_snap_clips; actionRefreshHitTestSnapshots, run at every tick boundary
++// (actionDrainDpropsReleases, i.e. right after the previous tick's render in
++// both modes), recomputes the box of every clip queried in the last
++// HT_SNAP_IDLE_TICKS ticks and drops the rest (bounding the per-tick cost).
++// MovieClip structs are never freed, so the registry's pointers stay valid.
++#define HT_SNAP_IDLE_TICKS 256
++static MovieClip** g_ht_snap_clips = NULL;
++static int g_ht_snap_count = 0;
++static int g_ht_snap_capacity = 0;
++
++static void htSnapCompute(MovieClip* mc)
++{
++	int has = 0;
++	double x0 = 0, y0 = 0, x1 = 0, y1 = 0;
++	COMPUTE_GLOBAL_AABB(mc, has, x0, y0, x1, y1);
++	mc->ht_snap_has = has ? 1 : 2;
++	mc->ht_snap_box[0] = x0; mc->ht_snap_box[1] = y0;
++	mc->ht_snap_box[2] = x1; mc->ht_snap_box[3] = y1;
++}
++
++void actionRefreshHitTestSnapshots(void)
++{
++	extern size_t g_tick_count;
++	int w = 0;
++	for (int i = 0; i < g_ht_snap_count; i++) {
++		MovieClip* mc = g_ht_snap_clips[i];
++		if (g_tick_count - mc->ht_snap_query_tick > HT_SNAP_IDLE_TICKS) {
++			mc->ht_snap_has = 0;
++			mc->ht_snap_registered = 0;
++			continue;
++		}
++		htSnapCompute(mc);
++		g_ht_snap_clips[w++] = mc;
++	}
++	g_ht_snap_count = w;
++}
++
++// The prefilter box for a shape hitTest on `mc` (global twips). Returns 0 when
++// the snapshot holds no bounds (the caller then keeps the live box: a clip that
++// was empty at the last render and drew this frame). First query: caches the
++// live box passed in and registers the clip.
++static int actionHitTestStaleBounds(MovieClip* mc, int live_has,
++	double lx0, double ly0, double lx1, double ly1, double out[4])
++{
++	extern size_t g_tick_count;
++	if (mc == NULL) return 0;
++	mc->ht_snap_query_tick = g_tick_count;
++	if (!mc->ht_snap_registered) {
++		if (g_ht_snap_count >= g_ht_snap_capacity) {
++			int ncap = g_ht_snap_capacity ? g_ht_snap_capacity * 2 : 32;
++			MovieClip** nv = (MovieClip**) realloc(g_ht_snap_clips, (size_t)ncap * sizeof(MovieClip*));
++			if (nv == NULL) return 0;   // OOM: live box (pre-s28 behaviour)
++			g_ht_snap_clips = nv;
++			g_ht_snap_capacity = ncap;
++		}
++		g_ht_snap_clips[g_ht_snap_count++] = mc;
++		mc->ht_snap_registered = 1;
++		mc->ht_snap_has = live_has ? 1 : 2;
++		mc->ht_snap_box[0] = lx0; mc->ht_snap_box[1] = ly0;
++		mc->ht_snap_box[2] = lx1; mc->ht_snap_box[3] = ly1;
++	}
++	if (mc->ht_snap_has != 1) return 0;
++	out[0] = mc->ht_snap_box[0]; out[1] = mc->ht_snap_box[1];
++	out[2] = mc->ht_snap_box[2]; out[3] = mc->ht_snap_box[3];
++	return 1;
++}
++
+ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ {
+ 	if (g_execution_halted) return;
+@@ -80447,81 +80619,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
+ 				GEN_EXTERN_TRANSFORM_DATA;
+ 
+-				// Helper: compute global AABB for a MovieClip (in _root twips space)
+-				// This finds the MC's sprite_display_list, computes local bounds,
+-				// then transforms by the MC's world matrix.
+-				#define COMPUTE_GLOBAL_AABB(the_mc, out_has, out_xmin, out_ymin, out_xmax, out_ymax) do { \
+-					out_has = 0; \
+-					/* Find MC's sprite_display_list */ \
+-					DisplayObject* _hmc_dl = NULL; size_t _hmc_max = 0; \
+-					if (the_mc == &root_movieclip) { \
+-						_hmc_dl = display_list; _hmc_max = max_depth; \
+-					} \
+-					else if (the_mc != NULL && the_mc->display_obj != NULL) { \
+-						DisplayObject* _hdobj = (DisplayObject*)the_mc->display_obj; \
+-						if (_hdobj->sprite_display_list != NULL) { \
+-							_hmc_dl = _hdobj->sprite_display_list; _hmc_max = _hdobj->sprite_max_depth; \
+-						} \
+-					} \
+-					if (_hmc_dl == NULL && the_mc != NULL && the_mc->name[0] != '\0') { \
+-						MovieClip* _hch[16]; int _hcl = 0; \
+-						for (MovieClip* _hcur = the_mc; _hcur && _hcur != &root_movieclip && _hcl < 16; _hcur = _hcur->parent) \
+-							_hch[_hcl++] = _hcur; \
+-						DisplayObject* _hdl = display_list; size_t _hm = max_depth; \
+-						for (int _hi = _hcl - 1; _hi >= 0; _hi--) { \
+-							size_t _hfd = SIZE_MAX; \
+-							for (size_t _hd = 1; _hd <= _hm; _hd++) { \
+-								if (_hdl[_hd].char_id == 0) continue; \
+-								if (_hdl[_hd].instance_name && strcmp(_hdl[_hd].instance_name, _hch[_hi]->name) == 0) \
+-									{ _hfd = _hd; break; } \
+-							} \
+-							if (_hfd == SIZE_MAX) break; \
+-							if (_hi == 0) { \
+-								if (_hdl[_hfd].sprite_display_list) { \
+-									_hmc_dl = _hdl[_hfd].sprite_display_list; _hmc_max = _hdl[_hfd].sprite_max_depth; \
+-								} \
+-							} else { \
+-								if (!_hdl[_hfd].sprite_display_list) break; \
+-								_hm = _hdl[_hfd].sprite_max_depth; _hdl = _hdl[_hfd].sprite_display_list; \
+-							} \
+-						} \
+-					} \
+-					/* Compute local bounds */ \
+-					double _hlxmin=0, _hlymin=0, _hlxmax=0, _hlymax=0; \
+-					if (_hmc_dl != NULL) { \
+-						ng_computeBoundsFromDL_matrix(_hmc_dl, _hmc_max, \
+-							1.0, 0.0, 0.0, 1.0, 0.0, 0.0, \
+-							&out_has, &_hlxmin, &_hlymin, &_hlxmax, &_hlymax); \
+-					} \
+-					/* Include drawing bounds */ \
+-					if (the_mc != NULL && the_mc->draw_has_bounds) { \
+-						double _hdxmin = the_mc->draw_xmin * 20.0, _hdxmax = the_mc->draw_xmax * 20.0; \
+-						double _hdymin = the_mc->draw_ymin * 20.0, _hdymax = the_mc->draw_ymax * 20.0; \
+-						if (!out_has) { _hlxmin=_hdxmin; _hlxmax=_hdxmax; _hlymin=_hdymin; _hlymax=_hdymax; out_has=1; } \
+-						else { if (_hdxmin<_hlxmin) _hlxmin=_hdxmin; if (_hdxmax>_hlxmax) _hlxmax=_hdxmax; \
+-							   if (_hdymin<_hlymin) _hlymin=_hdymin; if (_hdymax>_hlymax) _hlymax=_hdymax; } \
+-					} \
+-					/* Transform through world matrix to global (stage) space */ \
+-					/* Uses getConcatMatrixForMC which handles AS-set _x/_y/etc. */ \
+-					if (out_has) { \
+-						double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0; \
+-						getConcatMatrixForMC(the_mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty); \
+-						/* getConcatMatrixForMC returns tx/ty in pixels; convert to twips */ \
+-						_hwtx *= 20.0; _hwty *= 20.0; \
+-						double _hcorners[4][2] = { \
+-							{_hlxmin, _hlymin}, {_hlxmax, _hlymin}, {_hlxmin, _hlymax}, {_hlxmax, _hlymax} \
+-						}; \
+-						for (int _hci = 0; _hci < 4; _hci++) { \
+-							double _hpx = _hcorners[_hci][0], _hpy = _hcorners[_hci][1]; \
+-							/* Round to integer twips per Ruffle's `Matrix * Point<Twips>` */ \
+-							double _hox = round(_hwa*_hpx + _hwc*_hpy + _hwtx); \
+-							double _hoy = round(_hwb*_hpx + _hwd*_hpy + _hwty); \
+-							if (_hci == 0) { out_xmin=out_xmax=_hox; out_ymin=out_ymax=_hoy; } \
+-							else { if (_hox<out_xmin) out_xmin=_hox; if (_hox>out_xmax) out_xmax=_hox; \
+-								   if (_hoy<out_ymin) out_ymin=_hoy; if (_hoy>out_ymax) out_ymax=_hoy; } \
+-						} \
+-					} \
+-				} while(0)
+ 
+ 				if (num_args >= 2) {
+ 					// Point hitTest: hitTest(x, y [, shapeFlag])
+@@ -80576,6 +80673,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 
+ 					// Check bounding box first (fast reject)
+ 					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
++					// s28 w2-hittest-shape-stale: the SHAPE arity rejects against
++					// the render-time bounds (see actionHitTestStaleBounds); the
++					// bounds arity keeps the live box.
++					if (shape_flag) {
++						double _hsb[4];
++						if (actionHitTestStaleBounds(mc, has_bounds, gxmin, gymin, gxmax, gymax, _hsb))
++							hit = (ptx >= _hsb[0] && ptx <= _hsb[2] && pty >= _hsb[1] && pty <= _hsb[3]);
++					}
+ 
+ 					// AVM hitTest skips masks — but ONLY on the SHAPE arity.
+ 					// Ruffle's `hit_test` (core/src/avm1/globals/movie_clip.rs:246-251)
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+index 9b9896d0..aba525b3 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+@@ -458,7 +458,12 @@ differences in font glyph outlines, morph boundary precision, and Drawing API
+ stroke tessellation accuracy. 332/338 lines pass; the remaining **6** (lines 71,
+ 171–177 and 296; was 9 — corrected s26 `w1-trace-tail-audit` §5, first flagged s24
+ `w1-avm1-tail` lead 3) are at exact geometric boundaries where our implementation
+-disagrees with Ruffle's.
++disagrees with Ruffle's golden AND with real Flash: the s28 FP32 capture
++(`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/movieclip_hittest_shapeflag.pinned.txt`)
++prints the golden's value on all 6 lines, so they are our own inaccuracy, not a
++Ruffle-vs-Flash question. (FP32 differs from the Ruffle golden only on lines
++35/37/39, the same-frame stale-bounds quirk; see the s28 `w2-hittest-shape-stale`
++RvF entry and flash_fixes.)
+ 
+ ### `movieclip_hittest_shapeflag` — Noto Sans vs Flash device font glyph outlines (5 diff lines; was 7)
+ 
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 104a6e52..bc46e999 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -178,3 +178,4 @@ arms cannot be reached any other way.
+ | `avm1_bitmap_nearest_tie_stage` | **On-stage (GPU) nearest-sampling tie rule of a non-smoothed bitmap fill: ties take the UPPER texel** (s27 `w2b-jpeg-refine`, `render_webgpu.c` `bitmap_nearest_clamp` / `bitmap_nearest_repeat`). SWF8, 8x8 lossless bitmap with unique texels, 0x43 fill at scale exactly 1.5, so every third pixel centre is a tie (80 px separate ties-up from ties-down). Golden = **Flash Player 32** `draw()` capture (equals the ties-up prediction at 0 px). Before: lavapipe's Nearest sampler resolved the ties neither way (52 px, max 32) |
+ | `avm1_edittext_tabstops_metric` | **TextField.textWidth with TABs uses Flash's default stops, and the painter honours explicit `TextFormat.tabStops`** (s27 `n-levels-5plus`; `ng_shared.c ng_next_tab_stop` / `ng_set_tab_font`, `tag.c tf_tab_stop` / `TF_TAB_REF`). Default stops: multiples of 2·(⌊asc⌋+⌊desc⌋) from the field edge (gutter + leftMargin + indent); explicit stops from the text origin, no advance past the last. Golden = **Flash Player 32** trace + image (Ruffle's 2.7·size stops are NOT a golden) |
+ | `avm1_edittext_border_subpixel` | **An unscaled bordered EditText at a fractional-pixel position draws its box on whole pixels** (s27 `n-levels-5plus`; `tag.c textfield_render_cb` unit-scale snap, `trunc((t + 2 twips) / 1 px)`). Golden = **Flash Player 32** image (Ruffle straddles two rows at half coverage) |
++| `avm1_hittest_shape_stale_matrix` | **`hitTest(x, y, true)` rejects against the clip's world bounds as of the LAST RENDER; the exact shape test and `hitTest(x, y, false)` / `localToGlobal` use the live matrix** (s28 `w2-hittest-shape-stale`; `action.c` `actionHitTestStaleBounds` / `actionRefreshHitTestSnapshots`). A 100x100 Drawing-API square `c` at (100,100); phases A identity, B same frame after `_root._x = 100`, C next frame, D same frame after `_root._x = 0`, E next frame, F same frame after `c._x = 200`, G same frame after `_root._xscale = 50`; each traces `hitTest(150/250/50, 150, true/false)` and `c.localToGlobal(0,0)`. Before the fix B/D/F's shape column read the live (Ruffle) answer (`hit(150,150) shape=true` in B). Hand-assembled SWF 8 (`create_test_swf.py` + its own `avm1asm.py`, the s28 w1-leads probe, regenerates byte-identically). **Expected output is real Flash Player 32** (LNX debug projector, direct, pinned == no-pin; `session28-fanout-reports/w1-local-oracles/w1-leads/`). Ruffle reads the live matrix (RvF) |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/create_test_swf.py
+new file mode 100644
+index 00000000..af483ae1
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/create_test_swf.py
+@@ -0,0 +1,76 @@
++#!/usr/bin/env python3
++"""avm1_hittest_root_stale_matrix: which coordinate model does Flash's
++MovieClip.hitTest(x, y, shapeFlag) use right after _root's own transform
++changes in the SAME frame (before any render)?
++
++s28 w1-leads item 1. avm1/movieclip_hittest_shapeflag's block "donut, root
++transformed" sets _root._x = 400, _root._xscale = 50 and hit-tests at once;
++pinned FP32 prints false on 3 of the 4 ring points where Ruffle's golden says
++true. Three candidate models, each with a distinct truth table at phase B:
++  ruffle (point is root-local, mapped through _root's NEW matrix; clip's
++          world matrix fresh):          150:true  250:false 50:false
++  stale  (point mapped through _root's NEW matrix, clip's world matrix still
++          the pre-change one):          150:false 250:false 50:true
++  stage  (point is stage-global):       150:false 250:true  50:false
++Clip c = 100x100 red square drawn at (0,0), placed at (100,100) in _root.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++
++
++def setp(path, prop, val):
++    return get(path) + push(prop, val) + SETMEM
++
++
++def ht(x, y, shape):
++    return callm('c', 'hitTest', x, y, shape, keep=True)
++
++
++def phase(p):
++    code = b''
++    for x in (150, 250, 50):
++        code += T(p + ' hit(' + str(x) + ',150) shape=', ht(x, 150, True), ' bounds=', ht(x, 150, False))
++    # localToGlobal of c's origin (does it see the same matrix?)
++    code += push('o', 0, 'Object') + NEWOBJ + DEFLOCAL
++    code += setp('o', 'x', 0) + setp('o', 'y', 0)
++    code += push('o') + GETVAR + push(1) + get('c') + push('localToGlobal') + CALLM + POP
++    code += T(p + ' c.localToGlobal(0,0)=', get('o.x'), ',', get('o.y'))
++    return code
++
++
++f1 = (
++    callm('this', 'createEmptyMovieClip', 'c', 1)
++    + callm('c', 'beginFill', 0xFF0000, 100)
++    + callm('c', 'moveTo', 0, 0)
++    + callm('c', 'lineTo', 100, 0)
++    + callm('c', 'lineTo', 100, 100)
++    + callm('c', 'lineTo', 0, 100)
++    + callm('c', 'lineTo', 0, 0)
++    + callm('c', 'endFill')
++    + setp('c', '_x', 100) + setp('c', '_y', 100)
++    + phase('A identity:')
++    + setp('_root', '_x', 100)
++    + phase('B same-frame _root._x=100:')
++)
++f2 = (
++    phase('C next-frame _root._x=100:')
++    + setp('_root', '_x', 0)
++    + phase('D same-frame _root._x=0:')
++)
++f3 = (
++    phase('E next-frame identity:')
++    + setp('c', '_x', 200)
++    + phase('F same-frame c._x=200:')
++    + setp('_root', '_xscale', 50)
++    + phase('G same-frame _root._xscale=50:')
++    + setp('_root', '_xscale', 100)
++    + STOP
++)
++open(sys.argv[1], 'wb').write(swf(8, b'', [doaction(f) for f in (f1, f2, f3)], w=640, h=520))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/output.txt b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/output.txt
+new file mode 100644
+index 00000000..61c95d31
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/output.txt
+@@ -0,0 +1,28 @@
++A identity: hit(150,150) shape=true bounds=true
++A identity: hit(250,150) shape=false bounds=false
++A identity: hit(50,150) shape=false bounds=false
++A identity: c.localToGlobal(0,0)=100,100
++B same-frame _root._x=100: hit(150,150) shape=false bounds=true
++B same-frame _root._x=100: hit(250,150) shape=false bounds=false
++B same-frame _root._x=100: hit(50,150) shape=false bounds=false
++B same-frame _root._x=100: c.localToGlobal(0,0)=200,100
++C next-frame _root._x=100: hit(150,150) shape=true bounds=true
++C next-frame _root._x=100: hit(250,150) shape=false bounds=false
++C next-frame _root._x=100: hit(50,150) shape=false bounds=false
++C next-frame _root._x=100: c.localToGlobal(0,0)=200,100
++D same-frame _root._x=0: hit(150,150) shape=false bounds=true
++D same-frame _root._x=0: hit(250,150) shape=false bounds=false
++D same-frame _root._x=0: hit(50,150) shape=false bounds=false
++D same-frame _root._x=0: c.localToGlobal(0,0)=100,100
++E next-frame identity: hit(150,150) shape=true bounds=true
++E next-frame identity: hit(250,150) shape=false bounds=false
++E next-frame identity: hit(50,150) shape=false bounds=false
++E next-frame identity: c.localToGlobal(0,0)=100,100
++F same-frame c._x=200: hit(150,150) shape=false bounds=false
++F same-frame c._x=200: hit(250,150) shape=false bounds=true
++F same-frame c._x=200: hit(50,150) shape=false bounds=false
++F same-frame c._x=200: c.localToGlobal(0,0)=200,100
++G same-frame _root._xscale=50: hit(150,150) shape=false bounds=false
++G same-frame _root._xscale=50: hit(250,150) shape=true bounds=true
++G same-frame _root._xscale=50: hit(50,150) shape=false bounds=false
++G same-frame _root._xscale=50: c.localToGlobal(0,0)=100,100
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/test.swf b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad12d8928307fc296194366184229ea32bb17816
+GIT binary patch
+literal 5049
+zcmds*+iu!G5QhH*5z~WuP^$JOs$5k<i9)DDnqE{zp(TN<mMTT+CE~Ctu8bF9H!?4>
+z@6tEuoAe!eLuZXG8x`9qR^`Y@7#Pj&{yX#S>@KaZUrIlB0S7w`;K^s;c>(8-L9gca
+zVzD?YOm+ZKg0dxTLx>`jZTcq2Y>#ydd*UhCXRL3ti^<fUf8^IXYa03#m(RpqC?j%K
+zfJM-<Ap6-9_kaQWrkgF@Fg#y51o=|${wSVr37GI}*5zSG+4CAlLpK9Qcl3=NBZgk-
+zQTjw_3>-<n+nJ~T4#3QjKhwb2bCv<>h>&gW+g<?gRei)vTes(L)v<2xAD?O!dLO9P
+zxIblei2EpRDMD(J4;c>X38C(&RhL;dF58q1s004P99ea=Wy@uw<d$WzMoKMO%AXrc
+zNo-jb>c3HmR#LmMlEju}@d)6{Jfk!C&W1J`?_}gT(M`lsZfSJ5x%Etx+7%OJK&~r4
+zT@L|+5Bo-!w+%k%yUXI`>U4+I6_0(bq8$(h-l+89;8R=vtWb&r>zu4*L4)^ZoZF<2
+zhz#J<fDfwGpRl8=89i0ksoHbu$C{Qccgf1K!thmM%<@bnt&SLC(m;v^&I*S`S`?J~
+zrfM?BzKv8SD9ez_1Z6p=GG_K^s9aMzmxa6voUbjN85hnZU0DHoln}2x<4FZAl9e=Y
+zx+U{BZSJB1T!c&J?KnKftICSR!`N8mnM0}#5tO8%&_Bd_C(B>%(U(%+3YW*BJXO}R
+zK2^r6$`HtySmhkZh?%DXGIZT}Ag?<XU9A`td9&+?*FZZ=rhn&go$99<Z{M4#%Zk*K
+YjbfK)V&5c2;D3-S|H$enwA}-L0Te<$`v3p{
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/test.toml b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/test.toml
+new file mode 100644
+index 00000000..c64cb4c7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_hittest_shape_stale_matrix/test.toml
+@@ -0,0 +1 @@
++num_frames = 3
