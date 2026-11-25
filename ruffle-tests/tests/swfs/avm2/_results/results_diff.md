@@ -1,23 +1,31 @@
 # Ruffle Test Results Diff
 
-**Previous:** `78fee9e13f85` (2026-11-24T16:56:52.985965+00:00)
-**Current:** `8f4f6e395305` (2026-11-25T03:59:19.164818+00:00)
+**Previous:** `8f4f6e395305` (2026-11-25T03:59:19.164818+00:00)
+**Current:** `10a5b515a03a` (2026-11-25T21:10:43.751034+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1288 | 1292 | +4 |
+| Passing | 1292 | 1298 | +6 |
 | Total | 1346 | 1346 | 0 |
-| Pass rate | 95.7% | 96.0% | +0.3% |
-| Mismatched lines | 2467 | 2423 | -44 |
-|   Decreased | | | -44 |
+| Pass rate | 96.0% | 96.4% | +0.4% |
+| Mismatched lines | 2423 | 2231 | -192 |
+|   Decreased | | | -192 |
 
-## Newly Passing (4)
+## Newly Passing (6)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `goto_framescript_queued/swf13` | ruffle_matched | 56/59 | 59/59 |
-| `goto_framescript_queued_next_prev` | ruffle_matched | 7/20 | 20/20 |
-| `goto_isplaying` | ruffle_matched | 20/28 | 28/28 |
-| `goto_scene_isplaying` | ruffle_matched | 4/24 | 24/24 |
+| `array_access_oob_interpreter` | ruffle_matched | 0/1 | 1/1 |
+| `edittext_getcharboundaries_missing_embedded_font` | ruffle_matched | 4/7 | 7/7 |
+| `encode_uri_surrogate_pair_swf10` | ruffle_matched | 0/15 | 15/15 |
+| `graphics_draw_path` | ruffle_matched | 51/101 | 101/101 |
+| `groupelement_text` | ruffle_matched | 154/156 | 156/156 |
+| `vector_indexing_cutoffs` | ruffle_matched | 17/18 | 18/18 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `edittext_getcharboundaries_culling` | ruffle_matched | 5/305 | 125/305 | -120 |

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-24T16:56:53.060041+00:00",
-    "old_git_sha": "78fee9e13f853501e2dc637877cddb20254a603f",
-    "new_timestamp": "2026-11-25T03:59:19.239827+00:00",
-    "new_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "old_timestamp": "2026-11-25T03:59:19.239827+00:00",
+    "old_git_sha": "8f4f6e3953050d2e20bc6d6624f83eee47fcaf37",
+    "new_timestamp": "2026-11-25T21:10:43.799060+00:00",
+    "new_git_sha": "10a5b515a03a386400e27a68adeddb628a47bc82",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,54 @@
     "old_effective_pass": 7,
     "old_total": 7,
     "old_pass_rate": 71.4,
-    "new_pass": 5,
-    "new_ruffle_matched": 2,
+    "new_pass": 7,
+    "new_ruffle_matched": 0,
     "new_effective_pass": 7,
     "new_total": 7,
-    "new_pass_rate": 71.4,
+    "new_pass_rate": 100.0,
     "old_mismatched_lines": 16,
-    "new_mismatched_lines": 16,
+    "new_mismatched_lines": 0,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 16,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 7,
+    "status_changed": 2,
+    "unchanged": 5,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "lzma_length_too_long",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 77,
+        "expected_lines": 19,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      }
+    },
+    {
+      "test": "swf_length_too_long",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 12
+      },
+      "new_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      }
+    }
+  ]
 }
