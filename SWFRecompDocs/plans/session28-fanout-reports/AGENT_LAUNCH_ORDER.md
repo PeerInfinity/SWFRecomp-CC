@@ -38,7 +38,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w2-occupied-depth | w1-render-flash-headroom + Flash captures | trace `place_object_test` rm→pass, `place_object_test2` rm→pass; flash_fixes `placeobject_occupied_depth` (warning lines) | session_018CoDi3xRoN7CviWpsxgTey — launched |
 | w2-lowq-sample-point | w1-avm2-vector-flash + Flash lowq probe | Flash-ward vector rows; 0 Flash-golden losses required | session_018CoDi6jKqMzjzZrf6c2R4Y — launched |
 | w2-avm1-leads-land | w1-leads + Flash | 4–5 regression fixtures (Flash goldens) | session_018CoDi4VAVkGy2CQUkCbfQU — launched |
-| w2-hittest-shape-stale | w1-leads + Flash probe | fixture; shapeflag flash_fix (0 flips) | session_018CoDi7pH2PXPvBaoSjSrcd — launched |
+| w2-hittest-shape-stale | w1-leads + Flash probe | fixture; shapeflag flash_fix (0 flips) | session_018CoDi7pH2PXPvBaoSjSrcd — DELIVERED, LANDED `2c639b2a0` (stale last-render bounds reject; +2 gnash HitTest-v6/v7 rm→pass expected; fixture FP32) |
 | w2-text-edit-land | w1-text-edit-tail + Flash | 3 regression fixtures (Flash goldens); RvF selection tint | session_018CoDi3oPLgPKaaLnZ4fAEX — launched |
 | w2-glyph-quarter-snap | w1-text-glyph-aa + Flash captures | wordwrap golden → Flash; rotated_borders fixture; priced RvF losses | session_018CoDi7ye6JuqkAj3DtMYv6 — DELIVERED, LANDED (glyph ¼-px snap embedded+AA only; border pen 1+tan/2; +2 rows, 2 goldens → Flash; 0 corpus moves) |
 | w1b-rm-avm2 | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4K1YrfUyotfKco1y4 — DELIVERED; prototype LANDED `558c5a8cf` (+18 rm→pass measured); sort64/32bit swap declined (platform split); Date TZ rows refuted as gaps; bucket J → w2b-avm2-d2a |
