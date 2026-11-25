@@ -1,0 +1,42 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 783789d9..6094820f 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -27932,6 +27932,9 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
+                                      double frame_duration_ms)
+ {
+ 	if (!g_avm1_under_avm2_ready) return;
++	// Tick start: the previous tick's next-tick loadClips become due in THIS
++	// tick's MCL drain below (the AVM1 loops do this in their tick prologue).
++	{ extern void actionPromotePendingMCLLoadsUnderAvm2(void); actionPromotePendingMCLLoadsUnderAvm2(); }
+ 	MovieClip* saved_ctx = g_current_context;
+ 	for (int i = 0; i < g_avm1u2_count; i++) {
+ 		Avm1UnderAvm2Child* c = &g_avm1u2[i];
+@@ -42774,11 +42777,27 @@ void actionCancelPendingLoadsFor(MovieClip* mc)
+         if (g_pending_mcl_loads_next_tick[i].target == mc) g_pending_mcl_loads_next_tick[i].cancelled = 1;
+     actionCancelPendingDirectLoadsFor(mc);
+ }
++static void mclPromoteNextTickBucket(void);
+ void actionPromotePendingMCLLoads(SWFAppContext* app_context)
+ {
+     { extern int g_level_advance_ran_this_tick; g_level_advance_ran_this_tick = 0; }
+     { extern void actionStampCarriedDirectLoads(void); actionStampCarriedDirectLoads(); }
+     (void)app_context;
++    mclPromoteNextTickBucket();
++}
++// s28 w3-mouse-pick-avm1-root: the AVM1-under-AVM2 tick
++// (actionTickAvm1ChildrenUnderAvm2) never runs either AVM1 frame loop, so
++// nothing promoted g_pending_mcl_loads_next_tick there: once C' sent every
++// frame-script loadClip to the next-tick bucket, an AVM1 child's loadClip
++// under an AVM2 Loader never fired (avm2/mouse_pick_avm1_root). That tick
++// calls this bucket move alone, at its top; the direct-load epoch stamp and
++// the advance-ran flag belong to the AVM1-root loops and stay out of it.
++void actionPromotePendingMCLLoadsUnderAvm2(void)
++{
++    mclPromoteNextTickBucket();
++}
++static void mclPromoteNextTickBucket(void)
++{
+     int n = g_pending_mcl_load_count_next_tick;
+     if (n == 0) return;
+     while ((size_t)(g_pending_mcl_load_count_this_tick + n) > g_pending_mcl_loads_this_tick_cap)
