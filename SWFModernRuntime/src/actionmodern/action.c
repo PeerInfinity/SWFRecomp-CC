@@ -7901,6 +7901,42 @@ static ActionVar newBroadcastMessageFunc(SWFAppContext* app_context)
 	return v;
 }
 
+// FP32 (avm1/asnative_sweep, Linux FP32 == golden): ASnative(major, minor)
+// is a function for EVERY minor of an existing major table, even one that
+// names no native (the sweep probes minor 9999). These are the 73 majors FP32
+// reports. Minors we do not implement get one shared no-op native, so
+// `typeof` and `!== undefined` match; calling it returns undefined.
+static int asnativeFlashMajorExists(u32 major)
+{
+	static const u16 majors[] = {1,2,3,4,5,9,11,12,13,14,15,100,101,102,103,104,105,106,107,
+		110,111,112,113,200,250,251,252,253,300,301,400,500,600,666,667,700,800,900,901,
+		1021,1066,1067,1100,1101,1102,1103,1105,1106,1107,1108,1109,1110,1111,1112,1999,
+		2100,2101,2102,2104,2106,2107,2108,2150,2151,2198,2200,2201,2204,2205,2401,2700,
+		2800,2900};
+	for (size_t i = 0; i < sizeof(majors) / sizeof(majors[0]); i++)
+		if (majors[i] == major) return 1;
+	return 0;
+}
+static ActionVar asnativeUnknownMinor(u32 major)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (!asnativeFlashMajorExists(major)) return undef;
+	static ASFunction g_asnative_dead;
+	static int g_asnative_dead_init = 0;
+	if (!g_asnative_dead_init) {
+		memset(&g_asnative_dead, 0, sizeof(ASFunction));
+		strncpy(g_asnative_dead.name, "ASnative", 255);
+		g_asnative_dead.function_type = 2;
+		g_asnative_dead.advanced_func = (Function2Ptr)builtin_noop_func;
+		g_asnative_dead_init = 1;
+	}
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_FUNCTION;
+	VAL(u64, &r.data.numeric_value) = (u64)&g_asnative_dead;
+	return r;
+}
+
 static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
@@ -7927,7 +7963,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 			VAL(u64, &result.data.numeric_value) = (u64)&g_asnative_2_asnew;
 			return result;
 		}
-		return undef;
+		return asnativeUnknownMinor(class_id);
 	}
 
 	// Class 1: Function-class natives. The Gnash Function.as test (lines
@@ -7944,7 +7980,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 	// so `hasOwnProperty('__proto__'/'constructor')` reads false.
 	if (class_id == 1) {
 		ASFunction* fn = (ASFunction*)calloc(1, sizeof(ASFunction));
-		if (fn == NULL) return undef;
+		if (fn == NULL) return asnativeUnknownMinor(class_id);
 		actionGcLinkFunction(fn);
 		fn->function_type = 2;
 		fn->advanced_func = (Function2Ptr)builtin_noop_func;
@@ -8008,7 +8044,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 				return result;
 			}
 		}
-		return undef;
+		return asnativeUnknownMinor(class_id);
 	}
 
 	if (class_id == 100) {
@@ -8019,7 +8055,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 			VAL(u64, &result.data.numeric_value) = (u64)&g_asnative_100_funcs[method_index];
 			return result;
 		}
-		return undef;
+		return asnativeUnknownMinor(class_id);
 	}
 
 	// Class 103: Date — getters/setters, constructor, and UTC. Index mapping in date.c.
@@ -8034,7 +8070,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 			VAL(u64, &result.data.numeric_value) = (u64)fn;
 			return result;
 		}
-		return undef;
+		return asnativeUnknownMinor(class_id);
 	}
 
 	if (class_id == 200) {
@@ -8141,7 +8177,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 				return result;
 			}
 		}
-		return undef;
+		return asnativeUnknownMinor(class_id);
 	}
 
 	// Class 1109: ConvolutionFilter — 9 properties × (getter, setter) at minor=1
@@ -8153,10 +8189,10 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 			VAL(u64, &result.data.numeric_value) = (u64)&g_conv_filter_natives[method_index];
 			return result;
 		}
-		return undef;
+		return asnativeUnknownMinor(class_id);
 	}
 
-	return undef;
+	return asnativeUnknownMinor(class_id);
 }
 
 // ASSetNative(target, major, props, minor=0)
@@ -9515,8 +9551,17 @@ static int virtualAccessorBlocked(ASProperty* prop, void* this_obj, u8 is_setter
 {
 	int watch_nesting = watch_firing_depth_recv(this_obj, prop->name, prop->name_length);
 	if (g_swf_version <= 6)
-		return countActiveAccessor(this_obj, prop->name, prop->name_length, is_setter) + watch_nesting
-		       >= accessorReentryLimit();
+	{
+		// SWF6: ONE busy flag per (receiver, name) shared by getter AND
+		// setter. FP32 (avm1/virtual_property_recursion_swf6, Linux FP32 ==
+		// golden): a read inside the setter, and a write inside the getter,
+		// both bottom out at the underlying value without invoking the
+		// other accessor.
+		(void)is_setter;
+		return countActiveAccessor(this_obj, prop->name, prop->name_length, 0)
+		       + countActiveAccessor(this_obj, prop->name, prop->name_length, 1)
+		       + watch_nesting >= accessorReentryLimit();
+	}
 	return countActiveAccessorEntry(vpropEntryId(prop)) + watch_nesting >= accessorReentryLimit();
 }
 
@@ -13123,6 +13168,18 @@ static int constructGeomRectDynamic(SWFAppContext* app_context,
     if (rect_val != NULL && rect_val->type != ACTION_STACK_VALUE_FUNCTION) {
         return 0;
     }
+    // `flash` or `flash.geom` replaced by a non-object: FP32 (and Ruffle)
+    // return -1 (avm1/bitmapdata_custom_rectangle "not an object" block).
+    if (global_object != NULL) {
+        ActionVar* fv = getPropertyWithPrototype(global_object, "flash", 5);
+        if (fv != NULL && !(fv->type == ACTION_STACK_VALUE_OBJECT && fv->data.numeric_value != 0))
+            return 0;
+        if (fv != NULL) {
+            ActionVar* gv = getPropertyWithPrototype((ASObject*)fv->data.numeric_value, "geom", 4);
+            if (gv != NULL && !(gv->type == ACTION_STACK_VALUE_OBJECT && gv->data.numeric_value != 0))
+                return 0;
+        }
+    }
 
     ASFunction* rect_func = (rect_val != NULL) ? (ASFunction*)rect_val->data.numeric_value : NULL;
 
@@ -13449,13 +13506,19 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
         }
     }
     int mergeAlpha = 0;
-    if (arg_count >= 6) mergeAlpha = (int)varToDoubleSimple(&args[5]);
+    // ToBoolean, not (int)ToNumber: undefined -> NaN -> (int) was nonzero on
+    // x86 and merged where FP32 does not (copyPixels golden, `undefined` row).
+    if (arg_count >= 6) mergeAlpha = tsArgTruthy(&args[5]);
 
     // The alpha-bitmap arm below is the only one that still needs a snapshot of an
     // aliasing source: it is a per-pixel un/re-premultiply walk with no
     // direction rule of its own, so reading as we write would pick up
     // already-overwritten pixels.
-    int bdcp_alpha_path = (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent);
+    // FP32 (avm1/bitmap_data_thorough/copyPixels, Linux FP32 == golden): an
+    // alphaBitmapData passed WITHOUT an alphaPoint argument (4 args) is ignored;
+    // with a 5th argument (even null/undefined/{}) it applies at (0,0).
+    int bdcp_alpha_path = (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent
+                           && arg_count >= 5);
     // The plain (no alpha bitmap) self-copy instead follows Flash's own overwrite
     // rule, mirroring Ruffle operations/copy_on_cpu.rs::copy_on_cpu_self
     // (ea3956e89): walk backwards when the destination moved in the SAME direction
@@ -13499,20 +13562,17 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
                 uint32_t ab_px = alpha_pixels[aby * alpha_bmp->width + abx];
                 uint32_t ab_alpha = (ab_px >> 24) & 0xFF;
                 uint32_t src_px = src_pixels[src_y * src_bmp->width + src_x];
-                // Unpremultiply source, compute new alpha, re-premultiply
-                uint32_t straight = copyPixelsUnpremultiplyRound(src_px);
-                uint32_t sa = (straight >> 24) & 0xFF;
-                uint32_t sr = (straight >> 16) & 0xFF;
-                uint32_t sg = (straight >> 8) & 0xFF;
-                uint32_t sb = straight & 0xFF;
-                uint32_t final_alpha;
-                if (src_bmp->transparent) {
-                    final_alpha = ((uint32_t)ab_alpha * sa) >> 8;
-                } else {
-                    final_alpha = ab_alpha;
+                // FP32 scales every PREMULTIPLIED channel, alpha included, by
+                // the mask alpha with a >> 8 (opaque 0xff345678 under mask
+                // alpha 0x12 -> 0x112d5a78; Ruffle's unpremultiply / new alpha /
+                // re-premultiply walk gave 0x12395571).
+                {
+                    uint32_t pa = (src_px >> 24) & 0xFF, pr = (src_px >> 16) & 0xFF;
+                    uint32_t pg = (src_px >> 8) & 0xFF, pb = src_px & 0xFF;
+                    if (!src_bmp->transparent) pa = 0xFF;
+                    src_px = (((pa * ab_alpha) >> 8) << 24) | (((pr * ab_alpha) >> 8) << 16)
+                           | (((pg * ab_alpha) >> 8) << 8) | ((pb * ab_alpha) >> 8);
                 }
-                if (final_alpha > 255) final_alpha = 255;
-                src_px = premultiplyAlpha((final_alpha << 24) | (sr << 16) | (sg << 8) | sb);
                 if (alpha_blend) {
                     uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
                     uint32_t spa = (src_px >> 24) & 0xFF;
@@ -14158,8 +14218,9 @@ static ActionVar bitmapDataPaletteMap(SWFAppContext* app_context, ActionVar* arg
         }
     }
     // Build 256-entry LUTs for each channel. If the arg is Object/Array, look up
-    // numeric-indexed elements and mask & 0xFF (matching Ruffle's per-channel
-    // contribution byte). Otherwise (missing/null/undefined/primitive), use an
+    // numeric-indexed elements and use the FULL 32-bit value: FP32
+    // (avm1/bitmap_data_thorough/paletteMap, Linux FP32 == golden) sums
+    // 0xCC + 0x156 + 0x78 = 0x29A where Ruffle's per-channel & 0xFF gave 0x19A. Otherwise (missing/null/undefined/primitive), use an
     // identity mapping (channel << shift) so the channel is copied unchanged.
     u32 red_lut[256], grn_lut[256], blu_lut[256], alp_lut[256];
     const int shifts[4] = {16, 8, 0, 24};
@@ -14181,7 +14242,7 @@ static ActionVar bitmapDataPaletteMap(SWFAppContext* app_context, ActionVar* arg
                 if (elem != NULL && elem->type != ACTION_STACK_VALUE_HOLE &&
                     elem->type != ACTION_STACK_VALUE_UNDEFINED)
                     v = doubleToUint32(tsArgToDouble_ctx(app_context, elem));
-                luts[ch][i] = v & 0xFF;
+                luts[ch][i] = v;  // FP32: the full 32-bit entry (no & 0xFF)
             } else if (aobj != NULL) {
                 char keybuf[16]; int klen = snprintf(keybuf, sizeof(keybuf), "%d", i);
                 ActionVar* elem = getPropertyWithPrototype(aobj, keybuf, klen);
@@ -14189,7 +14250,7 @@ static ActionVar bitmapDataPaletteMap(SWFAppContext* app_context, ActionVar* arg
                 if (elem != NULL && elem->type != ACTION_STACK_VALUE_HOLE &&
                     elem->type != ACTION_STACK_VALUE_UNDEFINED)
                     v = doubleToUint32(tsArgToDouble_ctx(app_context, elem));
-                luts[ch][i] = v & 0xFF;
+                luts[ch][i] = v;  // FP32: the full 32-bit entry (no & 0xFF)
             } else {
                 luts[ch][i] = ((u32)i) << shifts[ch];
             }
@@ -14212,6 +14273,9 @@ static ActionVar bitmapDataPaletteMap(SWFAppContext* app_context, ActionVar* arg
             u8 sb = src_px & 0xFF;
             u8 sa = (src_px >> 24) & 0xFF;
             u32 sum = red_lut[sr] + grn_lut[sg] + blu_lut[sb] + alp_lut[sa];
+            // Opaque target: FP32 keeps alpha 0xFF whatever the summed alpha
+            // byte (paletteMap golden: 0xff0004a9 where the sum's alpha is 0).
+            if (!dest_bmp->transparent) sum |= 0xFF000000u;
             dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = premultiplyAlpha(sum);
         }
     }
@@ -14363,7 +14427,9 @@ static double perlin_turbulence(const PerlinState* state, int color_channel,
             bf_x = (bf_x / lo < hi / bf_x) ? lo : hi;
         }
         if (bf_y != 0.0) {
-            double lo = floor(tile_h * bf_x) / tile_h;  // Note: Ruffle uses bf_x here (matches SVG spec bug)
+            // FP32 uses bf_y here; Ruffle copies the SVG-spec typo (bf_x).
+            // avm1/bitmap_data_thorough/perlinNoise (objLooksLikeNum, 80, stitch).
+            double lo = floor(tile_h * bf_y) / tile_h;
             double hi = ceil(tile_h * bf_y) / tile_h;
             bf_y = (bf_y / lo < hi / bf_y) ? lo : hi;
         }
@@ -14438,8 +14504,10 @@ static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* ar
 
     if (num_octaves < 0) num_octaves = 0;
 
-    double base_freq_x = (base_x == 0.0) ? 0.0 : 1.0 / base_x;
-    double base_freq_y = (base_y == 0.0) ? 0.0 : 1.0 / base_y;
+    // FP32 treats a negative base like its magnitude (perlinNoise golden:
+    // the baseX=-2 block == the baseX=2 block).
+    double base_freq_x = (base_x == 0.0) ? 0.0 : 1.0 / fabs(base_x);
+    double base_freq_y = (base_y == 0.0) ? 0.0 : 1.0 / fabs(base_y);
 
     // Parse offsets array (array of Point objects)
     double offsets_x_buf[32] = {0};
@@ -15613,7 +15681,25 @@ static ActionVar bitmapDataGenerateFilterRect(SWFAppContext* app_context, Action
     BitmapDataNative* bmp = getBitmapNative(obj);
     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
     if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
-    return r;
+    // FP32 (avm1/bitmapdata_custom_rectangle, Linux FP32 == golden): a default
+    // (inner) BevelFilter hands back the source rect, BUILT through the live
+    // `flash.geom.Rectangle` (a replaced class runs, a throwing one throws, a
+    // non-object `flash.geom` yields -1) like getColorBoundsRect/rectangle.
+    // PROTOTYPE: only the identity case is modelled; Flash's outset for
+    // blur/glow/drop-shadow/outer filters is unprobed (LOCAL ORACLE REQUEST).
+    if (arg_count < 2 || args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0)
+        return r;
+    ASObject* src_rect = (ASObject*) args[0].data.numeric_value;
+    ActionVar* srx = getPropertyWithPrototype(src_rect, "x", 1);
+    ActionVar* sry = getPropertyWithPrototype(src_rect, "y", 1);
+    ActionVar* srw = getPropertyWithPrototype(src_rect, "width", 5);
+    ActionVar* srh = getPropertyWithPrototype(src_rect, "height", 6);
+    if (!srx || !sry || !srw || !srh) return r;
+    double x = tsArgToDouble_ctx(app_context, srx), y = tsArgToDouble_ctx(app_context, sry);
+    double w = tsArgToDouble_ctx(app_context, srw), h = tsArgToDouble_ctx(app_context, srh);
+    ActionVar rect_var = {0};
+    if (!constructGeomRectDynamic(app_context, x, y, w, h, &rect_var)) { r = makeF64(-1); return r; }
+    return rect_var;
 }
 
 // LoadBitmap — static method: BitmapData.loadBitmap(exportName)
@@ -16800,7 +16886,17 @@ static inline void switchToFunctionVersion(ASFunction* func, int* saved_ver, ASO
 	*saved_global = global_object;
 	*saved_movie_idx = 0; // reserved for future use
 	if (func->swf_version != 0) {
-		g_swf_version = func->swf_version;
+		// Flash keys a function's SWF version off its base clip's CURRENT
+		// movie: once _level0 is replaced (MovieClipLoader/loadMovieNum into
+		// level 0), closures defined by the old root run under the new root
+		// movie's version (FP32: mcl_replace_root_swf7_to_swf5/6 print
+		// "rest=" for an unset param, i.e. SWF<7 concat, in every callback).
+		extern MovieClip root_movieclip;
+		int fv = func->swf_version;
+		if (func->base_clip == &root_movieclip && root_movieclip.swf_version != 0
+		    && root_movieclip.swf_version != fv)
+			fv = root_movieclip.swf_version;
+		g_swf_version = fv;
 		int vg = versionGroup(g_swf_version);
 		if (vg == 0 && g_global_legacy) global_object = g_global_legacy;
 		else if (vg == 1 && g_global_modern) global_object = g_global_modern;
@@ -40425,6 +40521,44 @@ static void parseURLEncodedVars(SWFAppContext* app_context, char* content, Movie
 	}
 }
 
+// FP32's lenient UTF-8 read of a form-loader payload (SWF6+, no codepage).
+// A lead byte takes the next 1-3 bytes WITHOUT validating them as
+// continuation bytes: cp = ((lead & mask) << 6k) + sum((trail_i - 0x80) << ..).
+// A lead byte whose sequence runs past the end is dropped; a stray trail byte
+// (0x80..0xBF) or other undecodable byte is taken as U+00xx. Valid UTF-8 is
+// unchanged. Derived from avm1/form_loader_encoding_4 (FP32 Linux == golden):
+// "\xC4\xD6" -> U+0156, "\xDC " -> U+06A0, trailing "\xDF" at EOF -> dropped,
+// Shift-JIS "\x95\xD0\x89\xBC" -> U+0095 U+0409 U+00BC.
+// Returns a malloc'd NUL-terminated UTF-8 buffer (NULL on OOM).
+static char* formFlashLenientUtf8(const unsigned char* b, int len)
+{
+	char* out = (char*) malloc((size_t) len * 4 + 1);
+	if (out == NULL) return NULL;
+	int o = 0;
+	for (int i = 0; i < len; )
+	{
+		unsigned c = b[i];
+		int need = (c & 0xE0) == 0xC0 ? 1 : (c & 0xF0) == 0xE0 ? 2 : (c & 0xF8) == 0xF0 ? 3 : 0;
+		long cp;
+		if (need == 0) { cp = c; i += 1; }
+		else if (i + need >= len) { break; }  // truncated sequence at EOF: dropped
+		else
+		{
+			cp = (long) (c & (need == 1 ? 0x1F : need == 2 ? 0x0F : 0x07));
+			for (int k = 1; k <= need; k++) cp = (cp << 6) + ((long) b[i + k] - 0x80);
+			if (cp < 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+			{ cp = c; i += 1; }  // unprobed shapes: keep the lead byte as U+00xx
+			else i += need + 1;
+		}
+		if (cp < 0x80) out[o++] = (char) cp;
+		else if (cp < 0x800) { out[o++] = (char) (0xC0 | (cp >> 6)); out[o++] = (char) (0x80 | (cp & 0x3F)); }
+		else if (cp < 0x10000) { out[o++] = (char) (0xE0 | (cp >> 12)); out[o++] = (char) (0x80 | ((cp >> 6) & 0x3F)); out[o++] = (char) (0x80 | (cp & 0x3F)); }
+		else { out[o++] = (char) (0xF0 | (cp >> 18)); out[o++] = (char) (0x80 | ((cp >> 12) & 0x3F)); out[o++] = (char) (0x80 | ((cp >> 6) & 0x3F)); out[o++] = (char) (0x80 | (cp & 0x3F)); }
+	}
+	out[o] = '\0';
+	return out;
+}
+
 // Ruffle's load_form_into_object body (core/src/loader.rs:990-1027): fetch the
 // URL, decode it per the charset rules, and set every "k=v" pair on the target
 // clip. Factored out of actionGetURL2's loadVariables branch so the
@@ -40467,7 +40601,9 @@ static int avm1LoadFormIntoMC(SWFAppContext* app_context, MovieClip* mc, const c
 
 	// Heap, not a 4097-byte stack buffer: decoding expands (up to 3x) and
 	// parseURLEncodedVars mutates its argument.
-	char* buf = legacy_charset_to_utf8((const unsigned char*) data->content, len, cs, NULL);
+	char* buf = (cs == LEGACY_CS_UTF8)
+		? formFlashLenientUtf8((const unsigned char*) data->content, len)
+		: legacy_charset_to_utf8((const unsigned char*) data->content, len, cs, NULL);
 	if (buf != NULL) {
 		parseURLEncodedVars(app_context, buf, mc);
 		free(buf);
@@ -62323,8 +62459,12 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 			// — Flash's v5-v8 invariant. Gnash's `typeof(TextField.prototype)
 			// == 'undefined'` check fails under this exposure, but Ruffle
 			// fails that same check, so our diff remains a subset.
-			if (g_swf_version < 6 && func == &g_stub_ctors[0])
+			if (g_swf_version < 6 && (func == &g_stub_ctors[0] || func == &g_textfield_constructor))
 			{
+				// FP32 (s28 trace-provenance: avm1/textfield_props_swf5 Linux
+				// FP32 == golden) and gnash TextField-v5 (`TextField.prototype
+				// == undefined` PASSED) both hide TextField.prototype from SWF5
+				// code; `new TextField()` still links to it internally.
 				pushUndefined(app_context);
 			}
 			else
@@ -79584,6 +79724,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			if (args != NULL) FREE(args);
 			double v = mc->unloaded ? 0.0 : (mc->load_failed ? 0.0 : (double)mc->byte_size);
+#if defined(SWF_BYTES_LOADED) && defined(SWF_FILE_SIZE)
+			// Truncated root SWF (header length > bytes present): FP32 never
+			// finishes loading it and reports the bytes it decoded.
+			{
+				extern MovieClip root_movieclip;
+				if (mc == &root_movieclip && !mc->unloaded && !mc->load_failed
+				    && mc->byte_size == SWF_FILE_SIZE)
+					v = (double)SWF_BYTES_LOADED;
+			}
+#endif
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}

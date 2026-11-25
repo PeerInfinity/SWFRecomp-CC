@@ -104,6 +104,33 @@ CHAR_TO_KEYCODE = {
 }
 
 
+
+def _swf_available_len(swf_path):
+    """Bytes of the (decompressed) SWF actually present, header included.
+
+    A truncated SWF whose header length overstates the file never finishes
+    loading in Flash: FP32 reports getBytesLoaded() = the bytes it really
+    decoded (swf/swf_length_too_long: 334 of 734; lzma_length_too_long: 413
+    of 649) while getBytesTotal() keeps the header value. Returns None on
+    any decode problem (callers then keep loaded == total).
+    """
+    import struct as _st, zlib as _zl, lzma as _lz
+    try:
+        b = open(swf_path, "rb").read()
+        if b[:3] == b"FWS":
+            return len(b)
+        if b[:3] == b"CWS":
+            return 8 + len(_zl.decompressobj().decompress(b[8:]))
+        if b[:3] == b"ZWS":
+            pr = b[12:17]; d = pr[0]; lc = d % 9; d //= 9; lp = d % 5; pb = d // 5
+            ds = _st.unpack("<I", pr[1:5])[0]
+            dec = _lz.LZMADecompressor(_lz.FORMAT_RAW, filters=[{"id": _lz.FILTER_LZMA1,
+                  "dict_size": ds, "lc": lc, "lp": lp, "pb": pb}])
+            return 8 + len(dec.decompress(b[17:]))
+    except Exception:
+        return None
+    return None
+
 def ruffle_key_to_flash_code(key):
     if isinstance(key, str):
         return RUFFLE_KEY_TO_FLASH.get(key, 0)
@@ -3144,6 +3171,9 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         else:
             swf_file_size = test_swf.stat().st_size
         extra_defines.append(f"-DSWF_FILE_SIZE={swf_file_size}")
+        _avail = _swf_available_len(test_swf)
+        if _avail is not None and _avail < swf_file_size:
+            extra_defines.append(f"-DSWF_BYTES_LOADED={_avail}")
         # LoaderInfo.bytesLoaded/bytesTotal for the ROOT movie report the
         # actual downloaded (on-disk, still-compressed) byte count — Ruffle
         # returns swf.compressed_len(). This differs from SWF_FILE_SIZE (the
@@ -3645,6 +3675,9 @@ def compile_wasm(test_dir, num_frames, build_dir):
         else:
             swf_file_size = test_swf.stat().st_size
         extra_defines.append(f"-DSWF_FILE_SIZE={swf_file_size}")
+        _avail = _swf_available_len(test_swf)
+        if _avail is not None and _avail < swf_file_size:
+            extra_defines.append(f"-DSWF_BYTES_LOADED={_avail}")
     # Write SWF_URL to a header file instead of -D (avoids shell/response-file quoting issues)
     (build_dir / "swf_url.h").write_text('#define SWF_URL "file:///test.swf"\n')
     extra_defines.append("-include")

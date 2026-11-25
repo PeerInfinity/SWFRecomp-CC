@@ -1395,6 +1395,18 @@ void tagMain(SWFAppContext* app_context)
 		// the next tick sees is_playing=0 (from gotoAndStop), so funcs[target]
 		// never runs. Mirrors swf_core.c outer catch-up loop (line ~1195+).
 		// Key test: avm1/goto_frame_number.
+#ifdef SWF_BYTES_LOADED
+		// Truncated root SWF (verify_output SWF_BYTES_LOADED < header length):
+		// FP32 never wraps a root that has not finished loading; the playhead
+		// holds past the last loaded frame while onEnterFrame keeps ticking
+		// (swf/lzma_length_too_long). Cancel the recompiler-emitted natural wrap.
+		if (manual_next_frame && !goto_from_action && next_frame < current_frame
+		    && current_frame + 1 == g_frame_count)
+		{
+			manual_next_frame = 0;
+			next_frame = current_frame;
+		}
+#endif
 #ifdef OFFSCREEN_RENDER
 		// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK), ported from swf_core.c
 		// (~line 1257): promote a natural backward wrap that leaves stale

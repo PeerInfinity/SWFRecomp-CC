@@ -75,5 +75,27 @@
     "reason": "Linux pinned x2, --no-pin, 20 s cap and Windows all agree: hitTest(400,500,true), (500,400,true), (400,300,true) are false in FP32 (golden says true). Ours vs FP32: 7 lines.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
     "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/watch_recursion_swf6",
+    "file": "output.txt",
+    "upstream_sha256": "6a566ea04675e27aa8bc024f368812b98aae1a204db36152c750443f3eb9457b",
+    "fix": "avm1/watch_recursion_swf6/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__watch_recursion_swf6.r1.txt (s28 trace-provenance); w1b-rm-avm1-misc B8",
+    "reason": "FP32 prints '  o2.prop: ' with a trailing space; the upstream golden had trailing spaces stripped. Ours is byte-identical to FP32.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "avm1/watch_recursion_double_swf6",
+    "file": "output.txt",
+    "upstream_sha256": "dc82945d983ee8c29a1a27d577972b7771d14638f20eb26ba87c93dd9c804205",
+    "fix": "avm1/watch_recursion_double_swf6/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__watch_recursion_double_swf6.r1.txt (s28 trace-provenance); w1b-rm-avm1-misc B8",
+    "reason": "FP32 prints '  o2.prop: ' with a trailing space; the upstream golden had trailing spaces stripped. Ours is byte-identical to FP32.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
+    "added": "2026-11-25"
   }
 ]

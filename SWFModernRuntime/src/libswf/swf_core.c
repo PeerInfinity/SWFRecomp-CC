@@ -1461,6 +1461,18 @@ void swfStart(SWFAppContext* app_context)
 		// Safety limit: prevent infinite goto catch-up within a single tick.
 		// Tests like gotoFrame2Test can trigger GotoFrame2 inside a deferred
 		// script which re-triggers catch-up, creating an infinite cycle.
+#ifdef SWF_BYTES_LOADED
+		// Truncated root SWF (verify_output SWF_BYTES_LOADED < header length):
+		// FP32 never wraps a root that has not finished loading; the playhead
+		// holds past the last loaded frame while onEnterFrame keeps ticking
+		// (swf/lzma_length_too_long). Cancel the recompiler-emitted natural wrap.
+		if (manual_next_frame && !goto_from_action && next_frame < current_frame
+		    && current_frame + 1 == g_frame_count)
+		{
+			manual_next_frame = 0;
+			next_frame = current_frame;
+		}
+#endif
 		int goto_retry_limit = 16;
 		for (;;)
 		{

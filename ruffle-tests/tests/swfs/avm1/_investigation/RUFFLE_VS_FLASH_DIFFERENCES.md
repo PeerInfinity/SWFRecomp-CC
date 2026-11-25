@@ -933,3 +933,10 @@ regression goldens swapped to Flash).
 
 **Decision:** match Flash (user ruling). Both differences are Flash-only fits; the AVM2 twin
 (`avm2_display.c avm2_draw_border_line`) keeps Ruffle's model until a Flash capture of the AVM2 fixture lands.
+
+### s28 w1b-rm-avm1-misc B8: watch_recursion goldens lost FP32's trailing spaces (2026-11-25)
+
+| test | Flash vs golden | ours vs FP32 | decision |
+|---|---|---|---|
+| `avm1/watch_recursion_swf6` | FP32 prints `  o2.prop: ` with a trailing space (1 line); the golden's trailing whitespace was stripped | **0** (byte-identical) | flash_fixes entry (golden = FP32 capture `session28-fanout-reports/trace-provenance/avm1__watch_recursion_swf6.r1.txt`); expected `ruffle_matched` → pass |
+| `avm1/watch_recursion_double_swf6` | same, 4 lines | **0** | same; expected `ruffle_matched` → pass |

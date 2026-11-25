@@ -93,7 +93,6 @@
 #   stylesheet_load       RESOLVED 2026-11-21 (s24 w1-avm1-tail): passes; pruned.
 #                         It was 1/49: `StyleSheet.load` was a stub (now rides
 #                         the deferred LoadVars queue, then parse() + onLoad()).
-form_loader_encoding_4
 
 # --- XML networking/sockets ---
 # (xml_socket, xml_socket_close_in_handler, xml_socket_connect_null,
@@ -209,8 +208,6 @@ global_instance_decls
 # Root causes: Flash UB we don't replicate, platform-dependent UB in expected output,
 # or internally inconsistent expected output (Ruffle test generation bugs).
 date
-mcl_replace_root_swf7_to_swf5
-mcl_replace_root_swf7_to_swf6
 movieclip_library_state_values
 native_objects_swf6
 tab_ordering_properties_tab_index_edge_case
