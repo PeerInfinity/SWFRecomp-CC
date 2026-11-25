@@ -1514,3 +1514,90 @@ Trace side: `polish-sweep-arc.md` §27.
 - **Exporter on Dx12** inks line-rect corners at 3/4; use `WGPU_BACKEND=vulkan` for border goldens.
 - **Ruffle's test runner** is the oracle for timers and loaded children (one input step per frame). See also the shared-tree staging rule above.
 - **A Ruffle-generated golden is not a Flash oracle.** When a Flash-model change loses such a row, price the loss, disposition it (ACCEPTED + RVF + image-axis marker), and keep the Flash-correct pass (user ruling: Flash over Ruffle).
+
+## 26. Session-27 state of the board (2026-11-24)
+
+**Baseline:** the s26 record images run `45284922078` (`df7729df2`), 592 pass / 41 fail.
+
+**Images runs:**
+- Wave 0 `45300086369` (0 moves).
+- Interim #1 `45312833576` (+3).
+- Interim #2 `45339607994` (0 flips, 1 priced band).
+- Interim #3 `45434403230` (1 new-fixture regression, fixed).
+- FINAL `45536913308` at `8f4f6e395` (results `cb14cd063`).
+
+**Result: 626 pass / 39 fail** (+6 ignored, 3 skip). On the baseline intersection it is 594 / 633: **+2 by name, 0 regressions**.
+- **35 new regression-fixture comparisons**, all passing. Most goldens are real Flash 32 captures.
+- **Bands:** −1 b_tiny, −1 d_moderate. Trace side: `polish-sweep-arc.md` §28.
+
+| patch | flips | comparisons |
+|---|---:|---|
+| `d3b6d71b8` w1-drift (`bmp_sample` ties round up) | +1 | `avm2/pixelbender_dithering` 34301 → 9413 under upstream's FLASH golden |
+| `202340a12` w1-render-bitmap-leads | +2 (−1 later) | `visual/blend_modes/shader_as_mask`; `acid-color-0`, which passed from interim #1 to interim #3 |
+| `31d3e3237` w2-jpeg-flash-decode + w2b-jpeg-refine (IJG v7+ model) | −1 priced | `acid-color-0` pass → fail (1135 over, b_tiny). The golden is Ruffle-made and our decoder is bit-exact vs Flash on `bitmapdata-clone`, which still fails its own Ruffle golden at 18693. Flash over Ruffle: the RvF entry has an `<!-- image-axis -->` marker |
+| `cceb5133a` w2-flash-filter-kernels | priced band | `bitmapdata_applyfilter_blur` 39351 → 47515 (Ruffle golden; ACCEPTED Cat 2 + RvF since s26) |
+| interim #3 → final | band | `bitmapbuttons` 52 → 39 (a_epsilon) |
+| everything else (layer/group alpha, applyFilter AVM1, holder drawing, text, N, browser) | 0 corpus | 35 fixture comparisons, among them 12 group-alpha (AVM1 + AVM2) and 6 AVM1 applyFilter/CM from Flash captures |
+
+### s27 golden provenance (rounds 1 + 2: `session27-fanout-reports/golden-provenance.md`)
+
+> **s27 golden provenance, round 2.** Direct-mode runs are now **pinned to 1:1**. A root stub (`capture/PinStub.swf`)
+> loads the test into `_level0` only once the X window has settled. The test then runs as the real root from its
+> frame 1, and the harness installs `test.toml` fonts as device fonts. **Both hitTest "RvF candidates" are
+> retired.** `movieclip_hittest` and `displayobject_hittestpoint_boundary` match their goldens at 1:1 (4/4 pinned
+> runs, and on Windows). The round-1 `false`s were the show-all scale race.
+> **596 comparisons re-graded: 255 Flash, 11 near, 142 not Flash, 188 untestable.** Of the 38 failing rows on the board,
+> 15 have Flash goldens. `filters/blur_quality` matches Flash at 0 px (RvF written).
+> - **Default quality:** 2 goldens are Flash at its default HIGH quality although `test.toml` says low: `gradientTransform`
+>   (exact) and `acid-color` frame1.
+> - **Windows:** of the 12 `known_failure` + `.ruffle.png` "Flash references" that Linux rejected, Windows reproduces
+>   none. The 6 text rows look like captures from a Windows host with ClearType off. Proving that needs a system-wide
+>   Windows setting change, so it waits for Robert's OK.
+
+**Re-priced board.** The table is in `golden-provenance.md` §"Re-priced pixel board". A row whose golden is not Flash is
+not a Flash target. Price it as headroom against Flash, not against the golden.
+
+**Goal-4 decision, deferred to Robert / s28:**
+- 5 per-row golden **swaps** to Flash captures: `visual/simple_shapes/strokes/scale`, `avm2/graphics_draw_path`,
+  `avm2/bitmapdata_opaque`, `avm2/blend_scroll` and `visual/definefont4` (we are closer to Flash than its golden).
+- `gradientTransform` stays as a Flash target.
+- 2 deferred swaps, `place_object_test` and `shape_test`, once our miss is under ~1k px.
+- 6 keeps: `bitmapdata_draw` (host-dependent), plus 5 device-text rows that get a "Windows-like Flash, not reproducible"
+  disposition.
+
+None of the swaps flips a row to pass. Their value is an honest residual. Swapping needs a per-row golden-override
+mechanism in `image_triage.py` or the runner (S–M; design first).
+
+### Left on the board (session 28)
+
+- **Goal-4 golden override** (above): design the override, then swap the 5 rows.
+- **Quality model:** `gradientTransform`'s golden is Flash at HIGH, while we follow `test.toml` low. The 9-px miss may
+  be our AA mode.
+- **Text:**
+  - wordwrap render fixture: Flash glyph AA, ~590 channels (it keeps an interim Ruffle golden);
+  - `rotated_glyphs`: 1111 px vs Flash;
+  - AVM2 selection tint: needs an ADDED_TO_STAGE fixture;
+  - device-text rows: a ClearType-off Windows pass (Robert's OK).
+- **Filters:**
+  - applyFilter DropShadow residual and Bevel sample residual;
+  - GPU display-filter growth: NO-GO as of record;
+  - w2b-group-alpha `shadow_shape_a50` residual, 768 px.
+- **N:** thin-stroke Flash pixel snapping is the N ladder's next slice (hairline fixture parked under
+  `SWFRecompDocs/plans/n-levels-5plus-hairline-fixture/`).
+- **Leads:**
+  - `movieclip_hittest_shapeflag`: pinned Flash says `false` on 3 golden-`true` lines;
+  - the `shapeflag` hit-test lead;
+  - `bitmapdata-clone` has 0 headroom vs its Ruffle golden, but we are bit-exact vs Flash. It is an RvF candidate if it
+    ever flips.
+- **Flash-fidelity NO-GOs of record:** unchanged from §25, minus the swap candidates above, which now have Flash captures.
+
+### Process notes added in session 27
+
+- **The Flash oracle is the first choice** (`tools/flash-oracle/`):
+  - AVM1 in DIRECT mode, pinned (`--wrapped` changes `_root` and depths);
+  - `--screen` for non-LAYER blends, because `draw()` is wrong for them;
+  - the exporter is a fallback only.
+  - The binaries never go to the cloud. The coordinator runs the capture requests locally and archives them under
+    `session27-fanout-reports/*-local-oracles/`.
+- **A Flash-correct model can lose a Ruffle-golden row.** Price the loss in the brief before landing, disposition it
+  (RvF + image-axis marker), and keep the model (`acid-color-0`, `bitmapdata_applyfilter_blur`).

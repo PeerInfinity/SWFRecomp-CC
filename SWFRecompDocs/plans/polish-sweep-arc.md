@@ -3658,3 +3658,115 @@ Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-
   - the avm2 ACCEPTED/RvF set.
 
 **Pixels.** See `graphics-fanout-playbook.md` §25.
+
+## 28. Session 27 (2026-11-24) — dual-axis fan-out #19, CLOUD-FIRST, full size, FLASH-ORACLE FIRST: trace 4684 → 4781 eff (4722 → 4819 rows; 97 new rows, all pass), pixels 592 → 626 pass (+2 corpus by name, 35 new fixture comparisons), 0 code regressions; 1 Flash-ward reclassification and 1 priced Flash-over-Ruffle loss
+
+Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slots), 12 local one-task-session commits (N ladder and browser ladder), 2 golden-provenance rounds, plus docs. Every report, patch, probe and oracle capture is under `session27-fanout-reports/`. The 32 `fanout/*` branches were pruned at closeout, after their report and patch blobs were checked identical on master. Cloud slots: 10 wave-1 diagnosis, 13 wave-2, 7 wave-2b, 2 wave-3 (env "SWFRecomp fan-out", Opus). All 32 delivered and none were lost. Their work landed in those 16 commits, except `w1-browser-avm1-gaps`, which went to the local `browser-arms-land`.
+
+**What changed the method: a real Flash Player 32 oracle** (`tools/flash-oracle/`, Linux + Windows projectors, local only). The s26-coordinator's `flash-oracle` session built it at Robert's request. From wave 2 on, every fixture golden and every held verdict was taken from Flash, with the Ruffle exporter as a fallback. Several standing verdicts fell to it (§28.2). Robert also asked for a golden-provenance sweep of every Ruffle image golden against Flash: `golden-provenance` and `golden-provenance-2` (summary in playbook §26).
+
+**Local ladders running in parallel**, each launched one task at a time, with the REPORT BACK verified on disk before the successor launched:
+- N: `n-trap-stroke` (wave 0) → `n-ragdoll-strokes` → `n-l2l4-pixel-pass` → `n-levels-5plus`.
+- Browser: `browser-arms-land` → `browser-eager-init` → `browser-advance-order` → `browser-parked-frame`.
+
+**Baselines read fresh:** the s26 record pair at `005bea42a`, graphics `45284922078` (results `df7729df2`) and no-graphics `45284938521` (`81d32b9b2`). Trace 4684 eff / 4722 rows; pixels 592 pass / 41 fail.
+
+**Grading runs** (detail: `session27-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+
+| run | code | trace | pixels | no-graphics |
+|---|---|---|---|---|
+| `45300086369` (wave 0) | `d70f2c0aa` n-trap-stroke | exact, +2 fixture rows | 0 moves | — |
+| `45312833576` (interim #1) | `b8d3b736a` drift, glyph-fidelity, applyfilter-tail, render-bitmap-leads | exact, +5 fixture rows | **+3** `pixelbender_dithering`, `acid-color-0`, `shader_as_mask` | — |
+| `45339607994` / `45339610962` (interim #2) | `cceb5133a` + allow-networking, layer-alpha, text-layout, holder-full, avm2-text-tail, timers, filter-kernels, applyfilter-cm, n-ragdoll, browser-arms | +1 `InitActionTest2` (rm → pass); 34 new rows pass → 4725 / 4763 | 0 flips; priced band `bitmapdata_applyfilter_blur` 39351 → 47515 | exact, 4723 / 4763 |
+| `45434403230` / `45434410378` (interim #3) | `78fee9e13` + leftovers, draw-cx, loaded-shell, exec-order, 4× w2b, n-l2l4, browser-eager | **3 regressions** (below); 6 new upstream drift rows failing | 15 fixture images pass | same 3 |
+| **`45536913308` / `45536916402` (FINAL)** at `8f4f6e395` | + JPEG `31d3e3237`, avm1-text-edit, w3-interim3-regressions, w3-drift-2, draw-text-tint, browser-advance-order, browser-parked-frame, n-levels-5plus, swapDepths `8350ca120` | **4781 / 4819 eff**: 4522 pass + 259 ruffle_matched, 38 failing. vs interim #3: +9 by name, 0 regressions. vs baseline intersection: +1 −1 (below); 97 new rows, all pass. Results `cb14cd063` | **626 pass / 39 fail** (+6 ignored, 3 skip). vs baseline: +2 by name, 0 regressions, 35 new comparisons pass, 2 worsened bands (both priced) | **4779 / 4819**, same moves. Mode diffs only the predicted `audio/aac` + `audio_computespectrum`. Results `2e286cf2f` |
+
+**Interim #3's three regressions** were fixed by `w3-interim3-regressions` (`8f4f6e395`), and the final run confirms every fix:
+- `avm1/globals_monkeypatch` output_mismatch → SEGFAULT: `tfCallGlobalCtorOnField` used `INV_SUPER_CTX` with a MovieClip `this`. It is back to its documented output_mismatch.
+- Fixture image `avm1_attached_clip_selfgoto_child_parent` FAIL: `ng_apply_pending_sprite_self_gotos` minted `_root`-parented orphans. It passes, 0 outliers.
+- gnash `action_execution_order_test12` ruffle_matched → output_mismatch: **NOT a regression to fix.** It came from w2b-timers-tail's goto-queued init flush at the call return, and it was predicted. Our output is now byte-identical to Flash's `output.fp9.txt`. The graded golden is the fp10 one, which has an FP10-only enterFrame line. This is the only row that falls vs the baseline (Flash over Ruffle; the options are on the s28 board).
+
+**Final vs baseline, by name.**
+- Trace on the 4722-row intersection:
+  - Effective: +1 (`from_shumway/bitmapdata/getpixel-from-embedded`, from the Flash-modelled IJG JPEG decoder) and −1 (`test12`, Flash-ward), so eff is flat at 4684.
+  - Two ruffle_matched rows were promoted to pass: gnash `InitActionTest2` (timers) and `avm2/goto_framescript_queued/swf13` (w3-drift-2).
+- New rows, all passing in both modes (97):
+  - 83 regression fixtures.
+  - 8 allow_networking subtest variants (`w2-allow-networking-subtests`).
+  - 6 upstream rows: 3 `avm1/malformed_actions/*`, plus `avm2/goto_isplaying`, `goto_scene_isplaying` and `goto_framescript_queued_next_prev` (w3-drift-2).
+
+### 28.1 Ledger
+
+| patch | trace | pixels | notes |
+|---|---:|---:|---|
+| `d3b6d71b8` w1-drift | | +1 | `avm2/pixelbender_dithering` 34301 → 9413, against upstream's new FLASH golden (bmp_sample ties round up). `bitmapdata-clone` has 0 headroom |
+| `202340a12` w1-render-bitmap-leads | | +2 / (−1 later) | `shader_as_mask`, `acid-color-0`. acid-color-0 later went back to failing under the Flash JPEG decoder (below) |
+| `0494cd927`, `456fef1bf` glyph-fidelity, applyfilter-tail | 0 | 0 | DefineText T·G in the recompiler, AVM2 box cx + BORDER background; exact GPU blur taps for a pure BlurFilter |
+| `d37ca69b5` w2-allow-networking-subtests | +8 new | | subtest variants of 4 allow_networking rows, all passing |
+| `cceb5133a` w2-timers-land, w2-flash-filter-kernels, w2-applyfilter-cm | rm→pass `InitActionTest2` | priced band | Ruffle timer clock, goto-skipped DoInitAction. Flash glow/draw_filtered kernels: `bitmapdata_applyfilter_blur` 39351 → 47515 against a Ruffle-made golden (ACCEPTED Cat 2 + RvF, s26). AVM1 applyFilter bridge |
+| `fb6fe4ba4`, `78fee9e13` layer-alpha-group, w2b-group-alpha-triggers | 0 | 0 (12 fixtures) | Flash groups layer alpha for filters, blends and alpha offset, but not for cacheAsBitmap. Ruffle is per-child, so an exporter golden would have been wrong |
+| `c2f237a94` text-layout, holder-drawing-full, avm2-text-tail | 0 | 0 | holder Drawing API under its children; avm2_definetext_matrix == Flash; DefineFont4 CFF data |
+| `85cca4df6` w2-avm1-leftovers-land, w2-draw-cx-text | 0 | 0 | 8 Flash direct-mode fixtures: MC + button unified pick, path-variable scope, dotted `__resolve`, setNewTextFormat size, cut/copy selection, SWF6/7 builtin case |
+| `78fee9e13` loaded-shell, exec-order, w2b timers-tail / applyfilter-flash / kernels-residual | 0 | 0 | per-movie DL phase 3 delivery tick (hand-merged with timers' growable direct-load queue). Flash confirms 3 of the 5 re-goldened loaded-shell fixtures exactly, and the other 2 moved toward Flash. Nested frames run before Phase 1; init flush at call return; gradient kernels; the held glow/draw_filtered fixtures landed green |
+| `31d3e3237` w2-jpeg-flash-decode + w2b-jpeg-refine | **+1** `getpixel-from-embedded` | −1 priced | IJG v7+ model: `bitmapdata-clone` is bit-exact vs Flash. `acid-color-0` pass → fail (1135 over) against a Ruffle golden: Flash over Ruffle, RvF + image-axis marker |
+| `c72303e75` w2b-avm1-text-edit | 0 | 0 | setNewTextFormat per instance, maxChars clips insertion, the v7 bare depth-method gate |
+| `8f4f6e395` w3-interim3-regressions, w3-drift-2, w2b-draw-text-tint | +9 vs interim #3 | +1 fixture image | the 3 regressions above; malformed-action pools and push overspill; avm2 `isPlaying` after goto; embedded-field `draw()` tint |
+| N ladder: `d70f2c0aa`, `438121c22`, `f5565dcf9`, `58a51a781` | 0 | 0 | strokes in line-style-id order; attachMovie'd clip timeline children parented to the clip (not `_root`); attached self-goto; AVM1 tab stops; `_xscale` as double; levels 5+ (ep0 has only L0–4) |
+| (interim #3 → final, one of `31d3e3237` / `c72303e75` / `8f4f6e395`) | | band | `bitmapbuttons` 52 → 39 (still a_epsilon) |
+| Browser ladder: `91418ebbe`, `fe6eb5f9d`, `eaa3e70f7`, `088d60351`, `c8ed0e679`, `8350ca120`, `96952c641` | 0 CI (+1 CI bug) | | ungated browser AVM1 arms; eager init; per-tick advance order; a parked root doesn't re-run its frame; wasm-ld `--fatal-warnings` on every browser link. The browser fixture found the CI swapDepths display-list rebase bug (`8350ca120`) |
+
+**New `regression/` fixtures (83).** Most goldens come from real Flash 32: direct mode for AVM1, `--screen` for non-LAYER blends, pinned 1:1. The exceptions are named in their slot reports: the wordwrap render fixture keeps an interim Ruffle PNG because of ~590 channels of glyph-AA difference. The full list is the 83 `regression/` rows new at `cb14cd063` vs `df7729df2`. The families:
+- applyFilter: `avm1_applyfilter_*` ×6, `avm2_applyfilter_*` ×2.
+- group alpha: ×12 (AVM1 + AVM2).
+- PO3 CM: ×3.
+- edittext/text: ×14.
+- timers and goto-skipped init: ×11.
+- loaded shell: ×5.
+- browser gates: ×6 (graded natively).
+- `draw()` text and colour: ×6.
+- robustness: clone depth, watch overflow ×4.
+- N: stroke order, attached timeline/selfgoto parent, `_xscale`.
+
+### 28.2 Standing verdicts that fell
+
+- **"Per-movie DL phase 3 is NO-GO (−2 on `cross_call`)"** (§27.4): w1-per-movie-dl-phase3 found it GO, with a 268 + 112 gate identical. It landed as w2-loaded-shell-land. Flash delivers one tick later than the Feb-2026 Ruffle runner, so the 3 "held, runner disagrees" loaded-shell fixtures were re-goldened from Flash.
+- **"The native soft-wrap gap may be a large family (M–L)"**: the corpus family is AVM1-only and empty (0 rows). The s26 wordwrap fixture was **Flash-invalid**: Flash drew no glyphs because the font's code table wasn't ascending.
+- **"`acid-color-0` step 3 is NO-GO; the floor is ~110, so it never flips"**: it flipped in interim #1 (render-bitmap-leads). It then became a priced Flash-over-Ruffle loss to the IJG decoder, because its golden is Ruffle-made.
+- **"Flash 32 decodes JPEG flat like stb (BitmapDataDraw = 82944)"**: that value is Flash `draw()` mipmapping, not the decoder. The IJG model stands.
+- **"`pixelbender_dithering` needs a re-sync first; 1801 over"**: it passes (9413 under the new Flash golden).
+- **"N3 layer-group alpha: Ruffle is per-child like us"**: Flash groups for filters, blends and alpha offset, but cacheAsBitmap does not.
+- **"`avm1_edittext_html_typed_runs` needs a Flash capture"**: captured. Ruffle's `c0=0` is an artifact; the fixture landed with an RvF entry.
+- **"glow_kernels / draw_filtered fixtures held for a Flash capture"**: captured, and they landed green.
+- **The w1-avm1-leftovers "Flash refutes 5 analytic goldens" verdict was half MY tool error.** `--wrapped` loads AVM1 as an AS3 child, so `_root` and depths differ. w2-avm1-leftovers-land caught it, and direct mode is now the AVM1 default.
+- **Both hitTest RvF candidates** (golden-provenance round 1): an unpinned show-all scale race. Pinned at 1:1 they match their goldens 4/4.
+- **"Browser gaps are action.c arms"** (gate inventory): the eager-init, advance-order and parked-frame gaps lived in `tag.c`/`swf.c`. And `78fee9e13` silently broke every browser build: an implicit-int `ng_rootDLLeave` became a wasm-ld signature-mismatch trap.
+- **N "ragdoll thin strokes"**: an attachMovie'd clip's timeline children were parented to `_root`, so a double compose dropped the d=0 bones. The edge dots are Ruffle's curve tolerance. **N "levels 5+"**: episode 0 has only L0–4.
+
+### 28.3 Method notes (deltas vs s26)
+
+- **Flash first, Ruffle exporter second.** Put "A REAL FLASH ORACLE EXISTS" in every brief (BRIEFS_COMMON.md). Cloud workers cannot run it: the binaries never leave the machine. So the coordinator ran each captured request locally and archived the PNG + trace under `w*-local-oracles/` and `flash-oracle-captures/`, and the next wave was briefed from the verdicts. AVM1 runs in DIRECT mode (pinned), and non-LAYER blends need `--screen`. A Ruffle golden that Flash disagrees with is a priced loss, never a target.
+- **The s26 rule paid off.** Interim #3 was scheduled after the local-ladder landings and ran the NG leg (timers and exec-order touched NG code). It caught all 3 regressions while 3 more slots were in flight, and a wave-3 cloud slot fixed them before the final.
+- **Browser links fail loudly now** (`-Wl,--fatal-warnings` in child_probe, `build_test.sh`, bundle, `build_wasm_avm2.sh`). The Pages dry run on every landing caught a missing `avm1_filter_kernels.c` in the bundle snapshot (`1994a761f`).
+- **Hand merges of overlapping slots** used `git merge-file` against the merge-base (the partial clone blocks `--3way`), with commits made from the index. Two were needed: `setNewTextFormat` (leftovers vs browser ungating) and loaded-shell's delivery tick vs timers' growable queue.
+- **Ruled-out landings get a successor slot, not a revert:** w2-jpeg HELD → w2b-jpeg-refine. A Flash contradiction stays a lead until the next oracle explains it.
+- **The local CPU lock starved local checks** while two ladders were building. The leftovers/draw-cx landing relied on CI (12/21 checked locally).
+
+### 28.4 Left on the board (session 28)
+
+**Trace**
+- **`test12`**: rule on one of these: (a) accept the output_mismatch as Flash-ward (RvF); (b) a from_gnash disposition naming the fp9 golden; (c) a harness rule that accepts any Flash variant's `output.fp*.txt`.
+- **N ladder (parked; head = thin-stroke Flash pixel snapping)**: the hairline fixture is parked at `SWFRecompDocs/plans/n-levels-5plus-hairline-fixture/`. Episodes 1–2 native = exporter.
+- **Browser ladder (parked; head = port OFFSCREEN's inline root-goto catch-up)** (`ng_executeGotoCatchUp` / `ng_runPendingRootGoto` from timer and event callbacks; M). Its oracle is `avm1_timer_root_goto_stopped_{gs,nf}` and `avm1_goto_backward_enterframe_once` in child_probe. Then:
+  - `ng_apply_pending_sprite_self_gotos` in the browser (S).
+  - Route `advance_attached_clip_frames` through the CI goto path (M; re-check Doodle Jump's `attachBlocks`).
+  - Delete the dead `pending_remove` code (S).
+  - Browser clone INIT/CONSTRUCT events (`graphics_stubs.c` Group 1, unmeasured).
+- **Loaded-shell residuals:** `child_timeline_loop`, `mcl_holder_totalframes`, `mcl_load_tick`. **Child frame-1 order** (`e1 d1 c1`).
+- **avm1-text-edit oracle requests:** Restrict/onChanged, leading/margin. Small leftovers: the `MAX_DEFERRED_*` queues; FileReference `download()`/`postData`.
+- **Unchanged NO-GOs:**
+  - the action_order family, `global_proto_decls(_delete)`, `global_instance_decls`, `native_objects_swf6`, `globals_monkeypatch`, `GradientFillTest`, `external_interface_monkeypatch`;
+  - shumway `esc`;
+  - the avm2 ACCEPTED/RvF set.
+- `movieclip_hittest_shapeflag` lead: pinned Flash gives `false` on 3 lines where the golden says `true`. Check whether those are our ACCEPTED lines (then it's an RvF).
+
+**Pixels.** See `graphics-fanout-playbook.md` §26.
