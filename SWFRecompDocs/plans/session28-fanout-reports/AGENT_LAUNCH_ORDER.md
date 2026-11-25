@@ -41,7 +41,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w2-hittest-shape-stale | w1-leads + Flash probe | fixture; shapeflag flash_fix (0 flips) | session_018CoDi7pH2PXPvBaoSjSrcd — launched |
 | w2-text-edit-land | w1-text-edit-tail + Flash | 3 regression fixtures (Flash goldens); RvF selection tint | session_018CoDi3oPLgPKaaLnZ4fAEX — launched |
 | w2-glyph-quarter-snap | w1-text-glyph-aa + Flash captures | wordwrap golden → Flash; rotated_borders fixture; priced RvF losses | session_018CoDi7ye6JuqkAj3DtMYv6 — DELIVERED, LANDED (glyph ¼-px snap embedded+AA only; border pen 1+tan/2; +2 rows, 2 goldens → Flash; 0 corpus moves) |
-| w1b-rm-avm2 | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4K1YrfUyotfKco1y4 — launched (wave 1b) |
+| w1b-rm-avm2 | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4K1YrfUyotfKco1y4 — DELIVERED; prototype LANDED `558c5a8cf` (+18 rm→pass measured); sort64/32bit swap declined (platform split); Date TZ rows refuted as gaps; bucket J → w2b-avm2-d2a |
 | w1b-rm-gnash | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi7EJcG2PzxYnxubmxh — DELIVERED; prototype LANDED `ace9d2f88` (+16 rm→pass measured); HOLDs → w2b-gnash-holds |
 | w1b-rm-avm1-misc | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4KkhjNDFiySBwY5AV — DELIVERED; prototype LANDED `bc3e02caf` (+14 rm→pass measured) + 2 flash_fixes (watch_recursion) |
 | w2-test12-land | w1-test12-enterframe + Flash | trace test12 → pass; fixtures (Flash) | session_018CoDi5LgngECdcoyMmk6s1 — DELIVERED, LANDED `f456cedfe` (test12 → pass expected; noprobe fixture Flash golden; 2 probe rows held: lead L1) |
@@ -49,3 +49,4 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w2-loaded-shell-land | w1-loaded-shell-residuals + Flash | +1 load_cancel_via_unloadmovie; 3 golden swaps; 3 fixtures | session_018CoDi7qCLS9aytBojTChDH — launched |
 | w2-filter-residuals-land | w1-filter-residuals + Flash | ~5 regression rows (Flash goldens), 2 re-goldens; 3 priced RvF losses | session_018CoDi6PJKjrqv8uEn4N9Ga — launched |
 | w2b-gnash-holds | w1b-rm-gnash + Flash probes | B10/B11/B2/B6/B19 gnash rows | session_018CoDi6GATKmiipHwo2aKVW — launched |
+| w2b-avm2-d2a | w1b-rm-avm2 bucket J | 8 avmplus number→string rows | session_018CoDi6hQzJbibxagXMwR2u — launched |
