@@ -26230,9 +26230,19 @@ static void aq_dispatch_timeline_unload(SWFAppContext* app_context, void* user)
 		pu->mc->avm1_removed = 1;
 		pu->mc->depth = -(int)pu->swf_depth - 1 - 16384;
 
+		// s28 w2-avm1-leads-land: SWF6+ handlers are closures, so bare names
+		// resolve through the DEFINING timeline, not the dying clip (the same
+		// rule aq_dispatch_unload / mc_call_as2_handler_ng apply). FP32
+		// (regression/avm1_onunload_setvar_scope): a _root-defined onUnload
+		// doing `n = n + 1` updates _root.n and reads n=2, with this=_level0.a.
+		// Only a SWF5 handler takes the clip as its base clip. `this` now
+		// comes from the this-stack push (this_mc), as in aq_dispatch_unload.
 		MovieClip* saved_context = g_current_context;
-		actionSetCurrentContext(pu->mc);
-		invokeUnloadHandler(app_context, pu->func, NULL);
+		int _tuv = (pu->func->swf_version != 0)
+			? (int) pu->func->swf_version : g_swf_version;
+		if (_tuv < 6)
+			actionSetCurrentContext(pu->mc);
+		invokeUnloadHandler(app_context, pu->func, pu->mc);
 		actionSetCurrentContext(saved_context);
 	}
 	free(pu);
@@ -26417,14 +26427,31 @@ static int g_pending_direct_stamped = 0;
 // movie's clip enterFrame starts on the NEXT tick (Flash: no `cx` on the
 // delivery tick). Read by ng_dispatch_loaded_shell_enterframe (tag.c).
 #define MAX_DELIVERED_THIS_TICK 16
-static MovieClip* g_delivered_mc[MAX_DELIVERED_THIS_TICK];
-static unsigned g_delivered_epoch[MAX_DELIVERED_THIS_TICK];
-static int g_delivered_next = 0;
+// s28 w1-leads: growable list keyed by epoch (was a 16-slot ring: the 17th
+// delivery of one tick overwrote the 1st, whose movie then got its clip
+// enterFrame on the delivery tick). The list is reset lazily when the epoch
+// moves on; MAX_DELIVERED_THIS_TICK is now only the initial capacity.
+static MovieClip** g_delivered_mc = NULL;
+static size_t g_delivered_cap = 0;
+static size_t g_delivered_count = 0;
+static unsigned g_delivered_list_epoch = 0;
 int actionLoadedMovieDeliveredThisTick(MovieClip* mc)
 {
-	for (int i = 0; i < MAX_DELIVERED_THIS_TICK; i++)
-		if (g_delivered_mc[i] == mc && g_delivered_epoch[i] == g_direct_load_epoch) return 1;
+	if (g_delivered_list_epoch != g_direct_load_epoch) return 0;
+	for (size_t i = 0; i < g_delivered_count; i++)
+		if (g_delivered_mc[i] == mc) return 1;
 	return 0;
+}
+static void actionNoteLoadedMovieDelivered(MovieClip* mc)
+{
+	if (g_delivered_list_epoch != g_direct_load_epoch) {
+		g_delivered_list_epoch = g_direct_load_epoch;
+		g_delivered_count = 0;
+	}
+	if (g_delivered_count < g_delivered_cap
+	    || ng_table_grow((void**)&g_delivered_mc, &g_delivered_cap,
+	                     sizeof(MovieClip*), MAX_DELIVERED_THIS_TICK))
+		g_delivered_mc[g_delivered_count++] = mc;
 }
 
 // --- Deferred loadVariables `onData` queue ---------------------------------
@@ -26442,14 +26469,38 @@ int actionLoadedMovieDeliveredThisTick(MovieClip* mc)
 // another loadVariables (from_gnash actionscript.all/MovieClip-v6 does exactly
 // that) lands on the NEXT tick rather than recursing.
 #define MAX_PENDING_FORM_DATA 16
-static MovieClip* g_pending_form_data[MAX_PENDING_FORM_DATA];
+// s28 w1-leads: growable (was a fixed 16: the 17th loadVariables completed in
+// one tick silently lost its onData). MAX_PENDING_FORM_DATA is now only the
+// initial capacity. The drain copies the queue out before dispatching, so an
+// enqueue from inside a handler never reallocs under the walk.
+//
+// s28 w2-avm1-leads-land: DELIVERY TICK. Flash Player 32 (coordinator capture,
+// regression/avm1_loadvariables_ondata_overflow) fires the onData of a
+// loadVariables issued from frame N's script AFTER frame N+1's script, not at
+// the end of frame N's own tick (Ruffle's runner order, which we used to
+// mirror). Each entry carries the drain generation it was queued in; a drain
+// fires only entries queued BEFORE it began (g_form_data_gen moves on once per
+// drain, i.e. once per tick). Entries queued from INSIDE the drain (an onData
+// that issues another loadVariables: gnash MovieClip-v6's handshake) stay
+// immediate, as before, so the re-entrant chain still completes.
+typedef struct { MovieClip* mc; unsigned gen; } PendingFormData;
+static PendingFormData* g_pending_form_data = NULL;
+static size_t g_pending_form_data_cap = 0;
 static int g_pending_form_data_count = 0;
+static unsigned g_form_data_gen = 1;
+static int g_in_form_data_drain = 0;
 
 static void avm1QueueFormDataEvent(MovieClip* mc)
 {
 	if (mc == NULL) return;
-	if (g_pending_form_data_count < MAX_PENDING_FORM_DATA)
-		g_pending_form_data[g_pending_form_data_count++] = mc;
+	if ((size_t)g_pending_form_data_count < g_pending_form_data_cap
+	    || ng_table_grow((void**)&g_pending_form_data, &g_pending_form_data_cap,
+	                     sizeof(PendingFormData), MAX_PENDING_FORM_DATA)) {
+		g_pending_form_data[g_pending_form_data_count].mc = mc;
+		g_pending_form_data[g_pending_form_data_count].gen =
+			g_in_form_data_drain ? 0u : g_form_data_gen;
+		g_pending_form_data_count++;
+	}
 }
 
 // One clip's `onData`. Deliberately a private copy of mc_call_as2_handler_ng's
@@ -26525,12 +26576,29 @@ static void avm1FireFormDataEvents(SWFAppContext* app_context)
 	// gnash tests put the whole handshake in the LAST frame's script, leaving
 	// no later tick to drain into.
 	int guard = 0;
+	unsigned drain_gen = g_form_data_gen++;
+	g_in_form_data_drain++;
 	while (g_pending_form_data_count > 0 && guard++ < 8)
 	{
-		int count = g_pending_form_data_count;
-		MovieClip* pend[MAX_PENDING_FORM_DATA];
-		for (int i = 0; i < count; i++) pend[i] = g_pending_form_data[i];
-		g_pending_form_data_count = 0;
+		// Split the queue: entries due now (queued before this drain began, or
+		// from inside it) are copied out; later ones stay queued, in order.
+		int total = g_pending_form_data_count;
+		MovieClip* pend_small[MAX_PENDING_FORM_DATA];
+		MovieClip** pend = pend_small;
+		if (total > MAX_PENDING_FORM_DATA) {
+			pend = (MovieClip**)malloc((size_t)total * sizeof(MovieClip*));
+			if (pend == NULL) { pend = pend_small; total = MAX_PENDING_FORM_DATA; }
+		}
+		int count = 0, kept = 0;
+		for (int i = 0; i < total; i++) {
+			if (g_pending_form_data[i].gen < drain_gen)
+				pend[count++] = g_pending_form_data[i].mc;
+			else
+				g_pending_form_data[kept++] = g_pending_form_data[i];
+		}
+		for (int i = total; i < g_pending_form_data_count; i++)
+			g_pending_form_data[kept++] = g_pending_form_data[i];
+		g_pending_form_data_count = kept;
 		for (int i = 0; i < count; i++)
 		{
 			MovieClip* mc = pend[i];
@@ -26538,7 +26606,10 @@ static void avm1FireFormDataEvents(SWFAppContext* app_context)
 				continue;
 			avm1FireFormDataEvent(app_context, mc);
 		}
+		if (pend != pend_small) free(pend);
+		if (count == 0) break;
 	}
+	g_in_form_data_drain--;
 }
 
 // --- Per-tick loaded-child-movie advancement ---
@@ -28215,9 +28286,7 @@ static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fir
 		int _saved_is_playing = is_playing;
 
 		entry->init_func(app_context);
-		g_delivered_mc[g_delivered_next] = mc;
-		g_delivered_epoch[g_delivered_next] = g_direct_load_epoch;
-		g_delivered_next = (g_delivered_next + 1) % MAX_DELIVERED_THIS_TICK;
+		actionNoteLoadedMovieDelivered(mc);
 		// Register the loaded movie's playhead BEFORE its frame 1 runs. This used
 		// to be gated on `is_level`, which is why a movie loadMovie'd into a
 		// HOLDER CLIP never advanced past its first frame: nothing called

@@ -36,13 +36,22 @@ SpriteFrameScriptFn actionGetSpriteFrameScript(size_t char_id, size_t frame_idx)
 
 #define MAX_PENDING_SPRITE_SCRIPTS 16
 
-static PendingSpriteScriptEntry g_pending[MAX_PENDING_SPRITE_SCRIPTS];
+extern int ng_table_grow(void** table, size_t* cap, size_t elem, size_t initial);
+// s28 w1-leads: growable (was a fixed 16: a sprite script issuing more than
+// 16 self-gotos before the next flush lost the later target-frame scripts).
+// MAX_PENDING_SPRITE_SCRIPTS is now only the initial capacity. The flush only
+// enqueues (it runs no script), so no enqueue can realloc under a walk.
+static PendingSpriteScriptEntry* g_pending = NULL;
+static size_t g_pending_cap = 0;
 static size_t g_pending_count = 0;
 
 int actionQueuePendingSpriteScript(size_t char_id, size_t frame_idx,
                                    SpriteFrameScriptFn fn)
 {
-	if (g_pending_count >= MAX_PENDING_SPRITE_SCRIPTS) return 0;
+	if (g_pending_count >= g_pending_cap
+	    && !ng_table_grow((void**)&g_pending, &g_pending_cap,
+	                      sizeof(PendingSpriteScriptEntry), MAX_PENDING_SPRITE_SCRIPTS))
+		return 0;
 	g_pending[g_pending_count].fn = fn;
 	g_pending[g_pending_count].char_id = char_id;
 	g_pending[g_pending_count].frame_idx = frame_idx;

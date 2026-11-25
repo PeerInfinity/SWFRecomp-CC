@@ -1,0 +1,1512 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 5b74145a..df0c3cef 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -26049,9 +26049,19 @@ static void aq_dispatch_timeline_unload(SWFAppContext* app_context, void* user)
+ 		pu->mc->avm1_removed = 1;
+ 		pu->mc->depth = -(int)pu->swf_depth - 1 - 16384;
+ 
++		// s28 w2-avm1-leads-land: SWF6+ handlers are closures, so bare names
++		// resolve through the DEFINING timeline, not the dying clip (the same
++		// rule aq_dispatch_unload / mc_call_as2_handler_ng apply). FP32
++		// (regression/avm1_onunload_setvar_scope): a _root-defined onUnload
++		// doing `n = n + 1` updates _root.n and reads n=2, with this=_level0.a.
++		// Only a SWF5 handler takes the clip as its base clip. `this` now
++		// comes from the this-stack push (this_mc), as in aq_dispatch_unload.
+ 		MovieClip* saved_context = g_current_context;
+-		actionSetCurrentContext(pu->mc);
+-		invokeUnloadHandler(app_context, pu->func, NULL);
++		int _tuv = (pu->func->swf_version != 0)
++			? (int) pu->func->swf_version : g_swf_version;
++		if (_tuv < 6)
++			actionSetCurrentContext(pu->mc);
++		invokeUnloadHandler(app_context, pu->func, pu->mc);
+ 		actionSetCurrentContext(saved_context);
+ 	}
+ 	free(pu);
+@@ -26236,15 +26246,32 @@ static int g_pending_direct_stamped = 0;
+ // movie's clip enterFrame starts on the NEXT tick (Flash: no `cx` on the
+ // delivery tick). Read by ng_dispatch_loaded_shell_enterframe (tag.c).
+ #define MAX_DELIVERED_THIS_TICK 16
+-static MovieClip* g_delivered_mc[MAX_DELIVERED_THIS_TICK];
+-static unsigned g_delivered_epoch[MAX_DELIVERED_THIS_TICK];
+-static int g_delivered_next = 0;
++// s28 w1-leads: growable list keyed by epoch (was a 16-slot ring: the 17th
++// delivery of one tick overwrote the 1st, whose movie then got its clip
++// enterFrame on the delivery tick). The list is reset lazily when the epoch
++// moves on; MAX_DELIVERED_THIS_TICK is now only the initial capacity.
++static MovieClip** g_delivered_mc = NULL;
++static size_t g_delivered_cap = 0;
++static size_t g_delivered_count = 0;
++static unsigned g_delivered_list_epoch = 0;
+ int actionLoadedMovieDeliveredThisTick(MovieClip* mc)
+ {
+-	for (int i = 0; i < MAX_DELIVERED_THIS_TICK; i++)
+-		if (g_delivered_mc[i] == mc && g_delivered_epoch[i] == g_direct_load_epoch) return 1;
++	if (g_delivered_list_epoch != g_direct_load_epoch) return 0;
++	for (size_t i = 0; i < g_delivered_count; i++)
++		if (g_delivered_mc[i] == mc) return 1;
+ 	return 0;
+ }
++static void actionNoteLoadedMovieDelivered(MovieClip* mc)
++{
++	if (g_delivered_list_epoch != g_direct_load_epoch) {
++		g_delivered_list_epoch = g_direct_load_epoch;
++		g_delivered_count = 0;
++	}
++	if (g_delivered_count < g_delivered_cap
++	    || ng_table_grow((void**)&g_delivered_mc, &g_delivered_cap,
++	                     sizeof(MovieClip*), MAX_DELIVERED_THIS_TICK))
++		g_delivered_mc[g_delivered_count++] = mc;
++}
+ 
+ // --- Deferred loadVariables `onData` queue ---------------------------------
+ // Ruffle's load_form_into_object (core/src/loader.rs:1028-1042) parses the form
+@@ -26261,14 +26288,38 @@ int actionLoadedMovieDeliveredThisTick(MovieClip* mc)
+ // another loadVariables (from_gnash actionscript.all/MovieClip-v6 does exactly
+ // that) lands on the NEXT tick rather than recursing.
+ #define MAX_PENDING_FORM_DATA 16
+-static MovieClip* g_pending_form_data[MAX_PENDING_FORM_DATA];
++// s28 w1-leads: growable (was a fixed 16: the 17th loadVariables completed in
++// one tick silently lost its onData). MAX_PENDING_FORM_DATA is now only the
++// initial capacity. The drain copies the queue out before dispatching, so an
++// enqueue from inside a handler never reallocs under the walk.
++//
++// s28 w2-avm1-leads-land: DELIVERY TICK. Flash Player 32 (coordinator capture,
++// regression/avm1_loadvariables_ondata_overflow) fires the onData of a
++// loadVariables issued from frame N's script AFTER frame N+1's script, not at
++// the end of frame N's own tick (Ruffle's runner order, which we used to
++// mirror). Each entry carries the drain generation it was queued in; a drain
++// fires only entries queued BEFORE it began (g_form_data_gen moves on once per
++// drain, i.e. once per tick). Entries queued from INSIDE the drain (an onData
++// that issues another loadVariables: gnash MovieClip-v6's handshake) stay
++// immediate, as before, so the re-entrant chain still completes.
++typedef struct { MovieClip* mc; unsigned gen; } PendingFormData;
++static PendingFormData* g_pending_form_data = NULL;
++static size_t g_pending_form_data_cap = 0;
+ static int g_pending_form_data_count = 0;
++static unsigned g_form_data_gen = 1;
++static int g_in_form_data_drain = 0;
+ 
+ static void avm1QueueFormDataEvent(MovieClip* mc)
+ {
+ 	if (mc == NULL) return;
+-	if (g_pending_form_data_count < MAX_PENDING_FORM_DATA)
+-		g_pending_form_data[g_pending_form_data_count++] = mc;
++	if ((size_t)g_pending_form_data_count < g_pending_form_data_cap
++	    || ng_table_grow((void**)&g_pending_form_data, &g_pending_form_data_cap,
++	                     sizeof(PendingFormData), MAX_PENDING_FORM_DATA)) {
++		g_pending_form_data[g_pending_form_data_count].mc = mc;
++		g_pending_form_data[g_pending_form_data_count].gen =
++			g_in_form_data_drain ? 0u : g_form_data_gen;
++		g_pending_form_data_count++;
++	}
+ }
+ 
+ // One clip's `onData`. Deliberately a private copy of mc_call_as2_handler_ng's
+@@ -26344,12 +26395,29 @@ static void avm1FireFormDataEvents(SWFAppContext* app_context)
+ 	// gnash tests put the whole handshake in the LAST frame's script, leaving
+ 	// no later tick to drain into.
+ 	int guard = 0;
++	unsigned drain_gen = g_form_data_gen++;
++	g_in_form_data_drain++;
+ 	while (g_pending_form_data_count > 0 && guard++ < 8)
+ 	{
+-		int count = g_pending_form_data_count;
+-		MovieClip* pend[MAX_PENDING_FORM_DATA];
+-		for (int i = 0; i < count; i++) pend[i] = g_pending_form_data[i];
+-		g_pending_form_data_count = 0;
++		// Split the queue: entries due now (queued before this drain began, or
++		// from inside it) are copied out; later ones stay queued, in order.
++		int total = g_pending_form_data_count;
++		MovieClip* pend_small[MAX_PENDING_FORM_DATA];
++		MovieClip** pend = pend_small;
++		if (total > MAX_PENDING_FORM_DATA) {
++			pend = (MovieClip**)malloc((size_t)total * sizeof(MovieClip*));
++			if (pend == NULL) { pend = pend_small; total = MAX_PENDING_FORM_DATA; }
++		}
++		int count = 0, kept = 0;
++		for (int i = 0; i < total; i++) {
++			if (g_pending_form_data[i].gen < drain_gen)
++				pend[count++] = g_pending_form_data[i].mc;
++			else
++				g_pending_form_data[kept++] = g_pending_form_data[i];
++		}
++		for (int i = total; i < g_pending_form_data_count; i++)
++			g_pending_form_data[kept++] = g_pending_form_data[i];
++		g_pending_form_data_count = kept;
+ 		for (int i = 0; i < count; i++)
+ 		{
+ 			MovieClip* mc = pend[i];
+@@ -26357,7 +26425,10 @@ static void avm1FireFormDataEvents(SWFAppContext* app_context)
+ 				continue;
+ 			avm1FireFormDataEvent(app_context, mc);
+ 		}
++		if (pend != pend_small) free(pend);
++		if (count == 0) break;
+ 	}
++	g_in_form_data_drain--;
+ }
+ 
+ // --- Per-tick loaded-child-movie advancement ---
+@@ -28034,9 +28105,7 @@ static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fir
+ 		int _saved_is_playing = is_playing;
+ 
+ 		entry->init_func(app_context);
+-		g_delivered_mc[g_delivered_next] = mc;
+-		g_delivered_epoch[g_delivered_next] = g_direct_load_epoch;
+-		g_delivered_next = (g_delivered_next + 1) % MAX_DELIVERED_THIS_TICK;
++		actionNoteLoadedMovieDelivered(mc);
+ 		// Register the loaded movie's playhead BEFORE its frame 1 runs. This used
+ 		// to be gated on `is_level`, which is why a movie loadMovie'd into a
+ 		// HOLDER CLIP never advanced past its first frame: nothing called
+diff --git a/SWFModernRuntime/src/actionmodern/sprite_frame_scripts.c b/SWFModernRuntime/src/actionmodern/sprite_frame_scripts.c
+index a732a6d9..83f2ad9a 100644
+--- a/SWFModernRuntime/src/actionmodern/sprite_frame_scripts.c
++++ b/SWFModernRuntime/src/actionmodern/sprite_frame_scripts.c
+@@ -36,13 +36,22 @@ SpriteFrameScriptFn actionGetSpriteFrameScript(size_t char_id, size_t frame_idx)
+ 
+ #define MAX_PENDING_SPRITE_SCRIPTS 16
+ 
+-static PendingSpriteScriptEntry g_pending[MAX_PENDING_SPRITE_SCRIPTS];
++extern int ng_table_grow(void** table, size_t* cap, size_t elem, size_t initial);
++// s28 w1-leads: growable (was a fixed 16: a sprite script issuing more than
++// 16 self-gotos before the next flush lost the later target-frame scripts).
++// MAX_PENDING_SPRITE_SCRIPTS is now only the initial capacity. The flush only
++// enqueues (it runs no script), so no enqueue can realloc under a walk.
++static PendingSpriteScriptEntry* g_pending = NULL;
++static size_t g_pending_cap = 0;
+ static size_t g_pending_count = 0;
+ 
+ int actionQueuePendingSpriteScript(size_t char_id, size_t frame_idx,
+                                    SpriteFrameScriptFn fn)
+ {
+-	if (g_pending_count >= MAX_PENDING_SPRITE_SCRIPTS) return 0;
++	if (g_pending_count >= g_pending_cap
++	    && !ng_table_grow((void**)&g_pending, &g_pending_cap,
++	                      sizeof(PendingSpriteScriptEntry), MAX_PENDING_SPRITE_SCRIPTS))
++		return 0;
+ 	g_pending[g_pending_count].fn = fn;
+ 	g_pending[g_pending_count].char_id = char_id;
+ 	g_pending[g_pending_count].frame_idx = frame_idx;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 164a8217..b40f537b 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -14135,7 +14135,14 @@ typedef struct {
+ 	size_t orig_char_id;
+ 	char orig_instance_name[64];
+ } PendingFinalizeEntry;
+-static PendingFinalizeEntry ng_pending_finalize_entries[NG_PENDING_FINALIZE_CAP];
++// s28 w1-leads: growable (was a fixed NG_PENDING_FINALIZE_CAP = 256: the 257th
++// handler-bearing removal of one tick was dropped, so its clip was never
++// cleared and survived as a ghost). The cap is now only the initial size.
++// run_pending_finalize takes ownership of the table before walking it, so an
++// enqueue during the walk lands in a fresh table instead of overwriting (or,
++// now, reallocating) the entries being walked.
++static PendingFinalizeEntry* ng_pending_finalize_entries = NULL;
++static size_t ng_pending_finalize_cap = 0;
+ static int ng_pending_finalize_count = 0;
+ 
+ // ===========================================================================
+@@ -14480,10 +14487,13 @@ int ng_depth_has_pending_finalize(size_t depth)
+ void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth)
+ {
+ 	if (mc == NULL) return;
+-	if (ng_pending_finalize_count >= NG_PENDING_FINALIZE_CAP) return;
+ 	for (int i = 0; i < ng_pending_finalize_count; i++) {
+ 		if (ng_pending_finalize_entries[i].mc == mc) return;
+ 	}
++	if ((size_t)ng_pending_finalize_count >= ng_pending_finalize_cap
++	    && !ng_table_grow((void**)&ng_pending_finalize_entries, &ng_pending_finalize_cap,
++	                      sizeof(PendingFinalizeEntry), NG_PENDING_FINALIZE_CAP))
++		return;
+ 	PendingFinalizeEntry* slot =
+ 		&ng_pending_finalize_entries[ng_pending_finalize_count];
+ 	slot->mc = mc;
+@@ -14519,9 +14529,12 @@ void run_pending_finalize_mark_only(SWFAppContext* app_context)
+ void run_pending_finalize(SWFAppContext* app_context)
+ {
+ 	int n = ng_pending_finalize_count;
++	PendingFinalizeEntry* list = ng_pending_finalize_entries;
++	ng_pending_finalize_entries = NULL;
++	ng_pending_finalize_cap = 0;
+ 	ng_pending_finalize_count = 0;
+ 	for (int i = 0; i < n; i++) {
+-		PendingFinalizeEntry* e = &ng_pending_finalize_entries[i];
++		PendingFinalizeEntry* e = &list[i];
+ 		actionMarkMCPendingRemovalDirect(e->mc, e->swf_depth);
+ 		// Skip clear_display_entry when the slot has been overwritten by a
+ 		// same-frame fresh placement under a *different* instance name (a
+@@ -14603,6 +14616,7 @@ void run_pending_finalize(SWFAppContext* app_context)
+ 			}
+ 		}
+ 	}
++	free(list);
+ }
+ #else
+ void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth) {
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/create_test_swf.py
+new file mode 100644
+index 00000000..3f5c9beb
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/create_test_swf.py
+@@ -0,0 +1,28 @@
++#!/usr/bin/env python3
++"""avm1_loadvars_ondata_overflow: 20 MovieClip.loadVariables() calls issued in
++ONE frame must each fire their clip's onData (Flash fires one onData per
++completed load). s28 w1-leads item 2: our deferred onData queue was a fixed
++MAX_PENDING_FORM_DATA = 16 (action.c avm1QueueFormDataEvent) and silently
++dropped the 17th..20th event.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++N = 20
++T = trace_concat
++ondata = deffunc1('', [], T('onData ', get('this._name'), ' a=', get('this.a')))
++f1 = b''
++for i in range(N):
++    n = 'm%d' % i
++    f1 += callm('this', 'createEmptyMovieClip', n, i + 1)
++    f1 += get(n) + push('onData') + ondata + SETMEM
++    f1 += callm(n, 'loadVariables', 'vars.txt')
++f1 += T('frame 1 end')
++f2 = T('frame 2')
++f3 = T('frame 3') + STOP
++open(sys.argv[1], 'wb').write(swf(8, b'', [doaction(f) for f in (f1, f2, f3)]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/output.txt
+new file mode 100644
+index 00000000..7cde1efc
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/output.txt
+@@ -0,0 +1,23 @@
++frame 1 end
++frame 2
++onData m0 a=1
++onData m1 a=1
++onData m2 a=1
++onData m3 a=1
++onData m4 a=1
++onData m5 a=1
++onData m6 a=1
++onData m7 a=1
++onData m8 a=1
++onData m9 a=1
++onData m10 a=1
++onData m11 a=1
++onData m12 a=1
++onData m13 a=1
++onData m14 a=1
++onData m15 a=1
++onData m16 a=1
++onData m17 a=1
++onData m18 a=1
++onData m19 a=1
++frame 3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..8881b8f27150d5bc44a161a067e7d9f0a4234004
+GIT binary patch
+literal 4046
+zcmciFxlY4C5C-5M0+>5of(D^fDG^RM3l52^0wj>2L<<-ZDNdrqLeTLPZfJN9-ho#N
+zGi$U;!4$j2q>9$b{QJd@fBEe0X8flNbWr{RzCW;5!pS`7bv)ef_YX@SbTFSlG{kG^
+z2J%rv!}K;E1G1M!53Bhy@YqdEmYk-Y?ERws+DML@jSj9?@)7%;)qEUiw@yrE@HxtZ
+z4tVC@Qe|*f1l+ewn&9%Bl29@GI3I{A0fr7$ukuOY)pUF7*;{7!#QSq`wC85qJl&dZ
+z!#p&T9&d#Vyl<p&fFUNPqJiTC1N{PIs0A2mx(1FD40KhHp&nqU>l!#tFxbmD-3%~n
+z>KZssFwkF^&cjxKVN2J*ae{$v7-ZNEFl_4@I8HFoorMfL0frr21IGylx}B3@H^8u~
+zYv4G+K%GK{y#T|Wu7TtJGfX0yvWD2VsOff=(wEd)&gBV=>4M?g)po36S-U)eF;g&n
+z>)MW0>}!`NFlGyeZ)4lBik0p11O_ehW$s(rcC2D+yF7t0S1^2g+m2N%ZkH!8>{CV>
+z`&PFdtJvKxPhcz*XT!I>?O4V7c6kD0v0(TXxE-t5;4V*KEENpj4!2_!OWfuC$Dq=9
+h?$R@GC9Wi`Csc8S*%Ci57ppb9QXW{TqZ-kNfL}2ItBn8v
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/test.toml
+new file mode 100644
+index 00000000..c64cb4c7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/test.toml
+@@ -0,0 +1 @@
++num_frames = 3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/vars.txt b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/vars.txt
+new file mode 100644
+index 00000000..1c377f29
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loadvars_ondata_overflow/vars.txt
+@@ -0,0 +1 @@
++a=1
+\ No newline at end of file
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/create_test_swf.py
+new file mode 100644
+index 00000000..4ec2451f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/create_test_swf.py
+@@ -0,0 +1,31 @@
++#!/usr/bin/env python3
++"""avm1_onunload_setvar_scope: a function defined in _root's frame script and
++installed as a timeline clip's onUnload does an UNQUALIFIED `n = n + 1`.
++SetVariable must resolve `n` through the function's captured scope chain
++(_root, where `n` already exists), so _root.n counts the unloads. Also the
++same handler called as an ordinary method and as onEnterFrame, for contrast.
++s28 w1-leads side lead (seen while building avm1_remove_unload_finalize_overflow:
++_root.unloads stayed 0).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++import struct
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++defs = sprite(1, [doaction(STOP)])
++inc = deffunc1('', [], push('n') + get('n') + push(1) + ADD2 + SETVAR
++               + T('  in handler: n=', get('n'), ' this=', get('this'), ' this.n=', get('this.n')))
++f1 = (place(1, 1, 'a') + place(2, 1, 'b')
++      + doaction(push('n', 0) + SETVAR
++                 + get('a') + push('onUnload') + inc + SETMEM
++                 + get('b') + push('bump') + inc + SETMEM
++                 + callm('b', 'bump')
++                 + T('frame 1 after method call: _root.n=', get('_root.n'), ' b.n=', get('b.n'))))
++f2 = tag(28, struct.pack('<H', 1)) + doaction(T('frame 2 after remove: _root.n=', get('_root.n')))
++f3 = doaction(T('frame 3: _root.n=', get('_root.n')) + STOP)
++open(sys.argv[1], 'wb').write(swf(8, defs, [f1, f2, f3]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/output.txt b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/output.txt
+new file mode 100644
+index 00000000..4a82953e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/output.txt
+@@ -0,0 +1,5 @@
++  in handler: n=1 this=_level0.b this.n=undefined
++frame 1 after method call: _root.n=1 b.n=undefined
++  in handler: n=2 this=_level0.a this.n=undefined
++frame 2 after remove: _root.n=2
++frame 3: _root.n=2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/test.swf b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..467486e341dc3e66318b73882c74602c9b334b67
+GIT binary patch
+literal 580
+zcmc&yyGq1B6g|nXo7G0t!X_(&;8r52jVvrKxH#Pkidf3T%#wv<vcza@XJJ2$jsM{<
+z_)qcPJU}e8bc*5J$2oJ)%v{`F4`x2F!p1xB@r+%8*(PY6`&Ctau6gj_ivUwfz4Z4u
+z)C_zA5zfS`2e<)X5io1$1gIf&>p*UAY?|vBZ#^!h;F@js(De`y7i#FX04bMNCfdfS
+zDaO)Hx-P}qvP_l_6DZdQ7$Q`xU#AbL_gkSkVy;G)j3OF@IMHLa`llhtBzylk%+-$D
+z2Ns3Sj69NhQJO+#rcCl!-s?0S%ex}aOZMi7Uk7BRzP`EQl#CkVt;x1BqG$5yR!@bK
+co&0etUzjX^GQTS`|3J9yj(hS)d-E;600qQ;b^rhX
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/test.toml b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/test.toml
+new file mode 100644
+index 00000000..c64cb4c7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_onunload_setvar_scope/test.toml
+@@ -0,0 +1 @@
++num_frames = 3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/create_test_swf.py
+new file mode 100644
+index 00000000..e5fdc559
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/create_test_swf.py
+@@ -0,0 +1,40 @@
++#!/usr/bin/env python3
++"""avm1_remove_unload_finalize_overflow: 300 timeline sprites that each have an
++onUnload handler are removed by 300 RemoveObject2 tags in ONE frame. Every
++onUnload must fire once and every clip must be gone afterwards. s28 w1-leads
++item 2: the post-drain finalize queue (tag.c queue_pending_finalize_mc,
++NG_PENDING_FINALIZE_CAP = 256) silently dropped the 257th+ removal, leaving a
++ghost clip that is never cleared.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++import struct
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++N = 300
++T = trace_concat
++defs = sprite(1, [doaction(STOP)])
++places = b''.join(place(i + 1, 1, 's%d' % i) for i in range(N))
++onun = deffunc1('', [], get('_root') + push('unloads') + get('_root.unloads') + push(1) + ADD2 + SETMEM)
++r1 = push('unloads', 0) + SETVAR
++for i in range(N):
++    r1 += get('s%d' % i) + push('onUnload') + onun + SETMEM
++r1 += T('frame 1 handlers set')
++removes = b''.join(tag(28, struct.pack('<H', i + 1)) for i in range(N))
++r2 = T('frame 2 unloads=', get('unloads'))
++# frame 3: count survivors by name
++r3 = push('alive', 0) + SETVAR
++for i in range(N):
++    r3 += (push('alive') + get('alive') + typeof_('s%d' % i) + push('movieclip') + EQ2
++           + ADD2 + SETVAR)
++r3 += T('frame 3 unloads=', get('unloads'), ' alive=', get('alive'))
++r3 += T('frame 3 depth 300 instance=', callm('_root', 'getInstanceAtDepth', N, keep=True))
++r3 += STOP
++f1 = places + doaction(r1)
++f2 = removes + doaction(r2)
++f3 = doaction(r3)
++open(sys.argv[1], 'wb').write(swf(8, defs, [f1, f2, f3]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/output.txt b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/output.txt
+new file mode 100644
+index 00000000..5f547315
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/output.txt
+@@ -0,0 +1,4 @@
++frame 1 handlers set
++frame 2 unloads=300
++frame 3 unloads=300 alive=0
++frame 3 depth 300 instance=undefined
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/test.swf b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..35f1773c07a28118ec9bf5a1c92b5a772d5ed309
+GIT binary patch
+literal 46183
+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
+E0Hy58rvLx|
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/test.toml b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/test.toml
+new file mode 100644
+index 00000000..c64cb4c7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_remove_unload_finalize_overflow/test.toml
+@@ -0,0 +1 @@
++num_frames = 3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/create_test_swf.py
+new file mode 100644
+index 00000000..c2638627
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/create_test_swf.py
+@@ -0,0 +1,45 @@
++#!/usr/bin/env python3
++"""avm1_sprite_goto_script_overflow: 20 timeline sprites, each sent to its
++frame 2 from ONE root script (tellTarget + gotoAndStop, and a second wave via
++MovieClip.gotoAndStop). Every sprite's frame-2 DoAction must run once (Flash
++queues the target frame's actions per goto). s28 w1-leads item 2: the
++deferred sprite-script queue (sprite_frame_scripts.c, MAX_PENDING_SPRITE_SCRIPTS
++= 16) dropped entries past 16 between flushes.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++import struct
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++N = 20
++T = trace_concat
++GOTO = lambda f: op(0x81, struct.pack('<H', f))  # GotoFrame (0-based)
++sp_f1 = doaction(STOP)
++sp_f2 = doaction(T('f2 ', get('this._name')) + STOP)
++sp_f3 = doaction(T('f3 ', get('this._name')) + STOP)
++defs = sprite(1, [sp_f1, sp_f2, sp_f3])
++# Sprite 2: its OWN frame-1 script issues 20 self-gotos (alternating frames 2
++# and 3): these are the gotos that go through the pending sprite-script queue.
++loop_f1 = b''
++for i in range(N):
++    loop_f1 += GOTO(1 + (i % 2)) + push('k') + GETVAR + push(1) + ADD2 + push('k') + op(0x4d) + SETVAR
++loop_f1 = doaction(push('k', 0) + SETVAR + loop_f1 + T('L self-goto wave issued k=', get('k')))
++lp2 = doaction(T('L2 ', get('this._name')) + STOP)
++lp3 = doaction(T('L3 ', get('this._name')) + STOP)
++defs += sprite(2, [loop_f1, lp2, lp3])
++places = b''.join(place(i + 1, 1, 's%d' % i) for i in range(N)) + place(100, 2, 'L')
++r1 = b''
++for i in range(N):
++    r1 += settarget('s%d' % i) + GOTO(1) + settarget('')
++r1 += T('root tellTarget wave issued')
++for i in range(N):
++    r1 += callm('s%d' % i, 'gotoAndStop', 3)
++r1 += T('root method wave issued')
++f1 = places + doaction(r1)
++f2 = doaction(T('root frame 2'))
++f3 = doaction(T('root frame 3') + STOP)
++open(sys.argv[1], 'wb').write(swf(8, defs, [f1, f2, f3]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/output.txt b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/output.txt
+new file mode 100644
+index 00000000..678724fa
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/output.txt
+@@ -0,0 +1,65 @@
++L self-goto wave issued k=20
++root tellTarget wave issued
++root method wave issued
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++L2 L
++L3 L
++f2 s0
++f2 s1
++f2 s2
++f2 s3
++f2 s4
++f2 s5
++f2 s6
++f2 s7
++f2 s8
++f2 s9
++f2 s10
++f2 s11
++f2 s12
++f2 s13
++f2 s14
++f2 s15
++f2 s16
++f2 s17
++f2 s18
++f2 s19
++f3 s0
++f3 s1
++f3 s2
++f3 s3
++f3 s4
++f3 s5
++f3 s6
++f3 s7
++f3 s8
++f3 s9
++f3 s10
++f3 s11
++f3 s12
++f3 s13
++f3 s14
++f3 s15
++f3 s16
++f3 s17
++f3 s18
++f3 s19
++root frame 2
++root frame 3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/test.swf b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d58b63cd8501205f44de9a1144a845245ca49bb1
+GIT binary patch
+literal 2349
+zcmeH}&2H0B5QR_dG(SN9XeES{Ad^LQm1;Y`3j_#6HYp2=V2L8dX{)An6&nycSOMz(
+zu6Yk0fHhB4<_s-dqpI8os8`>yPwdG(GuM9hdbhS!2Trj14fy^M_k28Eha6A5Gdb$7
+z1WWMY`Bgl^ecvnrvnYV60QvqwhK8vEZ;mHN37(JImMOl{1f11>dVnYQe&~M?GBw~3
+zax<X$$&-f~pC=mf#A-=Sj(+PMUi7ZIc>T-k6~a!_G=OoCCG*+VUYe)D`^mc`ILNZM
+z$uu~8aM3`c_Mf&MyR`NAe{KDx(ke;wX4?>A8)qTOCq<+(DJCtEI;0AzORAE3q#CJD
+zs*?t!8>At=R$4bn;WqJ>Vn|$8jEF0WF>zI~LtInr64w=b#M_E};)ddYxT!eA=SpiT
+z6E~JQ{ZR%^ef~L}&{LU9%CIP-qKu2OQ<UAJ>=k9dC<jG3v}9SA<8N8ic3sqVVbpeI
+z)OKmqc5T#lanyEo)OLB)R(+-kEYdU&@?<`LIa%x_x!sXybDNV54;R~=k)@V(ZkT0&
+z{rmWMx|^pbcyZ@aXXxyVoSm_=v*YaSIy-yL&c3sA;OrbaIpt-@A#@2zt!^o))h#Bq
+zy5*!+x1iMOmXuoEqEf3{R%&$%ORblub@zPaj*@&oofgMUcKr?CteiV$3;BKtBJgFf
+M`S0l%`dI_~0`bP0e*gdg
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/test.toml b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/test.toml
+new file mode 100644
+index 00000000..c64cb4c7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_sprite_goto_script_overflow/test.toml
+@@ -0,0 +1 @@
++num_frames = 3

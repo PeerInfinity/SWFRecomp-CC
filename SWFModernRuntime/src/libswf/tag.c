@@ -14301,7 +14301,14 @@ typedef struct {
 	size_t orig_char_id;
 	char orig_instance_name[64];
 } PendingFinalizeEntry;
-static PendingFinalizeEntry ng_pending_finalize_entries[NG_PENDING_FINALIZE_CAP];
+// s28 w1-leads: growable (was a fixed NG_PENDING_FINALIZE_CAP = 256: the 257th
+// handler-bearing removal of one tick was dropped, so its clip was never
+// cleared and survived as a ghost). The cap is now only the initial size.
+// run_pending_finalize takes ownership of the table before walking it, so an
+// enqueue during the walk lands in a fresh table instead of overwriting (or,
+// now, reallocating) the entries being walked.
+static PendingFinalizeEntry* ng_pending_finalize_entries = NULL;
+static size_t ng_pending_finalize_cap = 0;
 static int ng_pending_finalize_count = 0;
 
 // ===========================================================================
@@ -14646,10 +14653,13 @@ int ng_depth_has_pending_finalize(size_t depth)
 void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth)
 {
 	if (mc == NULL) return;
-	if (ng_pending_finalize_count >= NG_PENDING_FINALIZE_CAP) return;
 	for (int i = 0; i < ng_pending_finalize_count; i++) {
 		if (ng_pending_finalize_entries[i].mc == mc) return;
 	}
+	if ((size_t)ng_pending_finalize_count >= ng_pending_finalize_cap
+	    && !ng_table_grow((void**)&ng_pending_finalize_entries, &ng_pending_finalize_cap,
+	                      sizeof(PendingFinalizeEntry), NG_PENDING_FINALIZE_CAP))
+		return;
 	PendingFinalizeEntry* slot =
 		&ng_pending_finalize_entries[ng_pending_finalize_count];
 	slot->mc = mc;
@@ -14685,9 +14695,12 @@ void run_pending_finalize_mark_only(SWFAppContext* app_context)
 void run_pending_finalize(SWFAppContext* app_context)
 {
 	int n = ng_pending_finalize_count;
+	PendingFinalizeEntry* list = ng_pending_finalize_entries;
+	ng_pending_finalize_entries = NULL;
+	ng_pending_finalize_cap = 0;
 	ng_pending_finalize_count = 0;
 	for (int i = 0; i < n; i++) {
-		PendingFinalizeEntry* e = &ng_pending_finalize_entries[i];
+		PendingFinalizeEntry* e = &list[i];
 		actionMarkMCPendingRemovalDirect(e->mc, e->swf_depth);
 		// Skip clear_display_entry when the slot has been overwritten by a
 		// same-frame fresh placement under a *different* instance name (a
@@ -14769,6 +14782,7 @@ void run_pending_finalize(SWFAppContext* app_context)
 			}
 		}
 	}
+	free(list);
 }
 #else
 void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth) {
