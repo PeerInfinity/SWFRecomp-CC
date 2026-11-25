@@ -15,6 +15,9 @@ using std::endl;
 
 namespace SWFRecomp
 {
+	// Constant-pool slot marker: an entry declared past the ConstantPool
+	// action's end reads as the number 0 (Flash Player 9/10).
+	static const size_t CONSTANT_POOL_ZERO = (size_t) -1;
 	// Struct for tracking try/catch/finally block boundaries during inline parsing
 	struct TryBlockBoundary {
 		char* catch_start;      // Start of catch body (nullptr if no catch)
@@ -1476,8 +1479,17 @@ namespace SWFRecomp
 
 				case SWF_ACTION_CONSTANT_POOL:
 				{
+					// Malformed-bytecode bounds (Flash Player 9/10, upstream Ruffle
+					// tests avm1/malformed_actions/constant_pool_{overlong,overspill}):
+					// - execution always resumes at the declared action end, so
+					//   trailing bytes after the last string are ignored;
+					// - an entry whose NUL terminator is not inside the action (and
+					//   every entry after it) is the NUMBER 0, not a string.
+					char* cp_body = action_buffer;
+					char* cp_end = cp_body + length;
+
 					// Read count of strings (16-bit)
-					u16 count = VAL(u16, action_buffer);
+					u16 count = (length >= 2) ? VAL(u16, action_buffer) : 0;
 					action_buffer += 2;
 
 					out_script << "\t" << "// ConstantPool (" << count << " strings)" << endl;
@@ -1486,12 +1498,13 @@ namespace SWFRecomp
 					// (e.g., after an unconditional Jump). Flash only processes
 					// ConstantPool when it's actually executed.
 					if (in_dead_code) {
-						// Still need to advance past the strings
-						for (u16 i = 0; i < count; i++) {
-							size_t str_len = strlen(action_buffer);
+						for (u16 i = 0; i < count && action_buffer < cp_end; i++) {
+							char* nul = (char*) memchr(action_buffer, 0, cp_end - action_buffer);
+							if (nul == NULL) break;
 							declareString(context, action_buffer);
-							action_buffer += str_len + 1;
+							action_buffer = nul + 1;
 						}
+						action_buffer = cp_end;
 						break;
 					}
 
@@ -1502,7 +1515,17 @@ namespace SWFRecomp
 					for (u16 i = 0; i < count; i++)
 					{
 						char* str = action_buffer;
-						size_t str_len = strlen(str);
+						char* nul = (str < cp_end) ? (char*) memchr(str, 0, cp_end - str) : NULL;
+						if (nul == NULL)
+						{
+							// Out of the action's bounds: this and every later
+							// entry reads as the number 0.
+							for (; i < count; i++)
+							{
+								constant_pool.push_back(CONSTANT_POOL_ZERO);
+							}
+							break;
+						}
 
 						// Declare the string
 						declareString(context, str);
@@ -1512,9 +1535,10 @@ namespace SWFRecomp
 						constant_pool.push_back(str_id);
 
 						// Advance past string and null terminator
-						action_buffer += str_len + 1;
+						action_buffer = nul + 1;
 					}
 
+					action_buffer = cp_end;
 					break;
 				}
 
@@ -2427,6 +2451,14 @@ namespace SWFRecomp
 
 							size_t str_id = constant_pool[pool_index];
 
+							if (str_id == CONSTANT_POOL_ZERO)
+							{
+								// Pool entry past the ConstantPool action's end (FP9/10): number 0.
+								out_script << "(ConstantPool8[" << (int)pool_index << "] out of action bounds -> 0)" << endl;
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, 0x0000000000000000ULL);" << endl;
+								break;
+							}
+
 							out_script << "(ConstantPool8[" << (int)pool_index << "])" << endl;
 							out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
 									   << "strlen(str_" << to_string(str_id) << "), " << str_id << ");" << endl;
@@ -2449,6 +2481,14 @@ namespace SWFRecomp
 							}
 
 							size_t str_id = constant_pool[pool_index];
+
+							if (str_id == CONSTANT_POOL_ZERO)
+							{
+								// Pool entry past the ConstantPool action's end (FP9/10): number 0.
+								out_script << "(ConstantPool16[" << (int)pool_index << "] out of action bounds -> 0)" << endl;
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, 0x0000000000000000ULL);" << endl;
+								break;
+							}
 
 							out_script << "(ConstantPool16[" << (int)pool_index << "])" << endl;
 							out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
@@ -2475,7 +2515,11 @@ namespace SWFRecomp
 						push_length = length;
 					}
 
-					action_buffer += push_length;
+					// Execution resumes at the declared action end even when the
+					// last value spilled past it (Flash Player 9/10, upstream Ruffle
+					// test avm1/malformed_actions/push_overspill: the spilled value
+					// is read from the following bytes, which then still execute).
+					action_buffer += length;
 
 					break;
 				}

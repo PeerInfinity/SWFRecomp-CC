@@ -2233,6 +2233,21 @@ static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
 int avm2_text_box_info(struct Avm2EditTextExt* et, int32_t* out_xywh,
                        uint32_t* out_flags, uint32_t* out_bg,
                        uint32_t* out_border);
+// s27 w2b-draw-text-tint: the box rule above is DEVICE-font only. Flash
+// Player 32 (oracle avm2_bitmapdata_draw_text_glyph_cx, X embed lines): an
+// EMBEDDED-font field's box IS tinted (ff0000 -> ff00) by the draw() ct, by
+// its own cx under a drawn holder, and by holder + ct. 1 = device-font box,
+// 0 = embedded-font box, -1 = no box info.
+static int bd_tf_box_is_device(Avm2Context* ctx, Avm2Object* tf_obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, tf_obj);
+	if (ext == NULL || ext->edittext == NULL) return -1;
+	int32_t bb[4];
+	uint32_t flags = 0, bg = 0, bc = 0;
+	if (!avm2_text_box_info(ext->edittext, bb, &flags, &bg, &bc)) return -1;
+	return (flags & 4u) != 0;
+}
+
 static void bd_draw_tf_box(Avm2Context* ctx, uint32_t* buf, int W, int H,
                            int transparent, Avm2Object* tf_obj,
                            double ma, double mb, double mc, double md,
@@ -2253,10 +2268,18 @@ static void bd_draw_tf_box(Avm2Context* ctx, uint32_t* buf, int W, int H,
 	                        node_alpha);
 }
 
+static void bd_draw_tf_box_tinted(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                                  Avm2Object* tf_obj,
+                                  double ma, double mb, double mc, double md,
+                                  double mtx, double mty,
+                                  int16_t rm, int16_t gm, int16_t bmul, int16_t am,
+                                  int16_t ro, int16_t go, int16_t bo, int16_t ao);
+
 // Thin BitmapData.draw wrapper — byte-for-byte the pre-refactor rasterizer
 // (node_alpha == 1, cxform/blend passed through). Keeps
-// avm2_bitmapdata_draw_textfield green. s27: the box is drawn first,
-// untinted (bd_draw_tf_box); the draw colorTransform still tints the glyphs.
+// avm2_bitmapdata_draw_textfield green. s27: the box is drawn first; a
+// device-font box untinted (bd_draw_tf_box), an embedded-font box through the
+// draw colorTransform (s27 w2b, Flash); the draw colorTransform tints glyphs.
 static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                               Avm2Object* tf_obj,
                               double ma, double mb, double mc, double md,
@@ -2265,8 +2288,12 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                               int16_t ro, int16_t go, int16_t bo, int16_t ao,
                               int blend_mode)
 {
-	bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
-	               dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
+	if (has_cxform && dst->pixels != NULL && bd_tf_box_is_device(ctx, tf_obj) == 0)
+		bd_draw_tf_box_tinted(ctx, dst, tf_obj, ma, mb, mc, md, mtx, mty,
+		                      rm, gm, bmul, am, ro, go, bo, ao);
+	else
+		bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+		               dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
 	text_raster_core(ctx, dst->pixels, (int) dst->width, (int) dst->height,
 	                 dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty,
 	                 has_cxform, rm, gm, bmul, am, ro, go, bo, ao,
@@ -2584,6 +2611,37 @@ static void bd_cx_compose_layer(Avm2BitmapDataExt* dst, const uint32_t* layer)
 	}
 }
 
+// s27 w2b-draw-text-tint: draw(embedded tf, m, ct) paints the field's box
+// through the draw colorTransform (Flash: X embed box draw(tf,ct) = ff00):
+// raster it untinted into a transparent layer, then compose that layer
+// through the ct with the walk's per-texel cx math (bd_cx_compose_layer).
+static void bd_draw_tf_box_tinted(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                                  Avm2Object* tf_obj,
+                                  double ma, double mb, double mc, double md,
+                                  double mtx, double mty,
+                                  int16_t rm, int16_t gm, int16_t bmul, int16_t am,
+                                  int16_t ro, int16_t go, int16_t bo, int16_t ao)
+{
+	size_t n = (size_t) dst->width * dst->height;
+	uint32_t* layer = (uint32_t*) calloc(n ? n : 1, sizeof(uint32_t));
+	if (layer == NULL)
+	{
+		bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+		               dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
+		return;
+	}
+	bd_draw_tf_box(ctx, layer, (int) dst->width, (int) dst->height, 1,
+	               tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
+	BdCx saved = g_bd_cx;
+	g_bd_cx.m[0] = rm / 256.0; g_bd_cx.m[1] = gm / 256.0;
+	g_bd_cx.m[2] = bmul / 256.0; g_bd_cx.m[3] = am / 256.0;
+	g_bd_cx.a[0] = ro; g_bd_cx.a[1] = go;
+	g_bd_cx.a[2] = bo; g_bd_cx.a[3] = ao;
+	bd_cx_compose_layer(dst, layer);
+	g_bd_cx = saved;
+	free(layer);
+}
+
 // An object's local-to-global matrix (twips), stopping below the Stage like
 // Ruffle's local_to_global_matrix. m = {a, b, c, d, tx, ty}.
 static void bd_l2g_matrix(Avm2Context* ctx, Avm2Object* obj, double m[6])
@@ -2861,9 +2919,13 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		return;
 	}
 
-	// s27 w2-draw-cx-text: a TextField's box goes straight onto the target,
-	// untinted (Flash), under the node's glyphs.
-	if (ext->edittext != NULL && !ext->is_bitmap && ext->shape_vert_count == 0)
+	// s27 w2-draw-cx-text: a DEVICE-font TextField's box goes straight onto
+	// the target, untinted (Flash), under the node's glyphs. s27 w2b: an
+	// EMBEDDED-font box is tinted (Flash), so it goes into the cx layer below.
+	int tf_box = (ext->edittext != NULL && !ext->is_bitmap
+	              && ext->shape_vert_count == 0)
+		? bd_tf_box_is_device(ctx, obj) : -1;
+	if (tf_box == 1)
 		bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
 		               dst->transparency, obj, wa, wb, wc, wd,
 		               wtx / 20.0, wty / 20.0, alpha);
@@ -2885,6 +2947,10 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 			sdst = &cxdst;
 		}
 	}
+	if (tf_box == 0)
+		bd_draw_tf_box(ctx, sdst->pixels, (int) sdst->width, (int) sdst->height,
+		               sdst->transparency, obj, wa, wb, wc, wd,
+		               wtx / 20.0, wty / 20.0, alpha);
 	if (ext->is_bitmap)
 		// A Bitmap inside the drawn subtree. avm2_cpu_walk has had this arm all
 		// along; this walk had not, so drawing a container that holds a Bitmap

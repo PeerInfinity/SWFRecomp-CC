@@ -1,0 +1,4 @@
+draw(tf) red=false green=false
+draw(tf,m,ct) red=false green=false
+draw(h>Color c>tf) red=false green=false
+draw(h2>tf,m,ct) red=false green=false

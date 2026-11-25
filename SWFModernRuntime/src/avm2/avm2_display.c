@@ -2603,11 +2603,18 @@ static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj)
 // defers with it, so a later stop()/play() inside the same frame script no
 // longer wins. Pre-fix, `playing` was assigned unconditionally at the top of
 // goto_frame.
+#define MC_GOTO_PLAY_FLAG 2
+static void mc_set_programmatically_played(Avm2DisplayObjectExt* ext);
 static void mc_goto_frame_now(Avm2Context* ctx, Avm2Object* obj,
                               Avm2DisplayObjectExt* ext, uint16_t frame,
                               int stop)
 {
-	ext->playing = stop ? 0 : 1;
+	// stop: 0 = play, 1 = stop, MC_GOTO_PLAY_FLAG = play + set the isPlaying
+	// flag when the goto RUNS (gotoAndPlay/nextScene/prevScene; a queued one
+	// leaves isPlaying unchanged until it is flushed, Flash
+	// avm2/goto_scene_isplaying, goto_framescript_queued/swf13).
+	if (stop == MC_GOTO_PLAY_FLAG) mc_set_programmatically_played(ext);
+	ext->playing = (stop == 1) ? 0 : 1;
 	// In AS3 a no-op goto still has user-visible side effects, so it runs.
 	if (frame != ext->current_frame)
 	{
@@ -3333,7 +3340,8 @@ static void mc_goto_frame(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int
 		// The play/stop is queued with the frame and applied by
 		// mc_goto_frame_now when the queue is flushed.
 		ext->queued_goto_frame = frame;
-		ext->queued_goto_stop = stop ? 1 : 0;
+		ext->queued_goto_stop = (stop == MC_GOTO_PLAY_FLAG) ? MC_GOTO_PLAY_FLAG
+		                      : (stop ? 1 : 0);
 		if (frame < ext->frame_script_cap
 		    && ext->frame_scripts[frame].kind == AVM2_VALUE_OBJECT)
 		{
@@ -7918,10 +7926,15 @@ static Avm2Value mc_get_frames_loaded(Avm2Activation* act)
 	return avm2_integer((int32_t) (fl < tf ? fl : tf));
 }
 
+// Flash: isPlaying is a flag of its own, not "the clip is playing". play(),
+// gotoAndPlay(), nextScene() and prevScene() set it (never on a 1-frame
+// clip), only stop() clears it; nextFrame/prevFrame/gotoAndStop stop the clip
+// but leave the flag (Flash goldens avm2/goto_isplaying,
+// goto_framescript_queued_next_prev, goto_scene_isplaying; Ruffle KF).
 static Avm2Value mc_get_is_playing(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = this_display(act);
-	return avm2_bool(ext != NULL && ext->programmatically_played && ext->playing);
+	return avm2_bool(ext != NULL && ext->programmatically_played);
 }
 
 static void mc_set_programmatically_played(Avm2DisplayObjectExt* ext)
@@ -7946,7 +7959,11 @@ static Avm2Value mc_play(Avm2Activation* act)
 static Avm2Value mc_stop(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = this_display(act);
-	if (ext != NULL) ext->playing = 0;
+	if (ext != NULL)
+	{
+		ext->playing = 0;
+		ext->programmatically_played = 0;
+	}
 	return avm2_undefined();
 }
 
@@ -8297,10 +8314,12 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
 	// it) NOOPs a goto issued while this clip runs a frame script — the
 	// clip neither jumps to frame 1 nor stops/plays.
 	if (frame == 0 && ext->executing_frame_script) return;
-	if (!stop) mc_set_programmatically_played(ext);
 	if (frame < 1) frame = 1;
-	// TRUNCATING u16 cast (Ruffle `frame.max(1) as u16`).
-	mc_goto_frame(ctx, obj, (uint16_t) (uint32_t) frame, stop);
+	// TRUNCATING u16 cast (Ruffle `frame.max(1) as u16`). gotoAndPlay sets
+	// the isPlaying flag when the goto RUNS: a queued one from a frame script
+	// leaves it unchanged until flushed, and then sets it even over an
+	// intervening stop() (Flash avm2/goto_framescript_queued/swf13).
+	mc_goto_frame(ctx, obj, (uint16_t) (uint32_t) frame, stop ? 1 : MC_GOTO_PLAY_FLAG);
 }
 
 static Avm2Value mc_goto_and_play(Avm2Activation* act)
@@ -8332,7 +8351,7 @@ static Avm2Value mc_next_scene(Avm2Activation* act)
 	}
 	if (best >= 0)
 	{
-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, 0);
+		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, MC_GOTO_PLAY_FLAG);
 	}
 	else
 	{
@@ -8340,7 +8359,7 @@ static Avm2Value mc_next_scene(Avm2Activation* act)
 		// next_scene's .or(current_scene) — movieclip_next_scene).
 		SceneInfo cur;
 		current_scene_of(ext, &cur);
-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, 0);
+		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, MC_GOTO_PLAY_FLAG);
 	}
 	return avm2_undefined();
 }
@@ -8364,13 +8383,13 @@ static Avm2Value mc_prev_scene(Avm2Activation* act)
 	}
 	if (best >= 0)
 	{
-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, 0);
+		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, MC_GOTO_PLAY_FLAG);
 	}
 	else
 	{
 		// No previous scene: goto the CURRENT scene's start (Ruffle
 		// prev_scene's .or(current_scene) — movieclip_prev_scene).
-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, 0);
+		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, MC_GOTO_PLAY_FLAG);
 	}
 	return avm2_undefined();
 }

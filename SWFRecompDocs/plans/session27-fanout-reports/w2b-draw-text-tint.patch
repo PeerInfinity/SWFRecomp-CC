@@ -1,0 +1,1188 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index dafa6470..2fed0701 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -14863,7 +14863,7 @@ static void bd1_draw_textfield_box(BitmapDataNative* dest, MovieClip* mc,
+                                    double mtx, double mty,
+                                    int dx0, int dy0, int dx1, int dy1,
+                                    const uint8_t* stencil, uint8_t stencil_write_value,
+-                                   uint8_t* stencil_out)
++                                   uint8_t* stencil_out, const DrawColorTransform* cx)
+ {
+ 	if (mc->dynamic_props == NULL || dx1 <= dx0 || dy1 <= dy0) return;
+ 	ASObject* props = (ASObject*) mc->dynamic_props;
+@@ -14907,7 +14907,14 @@ static void bd1_draw_textfield_box(BitmapDataNative* dest, MovieClip* mc,
+ 	                        ma, mb, mc_, md, mtx, mty,
+ 	                        bx, by, (double) mc->width, (double) mc->height,
+ 	                        has_bg, bg & 0xFFFFFFu, has_border, bc & 0xFFFFFFu, 1.0);
+-	bd1_apply_cx_over(dest, g_bd1_scratch, NULL, NULL, dx0, dy0, dx1, dy1,
++	// s27 w2b-draw-text-tint: only a DEVICE-font box is untinted. Flash
++	// Player 32 tints an EMBEDDED-font field's box by the draw() ct and by
++	// its own / an ancestor's colour transform (AVM2 oracle
++	// avm2_bitmapdata_draw_text_glyph_cx, X embed lines); the renderer is
++	// AVM-agnostic, so the same rule applies here (AVM1 twin
++	// avm1_bitmapdata_draw_text_embed_cx is a pending FLASH request).
++	bd1_apply_cx_over(dest, g_bd1_scratch, NULL, embed ? cx : NULL,
++	                  dx0, dy0, dx1, dy1,
+ 	                  stencil, stencil_write_value, stencil_out);
+ }
+ 
+@@ -14941,6 +14948,61 @@ static int bd1_compose_child_cx(const MovieClip* child, const DrawColorTransform
+ 	return 1;
+ }
+ 
++// s27 w2b-draw-text-tint: alpha of a Drawing-API fill/stroke drawn onto an
++// OPAQUE BitmapData. RASTER_TRI used to force such a source to alpha 0xFF and
++// overwrite, so a child's `_alpha`, beginFill(c, 50) or a ct alphaMultiplier
++// was dropped. Flash Player 32 (oracle avm1_bitmapdata_draw_child_color line
++// 3: red at _alpha 50 over opaque blue = 0x7F0080) composites the source
++// over the target with the Flash fixed-8 colour-transform alpha:
++// a = (a0 * round(am * 256)) >> 8 + ao  (255 * 128 >> 8 = 127, not 128).
++// Returns the source alpha 0..255 (255 = plain overwrite, as before).
++static uint32_t bd1_opaque_src_alpha(double a_unit, const DrawColorTransform* cx)
++{
++	int a = (int) nearbyint(a_unit * 255.0);
++	if (cx) {
++		int m8 = (int) nearbyint(cx->am * 256.0);
++		a = ((a * m8) >> 8) + (int) nearbyint(cx->ao);
++	}
++	if (a < 0) a = 0;
++	if (a > 255) a = 255;
++	return (uint32_t) a;
++}
++
++// src (opaque RGB) over an opaque target pixel at alpha a (0..254).
++static uint32_t bd1_opaque_over(uint32_t dst, uint32_t src, uint32_t a)
++{
++	uint32_t ia = 255u - a, out = 0xFF000000u;
++	for (int sh = 0; sh <= 16; sh += 8) {
++		uint32_t s = (src >> sh) & 0xFFu, d = (dst >> sh) & 0xFFu;
++		uint32_t c = (s * a + 127u) / 255u + (d * ia + 127u) / 255u;
++		out |= (c > 255u ? 255u : c) << sh;
++	}
++	return out;
++}
++
++// A translucent path's triangles overlap on shared edges and stroke joins, so
++// they are first marked into a coverage byte map (RASTER_TRI's `tri_mark`)
++// and composited once per pixel here; returns NULL (plain overwrite) when the
++// source is opaque or the target is transparent (unchanged paths).
++static uint8_t* bd1_tri_mark_begin(const BitmapDataNative* dest, uint32_t a)
++{
++	if (dest->transparent || a >= 255u) return NULL;
++	return (uint8_t*) calloc((size_t) dest->width * dest->height, 1);
++}
++
++static void bd1_tri_mark_flush(BitmapDataNative* dest, uint8_t* mark,
++                               uint32_t color, uint32_t a,
++                               int dx0, int dy0, int dx1, int dy1)
++{
++	if (mark == NULL) return;
++	for (int y = dy0; y < dy1; y++)
++		for (int x = dx0; x < dx1; x++) {
++			size_t i = (size_t) y * dest->width + x;
++			if (mark[i]) dest->pixels[i] = bd1_opaque_over(dest->pixels[i], color, a);
++		}
++	free(mark);
++}
++
+ // Rasterize a MovieClip's finalized drawing paths into `dest_pixels`/`stencil`,
+ // then recursively rasterize children (dynamic MCs on child_mc_cache).
+ // - `dest_pixels` may be NULL when we're only writing a stencil.
+@@ -14972,11 +15034,12 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+     if (dx0 >= dx1 || dy0 >= dy1) return;
+ 
+     // s27 w2-draw-cx-text: a TextField clip (MC_IS_TEXTFIELD, defined later in
+-    // this file) paints its box (untinted, see bd1_draw_textfield_box).
++    // this file) paints its box (device font: untinted; s27 w2b: embedded
++    // font: through `cx`, see bd1_draw_textfield_box).
+     if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2)
+         bd1_draw_textfield_box(dest, mc, ma, mb, mc_, md, mtx, mty,
+                                dx0, dy0, dx1, dy1,
+-                               stencil, stencil_write_value, stencil_out);
++                               stencil, stencil_write_value, stencil_out, cx);
+ 
+     // Helper: invert the 2D affine part of a 4x4 column-major matrix as used
+     // by gradient_matrix. Returns 0 if singular (then out_* are zeroed).
+@@ -15049,6 +15112,7 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+                 if (_w0 >= 0 && _w1 >= 0 && _w2 >= 0) { \
+                     if (_stencil_row && !_stencil_row[_px]) { /* masked out */ } \
+                     else if (_srow) { _srow[_px] = stencil_write_value; } \
++                    else if (tri_mark) { tri_mark[(size_t)_py * w + _px] = 1; } \
+                     else { _row[_px] = (color_argb); } \
+                 } \
+             } \
+@@ -15136,6 +15200,11 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+         } \
+     } while (0)
+ 
++    // s27 w2b: < 255 only for a translucent solid fill/stroke on an opaque
++    // target (bd1_opaque_src_alpha); RASTER_TRI then composites over.
++    uint32_t tri_over_a = 255u;
++    uint8_t* tri_mark = NULL;
++
+     // Rasterize this MC's own drawing paths (if any).
+     if (mc->drawing_state != NULL) {
+         DrawingState* ds = (DrawingState*) mc->drawing_state;
+@@ -15190,6 +15259,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+                     uint32_t fb = (uint32_t)(fb_d + 0.5);
+                     uint32_t fa8 = dest->transparent ? (uint32_t)(fa_d + 0.5) : 0xFF;
+                     uint32_t color = (fa8 << 24) | (fr << 16) | (fg << 8) | fb;
++                    tri_over_a = dest->transparent ? 255u
++                        : bd1_opaque_src_alpha(path->fill_a, cx);
++                    if (stencil_out == NULL)
++                        tri_mark = bd1_tri_mark_begin(dest, tri_over_a);
+                     for (u32 v = 0; v + 5 < path->fill_vert_count * 2; v += 6) {
+                         float* fv = &path->fill_verts[v];
+                         double s0x = fv[0] / 20.0, s0y = fv[1] / 20.0;
+@@ -15203,6 +15276,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+                         double d2y = mb * s2x + md  * s2y + mty;
+                         RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
+                     }
++                    bd1_tri_mark_flush(dest, tri_mark, color, tri_over_a,
++                                       dx0, dy0, dx1, dy1);
++                    tri_mark = NULL;
++                    tri_over_a = 255u;
+                 }
+             }
+             if (path->has_line && path->line_vert_count >= 3) {
+@@ -15223,6 +15300,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+                 uint32_t lb = (uint32_t)(lb_d + 0.5);
+                 uint32_t la8 = dest->transparent ? (uint32_t)(la_d + 0.5) : 0xFF;
+                 uint32_t color = (la8 << 24) | (lr << 16) | (lg << 8) | lb;
++                tri_over_a = dest->transparent ? 255u
++                    : bd1_opaque_src_alpha(path->line_a, cx);
++                if (stencil_out == NULL)
++                    tri_mark = bd1_tri_mark_begin(dest, tri_over_a);
+                 for (u32 v = 0; v + 5 < path->line_vert_count * 2; v += 6) {
+                     float* lv = &path->line_verts[v];
+                     double s0x = lv[0] / 20.0, s0y = lv[1] / 20.0;
+@@ -15236,6 +15317,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+                     double d2y = mb * s2x + md  * s2y + mty;
+                     RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
+                 }
++                bd1_tri_mark_flush(dest, tri_mark, color, tri_over_a,
++                                   dx0, dy0, dx1, dy1);
++                tri_mark = NULL;
++                tri_over_a = 255u;
+             }
+         }
+     }
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index df548040..0d73d87f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2233,6 +2233,21 @@ static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
+ int avm2_text_box_info(struct Avm2EditTextExt* et, int32_t* out_xywh,
+                        uint32_t* out_flags, uint32_t* out_bg,
+                        uint32_t* out_border);
++// s27 w2b-draw-text-tint: the box rule above is DEVICE-font only. Flash
++// Player 32 (oracle avm2_bitmapdata_draw_text_glyph_cx, X embed lines): an
++// EMBEDDED-font field's box IS tinted (ff0000 -> ff00) by the draw() ct, by
++// its own cx under a drawn holder, and by holder + ct. 1 = device-font box,
++// 0 = embedded-font box, -1 = no box info.
++static int bd_tf_box_is_device(Avm2Context* ctx, Avm2Object* tf_obj)
++{
++	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, tf_obj);
++	if (ext == NULL || ext->edittext == NULL) return -1;
++	int32_t bb[4];
++	uint32_t flags = 0, bg = 0, bc = 0;
++	if (!avm2_text_box_info(ext->edittext, bb, &flags, &bg, &bc)) return -1;
++	return (flags & 4u) != 0;
++}
++
+ static void bd_draw_tf_box(Avm2Context* ctx, uint32_t* buf, int W, int H,
+                            int transparent, Avm2Object* tf_obj,
+                            double ma, double mb, double mc, double md,
+@@ -2253,10 +2268,18 @@ static void bd_draw_tf_box(Avm2Context* ctx, uint32_t* buf, int W, int H,
+ 	                        node_alpha);
+ }
+ 
++static void bd_draw_tf_box_tinted(Avm2Context* ctx, Avm2BitmapDataExt* dst,
++                                  Avm2Object* tf_obj,
++                                  double ma, double mb, double mc, double md,
++                                  double mtx, double mty,
++                                  int16_t rm, int16_t gm, int16_t bmul, int16_t am,
++                                  int16_t ro, int16_t go, int16_t bo, int16_t ao);
++
+ // Thin BitmapData.draw wrapper — byte-for-byte the pre-refactor rasterizer
+ // (node_alpha == 1, cxform/blend passed through). Keeps
+-// avm2_bitmapdata_draw_textfield green. s27: the box is drawn first,
+-// untinted (bd_draw_tf_box); the draw colorTransform still tints the glyphs.
++// avm2_bitmapdata_draw_textfield green. s27: the box is drawn first; a
++// device-font box untinted (bd_draw_tf_box), an embedded-font box through the
++// draw colorTransform (s27 w2b, Flash); the draw colorTransform tints glyphs.
+ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                               Avm2Object* tf_obj,
+                               double ma, double mb, double mc, double md,
+@@ -2265,8 +2288,12 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                               int16_t ro, int16_t go, int16_t bo, int16_t ao,
+                               int blend_mode)
+ {
+-	bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+-	               dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
++	if (has_cxform && dst->pixels != NULL && bd_tf_box_is_device(ctx, tf_obj) == 0)
++		bd_draw_tf_box_tinted(ctx, dst, tf_obj, ma, mb, mc, md, mtx, mty,
++		                      rm, gm, bmul, am, ro, go, bo, ao);
++	else
++		bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
++		               dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
+ 	text_raster_core(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+ 	                 dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty,
+ 	                 has_cxform, rm, gm, bmul, am, ro, go, bo, ao,
+@@ -2584,6 +2611,37 @@ static void bd_cx_compose_layer(Avm2BitmapDataExt* dst, const uint32_t* layer)
+ 	}
+ }
+ 
++// s27 w2b-draw-text-tint: draw(embedded tf, m, ct) paints the field's box
++// through the draw colorTransform (Flash: X embed box draw(tf,ct) = ff00):
++// raster it untinted into a transparent layer, then compose that layer
++// through the ct with the walk's per-texel cx math (bd_cx_compose_layer).
++static void bd_draw_tf_box_tinted(Avm2Context* ctx, Avm2BitmapDataExt* dst,
++                                  Avm2Object* tf_obj,
++                                  double ma, double mb, double mc, double md,
++                                  double mtx, double mty,
++                                  int16_t rm, int16_t gm, int16_t bmul, int16_t am,
++                                  int16_t ro, int16_t go, int16_t bo, int16_t ao)
++{
++	size_t n = (size_t) dst->width * dst->height;
++	uint32_t* layer = (uint32_t*) calloc(n ? n : 1, sizeof(uint32_t));
++	if (layer == NULL)
++	{
++		bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
++		               dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
++		return;
++	}
++	bd_draw_tf_box(ctx, layer, (int) dst->width, (int) dst->height, 1,
++	               tf_obj, ma, mb, mc, md, mtx, mty, 1.0);
++	BdCx saved = g_bd_cx;
++	g_bd_cx.m[0] = rm / 256.0; g_bd_cx.m[1] = gm / 256.0;
++	g_bd_cx.m[2] = bmul / 256.0; g_bd_cx.m[3] = am / 256.0;
++	g_bd_cx.a[0] = ro; g_bd_cx.a[1] = go;
++	g_bd_cx.a[2] = bo; g_bd_cx.a[3] = ao;
++	bd_cx_compose_layer(dst, layer);
++	g_bd_cx = saved;
++	free(layer);
++}
++
+ // An object's local-to-global matrix (twips), stopping below the Stage like
+ // Ruffle's local_to_global_matrix. m = {a, b, c, d, tx, ty}.
+ static void bd_l2g_matrix(Avm2Context* ctx, Avm2Object* obj, double m[6])
+@@ -2861,9 +2919,13 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+ 		return;
+ 	}
+ 
+-	// s27 w2-draw-cx-text: a TextField's box goes straight onto the target,
+-	// untinted (Flash), under the node's glyphs.
+-	if (ext->edittext != NULL && !ext->is_bitmap && ext->shape_vert_count == 0)
++	// s27 w2-draw-cx-text: a DEVICE-font TextField's box goes straight onto
++	// the target, untinted (Flash), under the node's glyphs. s27 w2b: an
++	// EMBEDDED-font box is tinted (Flash), so it goes into the cx layer below.
++	int tf_box = (ext->edittext != NULL && !ext->is_bitmap
++	              && ext->shape_vert_count == 0)
++		? bd_tf_box_is_device(ctx, obj) : -1;
++	if (tf_box == 1)
+ 		bd_draw_tf_box(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+ 		               dst->transparency, obj, wa, wb, wc, wd,
+ 		               wtx / 20.0, wty / 20.0, alpha);
+@@ -2885,6 +2947,10 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+ 			sdst = &cxdst;
+ 		}
+ 	}
++	if (tf_box == 0)
++		bd_draw_tf_box(ctx, sdst->pixels, (int) sdst->width, (int) sdst->height,
++		               sdst->transparency, obj, wa, wb, wc, wd,
++		               wtx / 20.0, wty / 20.0, alpha);
+ 	if (ext->is_bitmap)
+ 		// A Bitmap inside the drawn subtree. avm2_cpu_walk has had this arm all
+ 		// along; this walk had not, so drawing a container that holds a Bitmap
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/create_test_swf.py
+new file mode 100644
+index 00000000..91529cf1
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/create_test_swf.py
+@@ -0,0 +1,91 @@
++#!/usr/bin/env python3
++"""avm1_bitmapdata_draw_child_color: AVM1 BitmapData.draw() of a holder whose
++CHILD clip carries its own colour transform (s27 w2-draw-cx-text, LOCAL ORACLE
++REQUEST, FLASH trace). Pins the child-cx composition this slot added to
++action.c rasterizeMovieClipToBitmap (it used to pass the draw() cx down
++unchanged, so a descendant's Color never tinted).
++
++Each child draws a 40x20 red (0xFF0000) Drawing-API rect; the probe reads the
++centre of an opaque blue (0x0000FF) 40x20 BitmapData.
++  1. draw(h1)  h1 > c1 (Color(c).setRGB(0x00FF00))        expect 65280 (0x00FF00)
++  2. draw(h2)  h2 > c (Color(c).setTransform({rb:0,gb:255,ra:0}))   65280
++  3. draw(h3)  h3 > c (c._alpha = 50)                     8323200 (0x7F0080)
++  4. draw(h4, m, ct) h4 > c (Color setRGB 0x00FF00), ct = (1,1,1,1, 0,0,255,0)
++                                                          expect 65535 (0x00FFFF)
++  5. draw(c1) of the tinted child ITSELF (its own transform is ignored) 16711680
++LANDED (s27 w2b-draw-text-tint): output.txt is Flash Player 32's trace
++(session27-fanout-reports/w2-local-oracles/w2-draw-cx-text/). Line 3: Flash
++composites the child at its _alpha over the OPAQUE target, with the fixed-8
++cx alpha 255*128>>8 = 127 (red 0x7F, blue 0x80).
++Usage: create_test_swf.py [path to regression/_lib]   (writes test.swf here)
++"""
++import pathlib, sys
++HERE = pathlib.Path(__file__).resolve().parent
++LIB = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else (
++    HERE.parents[4] / 'ruffle-tests' / 'tests' / 'swfs' / 'regression' / '_lib')
++sys.path.insert(0, str(LIB))
++from avm1asm import *  # noqa
++
++NEW_METHOD = bytes([0x53])
++INIT_OBJECT = bytes([0x43])
++
++def new_cls(pkg, cls, *args):
++    code = b''
++    for a in reversed(args):
++        code += a if isinstance(a, bytes) else push(a)
++    code += push(len(args)) + get_path('flash', pkg) + push(cls) + NEW_METHOD
++    return code
++
++def new_global(cls, *args):
++    code = b''
++    for a in reversed(args):
++        code += a if isinstance(a, bytes) else push(a)
++    code += push(len(args)) + push(cls) + bytes([0x40])
++    return code
++
++def obj(**kv):
++    code = b''
++    for k, v in kv.items():
++        code += push(k, v)
++    return code + push(len(kv)) + INIT_OBJECT
++
++def red_rect(path):
++    return (call_method(path, 'beginFill', 0xFF0000)
++            + call_method(path, 'moveTo', 0, 0) + call_method(path, 'lineTo', 40, 0)
++            + call_method(path, 'lineTo', 40, 20) + call_method(path, 'lineTo', 0, 20)
++            + call_method(path, 'lineTo', 0, 0) + call_method(path, 'endFill'))
++
++def holder(h, depth):
++    # Unique child names: AVM1 Color resolves its target by instance NAME in
++    # our runtime (colorGetMCName), so four children all called `c` would all
++    # alias h1.c (an s27 w2-draw-cx-text lead, not what this fixture probes).
++    c = 'c' + h[1:]
++    return (call_method(get_var('this'), 'createEmptyMovieClip', h, depth)
++            + call_method(get_var(h), 'createEmptyMovieClip', c, 1)
++            + red_rect(get_path(h, c)))
++
++def probe(label, bd):
++    return trace_expr(label, call_method(get_var(bd), 'getPixel', 20, 10, discard=False))
++
++def newbd(name):
++    return set_var(name, new_cls('display', 'BitmapData', 40, 20, False, 0x0000FF))
++
++a = b''
++a += holder('h1', 1)
++a += set_var('k1', new_global('Color', get_path('h1', 'c1'))) + call_method(get_var('k1'), 'setRGB', 0x00FF00)
++a += newbd('b1') + call_method(get_var('b1'), 'draw', get_var('h1')) + probe('1 draw(h>setRGB c)=', 'b1')
++a += holder('h2', 2)
++a += set_var('k2', new_global('Color', get_path('h2', 'c2')))
++a += call_method(get_var('k2'), 'setTransform', obj(ra=0, rb=0, gb=255))
++a += newbd('b2') + call_method(get_var('b2'), 'draw', get_var('h2')) + probe('2 draw(h>setTransform c)=', 'b2')
++a += holder('h3', 3)
++a += set_member(get_path('h3', 'c3'), '_alpha', 50)
++a += newbd('b3') + call_method(get_var('b3'), 'draw', get_var('h3')) + probe('3 draw(h>_alpha50 c)=', 'b3')
++a += holder('h4', 4)
++a += set_var('k4', new_global('Color', get_path('h4', 'c4'))) + call_method(get_var('k4'), 'setRGB', 0x00FF00)
++a += set_var('ct', new_cls('geom', 'ColorTransform', 1, 1, 1, 1, 0, 0, 255, 0))
++a += newbd('b4') + call_method(get_var('b4'), 'draw', get_var('h4'), new_cls('geom', 'Matrix'), get_var('ct'))
++a += probe('4 draw(h>setRGB c,m,ct)=', 'b4')
++a += newbd('b5') + call_method(get_var('b5'), 'draw', get_path('h1', 'c1')) + probe('5 draw(tinted c itself)=', 'b5')
++a += STOP
++swf_file(HERE / 'test.swf', [do_action(a)], version=8, w=100, h=100)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/output.txt b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/output.txt
+new file mode 100644
+index 00000000..cb333a5a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/output.txt
+@@ -0,0 +1,5 @@
++1 draw(h>setRGB c)=65280
++2 draw(h>setTransform c)=65280
++3 draw(h>_alpha50 c)=8323200
++4 draw(h>setRGB c,m,ct)=65535
++5 draw(tinted c itself)=16711680
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/test.swf b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7c76adddf7d1aaedd25a3ea09209d94bd79a635
+GIT binary patch
+literal 3387
+zcmb_fO>fgc5S_M^luvO0Dj-EUp(6D_^Kn9ys)6=YKusl%U^{MX)rli#RoWZB!hbis
+zS!a^9oyHDLRcW*Jyq%dh@41`fpPj9bPl$fg!C(G;yGHHx@p$}s;}!lIZ&GEAu-+r`
+z_Vsq1xA%#Z=Z~lwza(-Z*HZ4+{!rbVhF8AZ4*VgVZJSufz$Ql(A&JJ>>{YG;Cw+?_
+z5!r6f9~}EZFv*0fbiAy(Oi3lUEuwyS<(`Kb(C!3$8z}GxGtl!%@PC1d%1dREU|CC*
+zr-QSNKOk}kU7-t4FENm8kj%P5)DD9%qQf1YAqJ6}1fbOzOpaW2c5=i_;vhR2FhVI_
+zr%esW5`{2|ari}GjXa!zqPqTQ7+5zL>0_cJU-hlw7fV^x*_l=+RV7KPEWK`I{o%YX
+zi1ur|+4T;RYHH5=PdfKQ&IPE{Ak?AGYK(_HSN-s>U8v{e9mmOYudZQwyR^s+EOT2g
+zv`0?l3<1=sFDY^pS6bv5P)d5jTTbL<Kw5%nQfF<Uyi_I$merU<0Z2F&!tx@=K(aw1
+zCsX7AMizvQ9~Na~&p!9?S&JID4Lom~Z?#J%<EeJSd1MVn7h%*FKO|aMu^%{}G=Roz
+z-Wz^+LsU2XFs-TB6@1VfS8&Ig!Nwh2VPJU}4WwH9Pb23FhVYOZOS;0um3Bo2l+x<0
+zt|$Z2@-khq2qeL>PF+z55{`wioGbJM<SA(RWd%de(gUs|-FK$iPKLH(`Eu>1e0guk
+zcbljo@=c0reJGYLA2LU}Xd;nr^A6HAusF|aBGr=8We9WKTvECwuC#PBpmNeJ1Inpz
+z5lDh%ol3V5BpeH2Iq6<vAlV=hl=(u(-*UGW&JHG1w-!ffaY&`|qL;m_`UWg{=Bzk2
+zb+Lh_dv4gr$e&HFQqx!Q<Yr?h%37_z(2e$&F59?g&B{Tcr<RKRYwApSL_hMHM^!09
+zz9wplA?1Fx*WYtg(Itz|$$AoVvs;?()pm`qC5grOi-8O$NtSJ<l{BOLfpWVwr{=4X
+Q8(b7M)5<qfp+k`T4`t(dz5oCK
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/test.toml b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/test.toml
+new file mode 100644
+index 00000000..cf612396
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_child_color/test.toml
+@@ -0,0 +1 @@
++num_ticks = 1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/create_test_swf.py
+new file mode 100644
+index 00000000..ec82ee72
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/create_test_swf.py
+@@ -0,0 +1,88 @@
++#!/usr/bin/env python3
++"""avm1_bitmapdata_draw_text_glyph_cx: Flash characterization of DEVICE-font
++glyph colour in AVM1 BitmapData.draw() (s27 w2-draw-cx-text, LOCAL ORACLE
++REQUEST, FLASH trace). LANDED s27 w2b-draw-text-tint: output.txt = Flash's trace.
++
++Red bold 40px "WMW" (_sans) is drawn onto a transparent BitmapData; the
++glyphs' solid interior pixels are counted EXACTLY with
++BitmapData.threshold(..., "==", colour) (AA edges ignored), so each line says
++whether any fully-covered red (0xFFFF0000) / green (0xFF00FF00) pixel exists.
++The tint is ColorTransform(0,1,1,1, 0,255,0,0) / Color.setRGB(0x00FF00):
++red -> green.
++  1. draw(tf)
++  2. draw(tf, m, ct)
++  3. draw(h)   h > c (Color(c).setRGB(0x00FF00)) > field
++  4. draw(h2, m, ct)  h2 > field
++Usage: create_test_swf.py [path to regression/_lib]   (writes test.swf here)
++"""
++import pathlib, sys
++HERE = pathlib.Path(__file__).resolve().parent
++LIB = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else (
++    HERE.parents[4] / 'ruffle-tests' / 'tests' / 'swfs' / 'regression' / '_lib')
++sys.path.insert(0, str(LIB))
++from avm1asm import *  # noqa
++
++NEW_METHOD = bytes([0x53])
++GREATER = bytes([0x67])
++
++def new_cls(pkg, cls, *args):
++    code = b''
++    for a in reversed(args):
++        code += a if isinstance(a, bytes) else push(a)
++    code += push(len(args)) + get_path('flash', pkg) + push(cls) + NEW_METHOD
++    return code
++
++def new_global(cls, *args):
++    code = b''
++    for a in reversed(args):
++        code += a if isinstance(a, bytes) else push(a)
++    code += push(len(args)) + push(cls) + bytes([0x40])
++
++    return code
++
++def field(path_code):
++    a = set_member(path_code, 'text', 'WMW')
++    a += set_var('fmt', new_global('TextFormat'))
++    a += set_member(get_var('fmt'), 'font', '_sans')
++    a += set_member(get_var('fmt'), 'size', 40)
++    a += set_member(get_var('fmt'), 'bold', True)
++    a += set_member(get_var('fmt'), 'color', 0xFF0000)
++    a += call_method(path_code, 'setTextFormat', get_var('fmt'))
++    return a
++
++def count(bd, colour):
++    # bd.threshold(bd, bd.rectangle, new Point(0,0), "==", c, c, 0xFFFFFFFF, false) > 0
++    return call_method(get_var(bd), 'threshold', get_var(bd), get_path(bd, 'rectangle'),
++                       new_cls('geom', 'Point', 0, 0), '==', colour, colour,
++                       -1, False, discard=False) + push(0) + GREATER
++
++def probe(label, bd):
++    return trace_expr(label, ' red=', count(bd, -65536), ' green=', count(bd, -16711936))
++
++def newbd(name):
++    return set_var(name, new_cls('display', 'BitmapData', 200, 60, True, 0))
++
++this = get_var('this')
++a = b''
++a += call_method(this, 'createTextField', 'tf', 1, 0, 0, 200, 60)
++a += field(get_var('tf'))
++a += set_var('ct', new_cls('geom', 'ColorTransform', 0, 1, 1, 1, 0, 255, 0, 0))
++a += newbd('b1') + call_method(get_var('b1'), 'draw', get_var('tf'))
++a += probe('draw(tf)', 'b1')
++a += newbd('b2') + call_method(get_var('b2'), 'draw', get_var('tf'), new_cls('geom', 'Matrix'), get_var('ct'))
++a += probe('draw(tf,m,ct)', 'b2')
++a += call_method(this, 'createEmptyMovieClip', 'h', 2)
++a += call_method(get_var('h'), 'createEmptyMovieClip', 'c', 1)
++a += call_method(get_path('h', 'c'), 'createTextField', 't', 1, 0, 0, 200, 60)
++a += field(get_path('h', 'c', 't'))
++a += set_var('col', new_global('Color', get_path('h', 'c')))
++a += call_method(get_var('col'), 'setRGB', 0x00FF00)
++a += newbd('b3') + call_method(get_var('b3'), 'draw', get_var('h'))
++a += probe('draw(h>Color c>tf)', 'b3')
++a += call_method(this, 'createEmptyMovieClip', 'h2', 3)
++a += call_method(get_var('h2'), 'createTextField', 't', 1, 0, 0, 200, 60)
++a += field(get_path('h2', 't'))
++a += newbd('b4') + call_method(get_var('b4'), 'draw', get_var('h2'), new_cls('geom', 'Matrix'), get_var('ct'))
++a += probe('draw(h2>tf,m,ct)', 'b4')
++a += STOP
++swf_file(HERE / 'test.swf', [do_action(a)], version=8, w=200, h=100)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/output.txt b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/output.txt
+new file mode 100644
+index 00000000..f83b5d70
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/output.txt
+@@ -0,0 +1,4 @@
++draw(tf) red=false green=false
++draw(tf,m,ct) red=false green=false
++draw(h>Color c>tf) red=false green=false
++draw(h2>tf,m,ct) red=false green=false
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/test.swf b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..a843f0c91c590fd5c1bf6a0fae4d1069a1fbf0a9
+GIT binary patch
+literal 3414
+zcmdT`%Wl(95S_G?l$Ur2!N!HIq9S!e!jhJ%g=Uq2(uyvT>s-f{oH(+tpyfmSO?(P}
+zVa|;2jh)C;DvC<F$;9KCxn~~dj*rhyHorb13h4C#t^X!^)u5xbJkLL@cc9KTsQI1>
+z`O8QM(OcQz=Q~8&7xi6!#E%Zbl$`7-k(Ve}t5bEMk3$s=Y4FmRJ7NbtJJMP2j6U-p
+ze=Lfo9Pp4xJmX~SYC71m2IA|-6PUvATk1~I(pz4p;ZG%qb`WS5SYDmSfRU}yMx&xf
+z7%z_E#3YwjeNcu<nojnZC{?-wtjNi$0Edet0GV@1D$f$ihO9_yzsdIS_9Hh9P(xI6
+zq~bC4vnNDHjPW!<zCLO~CtF<1^S9*zoED$9*f*HXMZHHf4AW`kULr8cd>HDnJN@Wt
+z*91jF9S&qO$034cn7BW<iT4oze|NP1MgngqYPd&TuB)KI6y-(Q6$uo3dnH(ew^^?(
+z;48C+$(J}pt4~a>PWFH(QJ!`uqeuaMQ363L#k0>a(?O!rfEzxrJs5Q}B)>gMl$z86
+z&Zz*-ay0<AB*k`FxTSR&Gb?qIHq;IsD%x{(5?&Pbw_~x+{o+Em=f?uvFk`Vh-u3j&
+z&IV(tnGIHB)Mm3`%vNAFmH@cLsR?_~l0Zg8p2|!3g}sD7ji>su7k>}cQ4~&@#FpQ1
+z^-5O><YZU-EnYB|$X3d|fk?%r2sD(LxN=zkFS}vhM*RD?Zc)@GQMWa)@33_iD`UF?
+zKFWPxEWRdTlgv71Je>?vjb$|G9-7U1-dXlFVY0EPnDm`_(myw(5B3G`wzq%NTY&-9
+zFrU@HJ!8HxTLI=T0kAM1&5?UJD7M43sQ(WXM)Psf6(4r;_LkDtCTHN+5tfJl-LeUW
+vpx55RQfG{|?LSb>eV#qDlx%~G|6vs~oEk#1x=Ki6wgQA)0^nAY4nW60a6I5P
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/test.toml b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/test.toml
+new file mode 100644
+index 00000000..cf612396
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_bitmapdata_draw_text_glyph_cx/test.toml
+@@ -0,0 +1 @@
++num_ticks = 1
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/Test.as b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/Test.as
+new file mode 100644
+index 00000000..8ea79fa7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/Test.as
+@@ -0,0 +1,88 @@
++// s27 w2-draw-cx-text: Flash characterization of TEXT colour in
++// BitmapData.draw() (LOCAL ORACLE REQUEST, FLASH trace). Build with
++// ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_textfield/build_swf.sh
++// (mxmlc; DejaVuSans embed, same as that fixture).
++//
++// Flash already told us (w1 oracle avm2_bitmapdata_draw_edittext_box) that a
++// DEVICE-font field's BOX is not tinted by the draw() ct nor by its own cx.
++// Open questions this answers, each on a device-font AND an embedded field:
++//   G*: glyph colour under draw(tf), draw(tf, ct), draw(holder > tinted tf),
++//       draw(holder > tf, ct). Glyphs are red 0xFF0000; the tint (0,1,1,1,
++//       0,255,0,0) turns red into green 0x00FF00 (red*0+0, green*1+255).
++//   X*: the BOX of an EMBEDDED field under the same tints (is "untinted box"
++//       a device-font rule or a draw() rule?).
++// Glyph probes count EXACT solid pixels on a transparent target (stroke
++// interiors are fully covered, so 0xFFFF0000 / 0xFF00FF00 are exact by
++// construction; AA edges are ignored). Box probes read the centre pixel of an
++// opaque-blue target behind a field with no text.
++package {
++	import flash.display.MovieClip;
++	import flash.display.Sprite;
++	import flash.display.BitmapData;
++	import flash.geom.ColorTransform;
++	import flash.text.TextField;
++	import flash.text.TextFormat;
++
++	public class Test extends MovieClip {
++		[Embed(source="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
++		       fontName="TestFont", embedAsCFF="false", mimeType="application/x-font",
++		       unicodeRange="U+0020-U+007E")]
++		private var TestFontClass:Class;
++
++		private function tint():ColorTransform {
++			return new ColorTransform(0, 1, 1, 1, 0, 255, 0, 0);
++		}
++		private function glyphField(embed:Boolean):TextField {
++			var tf:TextField = new TextField();
++			tf.embedFonts = embed;
++			tf.selectable = false;
++			tf.width = 200; tf.height = 60;
++			tf.defaultTextFormat = new TextFormat(embed ? "TestFont" : "_sans", 40, 0xFF0000, true);
++			tf.text = "WMW";
++			return tf;
++		}
++		private function boxField(embed:Boolean):TextField {
++			var tf:TextField = new TextField();
++			tf.embedFonts = embed;
++			tf.width = 40; tf.height = 20;
++			tf.background = true; tf.backgroundColor = 0xFF0000;
++			return tf;
++		}
++		private function glyphs(src:*, ct:ColorTransform = null):String {
++			var bd:BitmapData = new BitmapData(200, 60, true, 0);
++			bd.draw(src, null, ct);
++			var red:uint = 0, green:uint = 0;
++			for (var y:int = 0; y < bd.height; y++)
++				for (var x:int = 0; x < bd.width; x++) {
++					var p:uint = bd.getPixel32(x, y);
++					if (p == 0xFFFF0000) red++;
++					else if (p == 0xFF00FF00) green++;
++				}
++			return "red=" + (red > 0) + " green=" + (green > 0);
++		}
++		private function box(src:*, ct:ColorTransform = null):String {
++			var bd:BitmapData = new BitmapData(40, 20, false, 0x0000FF);
++			bd.draw(src, null, ct);
++			return bd.getPixel(20, 10).toString(16);
++		}
++		private function holder(child:*, tinted:Boolean):Sprite {
++			var h:Sprite = new Sprite();
++			if (tinted) child.transform.colorTransform = tint();
++			h.addChild(child);
++			return h;
++		}
++		public function Test() {
++			for each (var embed:Boolean in [false, true]) {
++				var k:String = embed ? "embed" : "device";
++				trace("G " + k + " draw(tf) " + glyphs(glyphField(embed)));
++				trace("G " + k + " draw(tf,ct) " + glyphs(glyphField(embed), tint()));
++				trace("G " + k + " draw(h>tinted tf) " + glyphs(holder(glyphField(embed), true)));
++				trace("G " + k + " draw(h>tf,ct) " + glyphs(holder(glyphField(embed), false), tint()));
++				trace("X " + k + " box draw(tf) = " + box(boxField(embed)));
++				trace("X " + k + " box draw(tf,ct) = " + box(boxField(embed), tint()));
++				trace("X " + k + " box draw(h>tinted tf) = " + box(holder(boxField(embed), true)));
++				trace("X " + k + " box draw(h>tf,ct) = " + box(holder(boxField(embed), false), tint()));
++			}
++		}
++	}
++}
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/create_test_swf.py
+new file mode 100644
+index 00000000..fdb7b7df
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/create_test_swf.py
+@@ -0,0 +1,303 @@
++#!/usr/bin/env python3
++"""AVM2 BitmapData.draw() of a TextField: glyph and box colour under a tint,
++DEVICE vs EMBEDDED font (s27 w2b-draw-text-tint).
++
++Usage: create_test_swf.py [out.swf]   (default: test.swf beside this script)
++
++This is a no-mxmlc TWIN of Test.as (the s27 w2-draw-cx-text oracle request,
++kept beside this script). Flash Player 32 traced the mxmlc build of Test.as
++(session27-fanout-reports/w2-local-oracles/w2-draw-cx-text/
++avm2_bitmapdata_draw_text_glyph_cx/flash.direct.txt); that SWF was not
++archived and the cloud has no mxmlc, so this script emits the same API calls
++in the same order from a hand-assembled script-init ABC.
++
++The embedded font is NOT synthetic: the DefineFont3 ("TestFont", DejaVu Sans,
++U+0020-U+007E) and DefineFontName tags are copied byte-for-byte from the
++mxmlc-built ../avm2_bitmapdata_draw_textfield/test.swf, the same [Embed] that
++Test.as declares. Like the mxmlc build, nothing calls Font.registerFont: Flash
++resolves an embedded DefineFont3 by name.
++
++Glyph probes (G*) count EXACT solid pixels on a transparent 200x60 target:
++glyphs are red 0xFF0000; the tint (0,1,1,1, 0,255,0,0) turns red into green.
++Box probes (X*) read the centre pixel of an opaque-blue 40x20 target behind a
++textless field with a red background.
++
++Flash's answer: a DEVICE field draws no solid glyph pixel and its box is never
++tinted; an EMBEDDED field's glyphs AND box follow the draw ct, a descendant
++cx and holder+ct.
++"""
++import os
++import struct
++import sys
++import zlib
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++NS = ['', 'flash.display', 'flash.geom', 'flash.text']
++
++
++def u30(v):
++    out = bytearray()
++    while True:
++        b = v & 0x7F
++        v >>= 7
++        if v:
++            out.append(b | 0x80)
++        else:
++            out.append(b)
++            return bytes(out)
++
++
++def s24(v):
++    return struct.pack('<i', v)[:3]
++
++
++class Abc:
++    def __init__(self):
++        self.strings = [None]
++        self.names = [None]
++        self.ints = [None]
++        self.doubles = [None]
++
++    def _idx(self, pool, v):
++        if v not in pool:
++            pool.append(v)
++        return pool.index(v)
++
++    def string(self, s): return self._idx(self.strings, s)
++    def name(self, n): return self._idx(self.names, n)
++    def int_(self, v): return self._idx(self.ints, v)
++    def double(self, v): return self._idx(self.doubles, v)
++
++
++class Code:
++    def __init__(self, abc):
++        self.abc = abc
++        self.b = bytearray()
++
++    def op(self, *bs):
++        self.b += bytes(bs)
++
++    def push(self, v):
++        a = self.abc
++        if v is None:
++            self.op(0x20)
++        elif isinstance(v, bool):
++            self.op(0x26 if v else 0x27)
++        elif isinstance(v, str):
++            self.op(0x2c); self.b += u30(a.string(v))
++        elif isinstance(v, float):
++            self.op(0x2f); self.b += u30(a.double(v))
++        elif -128 <= v < 128:
++            self.op(0x24, v & 0xFF)
++        elif -0x80000000 <= v < 0x80000000:
++            self.op(0x2d); self.b += u30(a.int_(v))
++        else:
++            self.op(0x2f); self.b += u30(a.double(float(v)))
++
++    def get(self, i): self.op(0x62); self.b += u30(i)
++    def set(self, i): self.op(0x63); self.b += u30(i)
++    def getp(self, n): self.op(0x66); self.b += u30(self.abc.name(n))
++    def setp(self, n): self.op(0x61); self.b += u30(self.abc.name(n))
++
++    def new(self, cls, args):
++        self.op(0x5d); self.b += u30(self.abc.name(cls))
++        for v in args:
++            self.push(v)
++        self.op(0x4a); self.b += u30(self.abc.name(cls)) + u30(len(args))
++
++    def call(self, n, argc): self.op(0x46); self.b += u30(self.abc.name(n)) + u30(argc)
++    def callv(self, n, argc): self.op(0x4f); self.b += u30(self.abc.name(n)) + u30(argc)
++
++    def trace_top(self, emit):
++        self.op(0x5d); self.b += u30(self.abc.name('trace'))
++        emit()
++        self.callv('trace', 1)
++
++    def if_eq_skip(self, emit_lhs, rhs, body):
++        """if (lhs == rhs) body  (ifne over body)"""
++        emit_lhs(); self.push(rhs)
++        self.op(0x14); j = len(self.b); self.b += s24(0)
++        body()
++        self.b[j:j + 3] = s24(len(self.b) - (j + 3))
++
++    def loop(self, var_i, count, body):
++        self.push(0); self.set(var_i)
++        self.op(0x10); jpos = len(self.b); self.b += s24(0)
++        top = len(self.b)
++        self.op(0x09)
++        body()
++        self.get(var_i); self.op(0x91); self.set(var_i)
++        self.b[jpos:jpos + 3] = s24(len(self.b) - (jpos + 3))
++        self.get(var_i); self.push(count)
++        self.op(0x15); here = len(self.b) + 3
++        self.b += s24(top - here)
++
++
++BD, TF, H, X, Y, RED, GREEN, CT = 1, 2, 3, 4, 5, 6, 7, 8
++NLOCALS = 9
++
++
++def build_code(abc):
++    c = Code(abc)
++    c.op(0xd0, 0x30)
++
++    def tint():
++        c.new('ColorTransform', [0, 1, 1, 1, 0, 255, 0, 0])
++
++    def glyph_field(embed):
++        c.new('TextField', []); c.set(TF)
++        c.get(TF); c.push(embed); c.setp('embedFonts')
++        c.get(TF); c.push(False); c.setp('selectable')
++        c.get(TF); c.push(200); c.setp('width')
++        c.get(TF); c.push(60); c.setp('height')
++        c.get(TF)
++        c.new('TextFormat', ['TestFont' if embed else '_sans', 40, 0xFF0000, True])
++        c.setp('defaultTextFormat')
++        c.get(TF); c.push('WMW'); c.setp('text')
++
++    def box_field(embed):
++        c.new('TextField', []); c.set(TF)
++        c.get(TF); c.push(embed); c.setp('embedFonts')
++        c.get(TF); c.push(40); c.setp('width')
++        c.get(TF); c.push(20); c.setp('height')
++        c.get(TF); c.push(True); c.setp('background')
++        c.get(TF); c.push(0xFF0000); c.setp('backgroundColor')
++
++    def holder(tinted):
++        # returns with the holder in H; the source local is then H
++        c.new('Sprite', []); c.set(H)
++        if tinted:
++            c.get(TF); c.getp('transform'); tint(); c.setp('colorTransform')
++        c.get(H); c.get(TF); c.callv('addChild', 1)
++
++    def draw(src, with_ct):
++        c.get(BD); c.get(src); c.push(None)
++        if with_ct:
++            tint()
++        else:
++            c.push(None)
++        c.callv('draw', 3)
++
++    def glyphs(label, src, with_ct):
++        c.new('BitmapData', [200, 60, True, 0]); c.set(BD)
++        draw(src, with_ct)
++        c.push(False); c.set(RED); c.push(False); c.set(GREEN)
++
++        def inner():
++            def px():
++                c.get(BD); c.get(X); c.get(Y); c.call('getPixel32', 2)
++            c.if_eq_skip(px, 0xFFFF0000, lambda: (c.push(True), c.set(RED)))
++            c.if_eq_skip(px, 0xFF00FF00, lambda: (c.push(True), c.set(GREEN)))
++        c.loop(Y, 60, lambda: c.loop(X, 200, inner))
++
++        def msg():
++            c.push(label + ' red='); c.get(RED); c.op(0xa0)
++            c.push(' green='); c.op(0xa0); c.get(GREEN); c.op(0xa0)
++        c.trace_top(msg)
++
++    def box(label, src, with_ct):
++        c.new('BitmapData', [40, 20, False, 0x0000FF]); c.set(BD)
++        draw(src, with_ct)
++
++        def msg():
++            c.push(label + ' = ')
++            c.get(BD); c.push(20); c.push(10); c.call('getPixel', 2)
++            c.push(16); c.call('toString', 1)
++            c.op(0xa0)
++        c.trace_top(msg)
++
++    for embed in (False, True):
++        k = 'embed' if embed else 'device'
++        glyph_field(embed); glyphs('G %s draw(tf)' % k, TF, False)
++        glyph_field(embed); glyphs('G %s draw(tf,ct)' % k, TF, True)
++        glyph_field(embed); holder(True); glyphs('G %s draw(h>tinted tf)' % k, H, False)
++        glyph_field(embed); holder(False); glyphs('G %s draw(h>tf,ct)' % k, H, True)
++        box_field(embed); box('X %s box draw(tf)' % k, TF, False)
++        box_field(embed); box('X %s box draw(tf,ct)' % k, TF, True)
++        box_field(embed); holder(True); box('X %s box draw(h>tinted tf)' % k, H, False)
++        box_field(embed); holder(False); box('X %s box draw(h>tf,ct)' % k, H, True)
++    c.op(0x47)
++    return bytes(c.b)
++
++
++def build_abc():
++    abc = Abc()
++    build_code(abc)                        # intern everything
++    code = build_code(abc)
++    for n in abc.names[1:]:
++        abc.string(n)
++    for n in NS:
++        abc.string(n)
++    out = bytearray(struct.pack('<HH', 16, 46))
++    out += u30(len(abc.ints))
++    for v in abc.ints[1:]:
++        out += u30(v & 0xFFFFFFFF)
++    out += u30(0)                                     # uints
++    out += u30(len(abc.doubles))
++    for v in abc.doubles[1:]:
++        out += struct.pack('<d', v)
++    out += u30(len(abc.strings))
++    for s in abc.strings[1:]:
++        b = s.encode('utf-8')
++        out += u30(len(b)) + b
++    out += u30(len(NS) + 1)                           # namespaces
++    for n in NS:
++        out += bytes([0x16]) + u30(abc.string(n))     # PackageNamespace
++    out += u30(2) + u30(len(NS)) + b''.join(u30(i + 1) for i in range(len(NS)))
++    out += u30(len(abc.names))
++    for n in abc.names[1:]:
++        out += bytes([0x09]) + u30(abc.string(n)) + u30(1)   # Multiname(name, nsset 1)
++    out += u30(1) + u30(0) + u30(0) + u30(0) + bytes([0])    # 1 method
++    out += u30(0) + u30(0)                                   # metadata, classes
++    out += u30(1) + u30(0) + u30(0)                          # script 0
++    out += u30(1) + u30(0) + u30(24) + u30(NLOCALS) + u30(0) + u30(4)
++    out += u30(len(code)) + code
++    out += u30(0) + u30(0)
++    return bytes(out)
++
++
++def tag(code, payload):
++    if len(payload) >= 63:
++        return struct.pack('<HI', (code << 6) | 63, len(payload)) + payload
++    return struct.pack('<H', (code << 6) | len(payload)) + payload
++
++
++def font_tags():
++    """DefineFont3 (75) + DefineFontName (88), verbatim from the mxmlc SWF."""
++    d = open(os.path.join(HERE, '..', 'avm2_bitmapdata_draw_textfield',
++                          'test.swf'), 'rb').read()
++    if d[:3] == b'CWS':
++        d = d[:8] + zlib.decompress(d[8:])
++    nb = d[8] >> 3
++    p = 8 + (5 + 4 * nb + 7) // 8 + 4
++    out = b''
++    while p < len(d):
++        h = struct.unpack('<H', d[p:p + 2])[0]
++        code, ln, hp = h >> 6, h & 63, 2
++        if ln == 63:
++            ln, hp = struct.unpack('<I', d[p + 2:p + 6])[0], 6
++        if code in (75, 88):
++            out += d[p:p + hp + ln]
++        p += hp + ln
++        if code == 0:
++            break
++    assert out, 'font tags not found'
++    return out
++
++
++def build_swf():
++    abc = build_abc()
++    rect = bytes([0x78, 0x00, 0x05, 0x5F, 0x00, 0x00, 0x0F, 0xA0, 0x00])  # 550x400
++    body = rect + struct.pack('<HH', 30 << 8, 1)
++    body += tag(69, struct.pack('<I', 0x08))
++    body += font_tags()
++    body += tag(82, struct.pack('<I', 0) + b'drawtextcx\x00' + abc)
++    body += tag(1, b'')
++    body += tag(0, b'')
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++
++if __name__ == '__main__':
++    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'test.swf')
++    open(out, 'wb').write(build_swf())
++    print('wrote', out)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/output.txt b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/output.txt
+new file mode 100644
+index 00000000..31f979c0
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/output.txt
+@@ -0,0 +1,16 @@
++G device draw(tf) red=false green=false
++G device draw(tf,ct) red=false green=false
++G device draw(h>tinted tf) red=false green=false
++G device draw(h>tf,ct) red=false green=false
++X device box draw(tf) = ff0000
++X device box draw(tf,ct) = ff0000
++X device box draw(h>tinted tf) = ff0000
++X device box draw(h>tf,ct) = ff0000
++G embed draw(tf) red=true green=false
++G embed draw(tf,ct) red=false green=true
++G embed draw(h>tinted tf) red=false green=true
++G embed draw(h>tf,ct) red=false green=true
++X embed box draw(tf) = ff0000
++X embed box draw(tf,ct) = ff00
++X embed box draw(h>tinted tf) = ff00
++X embed box draw(h>tf,ct) = ff00
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/test.swf b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..4a5ca66c7cbd1bc13f6785896ff7264ca4f3a2ed
+GIT binary patch
+literal 12440
+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
+Y{7ZtrPWLz5|ADEp-%4}@bSww>Uj>^?&;S4c
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/test.toml b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/test.toml
+new file mode 100644
+index 00000000..dbee897f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_draw_text_glyph_cx/test.toml
+@@ -0,0 +1 @@
++num_frames = 1

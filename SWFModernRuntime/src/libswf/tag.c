@@ -2564,9 +2564,20 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 
 		int saved_sg_cm = catch_up_mode;
 		catch_up_mode = 1;
+		// An attached root's entry is unnamed, so exec_sprite_frame cannot bind
+		// its clip as the context, and this pass runs with _root as context:
+		// tagPlaceObject2's Phase-7b pre-create then parented every NAMED child
+		// of the replayed frames to _root (orphans the OFFSCREEN attached pass
+		// draws at identity, leaving the real children's compose with an
+		// identity local matrix: regression/avm1_attached_clip_selfgoto_child_parent
+		// image). Bind the clip as ng_attached_run_tree does for its advance.
+		MovieClip* sg_saved_ctx = g_current_context;
+		MovieClip* sg_saved_base = actionGetBaseClip();
+		if (att_mc) { actionSetCurrentContext(att_mc); actionSetBaseClip(att_mc); }
 		for (size_t f = 0; f <= target; f++)
 			if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
 				CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
+		if (att_mc) { actionSetCurrentContext(sg_saved_ctx); actionSetBaseClip(sg_saved_base); }
 		catch_up_mode = saved_sg_cm;
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)

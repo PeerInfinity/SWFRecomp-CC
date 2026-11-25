@@ -1,0 +1,239 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 208c7ec7..c5c9f93f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -2603,11 +2603,18 @@ static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj)
+ // defers with it, so a later stop()/play() inside the same frame script no
+ // longer wins. Pre-fix, `playing` was assigned unconditionally at the top of
+ // goto_frame.
++#define MC_GOTO_PLAY_FLAG 2
++static void mc_set_programmatically_played(Avm2DisplayObjectExt* ext);
+ static void mc_goto_frame_now(Avm2Context* ctx, Avm2Object* obj,
+                               Avm2DisplayObjectExt* ext, uint16_t frame,
+                               int stop)
+ {
+-	ext->playing = stop ? 0 : 1;
++	// stop: 0 = play, 1 = stop, MC_GOTO_PLAY_FLAG = play + set the isPlaying
++	// flag when the goto RUNS (gotoAndPlay/nextScene/prevScene; a queued one
++	// leaves isPlaying unchanged until it is flushed, Flash
++	// avm2/goto_scene_isplaying, goto_framescript_queued/swf13).
++	if (stop == MC_GOTO_PLAY_FLAG) mc_set_programmatically_played(ext);
++	ext->playing = (stop == 1) ? 0 : 1;
+ 	// In AS3 a no-op goto still has user-visible side effects, so it runs.
+ 	if (frame != ext->current_frame)
+ 	{
+@@ -3333,7 +3340,8 @@ static void mc_goto_frame(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int
+ 		// The play/stop is queued with the frame and applied by
+ 		// mc_goto_frame_now when the queue is flushed.
+ 		ext->queued_goto_frame = frame;
+-		ext->queued_goto_stop = stop ? 1 : 0;
++		ext->queued_goto_stop = (stop == MC_GOTO_PLAY_FLAG) ? MC_GOTO_PLAY_FLAG
++		                      : (stop ? 1 : 0);
+ 		if (frame < ext->frame_script_cap
+ 		    && ext->frame_scripts[frame].kind == AVM2_VALUE_OBJECT)
+ 		{
+@@ -7918,10 +7926,15 @@ static Avm2Value mc_get_frames_loaded(Avm2Activation* act)
+ 	return avm2_integer((int32_t) (fl < tf ? fl : tf));
+ }
+ 
++// Flash: isPlaying is a flag of its own, not "the clip is playing". play(),
++// gotoAndPlay(), nextScene() and prevScene() set it (never on a 1-frame
++// clip), only stop() clears it; nextFrame/prevFrame/gotoAndStop stop the clip
++// but leave the flag (Flash goldens avm2/goto_isplaying,
++// goto_framescript_queued_next_prev, goto_scene_isplaying; Ruffle KF).
+ static Avm2Value mc_get_is_playing(Avm2Activation* act)
+ {
+ 	Avm2DisplayObjectExt* ext = this_display(act);
+-	return avm2_bool(ext != NULL && ext->programmatically_played && ext->playing);
++	return avm2_bool(ext != NULL && ext->programmatically_played);
+ }
+ 
+ static void mc_set_programmatically_played(Avm2DisplayObjectExt* ext)
+@@ -7946,7 +7959,11 @@ static Avm2Value mc_play(Avm2Activation* act)
+ static Avm2Value mc_stop(Avm2Activation* act)
+ {
+ 	Avm2DisplayObjectExt* ext = this_display(act);
+-	if (ext != NULL) ext->playing = 0;
++	if (ext != NULL)
++	{
++		ext->playing = 0;
++		ext->programmatically_played = 0;
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -8297,10 +8314,12 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
+ 	// it) NOOPs a goto issued while this clip runs a frame script — the
+ 	// clip neither jumps to frame 1 nor stops/plays.
+ 	if (frame == 0 && ext->executing_frame_script) return;
+-	if (!stop) mc_set_programmatically_played(ext);
+ 	if (frame < 1) frame = 1;
+-	// TRUNCATING u16 cast (Ruffle `frame.max(1) as u16`).
+-	mc_goto_frame(ctx, obj, (uint16_t) (uint32_t) frame, stop);
++	// TRUNCATING u16 cast (Ruffle `frame.max(1) as u16`). gotoAndPlay sets
++	// the isPlaying flag when the goto RUNS: a queued one from a frame script
++	// leaves it unchanged until flushed, and then sets it even over an
++	// intervening stop() (Flash avm2/goto_framescript_queued/swf13).
++	mc_goto_frame(ctx, obj, (uint16_t) (uint32_t) frame, stop ? 1 : MC_GOTO_PLAY_FLAG);
+ }
+ 
+ static Avm2Value mc_goto_and_play(Avm2Activation* act)
+@@ -8332,7 +8351,7 @@ static Avm2Value mc_next_scene(Avm2Activation* act)
+ 	}
+ 	if (best >= 0)
+ 	{
+-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, 0);
++		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, MC_GOTO_PLAY_FLAG);
+ 	}
+ 	else
+ 	{
+@@ -8340,7 +8359,7 @@ static Avm2Value mc_next_scene(Avm2Activation* act)
+ 		// next_scene's .or(current_scene) — movieclip_next_scene).
+ 		SceneInfo cur;
+ 		current_scene_of(ext, &cur);
+-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, 0);
++		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, MC_GOTO_PLAY_FLAG);
+ 	}
+ 	return avm2_undefined();
+ }
+@@ -8364,13 +8383,13 @@ static Avm2Value mc_prev_scene(Avm2Activation* act)
+ 	}
+ 	if (best >= 0)
+ 	{
+-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, 0);
++		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, MC_GOTO_PLAY_FLAG);
+ 	}
+ 	else
+ 	{
+ 		// No previous scene: goto the CURRENT scene's start (Ruffle
+ 		// prev_scene's .or(current_scene) — movieclip_prev_scene).
+-		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, 0);
++		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, MC_GOTO_PLAY_FLAG);
+ 	}
+ 	return avm2_undefined();
+ }
+diff --git a/SWFRecomp/src/action/action.cpp b/SWFRecomp/src/action/action.cpp
+index 923339b2..007d55e9 100644
+--- a/SWFRecomp/src/action/action.cpp
++++ b/SWFRecomp/src/action/action.cpp
+@@ -15,6 +15,9 @@ using std::endl;
+ 
+ namespace SWFRecomp
+ {
++	// Constant-pool slot marker: an entry declared past the ConstantPool
++	// action's end reads as the number 0 (Flash Player 9/10).
++	static const size_t CONSTANT_POOL_ZERO = (size_t) -1;
+ 	// Struct for tracking try/catch/finally block boundaries during inline parsing
+ 	struct TryBlockBoundary {
+ 		char* catch_start;      // Start of catch body (nullptr if no catch)
+@@ -1476,8 +1479,17 @@ namespace SWFRecomp
+ 
+ 				case SWF_ACTION_CONSTANT_POOL:
+ 				{
++					// Malformed-bytecode bounds (Flash Player 9/10, upstream Ruffle
++					// tests avm1/malformed_actions/constant_pool_{overlong,overspill}):
++					// - execution always resumes at the declared action end, so
++					//   trailing bytes after the last string are ignored;
++					// - an entry whose NUL terminator is not inside the action (and
++					//   every entry after it) is the NUMBER 0, not a string.
++					char* cp_body = action_buffer;
++					char* cp_end = cp_body + length;
++
+ 					// Read count of strings (16-bit)
+-					u16 count = VAL(u16, action_buffer);
++					u16 count = (length >= 2) ? VAL(u16, action_buffer) : 0;
+ 					action_buffer += 2;
+ 
+ 					out_script << "\t" << "// ConstantPool (" << count << " strings)" << endl;
+@@ -1486,12 +1498,13 @@ namespace SWFRecomp
+ 					// (e.g., after an unconditional Jump). Flash only processes
+ 					// ConstantPool when it's actually executed.
+ 					if (in_dead_code) {
+-						// Still need to advance past the strings
+-						for (u16 i = 0; i < count; i++) {
+-							size_t str_len = strlen(action_buffer);
++						for (u16 i = 0; i < count && action_buffer < cp_end; i++) {
++							char* nul = (char*) memchr(action_buffer, 0, cp_end - action_buffer);
++							if (nul == NULL) break;
+ 							declareString(context, action_buffer);
+-							action_buffer += str_len + 1;
++							action_buffer = nul + 1;
+ 						}
++						action_buffer = cp_end;
+ 						break;
+ 					}
+ 
+@@ -1502,7 +1515,17 @@ namespace SWFRecomp
+ 					for (u16 i = 0; i < count; i++)
+ 					{
+ 						char* str = action_buffer;
+-						size_t str_len = strlen(str);
++						char* nul = (str < cp_end) ? (char*) memchr(str, 0, cp_end - str) : NULL;
++						if (nul == NULL)
++						{
++							// Out of the action's bounds: this and every later
++							// entry reads as the number 0.
++							for (; i < count; i++)
++							{
++								constant_pool.push_back(CONSTANT_POOL_ZERO);
++							}
++							break;
++						}
+ 
+ 						// Declare the string
+ 						declareString(context, str);
+@@ -1512,9 +1535,10 @@ namespace SWFRecomp
+ 						constant_pool.push_back(str_id);
+ 
+ 						// Advance past string and null terminator
+-						action_buffer += str_len + 1;
++						action_buffer = nul + 1;
+ 					}
+ 
++					action_buffer = cp_end;
+ 					break;
+ 				}
+ 
+@@ -2427,6 +2451,14 @@ namespace SWFRecomp
+ 
+ 							size_t str_id = constant_pool[pool_index];
+ 
++							if (str_id == CONSTANT_POOL_ZERO)
++							{
++								// Pool entry past the ConstantPool action's end (FP9/10): number 0.
++								out_script << "(ConstantPool8[" << (int)pool_index << "] out of action bounds -> 0)" << endl;
++								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, 0x0000000000000000ULL);" << endl;
++								break;
++							}
++
+ 							out_script << "(ConstantPool8[" << (int)pool_index << "])" << endl;
+ 							out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
+ 									   << "strlen(str_" << to_string(str_id) << "), " << str_id << ");" << endl;
+@@ -2450,6 +2482,14 @@ namespace SWFRecomp
+ 
+ 							size_t str_id = constant_pool[pool_index];
+ 
++							if (str_id == CONSTANT_POOL_ZERO)
++							{
++								// Pool entry past the ConstantPool action's end (FP9/10): number 0.
++								out_script << "(ConstantPool16[" << (int)pool_index << "] out of action bounds -> 0)" << endl;
++								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_F64, 0x0000000000000000ULL);" << endl;
++								break;
++							}
++
+ 							out_script << "(ConstantPool16[" << (int)pool_index << "])" << endl;
+ 							out_script << "\t" << "PUSH_STR_ID(str_" << to_string(str_id) << ", "
+ 									   << "strlen(str_" << to_string(str_id) << "), " << str_id << ");" << endl;
+@@ -2475,7 +2515,11 @@ namespace SWFRecomp
+ 						push_length = length;
+ 					}
+ 
+-					action_buffer += push_length;
++					// Execution resumes at the declared action end even when the
++					// last value spilled past it (Flash Player 9/10, upstream Ruffle
++					// test avm1/malformed_actions/push_overspill: the spilled value
++					// is read from the following bytes, which then still execute).
++					action_buffer += length;
+ 
+ 					break;
+ 				}

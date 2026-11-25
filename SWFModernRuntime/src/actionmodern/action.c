@@ -14863,7 +14863,7 @@ static void bd1_draw_textfield_box(BitmapDataNative* dest, MovieClip* mc,
                                    double mtx, double mty,
                                    int dx0, int dy0, int dx1, int dy1,
                                    const uint8_t* stencil, uint8_t stencil_write_value,
-                                   uint8_t* stencil_out)
+                                   uint8_t* stencil_out, const DrawColorTransform* cx)
 {
 	if (mc->dynamic_props == NULL || dx1 <= dx0 || dy1 <= dy0) return;
 	ASObject* props = (ASObject*) mc->dynamic_props;
@@ -14907,7 +14907,14 @@ static void bd1_draw_textfield_box(BitmapDataNative* dest, MovieClip* mc,
 	                        ma, mb, mc_, md, mtx, mty,
 	                        bx, by, (double) mc->width, (double) mc->height,
 	                        has_bg, bg & 0xFFFFFFu, has_border, bc & 0xFFFFFFu, 1.0);
-	bd1_apply_cx_over(dest, g_bd1_scratch, NULL, NULL, dx0, dy0, dx1, dy1,
+	// s27 w2b-draw-text-tint: only a DEVICE-font box is untinted. Flash
+	// Player 32 tints an EMBEDDED-font field's box by the draw() ct and by
+	// its own / an ancestor's colour transform (AVM2 oracle
+	// avm2_bitmapdata_draw_text_glyph_cx, X embed lines); the renderer is
+	// AVM-agnostic, so the same rule applies here (AVM1 twin
+	// avm1_bitmapdata_draw_text_embed_cx is a pending FLASH request).
+	bd1_apply_cx_over(dest, g_bd1_scratch, NULL, embed ? cx : NULL,
+	                  dx0, dy0, dx1, dy1,
 	                  stencil, stencil_write_value, stencil_out);
 }
 
@@ -14941,6 +14948,61 @@ static int bd1_compose_child_cx(const MovieClip* child, const DrawColorTransform
 	return 1;
 }
 
+// s27 w2b-draw-text-tint: alpha of a Drawing-API fill/stroke drawn onto an
+// OPAQUE BitmapData. RASTER_TRI used to force such a source to alpha 0xFF and
+// overwrite, so a child's `_alpha`, beginFill(c, 50) or a ct alphaMultiplier
+// was dropped. Flash Player 32 (oracle avm1_bitmapdata_draw_child_color line
+// 3: red at _alpha 50 over opaque blue = 0x7F0080) composites the source
+// over the target with the Flash fixed-8 colour-transform alpha:
+// a = (a0 * round(am * 256)) >> 8 + ao  (255 * 128 >> 8 = 127, not 128).
+// Returns the source alpha 0..255 (255 = plain overwrite, as before).
+static uint32_t bd1_opaque_src_alpha(double a_unit, const DrawColorTransform* cx)
+{
+	int a = (int) nearbyint(a_unit * 255.0);
+	if (cx) {
+		int m8 = (int) nearbyint(cx->am * 256.0);
+		a = ((a * m8) >> 8) + (int) nearbyint(cx->ao);
+	}
+	if (a < 0) a = 0;
+	if (a > 255) a = 255;
+	return (uint32_t) a;
+}
+
+// src (opaque RGB) over an opaque target pixel at alpha a (0..254).
+static uint32_t bd1_opaque_over(uint32_t dst, uint32_t src, uint32_t a)
+{
+	uint32_t ia = 255u - a, out = 0xFF000000u;
+	for (int sh = 0; sh <= 16; sh += 8) {
+		uint32_t s = (src >> sh) & 0xFFu, d = (dst >> sh) & 0xFFu;
+		uint32_t c = (s * a + 127u) / 255u + (d * ia + 127u) / 255u;
+		out |= (c > 255u ? 255u : c) << sh;
+	}
+	return out;
+}
+
+// A translucent path's triangles overlap on shared edges and stroke joins, so
+// they are first marked into a coverage byte map (RASTER_TRI's `tri_mark`)
+// and composited once per pixel here; returns NULL (plain overwrite) when the
+// source is opaque or the target is transparent (unchanged paths).
+static uint8_t* bd1_tri_mark_begin(const BitmapDataNative* dest, uint32_t a)
+{
+	if (dest->transparent || a >= 255u) return NULL;
+	return (uint8_t*) calloc((size_t) dest->width * dest->height, 1);
+}
+
+static void bd1_tri_mark_flush(BitmapDataNative* dest, uint8_t* mark,
+                               uint32_t color, uint32_t a,
+                               int dx0, int dy0, int dx1, int dy1)
+{
+	if (mark == NULL) return;
+	for (int y = dy0; y < dy1; y++)
+		for (int x = dx0; x < dx1; x++) {
+			size_t i = (size_t) y * dest->width + x;
+			if (mark[i]) dest->pixels[i] = bd1_opaque_over(dest->pixels[i], color, a);
+		}
+	free(mark);
+}
+
 // Rasterize a MovieClip's finalized drawing paths into `dest_pixels`/`stencil`,
 // then recursively rasterize children (dynamic MCs on child_mc_cache).
 // - `dest_pixels` may be NULL when we're only writing a stencil.
@@ -14972,11 +15034,12 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
     if (dx0 >= dx1 || dy0 >= dy1) return;
 
     // s27 w2-draw-cx-text: a TextField clip (MC_IS_TEXTFIELD, defined later in
-    // this file) paints its box (untinted, see bd1_draw_textfield_box).
+    // this file) paints its box (device font: untinted; s27 w2b: embedded
+    // font: through `cx`, see bd1_draw_textfield_box).
     if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2)
         bd1_draw_textfield_box(dest, mc, ma, mb, mc_, md, mtx, mty,
                                dx0, dy0, dx1, dy1,
-                               stencil, stencil_write_value, stencil_out);
+                               stencil, stencil_write_value, stencil_out, cx);
 
     // Helper: invert the 2D affine part of a 4x4 column-major matrix as used
     // by gradient_matrix. Returns 0 if singular (then out_* are zeroed).
@@ -15049,6 +15112,7 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
                 if (_w0 >= 0 && _w1 >= 0 && _w2 >= 0) { \
                     if (_stencil_row && !_stencil_row[_px]) { /* masked out */ } \
                     else if (_srow) { _srow[_px] = stencil_write_value; } \
+                    else if (tri_mark) { tri_mark[(size_t)_py * w + _px] = 1; } \
                     else { _row[_px] = (color_argb); } \
                 } \
             } \
@@ -15136,6 +15200,11 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         } \
     } while (0)
 
+    // s27 w2b: < 255 only for a translucent solid fill/stroke on an opaque
+    // target (bd1_opaque_src_alpha); RASTER_TRI then composites over.
+    uint32_t tri_over_a = 255u;
+    uint8_t* tri_mark = NULL;
+
     // Rasterize this MC's own drawing paths (if any).
     if (mc->drawing_state != NULL) {
         DrawingState* ds = (DrawingState*) mc->drawing_state;
@@ -15190,6 +15259,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
                     uint32_t fb = (uint32_t)(fb_d + 0.5);
                     uint32_t fa8 = dest->transparent ? (uint32_t)(fa_d + 0.5) : 0xFF;
                     uint32_t color = (fa8 << 24) | (fr << 16) | (fg << 8) | fb;
+                    tri_over_a = dest->transparent ? 255u
+                        : bd1_opaque_src_alpha(path->fill_a, cx);
+                    if (stencil_out == NULL)
+                        tri_mark = bd1_tri_mark_begin(dest, tri_over_a);
                     for (u32 v = 0; v + 5 < path->fill_vert_count * 2; v += 6) {
                         float* fv = &path->fill_verts[v];
                         double s0x = fv[0] / 20.0, s0y = fv[1] / 20.0;
@@ -15203,6 +15276,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
                         double d2y = mb * s2x + md  * s2y + mty;
                         RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
                     }
+                    bd1_tri_mark_flush(dest, tri_mark, color, tri_over_a,
+                                       dx0, dy0, dx1, dy1);
+                    tri_mark = NULL;
+                    tri_over_a = 255u;
                 }
             }
             if (path->has_line && path->line_vert_count >= 3) {
@@ -15223,6 +15300,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
                 uint32_t lb = (uint32_t)(lb_d + 0.5);
                 uint32_t la8 = dest->transparent ? (uint32_t)(la_d + 0.5) : 0xFF;
                 uint32_t color = (la8 << 24) | (lr << 16) | (lg << 8) | lb;
+                tri_over_a = dest->transparent ? 255u
+                    : bd1_opaque_src_alpha(path->line_a, cx);
+                if (stencil_out == NULL)
+                    tri_mark = bd1_tri_mark_begin(dest, tri_over_a);
                 for (u32 v = 0; v + 5 < path->line_vert_count * 2; v += 6) {
                     float* lv = &path->line_verts[v];
                     double s0x = lv[0] / 20.0, s0y = lv[1] / 20.0;
@@ -15236,6 +15317,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
                     double d2y = mb * s2x + md  * s2y + mty;
                     RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
                 }
+                bd1_tri_mark_flush(dest, tri_mark, color, tri_over_a,
+                                   dx0, dy0, dx1, dy1);
+                tri_mark = NULL;
+                tri_over_a = 255u;
             }
         }
     }
@@ -17831,13 +17916,22 @@ static void tfCallGlobalCtorOnField(SWFAppContext* app_context, MovieClip* field
 	// Default flag superset, plus a real zero-length `arguments` for a type-1
 	// (SWF6 DefineFunction) body, which has no prologue of its own
 	// (TextField.as:1239 `args == 0`).
-	InvokeOpts opts = { .flags = INV_DEPTH_GUARD | INV_THIS_STACK | INV_SUPER_CTX |
+	// Super context: the field's property bag at constructor depth 1, with the
+	// field as companion MC, exactly as actionInvokeRegisteredClassConstructor
+	// does. NOT INV_SUPER_CTX: that pushes the raw MovieClip* at depth 0, and a
+	// `super()` in the replaced constructor (globals_monkeypatch's
+	// monkeyPatchClass `zuper()`) then walks the MovieClip as an ASObject
+	// (walkProtoChain -> findPropertySlot on MovieClip memory) = SIGSEGV
+	// (s27 interim #3; exposed by 85cca4df6, latent before).
+	InvokeOpts opts = { .flags = INV_DEPTH_GUARD | INV_THIS_STACK |
 	                             INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS |
 	                             INV_BASE_CLIP | INV_VERSION_SWITCH | INV_EVENT_THIS_MC |
 	                             INV_EXEC_FUNC | INV_LOCAL_SCOPE_MC | INV_CTOR_CTX |
 	                             INV_MC_THIS_NULL_PTR,  // MC receiver: preload_this reads g_event_this_mc
 	                    .act_flags = INV_ACT_ARGUMENTS };
+	pushSuperContextWithMC(field->dynamic_props, 1, (void*) field);
 	(void) invokeFunctionValue(app_context, f, &this_var, NULL, 0, &opts);
+	popSuperContext();
 }
 
 // ============================================================
