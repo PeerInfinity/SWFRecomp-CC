@@ -43,3 +43,4 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | w1b-rm-avm2 | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4K1YrfUyotfKco1y4 — launched (wave 1b) |
 | w1b-rm-gnash | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi7EJcG2PzxYnxubmxh — launched (wave 1b) |
 | w1b-rm-avm1-misc | trace-provenance table A | rm→pass (Flash gains) by mechanism | session_018CoDi4KkhjNDFiySBwY5AV — launched (wave 1b) |
+| w2-test12-land | w1-test12-enterframe + Flash | trace test12 → pass; fixtures (Flash) | session_018CoDi5LgngECdcoyMmk6s1 — launched |
