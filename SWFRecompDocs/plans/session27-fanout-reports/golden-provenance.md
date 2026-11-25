@@ -1005,3 +1005,23 @@ LNX+WIN where round 2 also ran the Windows projector (its result is in Notes).
 | `visual/video/vp6_inter_frames` | output.14 | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX |  |
 | `visual/video/vp6_inter_frames` | output.15 | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX |  |
 | `visual/video/vp6_inter_frames` | output.16 | Flash (exact) | 0/0@t1 | 0 | 0 | draw | LNX |  |
+
+## Harness re-run: quality=low pinned roots (s28 `flash-oracle-harness`, 2026-11-25)
+
+The pin stub used for every "direct (pinned)" capture here set `_global._quality` instead of the player quality, so
+these AVM1 `quality = "low"` rows were really captured at **HIGH**. (AVM2 rows are unaffected: quality never carries
+into an AVM2 root.) They were re-captured with the fixed stub, using `sweep_goldens.py --direct`, LNX. The files sit
+next to the old ones: `golden-provenance/<row>__output.direct-pinned.newstub.png` + `.newstub.json`. The tables above
+are left as they were.
+
+| row | old pinned (HIGH) vs golden | new pinned (LOW) vs golden | old→new capture delta | verdict change |
+|---|---|---|---|---|
+| `from_gnash/misc-ming.all/place_object_test` | 5 209 px | **PASS** | 5 984 px | **not FP32 → golden = Flash (low)**: our miss is now a real Flash gap |
+| `from_gnash/misc-ming.all/shape_test` | 1 071 px | **PASS** | 1 437 px | **not FP32 → golden = Flash (low)**: same |
+| `avm1/movieclip_setmask` | 16 px (max 95) | 8 px (max 255) | 16 px | none (still not Flash; closer) |
+| `from_gnash/misc-swfmill.all/missing_bitmap` | 4 px (max 255) | 16 px (max 255) | 12 px | none (still a candidate) |
+| `avm1/movieclip_methods_with_loaded_image` | 569 px (max 1) | 569 px (max 1) | 0 | none |
+
+The two "deferred swaps" (`place_object_test`, `shape_test`, rows marked **keep** above) no longer apply: their goldens
+already ARE Flash at the test's own quality.
+

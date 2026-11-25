@@ -57,8 +57,14 @@ class PlayerEnv:
                 f.write("\n".join(os.path.abspath(p) for p in trust_paths) + "\n")
 
     def run(self, swf, max_duration=3.0, max_idle=0.5, player=DEFAULT_PLAYER, cwd=None,
-            screen=XVFB_SCREEN, done_marker=None, on_marker=None, triggers=(), pin_gate=None):
+            screen=XVFB_SCREEN, done_marker=None, on_marker=None, triggers=(), pin_gate=None,
+            overrun=0.0):
         """Run the projector until exit / timeout / done_marker in flashlog.
+
+        overrun: if flashlog is still being written when max_duration hits,
+        keep running until it has been quiet for OVERRUN_QUIET_S, for at most
+        `overrun` more seconds. stop_reason then reads "max_duration+overrun"
+        (went quiet: complete) or "TRUNCATED" (still writing at the hard cap).
 
         pin_gate: a PinGate (direct-mode window pin), polled every tick.
 
@@ -111,7 +117,8 @@ class PlayerEnv:
                             denv["XAUTHORITY"] = parts[1]
                     on_marker(denv)
             elif now - start > max_duration:
-                killed = "max_duration"
+                killed = _cap_reason(now - start, max_duration, overrun, now - last_activity,
+                                     mtime is not None)
             elif now - last_activity > max_idle:
                 killed = "max_idle"
             if killed:
@@ -145,6 +152,32 @@ class PlayerEnv:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
+OVERRUN_QUIET_S = 0.5
+
+
+def _cap_reason(elapsed, cap, overrun, since_write, wrote):
+    """None = keep running (still inside the overrun window and flashlog is
+    still growing); else the stop reason. A run that is still writing at
+    cap + overrun is reported "TRUNCATED" -- callers must say so loudly."""
+    if not wrote or since_write >= OVERRUN_QUIET_S:
+        return "max_duration" if elapsed - cap < 0.15 else "max_duration+overrun"
+    if elapsed < cap + overrun:
+        return None
+    return "TRUNCATED"
+
+
+def run_cap(frames, rate):
+    """Default direct-mode budget: the test's own length (frames / REAL frame
+    rate -- s28: clamping the rate to >= 1 fps cut 0.25-fps tests at a quarter
+    of their length) + 2 s, and the overrun allowed past it while flashlog is
+    still being written (long single-frame dumps): max(5 s, the length)."""
+    period = 1.0 / (rate if rate > 0 else 1.0)  # SWF rate 0 = treated as 1 fps here
+    length = frames * period
+    # +1 frame period: Flash's frame clock at very low rates lands the last
+    # tick past frames/rate (0.25 fps goto_queued_invalid/swf9: 2 lines short).
+    return length + period + 2.0, max(5.0, length)
+
+
 def read_swf_body(path):
     """Return (version, uncompressed bytes after the 8-byte header incl. RECT...)."""
     data = open(path, "rb").read()
@@ -172,7 +205,7 @@ def parse_rect(body):
     for i in range(4):
         shift = nbytes * 8 - 5 - (i + 1) * nbits
         v = (bits >> shift) & ((1 << nbits) - 1)
-        if v & (1 << (nbits - 1)):
+        if nbits and v & (1 << (nbits - 1)):  # nbits=0: legal all-zero RECT
             v -= 1 << nbits
         vals.append(v)
     return vals, nbytes  # xmin,xmax,ymin,ymax twips
@@ -203,6 +236,112 @@ def swf_info(path):
     return {"version": ver, "width": (xmax - xmin) / 20.0, "height": (ymax - ymin) / 20.0,
             "rect": (xmin, xmax, ymin, ymax), "rate": rate, "frames": frames,
             "bg": 0xFFFFFF if bg is None else bg, "avm2": avm2}
+
+
+def _frame1_root_actions(path):
+    """Bytecode of the root timeline's frame-1 DoAction tags (AVM1 only)."""
+    ver, body = read_swf_body(path)
+    _, n = parse_rect(body)
+    pos = n + 4
+    out = [ver]
+    while pos + 2 <= len(body):
+        code_len = struct.unpack("<H", body[pos:pos + 2])[0]
+        code, ln = code_len >> 6, code_len & 0x3F
+        pos += 2
+        if ln == 0x3F:
+            ln = struct.unpack("<I", body[pos:pos + 4])[0]
+            pos += 4
+        if code == 69 and ln >= 1 and body[pos] & 0x08:
+            return [ver]  # AVM2: no root onLoad
+        if code == 12:  # DoAction
+            out.append(body[pos:pos + ln])
+        if code in (1, 0):
+            break
+        pos += ln
+    return out
+
+
+def _push_values(data, pool):
+    vals, i = [], 0
+    while i < len(data):
+        t = data[i]
+        i += 1
+        if t == 0:
+            e = data.index(b"\0", i)
+            vals.append(data[i:e].decode("latin-1"))
+            i = e + 1
+        elif t in (1, 7):
+            vals.append(None); i += 4
+        elif t == 6:
+            vals.append(None); i += 8
+        elif t in (4, 5):
+            vals.append(None); i += 1
+        elif t in (2, 3):
+            vals.append(None)
+        elif t == 8:
+            vals.append(pool[data[i]] if data[i] < len(pool) else None); i += 1
+        elif t == 9:
+            k = struct.unpack("<H", data[i:i + 2])[0]
+            vals.append(pool[k] if k < len(pool) else None); i += 2
+        else:
+            break
+    return vals
+
+
+ROOT_NAMES = ("_root", "_level0", "this")
+
+
+def root_onload_defined(path):
+    """True if the root timeline's frame-1 actions define the root's onLoad:
+    `function onLoad(){}`, `onLoad = ...`, `_root.onLoad = ...`,
+    `this.onLoad = ...` (or `_level0.`). A cheap symbolic scan, not an
+    interpreter: anything it can't follow resets its stack, so it can miss
+    computed forms but never flags e.g. `myLoadVars.onLoad`. The pinned
+    direct mode loads the test as a REPLACED _level0, and Flash then fires
+    no frame-1 root onLoad (s28), so run_trace.py runs these unpinned."""
+    ver, *codes = _frame1_root_actions(path)
+    # SWF <= 6 identifiers are case-insensitive (gnash action_order: `OnLoad`).
+    norm = (lambda v: v.lower() if isinstance(v, str) else v) if ver <= 6 else (lambda v: v)
+    want = {norm(x) for x in ("onLoad", "_root.onLoad", "_level0.onLoad", "this.onLoad")}
+    roots = [("var", norm(r)) for r in ROOT_NAMES]
+    for code in codes:
+        pool, stack, i = [], [], 0
+        while i < len(code) and code[i] != 0:
+            op = code[i]
+            ln = struct.unpack("<H", code[i + 1:i + 3])[0] if op >= 0x80 else 0
+            data = code[i + 3:i + 3 + ln] if op >= 0x80 else b""
+            i += 3 + ln if op >= 0x80 else 1
+            if op == 0x88:  # ConstantPool
+                k = struct.unpack("<H", data[:2])[0]
+                pool, j = [], 2
+                for _ in range(k):
+                    e = data.index(b"\0", j)
+                    pool.append(data[j:e].decode("latin-1"))
+                    j = e + 1
+            elif op == 0x96:  # Push
+                stack += [norm(v) for v in _push_values(data, pool)]
+            elif op == 0x1C:  # GetVariable
+                name = stack.pop() if stack else None
+                stack.append(("var", name))
+            elif op == 0x4C:  # PushDuplicate
+                stack.append(stack[-1] if stack else None)
+            elif op in (0x9B, 0x8E):  # DefineFunction(2): name is the first C string
+                name = norm(data[:data.index(b"\0")].decode("latin-1"))
+                if name == norm("onLoad"):
+                    return True
+                stack.append(("fn",))
+                i += struct.unpack("<H", data[-2:])[0]  # skip the inline body
+            elif op == 0x1D:  # SetVariable
+                if len(stack) >= 2 and stack[-2] in want:
+                    return True
+                del stack[-2:]
+            elif op == 0x4F:  # SetMember
+                if len(stack) >= 3 and stack[-2] == norm("onLoad") and stack[-3] in roots:
+                    return True
+                del stack[-3:]
+            else:
+                stack = []
+    return False
 
 
 def encode_rect(xmin, xmax, ymin, ymax):
@@ -286,7 +425,8 @@ class WinPlayerEnv(PlayerEnv):
         self.root = None
 
     def run(self, swf, max_duration=3.0, max_idle=0.5, player=WIN_PLAYER, cwd=None,
-            screen=None, done_marker=None, on_marker=None, triggers=(), pin_gate=None):
+            screen=None, done_marker=None, on_marker=None, triggers=(), pin_gate=None,
+            overrun=0.0):
         # Windows projector timing (measured 2026-11-23): ~4 s from launch to
         # the first flashlog write, then flushes in ~5 KB/s chunks. So the
         # budget gets +WIN_STARTUP_S and idle only counts after the first write.
@@ -311,7 +451,9 @@ class WinPlayerEnv(PlayerEnv):
             if done_marker and size and done_marker in self.read_log():
                 killed = "done"
             elif now - start > max_duration + WIN_STARTUP_S:
-                killed = "max_duration"
+                killed = _cap_reason(now - start, max_duration + WIN_STARTUP_S, overrun,
+                                     now - last_activity if last_activity is not None else 1e9,
+                                     bool(size))
             elif last_activity is not None and size and now - last_activity > idle:
                 killed = "max_idle"
             if killed:
@@ -333,7 +475,8 @@ class WinPlayerEnv(PlayerEnv):
 # (stage-wide) window.
 NARROW_STAGE = 296
 
-PIN_STUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "capture", "PinStub.swf")
+PIN_STUB = os.environ.get("FLASH_ORACLE_PIN_STUB") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "capture", "PinStub.swf")
 
 
 def pinned_root(swf, work, url=None, quality=None):

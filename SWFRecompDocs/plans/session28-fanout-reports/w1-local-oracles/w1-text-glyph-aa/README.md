@@ -24,3 +24,23 @@ Grade only the text-glyph regions, ours before/after the prototype vs these PNGs
 EditTexts, 70×55 px box, rotated 15/30/45/60° at (1300,300)/(3300,300)/(5300,300)/(1300,2300) twips and sheared c=0.5
 at (3300,2300); stage 300×200. Captures: `flash.draw.png` (draw() wrapper) and `flash.direct-pinned.png`
 (direct pinned; 242 px / max 16 vs draw()).
+
+## Harness re-run with the fixed pin stub (s28 `flash-oracle-harness`, 2026-11-25)
+
+The pin stub never applied `quality = "low"` (it set `_global._quality`), so the Request-1 captures of the
+AVM1 `quality = "low"` rows below were really at HIGH. They were re-captured with the fixed stub (same
+`sweep_goldens.py --direct`): `png/<row>__<comp>.direct.newstub.png` + `<row>.direct.newstub.json`.
+`avm1_long_text_layout` (quality high) and `avm1_edittext_rotated_borders` (no quality) are unaffected.
+
+| row | old (HIGH) vs golden | new (LOW) vs golden | verdict change |
+|---|---|---|---|
+| `visual/filters/bevel` | 134 888 px | 118 027 px | none: still not Flash |
+| `visual/filters/glow` | 19 543 px | 15 448 px | none |
+| `visual/filters/drop_shadow` | 22 101 px | 18 137 px | none |
+| `visual/filters/glow_with_alpha_strength` | 145 526 px | 134 231 px | none |
+| `visual/cache_as_bitmap/edittext_scroll` .01/.02 | 423 / 421 px | 423 / 421 px (capture identical) | none |
+| `visual/text/String_path_variable_button` | no capture | 778 px / max 153 | now captured (the old "untestable in direct mode" did not reproduce) |
+| `from_gnash/misc-ming.all/morph_test1` frame6 | ~600 px | 325 px (frames 1–5 still ~20k: one static grab) | none (closer) |
+
+Grading the text-glyph regions: use the `.newstub` PNGs for these rows.
+

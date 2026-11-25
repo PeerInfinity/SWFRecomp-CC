@@ -12,5 +12,7 @@ FLEX="${FLEX_SDK:-$HOME/CC/flex-sdk}"
 
 # PinStub.swf: the direct-mode window pin (AVM1 root stub; README "Direct-mode
 # window pin"). Header size is irrelevant: flashenv patches RECT + rate per run.
-"${MTASC:-$HOME/CC/mtasc/bin/mtasc}" -cp "${MTASC_STD:-$HOME/CC/mtasc/ocaml/mtasc/std}" \
-  -main -header 500:250:24 PinStub.as -swf PinStub.swf -version 8
+# Source is System/PinStub.as (class System.PinStub): see its header for why it
+# must leave no trace in _global.
+"${MTASC:-$HOME/CC/mtasc/bin/mtasc}" -cp "${MTASC_STD:-$HOME/CC/mtasc/ocaml/mtasc/std}" -cp . \
+  -main -header 500:250:24 System/PinStub.as -swf PinStub.swf -version 8

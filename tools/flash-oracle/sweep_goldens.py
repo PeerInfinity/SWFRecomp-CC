@@ -161,7 +161,7 @@ def main():
     stops = []
     try:
         if a.direct:
-            fps = max(flashenv.swf_info(os.path.join(d, "test.swf"))["rate"], 1)
+            fps = flashenv.swf_info(os.path.join(d, "test.swf"))["rate"] or 1.0  # real rate (s28)
             crop, log, rec["static"], rec["pin"] = direct_screen(d, a.settle + (max(ticks) / fps if ticks else 0), pin=not a.no_pin,
                                                                        quality=a.quality or run_image.toml_quality(toml),
                                                                        fonts=flashenv.toml_fonts(d, toml))

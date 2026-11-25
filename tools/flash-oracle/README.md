@@ -28,7 +28,9 @@ record is `SWFRecompDocs/plans/flash-oracle-report.md`.
   projector window briefly appears on the desktop.
 - **mm.cfg** follows Ruffle: `TraceOutputFileEnable=1` and `SuppressDebuggerExceptionDialogs=1`. `ErrorReportingEnable=1`
   is set ONLY for `log_warnings` tests (`--log-warnings`). With it on, AVM1 emits extra `Warning: …` lines (Windows
-  measured on `avm1/add2`).
+  measured on `avm1/add2`). **`run_trace.py` also turns it on automatically when `output.txt` has a line starting
+  `Warning: `** (s28: 8 corpus goldens carry ErrorReportingEnable lines without `log_warnings` in test.toml, e.g.
+  `set_property_values/swf4`, `uncaught_exception*`, `placeobject_occupied_depth`; all 8 == golden with it on).
 - **AS3 compiler:** Apache Flex SDK `~/CC/flex-sdk` (`mxmlc`, playerglobal 11.1). `capture/build.sh` rebuilds the
   wrapper. **`-omit-trace-statements=false` is mandatory**: flex-config.xml defaults to stripping `trace()`, and the
   wrapper then runs silently with an empty flashlog.
@@ -51,6 +53,7 @@ python3 tools/flash-oracle/run_trace.py <test_dir> --windows --diff  # Windows p
 python3 tools/flash-oracle/run_trace.py <test_dir> --type CD --type-after "before:"   # XTest typing (input.json fixtures)
 python3 tools/flash-oracle/run_trace.py <test_dir> --wrapped         # exact num_frames cut (see limits)
 python3 tools/flash-oracle/run_trace.py <test_dir> --no-pin --diff   # direct WITHOUT the window pin (old behaviour)
+python3 tools/flash-oracle/run_trace.py <test_dir> --overrun 0       # hard cut at the cap (see "Run cap")
 
 # Images: AS3 wrapper loads the SWF, draws the stage at tick N, and ships pixels through flashlog.
 python3 tools/flash-oracle/run_image.py <test_dir> -o out.png [--ticks 1,3,5] [--quality low] \
@@ -117,9 +120,26 @@ tick k depends on the child's VM:
 
 ## Trace-mode limits
 
-- **Direct mode doesn't stop at `num_frames`.** It runs for num_frames/fps + 2 s, so looping content appends extra
-  lines past the Ruffle cut. Take the stable prefix over several runs (as done for the loaded-shell captures), or cut at
-  a known last-frame trace.
+- **Direct mode doesn't stop at `num_frames`.** Looping content appends extra lines past the Ruffle cut. Take the
+  stable prefix over several runs (as done for the loaded-shell captures), or cut at a known last-frame trace.
+- **Run cap (s28, `flashenv.run_cap`).** Cap = (num_frames + 1) / REAL frame rate + 2 s, plus the pin's cost
+  (2.5 s Linux / 4 s Windows + 3 stub frame periods: the stub polls on enterFrame at the test's rate). Before s28 the
+  rate was clamped to ≥ 1 fps and the pin's frames were not counted, so a 0.25-fps test
+  (`avm2/goto_queued_invalid/swf9`, first trace at 13.7 s) was cut at a third of its length; it now captures the
+  whole golden by default. **Overrun:** if flashlog is still being written when the cap hits, the run continues until
+  it has been quiet for 0.5 s, for up to max(5 s, test length) more (`--overrun S`; 0 = hard cut). Still writing at
+  the end → `stop=TRUNCATED` and a **boxed WARNING** on stderr: re-run with a larger `--max-duration`/`--overrun`
+  before grading. A test that traces every frame forever also ends that way (+5 s; the warning says so).
+  (s28's "`flash_text_TextField` came out empty" was not truncation: its golden is empty, Flash prints only FAILs.)
+- **Root `onLoad` (s28).** The pin loads the test as a REPLACED `_level0`, and Flash then fires no frame-1 root
+  `onLoad`. `run_trace.py` scans the root timeline's frame-1 DoActions (`flashenv.root_onload_defined`: `function
+  onLoad`, `onLoad =`, `_root/_level0/this.onLoad =`; case-folded for SWF ≤ 6) and runs those SWFs **unpinned**, with
+  a NOTE (`--force-pin` overrides). It flags exactly 4 of the 4 850 corpus SWFs: `avm1/root_onload`, gnash
+  `action_execution_order_test4` and swfmill `trace-as2/root_onload` (all three now == golden by default), plus
+  `regression/onload_type1_args`. Computed forms (`_root[k] = f`, a register-held root) are not detected: if a trace
+  lacks an onLoad line, cross-check with `--no-pin`. `run_image.py`/`sweep_goldens.py` don't auto-switch.
+- **Pin never released** (`pin=None` in the stop line, boxed WARNING): the test SWF never ran. Seen with 8 parallel
+  Linux runs; keep Linux runs to ≤ 4 in parallel.
 - **`--wrapped` cuts exactly at tick N**, but the SWF is then a loaded child:
   - `_level0` differs (`avm1/add2` diverges on its `_level0 + 1` lines);
   - **AVM1 `loadMovie` children never load** inside an AS3-hosted `AVM1Movie` (`h0 g0 k0` forever).
@@ -174,7 +194,7 @@ python3 tools/flash-oracle/sweep_goldens.py <test rel to root> --root ruffle-tes
   640×468 for the first ~0.3–1.5 s, so a direct root plays its first frames show-all scaled (`concatenatedMatrix`
   ×640/550, hitTest results flipped). `--no-pin` (both tools) reproduces the old behaviour.
 
-## Direct-mode window pin (s27 round 2; `capture/PinStub.as`)
+## Direct-mode window pin (s27 round 2; `capture/System/PinStub.as`)
 
 Direct runs (`run_trace.py` default, `sweep_goldens.py --direct`) no longer start the test as the projector's first
 root. They start `capture/PinStub.swf` (AVM1, built by `capture/build.sh` with MTASC), header-patched to the test's
@@ -192,9 +212,19 @@ at 1:1 from its frame 1. The Windows projector (no X tree) is released after a f
   test (`mcl_replace_root_*`, `movieclip_state_values` load siblings). Paths in traces therefore show a temp dir.
 - **Background:** the stub's `SetBackgroundColor` survives the replacement, so the harness stamps the test's colour
   into the stub (`patch_swf_header(..., bg=)`); without it black-stage tests (`focus_*`) came out white.
-- **Quality:** the stub sets `_quality` from `test.toml` `with_renderer.quality`. It carries into an **AVM1** root
-  (`_quality` traces `LOW`) but **not an AVM2 root** (new Stage, `stage.quality` = `HIGH`). AVM2 `quality = "low"`
+- **Quality:** the stub sets `_root._quality` from `test.toml` `with_renderer.quality`. It carries into an **AVM1**
+  root (`_quality` traces `LOW`) but **not an AVM2 root** (new Stage, `stage.quality` = `HIGH`). AVM2 `quality = "low"`
   rows can't be graded from a direct capture (use the wrapper when the test allows it).
+  **Before s28 the stub's unqualified `_quality = …` set `_global._quality` and the player stayed HIGH**: every pinned
+  direct capture of an AVM1 `quality = "low"` row before 2026-11-25 was really HIGH. Re-captures (`*.newstub.*`):
+  s27 `golden-provenance/` and s28 `w1-local-oracles/w1-text-glyph-aa/`; gnash `place_object_test` and `shape_test`
+  then PASS their goldens (were 5 209 / 1 071 px "not FP32").
+- **No trace in the test's globals (s28).** `_global` survives the replacement. The old top-level `class PinStub`
+  left `_global.PinStub` (+ `_global._quality`) in `_global` enumerations (`global_proto_decls*`, gnash `argstest-v*`)
+  and, under ErrorReportingEnable, a `Warning: Reference to undeclared variable, 'PinStub'` (MTASC's class prologue
+  probes the name with GetVariable). The stub is now `class System.PinStub` (the prologue then probes the EXISTING
+  `System`), deletes `_global.System.PinStub` first thing, and keeps its state in closures: `global_proto_decls` and
+  `argstest-v7` pinned == their `--no-pin` runs. Old stub for A/Bs: `FLASH_ORACLE_PIN_STUB=<path>` overrides the stub.
 - **Narrow stages (< 296 px wide):** the menubar keeps the drawing area ≥ ~296 px wide while the toplevel is only
   stage-wide and clips it, so a centred stage sits off-window. Those stages are pinned with `Stage.align = "TL"`
   (it survives the replacement; the test then traces `Stage.align` = `TL`/`LT`, not `""`). Heights are not clamped.
@@ -221,6 +251,6 @@ at 1:1 from its frame 1. The Windows projector (no X tree) is released after a f
 - `flashenv.py`: player environments (Linux temp-HOME + Xvfb; Windows interop) and the SWF header parse/patch.
 - `run_trace.py`, `run_image.py`, `validate_images.py`, `sweep_goldens.py`: the CLIs above.
 - `capture/CaptureWrapper.as` + `build.sh` → `CaptureWrapper.swf` (committed, 4.7 KB).
-- `capture/PinStub.as` + `build.sh` (MTASC) → `PinStub.swf` (committed): the direct-mode window pin.
+- `capture/System/PinStub.as` + `build.sh` (MTASC) → `PinStub.swf` (committed): the direct-mode window pin.
 - `xgrab/xgrab.c`: X window tree, root screenshot (PPM), and XTest typing.
 - `probes/tick_avm1`, `probes/tick_avm2`: the tick-alignment probes (MTASC / mxmlc sources + SWFs).

@@ -86,6 +86,12 @@ Both entries print `APPLIED` under `apply_flash_fixes.py --check`.
 
    `--windows` is the tie-breaker for those rows.
 
+**Harness re-run (s28 `flash-oracle-harness`, 2026-11-25):** findings 1–5 are fixed in `tools/flash-oracle/` (clean stub,
+auto-unpin on a root onLoad, real-rate cap + overrun + TRUNCATED warning, auto `--log-warnings`, 0-bit RECT). The
+affected rows carry a "harness re-run" note. One verdict changes: `tags_after_last_showframe` untestable → golden =
+Flash. Finding 3's `flash_text_TextField` half was not truncation (the golden is empty). Record:
+`flash-oracle-harness-report.md`.
+
 ## Tables
 
 ### A. Hidden gaps: `ruffle_matched` rows whose golden IS Flash (212)
@@ -262,7 +268,7 @@ Each of these counts as a pass today, but FP32 prints the graded golden and we d
 | `from_gnash/misc-ming.all/EmbeddedFontTest` | rm | `output.txt` | golden = Flash | 27 lines (idx) |  |
 | `from_gnash/misc-ming.all/TextSnapshotTest` | rm | `output.fp10.txt` | golden = Flash | 81 lines (idx) |  |
 | `from_gnash/misc-ming.all/action_order/action_execution_order_test` | rm | `output.fp10.txt` | golden = Flash | 12 lines (idx) |  |
-| `from_gnash/misc-ming.all/action_order/action_execution_order_test4` | rm | `output.txt` | golden = Flash | 7 lines (idx) | pinned run drops frame-1 `_root.onLoad` (replaced-_level0 artifact, s28-coordinator finding); `--no-pin` == golden |
+| `from_gnash/misc-ming.all/action_order/action_execution_order_test4` | rm | `output.txt` | golden = Flash | 7 lines (idx) | pinned run drops frame-1 `_root.onLoad` (replaced-_level0 artifact, s28-coordinator finding); `--no-pin` == golden · **harness re-run (s28 flash-oracle-harness, default flags):** root onLoad auto-detected → unpinned → byte-identical |
 | `from_gnash/misc-ming.all/action_order/action_execution_order_test6` | rm | `output.txt` | golden = Flash | 5 lines (idx) |  |
 | `from_gnash/misc-ming.all/callFunction_test` | rm | `output.txt` | golden = Flash | 6 lines (idx) |  |
 | `from_gnash/misc-ming.all/displaylist_depths/displaylist_depths_test` | rm | `output.txt` | golden = Flash | 7 lines (idx) |  |
@@ -295,7 +301,7 @@ Each of these counts as a pass today, but FP32 prints the graded golden and we d
 | `from_shumway/as3-loader/events/loader-events` | rm | `output.txt` | golden = Flash (Windows FP32) | 20 lines (idx) | Linux FP32 adds 4096/8192-byte progress events (I/O chunking); Windows == golden |
 | `from_shumway/avm1movie` | rm | `output.txt` | golden = Flash | 12 lines (idx) |  |
 | `from_shumway/avm2/flash/geom/transform/pixelBounds` | rm | `output.txt` | golden = Flash | 1 lines (idx) |  |
-| `from_shumway/flash_text_TextField` | rm | `output.txt` | golden = Flash | 5 lines (idx) | pinned 2 s run empty; the 20 s run == golden |
+| `from_shumway/flash_text_TextField` | rm | `output.txt` | golden = Flash | 5 lines (idx) | pinned 2 s run empty; the 20 s run == golden · **harness re-run (s28 flash-oracle-harness, default flags):** byte-identical at the default cap; the golden is EMPTY (Flash prints only FAILs), so the 2 s run was never truncated |
 | `from_shumway/flash_text_TextField2` | rm | `output.txt` | golden = Flash (Windows FP32) | 9 lines (idx) | Linux drops blank lines; Windows == golden |
 | `from_shumway/getobjectsunderpoint` | rm | `output.txt` | golden = Flash | 9 lines (idx) |  |
 | `from_shumway/timeline/nav/clipDepth` | rm | `output.txt` | golden = Flash | 4 lines (idx) |  |
@@ -314,16 +320,16 @@ For `output_mismatch` rows with a local graphics run, "ours vs Flash" is the dif
 | test | status @e1425f417 | graded file | verdict | ours vs Flash | notes |
 |---|---|---|---|---|---|
 | `avm1/external_interface_monkeypatch` | mm | `output.txt` | golden = Flash | -96/+22 |  |
-| `avm1/global_proto_decls` | mm | `output.txt` | golden = Flash | -2226/+1529 | pinned run leaks PinStub `_global` names; `--no-pin --log-warnings` == golden |
-| `avm1/global_proto_decls_delete` | mm | `output.txt` | golden = Flash | -2280/+493 | `--log-warnings` == golden except 1 line: `System.capabilities.manufacturer` enumeration position (its value is host-dependent: "Adobe Linux" vs "Adobe Windows") |
+| `avm1/global_proto_decls` | mm | `output.txt` | golden = Flash | -2226/+1529 | pinned run leaks PinStub `_global` names; `--no-pin --log-warnings` == golden · **harness re-run (s28 flash-oracle-harness, default flags):** new stub, pinned, no flags → byte-identical (no `--no-pin`/`--log-warnings` needed) |
+| `avm1/global_proto_decls_delete` | mm | `output.txt` | golden = Flash | -2280/+493 | `--log-warnings` == golden except 1 line: `System.capabilities.manufacturer` enumeration position (its value is host-dependent: "Adobe Linux" vs "Adobe Windows") · **harness re-run (s28 flash-oracle-harness, default flags):** auto `--log-warnings` + new stub, pinned → golden except the same `manufacturer` line |
 | `avm1/globals_swf5` | mm | `output.txt` | golden = Flash | -10/+10 |  |
 | `avm1/native_objects_swf6` | mm | `output.txt` | golden = Flash | -1/+1 |  |
-| `avm1/set_property_values/swf4` | mm | `output.txt` | golden = Flash | -317/+489 | golden carries ErrorReportingEnable warnings; `--log-warnings` == golden |
+| `avm1/set_property_values/swf4` | mm | `output.txt` | golden = Flash | -317/+489 | golden carries ErrorReportingEnable warnings; `--log-warnings` == golden · **harness re-run (s28 flash-oracle-harness, default flags):** auto `--log-warnings` (golden has `Warning:` lines) → byte-identical |
 | `avm2/avm1_root` | mm | `output.txt` | golden = Flash | -44/+20 |  |
 | `avm2/bom` | mm | `output.txt` | golden = Flash | -3/+3 |  |
 | `avm2/number_tostring` | mm | `output.txt` | golden = Flash | -168/+168 |  |
 | `avm2/verify_method_info_duplicate` | mm | `output.txt` | golden = Flash | -1/+0 | equal except the blank line Flash logs after each uncaught error (Ruffle golden convention omits it) |
-| `from_gnash/actionscript.all/argstest-v7` | mm | `output.fp32.txt` | golden = Flash | -971/+1554 | `--no-pin` == golden except the `System.capabilities.manufacturer` enumeration position (host value) |
+| `from_gnash/actionscript.all/argstest-v7` | mm | `output.fp32.txt` | golden = Flash | -971/+1554 | `--no-pin` == golden except the `System.capabilities.manufacturer` enumeration position (host value) · **harness re-run (s28 flash-oracle-harness, default flags):** new stub, pinned → `--no-pin` result (only the `manufacturer` position) |
 | `from_gnash/misc-ming.all/action_order/ActionOrderTest3` | mm | `output.txt` | golden = Flash | 59 lines (idx) |  |
 | `from_gnash/misc-ming.all/action_order/ActionOrderTest4` | mm | `output.txt` | golden = Flash | 50 lines (idx) |  |
 | `from_gnash/misc-ming.all/action_order/ActionOrderTest5` | mm | `output.txt` | golden = Flash | 44 lines (idx) |  |
@@ -407,12 +413,12 @@ For `output_mismatch` rows with a local graphics run, "ours vs Flash" is the dif
 |---|---|---|---|---|---|
 | `avm1/allow_networking_import_assets` | pass | `output.all.txt` | untestable |  | Ruffle `Navigator::fetch` runner lines (network) |
 | `avm1/allow_networking_import_assets2` | pass | `output.all.txt` | untestable |  | Ruffle `Navigator::fetch` runner lines (network) |
-| `avm1/root_onload` | pass | `output.txt` | golden = Flash |  | pinned run drops frame-1 `_root.onLoad`; `--no-pin` == golden |
+| `avm1/root_onload` | pass | `output.txt` | golden = Flash |  | pinned run drops frame-1 `_root.onLoad`; `--no-pin` == golden · **harness re-run (s28 flash-oracle-harness, default flags):** root onLoad auto-detected → unpinned → byte-identical |
 | `avm2/allow_networking` | pass | `output.all.txt` | untestable |  | Ruffle `Navigator::*` runner lines (network) |
 | `avm2/amf_array_serialization` | pass | `output.txt` | untestable |  | network (Ruffle `Navigator::fetch` lines) |
 | `avm2/collator_compare_basic` | pass | `output.txt` | untestable |  | host locale: Linux Collator unsupported (91 lines), Windows differs on `e vs é` |
 | `avm2/filereference_save_and_load` | pass | `output.txt` | untestable |  | host file dialog |
-| `avm2/goto_queued_invalid/swf9` | pass | `output.txt` | golden = Flash |  | 0.25 fps: 32 s run; with a 45 s cap the golden is a prefix of FP32 |
+| `avm2/goto_queued_invalid/swf9` | pass | `output.txt` | golden = Flash |  | 0.25 fps: 32 s run; with a 45 s cap the golden is a prefix of FP32 · **harness re-run (s28 flash-oracle-harness, default flags):** real-rate cap (≈52 s) → golden is a prefix of FP32 (2 extra post-cut lines); verdict unchanged |
 | `avm2/netconnection_serialize_arrays` | pass | `output.txt` | untestable |  | network |
 | `from_gnash/actionscript.all/Sound-v6` | pass | `output.txt` | golden = Flash (Windows FP32) |  | Linux FP32 has no audio device (onSoundComplete never fires); Windows == golden |
 | `from_gnash/actionscript.all/Sound-v7` | pass | `output.txt` | golden = Flash (Windows FP32) |  | as Sound-v6 |
@@ -420,8 +426,8 @@ For `output_mismatch` rows with a local graphics run, "ours vs Flash" is the dif
 | `from_gnash/actionscript.all/getvariable-v6` | pass | `output.fp10.txt` | golden = Flash |  | equal except debugger-only `Parameters of primitive types…` lines |
 | `from_gnash/actionscript.all/getvariable-v7` | pass | `output.fp10.txt` | golden = Flash |  | equal except debugger-only `Parameters of primitive types…` lines |
 | `from_gnash/actionscript.all/getvariable-v8` | pass | `output.fp10.txt` | golden = Flash |  | equal except debugger-only `Parameters of primitive types…` lines |
-| `from_gnash/misc-swfmill.all/tags_after_last_showframe` | pass | `output.txt` | untestable |  | harness bug: `flashenv.parse_rect` raises "negative shift count" on this SWF's 0-bit RECT |
-| `from_gnash/misc-swfmill.all/trace-as2/root_onload` | pass | `output.txt` | golden = Flash |  | pinned run drops frame-1 `_root.onLoad`; `--no-pin` == golden |
+| `from_gnash/misc-swfmill.all/tags_after_last_showframe` | pass | `output.txt` | untestable |  | harness bug: `flashenv.parse_rect` raises "negative shift count" on this SWF's 0-bit RECT · **harness re-run (s28 flash-oracle-harness, default flags):** `parse_rect` fixed → BYTE-IDENTICAL: **untestable → golden = Flash** |
+| `from_gnash/misc-swfmill.all/trace-as2/root_onload` | pass | `output.txt` | golden = Flash |  | pinned run drops frame-1 `_root.onLoad`; `--no-pin` == golden · **harness re-run (s28 flash-oracle-harness, default flags):** root onLoad auto-detected → unpinned → byte-identical |
 | `from_shumway/hittesting/mask-hit-test` | pass | `output.txt` | untestable |  | needs a mouse click (`clicked at 60,50`) |
 
 <details><summary>The 167 sample rows where pinned FP32 == the graded golden</summary>

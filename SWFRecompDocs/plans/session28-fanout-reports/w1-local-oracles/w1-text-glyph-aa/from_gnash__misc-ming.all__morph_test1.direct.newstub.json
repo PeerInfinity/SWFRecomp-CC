@@ -1,0 +1,110 @@
+{
+ "test": "from_gnash/misc-ming.all/morph_test1",
+ "mode": "direct",
+ "num_ticks": 30,
+ "quality": null,
+ "comparisons": {
+  "frame1": {
+   "trigger": 2,
+   "max_difference": 255,
+   "diff_pixels": 20000,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 5,
+     "max_outliers": 0,
+     "outliers": 39784,
+     "outlier_pixels": 20000
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame2": {
+   "trigger": 3,
+   "max_difference": 255,
+   "diff_pixels": 20325,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 5,
+     "max_outliers": 0,
+     "outliers": 50975,
+     "outlier_pixels": 20325
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame3": {
+   "trigger": 4,
+   "max_difference": 255,
+   "diff_pixels": 20325,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 5,
+     "max_outliers": 0,
+     "outliers": 50975,
+     "outlier_pixels": 20325
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame4": {
+   "trigger": 5,
+   "max_difference": 255,
+   "diff_pixels": 20325,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 5,
+     "max_outliers": 0,
+     "outliers": 50975,
+     "outlier_pixels": 20325
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame5": {
+   "trigger": 6,
+   "max_difference": 255,
+   "diff_pixels": 20325,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 5,
+     "max_outliers": 0,
+     "outliers": 50975,
+     "outlier_pixels": 20325
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame6": {
+   "trigger": 7,
+   "max_difference": 255,
+   "diff_pixels": 325,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 5,
+     "max_outliers": 0,
+     "outliers": 775,
+     "outlier_pixels": 325
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "static": false,
+ "pin": "settled 800x652",
+ "log_tail": [],
+ "stop": [
+  "direct"
+ ]
+}
