@@ -490,6 +490,61 @@ u8 scope_is_with[MAX_SCOPE_DEPTH];       // 1 = with scope, 0 = function scope
 MovieClip* scope_mc[MAX_SCOPE_DEPTH];     // non-NULL if scope entry is a MovieClip
 u32 scope_depth = 0;
 
+// ------------------------------------------------------------------
+// s28 w2b-gnash-holds (B11): NaN identity for ==.
+// FP32 compares two NaNs equal only when they are the SAME number atom: a
+// variable read twice equals itself, two reads of the `NaN` global are equal,
+// but NaNs produced separately (0/0, "abc"*0, Math.sqrt(-1), parseInt("x"),
+// Number(new Number(NaN)), --"a", undefined+1, a pushed NaN literal) are all
+// unequal to each other and to `NaN` (regression/avm1_gnash_flash_probes P4;
+// gnash ops.as:82/102-104/766/794). Model: our == already compares NaN by bit
+// pattern, so a NaN gets a unique payload ("atom id") when it is first stored
+// (SetVariable / DefineLocal / SetMember / StoreRegister); copies keep the
+// bits. The `NaN` global carries the fixed id 0. Untagged NaNs (fresh
+// arithmetic results) keep their old bit-pattern behaviour.
+#define AVM1_NAN_TAG_HI   0x7FFCA5A500000000ULL
+#define AVM1_NAN_TAG_MASK 0x7FFFFFFF00000000ULL  /* sign bit kept from the source NaN */
+#define AVM1_NAN_GLOBAL_BITS AVM1_NAN_TAG_HI
+static u32 g_avm1_nan_atom_serial = 0;
+static inline u64 avm1NanFreshAtomBits(u64 src_bits)
+{
+	if (++g_avm1_nan_atom_serial == 0) g_avm1_nan_atom_serial = 1;
+	return (src_bits & 0x8000000000000000ULL) | AVM1_NAN_TAG_HI | (u64)g_avm1_nan_atom_serial;
+}
+static inline double avm1NanGlobalValue(void)
+{
+	u64 b = AVM1_NAN_GLOBAL_BITS; double d; memcpy(&d, &b, sizeof(d)); return d;
+}
+// Give an untagged NaN number its own atom id (F32 NaN widens to F64).
+static void avm1NanTagVar(ActionVar* v)
+{
+	if (v->type == ACTION_STACK_VALUE_F64) {
+		u64 b = v->data.numeric_value; double d; memcpy(&d, &b, sizeof(d));
+		if (d == d || (b & AVM1_NAN_TAG_MASK) == AVM1_NAN_TAG_HI) return;
+		v->data.numeric_value = avm1NanFreshAtomBits(b);
+	} else if (v->type == ACTION_STACK_VALUE_F32) {
+		float f = VAL(float, &v->data.numeric_value);
+		if (f == f) return;
+		u32 fb; memcpy(&fb, &f, sizeof(fb));
+		v->type = ACTION_STACK_VALUE_F64;
+		v->data.numeric_value = avm1NanFreshAtomBits((u64)(fb & 0x80000000u) << 32);
+	}
+}
+// Same, on a raw stack slot (type at +0, value at +16).
+static void avm1NanTagStackSlot(SWFAppContext* app_context, u32 sp)
+{
+	u8 t = STACK[sp];
+	if (t != ACTION_STACK_VALUE_F64 && t != ACTION_STACK_VALUE_F32) return;
+	ActionVar v = {0};
+	v.type = t;
+	v.data.numeric_value = VAL(u64, &STACK[sp + 16]);
+	avm1NanTagVar(&v);
+	if (v.type != t || v.data.numeric_value != VAL(u64, &STACK[sp + 16])) {
+		STACK[sp] = v.type;
+		VAL(u64, &STACK[sp + 16]) = v.data.numeric_value;
+	}
+}
+
 // Exception handling infrastructure (setjmp/longjmp based try/catch)
 #define MAX_EXCEPTION_DEPTH 16
 
@@ -8621,9 +8676,19 @@ static ActionVar builtin_string_proto_valueOf(SWFAppContext* app_context, Action
 	if (thisv.type == ACTION_STACK_VALUE_OBJECT && thisv.data.numeric_value != 0) {
 		ASObject* obj = (ASObject*) thisv.data.numeric_value;
 		ActionVar* prim = getProperty(obj, "valueOf_value", 13);
-		if ((prim != NULL && prim->type == ACTION_STACK_VALUE_STRING) ||
-		    obj == g_string_proto_valueof_self[0] || obj == g_string_proto_valueof_self[1])
+		if (prim != NULL && prim->type == ACTION_STACK_VALUE_STRING)
 			return builtin_wrapper_valueOf(app_context, args, arg_count, registers, obj);
+		// s28 w2b-gnash-holds: the bare String.prototype is no String
+		// wrapper; FP32 String.prototype.valueOf() returns the STRING
+		// "[type Object]" (regression/avm1_gnash_flash_probes P6, SWF5/6/8).
+		if (obj == g_string_proto_valueof_self[0] || obj == g_string_proto_valueof_self[1]) {
+			// An autoboxed string primitive arrives with String.prototype
+			// as this_obj and the primitive on the this-stack: keep the
+			// wrapper path for it.
+			if (g_this_depth > 0 && g_this_stack[g_this_depth - 1].type == ACTION_STACK_VALUE_STRING)
+				return builtin_wrapper_valueOf(app_context, args, arg_count, registers, obj);
+			return makeStringActionVar(app_context, "[type Object]", 13);
+		}
 	}
 	char buf[1024];
 	u32 n = (u32) varToStringBuf(app_context, &thisv, buf, sizeof(buf));
@@ -16793,6 +16858,22 @@ static inline ASObject* getFunctionProto(int version) {
 	return (version <= 6) ? g_function_proto_legacy : g_function_proto_modern;
 }
 
+// s28 w2b-gnash-holds (B6): a built-in constructor's creation-time __proto__
+// (-> Function.prototype) carries the SWF6 visibility flag (0x80): SWF5
+// GetMember cannot read it nor inherit through it until ASSetPropFlags
+// clears 128 (FP32: gnash Object.as:33-37, Number.as:345-356). Called after
+// every init site that installs such a __proto__.
+static void b6FlagFnProto(ASObject* own_props)
+{
+	if (own_props == NULL) return;
+	ASProperty* pp = findPropertyRaw(own_props, "__proto__", 9);
+	if (pp == NULL || pp->value.type != ACTION_STACK_VALUE_OBJECT || pp->value.data.numeric_value == 0)
+		return;
+	ASObject* v = (ASObject*)(uintptr_t) pp->value.data.numeric_value;
+	if (v == g_function_proto_legacy || v == g_function_proto_modern)
+		pp->flash_flags |= 0x80;
+}
+
 // Flash wires a freshly created function object to `_global.Function` at
 // CREATION time: "__proto__ is _global.Function.prototype" (gnash
 // actionscript.all/Function.as:1069-1089). Our FUNCTION GetMember path already
@@ -16856,6 +16937,7 @@ static ASFunction* ensureObjectConstructor(SWFAppContext* app_context)
 				ActionVar _fpv = {0}; _fpv.type = ACTION_STACK_VALUE_OBJECT;
 				_fpv.data.numeric_value = (u64)_fn_p;
 				setProperty(app_context, g_object_constructor_static.own_props, "__proto__", 9, &_fpv);
+				b6FlagFnProto(g_object_constructor_static.own_props);
 			}
 		}
 		registerGeomMethod(&g_object_registerClass_func, "registerClass",
@@ -38320,6 +38402,12 @@ void actionLess2(SWFAppContext* app_context)
 		if (l == NULL) { l = u16_empty; l_len = 0; }
 		if (r == NULL) { r = u16_empty; r_len = 0; }
 		u64 bool_val = (u16_cmp(l, l_len, r, r_len) < 0) ? 1 : 0;
+		// s28 w2b-gnash-holds (B11b): FP32 (SWF5/6/8) orders the empty string
+		// AFTER every non-empty string in Less2: "" < "0", "" < "a", "" < " "
+		// are false and "0" < "" is true ("" < "" false). Pinned by
+		// regression/avm1_gnash_flash_probes P5 and gnash ops.as:174-177.
+		if (l_len == 0) bool_val = 0;
+		else if (r_len == 0) bool_val = 1;
 		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
 	}
 	else
@@ -49008,6 +49096,7 @@ static void ensureCtorOwnProps(SWFAppContext* app_context, ASFunction* ctor,
 				ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
 				fpv.data.numeric_value = (u64) fn_proto;
 				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
+				b6FlagFnProto(ctor->own_props);
 			}
 		}
 	}
@@ -50139,7 +50228,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// SWF4 equality treats NaN/Infinity as undefined strings, not numbers.
 	{
 		ActionVar _nan_v = {0}; _nan_v.type = ACTION_STACK_VALUE_F64;
-		VAL(double, &_nan_v.data.numeric_value) = __builtin_nan("");
+		VAL(double, &_nan_v.data.numeric_value) = avm1NanGlobalValue(); // B11 atom id 0
 		setPropertyWithFlags(app_context, global_object, "NaN", 3, &_nan_v, PROPERTY_FLAGS_DEFAULT);
 		ASProperty* _np = findPropertyRaw(global_object, "NaN", 3);
 		if (_np) _np->flash_flags = 0x8000;
@@ -50531,6 +50620,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			// Set __proto__ → Function.prototype (DONT_ENUM + DONT_DELETE, if not already set)
 			if (getProperty(ctor->own_props, "__proto__", 9) == NULL)
 				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val, PROPERTY_FLAG_WRITABLE);
+				b6FlagFnProto(ctor->own_props);
 		}
 
 		// ---- textRenderer own_props: add specific properties AFTER Phase 8c-2 ----
@@ -50585,7 +50675,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			// Number static constants on g_ctors[3].own_props
 			if (g_ctors[3].own_props != NULL && getProperty(g_ctors[3].own_props, "MAX_VALUE", 9) == NULL) {
 				ActionVar cv;
-				cv = makeF64(NAN);
+				cv = makeF64(avm1NanGlobalValue()); // B11: same atom as NaN (Number.as:51)
 				setProperty(app_context, g_ctors[3].own_props, "NaN", 3, &cv);
 				cv = makeF64(INFINITY);
 				setProperty(app_context, g_ctors[3].own_props, "POSITIVE_INFINITY", 17, &cv);
@@ -50702,6 +50792,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 								ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
 								fpv.data.numeric_value = (u64)fn_proto;
 								setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, ei_f);
+								b6FlagFnProto(ctor->own_props);
 							}
 							if (ctor->prototype_obj) {
 								ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT; pv.str_size = 0;
@@ -50736,6 +50827,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 										ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
 										fpv.data.numeric_value = (u64)fn_proto;
 										setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
+										b6FlagFnProto(ctor->own_props);
 									}
 								}
 								if (ctor->prototype_obj) {
@@ -50781,9 +50873,17 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		}
 		// __proto__ (READ_ONLY = 0x05)
 		{
-			ActionVar* ex = getProperty(old, "__proto__", 9);
-			if (ex) setPropertyWithFlags(app_context, new_props, "__proto__", 9, ex,
-				PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+			ASProperty* exp_ = findPropertyRaw(old, "__proto__", 9);
+			ActionVar* ex = exp_ ? &exp_->value : NULL;
+			if (ex) {
+				u16 ff = exp_->flash_flags;
+				setPropertyWithFlags(app_context, new_props, "__proto__", 9, ex,
+					PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+				// B6: keep the SWF6 flag (Object.__proto__ is undefined in
+				// SWF5 until ASSetPropFlags(Object, null, 8, 129), Object.as:33)
+				ASProperty* np_ = findPropertyRaw(new_props, "__proto__", 9);
+				if (np_) np_->flash_flags = ff;
+			}
 		}
 		// registerClass (DONT_ENUM + READ_ONLY = 0x04)
 		{
@@ -50794,7 +50894,6 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		releaseObject(app_context, old);
 		g_ctors[0].own_props = new_props;
 	}
-
 }
 
 // Copy all properties from src to dst, preserving flags
@@ -50831,6 +50930,7 @@ static ASFunction* createConstructorCopy(SWFAppContext* app_context, ASFunction*
 		ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
 		fp.data.numeric_value = (u64) fn_proto;
 		setProperty(app_context, copy->own_props, "__proto__", 9, &fp);
+		b6FlagFnProto(copy->own_props);
 	} else {
 		copy->own_props = NULL;
 	}
@@ -50961,6 +51061,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 			ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
 			fp.data.numeric_value = (u64) fn_proto;
 			setProperty(app_context, sec_obj_ctor->own_props, "__proto__", 9, &fp);
+			b6FlagFnProto(sec_obj_ctor->own_props);
 		}
 	}
 	{
@@ -51009,6 +51110,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 			ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
 			fp.data.numeric_value = (u64) sec_fn_proto;
 			setProperty(app_context, sec_extra_ctors[i]->own_props, "__proto__", 9, &fp);
+			b6FlagFnProto(sec_extra_ctors[i]->own_props);
 		}
 		// Set Function's prototype_obj to secondary Function.prototype (for instanceof Function)
 		if (i == 3 && sec_fn_proto) { // i==3 is "Function"
@@ -51112,6 +51214,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
 		fp.data.numeric_value = (u64) sec_fn_proto;
 		setProperty(app_context, sec_error_ctor->own_props, "__proto__", 9, &fp);
+		b6FlagFnProto(sec_error_ctor->own_props);
 	}
 
 	// Stub constructors — fresh instances
@@ -52352,7 +52455,7 @@ check_special_vars:
 			                    : (strncmp    ((_buf), (_lit), (_len)) == 0))
 		if (var_name_len == 3 && _CMP_BUILTIN_NAME(var_name, "NaN", 3))
 		{
-			double nan_val = NAN;
+			double nan_val = avm1NanGlobalValue(); // B11: the `NaN` global atom
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &nan_val));
 			return;
 		}
@@ -52504,6 +52607,7 @@ check_special_vars:
 						_fpv.type = ACTION_STACK_VALUE_OBJECT;
 						_fpv.data.numeric_value = (u64) _fn_proto;
 						setPropertyWithFlags(app_context, g_string_constructor.own_props, "__proto__", 9, &_fpv, PROPERTY_FLAGS_DONTENUM);
+						b6FlagFnProto(g_string_constructor.own_props);
 					}
 				}
 
@@ -52605,7 +52709,7 @@ check_special_vars:
 				// Register Number static constants as own_props
 				g_number_constructor.own_props = allocObject(app_context, 8);
 				retainObject(g_number_constructor.own_props);
-				ActionVar _ncp_nan = makeF64(NAN);
+				ActionVar _ncp_nan = makeF64(avm1NanGlobalValue()); // B11: same atom as NaN (Number.as:51)
 				setProperty(app_context, g_number_constructor.own_props, "NaN", 3, &_ncp_nan);
 				ActionVar _ncp_posinf = makeF64(INFINITY);
 				setProperty(app_context, g_number_constructor.own_props, "POSITIVE_INFINITY", 17, &_ncp_posinf);
@@ -52684,6 +52788,7 @@ check_special_vars:
 						ActionVar _pv = {0}; _pv.type = ACTION_STACK_VALUE_OBJECT;
 						_pv.data.numeric_value = (u64)fn_proto;
 						setPropertyWithFlags(app_context, g_number_constructor.own_props, "__proto__", 9, &_pv, PROPERTY_FLAGS_DEFAULT);
+						b6FlagFnProto(g_number_constructor.own_props);
 					}
 					ActionVar _proto = {0}; _proto.type = ACTION_STACK_VALUE_OBJECT;
 					_proto.data.numeric_value = (u64)g_number_constructor.prototype_obj;
@@ -53288,6 +53393,7 @@ void actionSetVariable(SWFAppContext* app_context)
 
 	u32 value_sp = SP;
 	u32 var_name_sp = SP_SECOND_TOP;
+	avm1NanTagStackSlot(app_context, value_sp); // B11 NaN atom id on store
 
 	// Read variable name info.
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
@@ -54089,6 +54195,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 
 	u32 value_sp = SP;
 	u32 var_name_sp = SP_SECOND_TOP;
+	avm1NanTagStackSlot(app_context, value_sp); // B11 NaN atom id on store
 
 	// Read variable name info
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
@@ -56675,6 +56782,37 @@ void actionEquals2(SWFAppContext* app_context)
 	ActionVar b;
 	popVar(app_context, &b);
 
+	// B6 (s28 w2b-gnash-holds): in SWF5 a function converts like an object,
+	// and with its Function.prototype hidden only an OWN valueOf/toString can
+	// give it a primitive; otherwise it is undefined. So `fn == undefined`,
+	// `fn == null`, `Number.prototype == Object`, `Object.prototype.toString
+	// == undefined` and "any function is equal to any other in SWF5" are
+	// all true (FP32: gnash Function.as:53-54, Number.as:332-334,
+	// toString_valueOf.as:96-101).
+	if (g_swf_version < 6 && (a.type == ACTION_STACK_VALUE_FUNCTION || b.type == ACTION_STACK_VALUE_FUNCTION))
+	{
+		ActionVar* fvs[2] = { &a, &b };
+		for (int fi = 0; fi < 2; fi++)
+		{
+			ActionVar* fv = fvs[fi];
+			if (fv->type != ACTION_STACK_VALUE_FUNCTION) continue;
+			ASFunction* ff = (ASFunction*)(uintptr_t) fv->data.numeric_value;
+			int has_own = ff != NULL && ff->own_props != NULL &&
+			              (getProperty(ff->own_props, "valueOf", 7) != NULL ||
+			               getProperty(ff->own_props, "toString", 8) != NULL);
+			if (!has_own) {
+				fv->type = ACTION_STACK_VALUE_UNDEFINED;
+				fv->data.numeric_value = 0;
+			} else {
+				int f_ok = 1;
+				ActionVar fprim = objectToPrimitive(app_context, fv, &f_ok);
+				if (fprim.type != ACTION_STACK_VALUE_OBJECT && fprim.type != ACTION_STACK_VALUE_ARRAY &&
+				    fprim.type != ACTION_STACK_VALUE_FUNCTION)
+					*fv = fprim;
+			}
+		}
+	}
+
 	// Object-to-primitive conversion via valueOf/toString
 	int a_is_obj = (a.type == ACTION_STACK_VALUE_OBJECT || a.type == ACTION_STACK_VALUE_ARRAY);
 	int b_is_obj = (b.type == ACTION_STACK_VALUE_OBJECT || b.type == ACTION_STACK_VALUE_ARRAY);
@@ -57203,6 +57341,7 @@ void actionStoreRegister(SWFAppContext* app_context, u8 register_num)
 	}
 
 	// Peek the top of stack (don't pop!)
+	avm1NanTagStackSlot(app_context, SP); // B11 NaN atom id on store
 	ActionVar value;
 	peekVar(app_context, &value);
 
@@ -58368,6 +58507,7 @@ void actionSetMember(SWFAppContext* app_context)
 	// Pop the value to assign
 	ActionVar value_var;
 	popVar(app_context, &value_var);
+	avm1NanTagVar(&value_var); // B11 NaN atom id on store
 
 	// Pop the property name
 	// The property name should be a string on the stack
@@ -59251,9 +59391,15 @@ void actionSetMember(SWFAppContext* app_context)
 					ActionVar* _np = getProperty(obj, "__proto__", 9);
 					ASObject* _cur = resolveProtoVar(_np);
 					int _md = 256;
+					// s28 w2b-gnash-holds (B19), FP32 SWF6 (gnash
+					// Global.as:258-307): an inherited virtual setter hidden
+					// by flag 256 or 1024 is STILL called (and stops the
+					// walk); one hidden by 4096 is walked past. I.e. the SWF6
+					// setter search uses the SWF7 visibility mask.
+					u16 _set_mask_ff = (g_swf_version == 6) ? (u16)~(0x100 | 0x400) : (u16)0xFFFF;
 					while (_cur != NULL && _md-- > 0) {
 						ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
-						if (_ps != NULL && !isPropertyHiddenAtVersion(_ps->flash_flags)
+						if (_ps != NULL && !isPropertyHiddenAtVersion(_ps->flash_flags & _set_mask_ff)
 						    && (_ps->getter != NULL || _ps->setter != NULL)) {
 							setter_prop = _ps;
 							break;
@@ -59345,8 +59491,19 @@ void actionSetMember(SWFAppContext* app_context)
 				    !(_existing->flags & PROPERTY_FLAG_WRITABLE)))
 					return;  // Property is read-only, silently ignore the assignment
 			}
-			// Set the property on the object
+			// Set the property on the object. B19: FP32 SWF6 keeps flag 1024
+			// on an own property it overwrites (256 and 4096 are cleared;
+			// gnash Global.as:255/274/295).
+			u16 _keep_ff = 0;
+			if (g_swf_version == 6) {
+				ASProperty* _kp = findPropertyRaw(obj, prop_name, prop_name_len);
+				if (_kp != NULL) _keep_ff = _kp->flash_flags & 0x400;
+			}
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
+			if (_keep_ff) {
+				ASProperty* _kp = findPropertyRaw(obj, prop_name, prop_name_len);
+				if (_kp != NULL) _kp->flash_flags |= _keep_ff;
+			}
 			xml_name_value_exclusive_after_set(app_context, obj, prop_name, prop_name_len);
 			if (obj->native_type == NATIVE_ARRAY)
 				asArrayObjectAfterSet(app_context, obj, prop_name, prop_name_len);
@@ -63284,6 +63441,23 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 				if (pv != NULL)
 				{
 					pushVar(app_context, pv);
+					found = 1;
+				}
+			}
+			// B6: in SWF5 the creation-time __proto__ (flagged 0x80, or the
+			// virtual one of a function without an own __proto__) is hidden,
+			// so nothing is inherited through it. `constructor` stays
+			// visible (FP32 SWF5: typeof(Object.constructor),
+			// typeof(Email.constructor) are 'function'; Object.as:31,
+			// Function.as:692).
+			if (!found && g_swf_version <= 5 &&
+			    !(prop_name_len == 11 && strncmp(prop_name, "constructor", 11) == 0))
+			{
+				ASProperty* _fpp = (func->own_props != NULL)
+					? findPropertyRaw(func->own_props, "__proto__", 9) : NULL;
+				if (_fpp == NULL || isPropertyHiddenAtVersion(_fpp->flash_flags))
+				{
+					pushUndefined(app_context);
 					found = 1;
 				}
 			}
@@ -68362,6 +68536,21 @@ static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
 	setProperty(app_context, dprops, name, name_len, value);
 }
 
+// s28 w2b-gnash-holds: the recompiler passes the kind of code the ActionWith
+// sits in (0 = frame/event script, 1 = DefineFunction, 2 = DefineFunction2);
+// -1 = legacy entry point (no kind known: frame-level cap everywhere).
+static int g_with_fn_kind = -1;
+// Tick on which a frame-level `with` overflowed the nesting cap (+1; 0 = none).
+static size_t g_with_frame_overflow_tick1 = 0;
+
+int actionWithStartK(SWFAppContext* app_context, int fn_kind)
+{
+	g_with_fn_kind = fn_kind;
+	int r = actionWithStart(app_context);
+	g_with_fn_kind = -1;
+	return r;
+}
+
 int actionWithStart(SWFAppContext* app_context)
 {
 	// Pop object from stack
@@ -68374,16 +68563,33 @@ int actionWithStart(SWFAppContext* app_context)
 		return 0;
 	}
 
-	// w1b-rm-gnash prototype: Flash Player 32 enters at most 13 nested `with`
-	// blocks (every SWF version; gnash with.as:566-625, golden
-	// "abcdefghijklm"). The 14th ActionWith skips its body silently. Push a
-	// NULL marker so the matching actionWithEnd pop stays balanced. Counted
+	// `with` nesting cap (B2, w1b-rm-gnash; refit to FP32 in s28
+	// w2b-gnash-holds from regression/avm1_gnash_flash_probes{,_v6,_v5} P2).
+	// An ActionWith over the cap skips its body silently; push a NULL marker
+	// so the matching actionWithEnd pop stays balanced. Nesting is counted
 	// down to the nearest function-scope entry (scope_is_with == 0).
+	//  - frame level, every SWF version: 13 (gnash with.as:625
+	//    "abcdefghijklm"; probe P2 frame);
+	//  - inside a SWF6+ function: 12 (probe P2 func2: the activation object
+	//    takes a level); SWF5 functions: 13 (probe v5 func/func2);
+	//  - once a frame-level `with` has overflowed, a SWF6+ DefineFunction
+	//    (type 1) called later in that script cannot enter any `with` (probe
+	//    P2 SWF6/8: no "func depth" line at all, while DefineFunction2 called
+	//    right after still gets 12). FITTED: Flash's exact lifetime of that
+	//    state is not pinned; we hold it for the rest of the tick.
 	{
+		extern size_t g_tick_count;
+		int kind = g_with_fn_kind;
+		u32 cap = (kind > 0 && g_swf_version >= 6) ? 12 : 13;
+		if (kind == 1 && g_swf_version >= 6 &&
+		    g_with_frame_overflow_tick1 == g_tick_count + 1)
+			cap = 0;
 		u32 nest = 0;
 		for (u32 k = scope_depth; k > 0 && scope_is_with[k - 1]; k--) nest++;
-		if (nest >= 13)
+		if (nest >= cap)
 		{
+			if (kind == 0 && cap == 13)
+				g_with_frame_overflow_tick1 = g_tick_count + 1;
 			scope_is_with[scope_depth] = 1;
 			scope_mc[scope_depth] = NULL;
 			scope_chain[scope_depth++] = NULL;
@@ -70685,6 +70891,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		if (num_args >= 1)
 		{
 			result = varToDoubleSWF(app_context, &args[0], g_swf_version);
+			// B11: Number(<object>) makes a fresh number, never the wrapped
+			// atom (FP32: Number(new Number(NaN)) != NaN, ops.as:102).
+			if (result != result && args[0].type != ACTION_STACK_VALUE_F64 &&
+			    args[0].type != ACTION_STACK_VALUE_F32)
+				result = NAN;
 		}
 		// else Number() → 0
 		if (args != NULL) FREE(args);
@@ -72643,6 +72854,20 @@ double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version)
 				return (swf_version < 7) ? 0.0 : NAN;
 			return NAN;
 		}
+		case ACTION_STACK_VALUE_FUNCTION:
+			// B6 (s28 w2b-gnash-holds): SWF5 ToNumber(function) is the
+			// convertFloat model (own valueOf, else 0: "2+Number" == 2), so
+			// isNaN(fn) is false in SWF5 (FP32: gnash Number.as:323,
+			// Function.as:57). SWF6+: NaN as before.
+			if (swf_version < 6) {
+				pushVar(app_context, v);
+				convertFloat(app_context);
+				ActionVar cv; popVar(app_context, &cv);
+				return (cv.type == ACTION_STACK_VALUE_F32)
+					? (double) VAL(float, &cv.data.numeric_value)
+					: VAL(double, &cv.data.numeric_value);
+			}
+			return NAN;
 		default: return NAN;
 	}
 }
@@ -85085,6 +85310,24 @@ static void selection_broadcast_on_set_focus(SWFAppContext* app_context, MovieCl
 
 // Selection.setFocus(target) — move keyboard focus to a specific object.
 // Returns: true if focus was changed, false otherwise.
+// s28 w2b-gnash-holds (B10): programmatic Selection.setFocus on a text field
+// selects all of it, and the getters report it at once: FP32 prints
+// begin=0 end=len caret=len right after setFocus (regression/
+// avm1_gnash_flash_probes P3; gnash Selection.as:186-195 is the len=0 case,
+// 0/0/0). Before this, 0/0/0 was reported for any length.
+static void selection_set_focus_select_all_indices(MovieClip* mc)
+{
+	int text_len = 0;
+	if (mc != NULL && mc->dynamic_props != NULL) {
+		ActionVar* tv = getProperty((ASObject*)mc->dynamic_props, "text", 4);
+		if (tv != NULL && tv->type == ACTION_STACK_VALUE_STRING)
+			text_len = (int)tv->str_size;
+	}
+	g_selection_begin = 0;
+	g_selection_caret = text_len;
+	g_selection_end = text_len;
+}
+
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
@@ -85135,11 +85378,7 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 		g_mouse_hovered_mc = NULL;
 		if (MC_IS_TEXTFIELD(new_mc)) {
 			g_tf_select_all = tfSetFocusSelectAll(new_mc);
-			// Flash reports 0/0/0 for Selection.getBeginIndex/getCaretIndex/getEndIndex
-			// immediately after programmatic setFocus (even though visual is select-all)
-			g_selection_begin = 0;
-			g_selection_caret = 0;
-			g_selection_end = 0;
+			selection_set_focus_select_all_indices(new_mc);
 		}
 		ret.data.numeric_value = 1; return ret;
 	}
@@ -85152,9 +85391,7 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	// Programmatic setFocus selects all text (mouse click does not)
 	if (MC_IS_TEXTFIELD(new_mc)) {
 		g_tf_select_all = tfSetFocusSelectAll(new_mc);
-		g_selection_begin = 0;
-		g_selection_caret = 0;
-		g_selection_end = 0;
+		selection_set_focus_select_all_indices(new_mc);
 	}
 	ret.data.numeric_value = 1;
 	return ret;
@@ -85240,6 +85477,13 @@ static ActionVar builtin_selection_setSelection(SWFAppContext* app_context, Acti
 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return ret;
 	if (arg_count == 0) return ret;  // no-op, keep previous indices
+	// s28 w2b-gnash-holds (B10), FP32 (regression/avm1_gnash_flash_probes P3,
+	// gnash Selection.as:253-296): 3+ args are a no-op, and the 1-arg form is a
+	// no-op while a selection exists (begin >= 0). From "no selection"
+	// (begin -1) the 1-arg form still applies (a, end of text): avm1/selection
+	// (.fla, Flash golden) prints 0/15/15 for setSelection(0) there.
+	if (arg_count >= 3) return ret;
+	if (arg_count == 1 && g_selection_begin >= 0) return ret;
 
 	// Get text length from the "text" property on dynamic_props
 	int text_len = 0;

@@ -22,6 +22,14 @@ implementation matches Flash Player and/or the IEEE 754 / ECMA-262 specification
 
 ### Math-v5 / Math-v6 / Math-v7 / Math-v8 — `Math.pow(1)` returns 1, not NaN (1 diff line each)
 
+> **Re-worded s28 (w2b-gnash-holds, from the w1b-rm-gnash audit + `trace-provenance`):** the
+> premise below is STALE. This golden is **Windows Flash Player 32** output, not Gnash output;
+> **Linux FP32 prints exactly our (and Ruffle's) lines** (`Math.pow(1) == 1` PASSED, SQRT2/SQRT1_2
+> strings equal). The 5 lines are a **platform split** (Windows CRT `pow` / number printing), the
+> same disposition as the RvF "Platform splits" bullet that already lists `Math-v5..v8`. The
+> decision (keep our IEEE behaviour, which equals Linux FP32) is unchanged; only the reason was wrong.
+
+
 **Example diff (all 4 tests):**
 ```
 - FAILED: expected: 1 obtained: NaN [./Math.as:517]
@@ -72,7 +80,17 @@ The Dejagnu harness emits summary counts at the end. Since we pass 3 additional 
 Gnash failed (the `pow` and `SQRT` cases above), our summary counts differ by exactly 3.
 This is a direct consequence of the above diffs.
 
-### ops-v8 — NaN equality bit-pattern differences (5 diff lines + 2 counts)
+### ~~ops-v8 — NaN equality bit-pattern differences (5 diff lines + 2 counts)~~ — RESOLVED s28 (w2b-gnash-holds)
+
+> **STALE premise, now fixed.** FP32 on **Linux x86-64** prints this golden byte for byte, and all
+> four `ops-v5..v8` rows carry the same lines, so this was never platform UB: it was a real gap.
+> Flash compares two NaNs equal only when they are the **same number atom** (a variable read twice,
+> two reads of the `NaN` global / `Number.NaN`); separately produced NaNs (`0/0`, `"abc"*0`,
+> `Number(new Number(NaN))`, `--"a"`, a pushed NaN literal, ...) are all unequal. Pinned by the
+> Flash-traced probe `regression/avm1_gnash_flash_probes{,_v6,_v5}` P4. Implemented in
+> `action.c` (NaN atom id on store: `avm1NanTagVar` / `avm1NanTagStackSlot`; `NaN` global = atom 0),
+> plus `"" < X` is false / `X < ""` true for non-empty X (probe P5, ops.as:177). `ops-v5..v8` pass.
+> Historical text kept below.
 
 **Example diffs:**
 ```
@@ -156,8 +174,11 @@ At the end of `testsuite/actionscript.all/Inheritance.as`, the test builds a
 circular `__proto__` chain (`a.__proto__ = b; b.__proto__ = a`) inside a `dangerousStuff`
 function dispatched via `setTimeout(dangerousStuff, 0)` and immediately runs
 `check(!a instanceof b)`. The source comment reads `"really just tests if we
-survive :)"` — Flash Player and Gnash both hang, so Gnash's recorded expected
-output simply stops after the `"Now your flash player will try..."` note.
+survive :)"` — Flash Player hangs (Ruffle wiki "Flash Player Oddities": cyclic
+`instanceof` on frame 2+). The golden is **FP32 output** (not Gnash's): it stops after the
+`"Now your flash player will try..."` note because Flash hung there. (Re-worded s28: the
+line Flash never printed is a hang, not a Gnash artifact. Decision unchanged: we do not
+replicate a hang.)
 
 Our `instanceof` walker detects the cycle and terminates, producing one
 additional `PASSED: !a instanceof b` line beyond the expected output. This is
@@ -165,6 +186,12 @@ strictly more correct than both Flash and Gnash — we successfully execute the
 check instead of hanging.
 
 **Category 1b: super-chain dynamic base class semantics (v6: 6 diffs, v7/v8: 2 diffs each)**
+
+> **Re-worded s28 (w2b-gnash-holds):** this is a **real Flash gap** (s28 w1b-rm-gnash bucket
+> B17), not an acceptable "matches Ruffle" diff: the golden is FP32 and Flash's `super`
+> re-resolves through the receiver's live chain (Inheritance.as:250-340). It stays listed only
+> because nobody has implemented it yet; completion mechanism: `super` dispatch must walk the
+> receiver's current `__proto__` chain per call. Matching Ruffle is not a reason to keep it.
 
 ```
 # v7 / v8
@@ -788,11 +815,11 @@ means reimplementing Flash hairline hinting at disproportionate risk.
 |------|-----------|------------|-------------|------|
 | simple_loop_test (misc-ming/loop) **frames 1–2 only** — **STALE, now 0 px** | ~~121–724 img px/frame~~ | Flash hairline (≤1px stroke) pixel-snapping; MSAA antialiases the sub-pixel-straddling hairline instead | Matches Ruffle (us-vs-Ruffle=0); both differ from Flash | Flash pixel-hinting for hairlines (Ruffle doesn't implement it either) |
 | simple_loop_test **frames 3–7** — **STALE, now 0 px** | ~~7442–21600 img px/frame~~ | ~~**NOT accepted** — timeline loop phase off-by-one~~; all 7 comparisons pass at baseline `1f8396f57` (see the status note above) | Resolved | — |
-| Math-v5 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
-| Math-v6 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
-| Math-v7 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
-| Math-v8 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
-| ops-v8 | 7 | Platform NaN bit patterns | Correct (x86-64) | IEEE 754 (platform-dependent) |
+| Math-v5 | 5 | Platform split (Windows FP32 golden; Linux FP32 == ours). Was "Gnash pow/SQRT bugs" (stale, s28) | Correct (== Linux FP32) | RvF "Platform splits" |
+| Math-v6 | 5 | Platform split (Windows FP32 golden; Linux FP32 == ours). Was "Gnash pow/SQRT bugs" (stale, s28) | Correct (== Linux FP32) | RvF "Platform splits" |
+| Math-v7 | 5 | Platform split (Windows FP32 golden; Linux FP32 == ours). Was "Gnash pow/SQRT bugs" (stale, s28) | Correct (== Linux FP32) | RvF "Platform splits" |
+| Math-v8 | 5 | Platform split (Windows FP32 golden; Linux FP32 == ours). Was "Gnash pow/SQRT bugs" (stale, s28) | Correct (== Linux FP32) | RvF "Platform splits" |
+| ~~ops-v8~~ | ~~7~~ | ~~Platform NaN bit patterns~~ RESOLVED s28 w2b-gnash-holds: real gap (Flash NaN atom identity + `"" <` ordering), now PASS (ops-v5..v8) | NOW PASS | FP32 Linux golden; regression/avm1_gnash_flash_probes P4/P5 |
 | TextSnapshot-v6 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
 | TextSnapshot-v7 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
 | TextSnapshot-v8 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |

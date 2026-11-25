@@ -1,0 +1,1392 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index 2c22ba2df..377152022 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -529,6 +529,7 @@ typedef ActionVar (*Function2Ptr)(SWFAppContext* app_context, ActionVar* args, u
+ 
+ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);
+ int actionWithStart(SWFAppContext* app_context);
++int actionWithStartK(SWFAppContext* app_context, int fn_kind);
+ void actionWithEnd(SWFAppContext* app_context);
+ 
+ // Exception handling (try-catch-finally)
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index e1667d158..e62eeef60 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -490,6 +490,61 @@ u8 scope_is_with[MAX_SCOPE_DEPTH];       // 1 = with scope, 0 = function scope
+ MovieClip* scope_mc[MAX_SCOPE_DEPTH];     // non-NULL if scope entry is a MovieClip
+ u32 scope_depth = 0;
+ 
++// ------------------------------------------------------------------
++// s28 w2b-gnash-holds (B11): NaN identity for ==.
++// FP32 compares two NaNs equal only when they are the SAME number atom: a
++// variable read twice equals itself, two reads of the `NaN` global are equal,
++// but NaNs produced separately (0/0, "abc"*0, Math.sqrt(-1), parseInt("x"),
++// Number(new Number(NaN)), --"a", undefined+1, a pushed NaN literal) are all
++// unequal to each other and to `NaN` (regression/avm1_gnash_flash_probes P4;
++// gnash ops.as:82/102-104/766/794). Model: our == already compares NaN by bit
++// pattern, so a NaN gets a unique payload ("atom id") when it is first stored
++// (SetVariable / DefineLocal / SetMember / StoreRegister); copies keep the
++// bits. The `NaN` global carries the fixed id 0. Untagged NaNs (fresh
++// arithmetic results) keep their old bit-pattern behaviour.
++#define AVM1_NAN_TAG_HI   0x7FFCA5A500000000ULL
++#define AVM1_NAN_TAG_MASK 0x7FFFFFFF00000000ULL  /* sign bit kept from the source NaN */
++#define AVM1_NAN_GLOBAL_BITS AVM1_NAN_TAG_HI
++static u32 g_avm1_nan_atom_serial = 0;
++static inline u64 avm1NanFreshAtomBits(u64 src_bits)
++{
++	if (++g_avm1_nan_atom_serial == 0) g_avm1_nan_atom_serial = 1;
++	return (src_bits & 0x8000000000000000ULL) | AVM1_NAN_TAG_HI | (u64)g_avm1_nan_atom_serial;
++}
++static inline double avm1NanGlobalValue(void)
++{
++	u64 b = AVM1_NAN_GLOBAL_BITS; double d; memcpy(&d, &b, sizeof(d)); return d;
++}
++// Give an untagged NaN number its own atom id (F32 NaN widens to F64).
++static void avm1NanTagVar(ActionVar* v)
++{
++	if (v->type == ACTION_STACK_VALUE_F64) {
++		u64 b = v->data.numeric_value; double d; memcpy(&d, &b, sizeof(d));
++		if (d == d || (b & AVM1_NAN_TAG_MASK) == AVM1_NAN_TAG_HI) return;
++		v->data.numeric_value = avm1NanFreshAtomBits(b);
++	} else if (v->type == ACTION_STACK_VALUE_F32) {
++		float f = VAL(float, &v->data.numeric_value);
++		if (f == f) return;
++		u32 fb; memcpy(&fb, &f, sizeof(fb));
++		v->type = ACTION_STACK_VALUE_F64;
++		v->data.numeric_value = avm1NanFreshAtomBits((u64)(fb & 0x80000000u) << 32);
++	}
++}
++// Same, on a raw stack slot (type at +0, value at +16).
++static void avm1NanTagStackSlot(SWFAppContext* app_context, u32 sp)
++{
++	u8 t = STACK[sp];
++	if (t != ACTION_STACK_VALUE_F64 && t != ACTION_STACK_VALUE_F32) return;
++	ActionVar v = {0};
++	v.type = t;
++	v.data.numeric_value = VAL(u64, &STACK[sp + 16]);
++	avm1NanTagVar(&v);
++	if (v.type != t || v.data.numeric_value != VAL(u64, &STACK[sp + 16])) {
++		STACK[sp] = v.type;
++		VAL(u64, &STACK[sp + 16]) = v.data.numeric_value;
++	}
++}
++
+ // Exception handling infrastructure (setjmp/longjmp based try/catch)
+ #define MAX_EXCEPTION_DEPTH 16
+ 
+@@ -8621,9 +8676,19 @@ static ActionVar builtin_string_proto_valueOf(SWFAppContext* app_context, Action
+ 	if (thisv.type == ACTION_STACK_VALUE_OBJECT && thisv.data.numeric_value != 0) {
+ 		ASObject* obj = (ASObject*) thisv.data.numeric_value;
+ 		ActionVar* prim = getProperty(obj, "valueOf_value", 13);
+-		if ((prim != NULL && prim->type == ACTION_STACK_VALUE_STRING) ||
+-		    obj == g_string_proto_valueof_self[0] || obj == g_string_proto_valueof_self[1])
++		if (prim != NULL && prim->type == ACTION_STACK_VALUE_STRING)
+ 			return builtin_wrapper_valueOf(app_context, args, arg_count, registers, obj);
++		// s28 w2b-gnash-holds: the bare String.prototype is no String
++		// wrapper; FP32 String.prototype.valueOf() returns the STRING
++		// "[type Object]" (regression/avm1_gnash_flash_probes P6, SWF5/6/8).
++		if (obj == g_string_proto_valueof_self[0] || obj == g_string_proto_valueof_self[1]) {
++			// An autoboxed string primitive arrives with String.prototype
++			// as this_obj and the primitive on the this-stack: keep the
++			// wrapper path for it.
++			if (g_this_depth > 0 && g_this_stack[g_this_depth - 1].type == ACTION_STACK_VALUE_STRING)
++				return builtin_wrapper_valueOf(app_context, args, arg_count, registers, obj);
++			return makeStringActionVar(app_context, "[type Object]", 13);
++		}
+ 	}
+ 	char buf[1024];
+ 	u32 n = (u32) varToStringBuf(app_context, &thisv, buf, sizeof(buf));
+@@ -16793,6 +16858,22 @@ static inline ASObject* getFunctionProto(int version) {
+ 	return (version <= 6) ? g_function_proto_legacy : g_function_proto_modern;
+ }
+ 
++// s28 w2b-gnash-holds (B6): a built-in constructor's creation-time __proto__
++// (-> Function.prototype) carries the SWF6 visibility flag (0x80): SWF5
++// GetMember cannot read it nor inherit through it until ASSetPropFlags
++// clears 128 (FP32: gnash Object.as:33-37, Number.as:345-356). Called after
++// every init site that installs such a __proto__.
++static void b6FlagFnProto(ASObject* own_props)
++{
++	if (own_props == NULL) return;
++	ASProperty* pp = findPropertyRaw(own_props, "__proto__", 9);
++	if (pp == NULL || pp->value.type != ACTION_STACK_VALUE_OBJECT || pp->value.data.numeric_value == 0)
++		return;
++	ASObject* v = (ASObject*)(uintptr_t) pp->value.data.numeric_value;
++	if (v == g_function_proto_legacy || v == g_function_proto_modern)
++		pp->flash_flags |= 0x80;
++}
++
+ // Flash wires a freshly created function object to `_global.Function` at
+ // CREATION time: "__proto__ is _global.Function.prototype" (gnash
+ // actionscript.all/Function.as:1069-1089). Our FUNCTION GetMember path already
+@@ -16856,6 +16937,7 @@ static ASFunction* ensureObjectConstructor(SWFAppContext* app_context)
+ 				ActionVar _fpv = {0}; _fpv.type = ACTION_STACK_VALUE_OBJECT;
+ 				_fpv.data.numeric_value = (u64)_fn_p;
+ 				setProperty(app_context, g_object_constructor_static.own_props, "__proto__", 9, &_fpv);
++				b6FlagFnProto(g_object_constructor_static.own_props);
+ 			}
+ 		}
+ 		registerGeomMethod(&g_object_registerClass_func, "registerClass",
+@@ -37908,6 +37990,12 @@ void actionLess2(SWFAppContext* app_context)
+ 		if (l == NULL) { l = u16_empty; l_len = 0; }
+ 		if (r == NULL) { r = u16_empty; r_len = 0; }
+ 		u64 bool_val = (u16_cmp(l, l_len, r, r_len) < 0) ? 1 : 0;
++		// s28 w2b-gnash-holds (B11b): FP32 (SWF5/6/8) orders the empty string
++		// AFTER every non-empty string in Less2: "" < "0", "" < "a", "" < " "
++		// are false and "0" < "" is true ("" < "" false). Pinned by
++		// regression/avm1_gnash_flash_probes P5 and gnash ops.as:174-177.
++		if (l_len == 0) bool_val = 0;
++		else if (r_len == 0) bool_val = 1;
+ 		PUSH(ACTION_STACK_VALUE_BOOLEAN, bool_val);
+ 	}
+ 	else
+@@ -48559,6 +48647,7 @@ static void ensureCtorOwnProps(SWFAppContext* app_context, ASFunction* ctor,
+ 				ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
+ 				fpv.data.numeric_value = (u64) fn_proto;
+ 				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
++				b6FlagFnProto(ctor->own_props);
+ 			}
+ 		}
+ 	}
+@@ -49690,7 +49779,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 	// SWF4 equality treats NaN/Infinity as undefined strings, not numbers.
+ 	{
+ 		ActionVar _nan_v = {0}; _nan_v.type = ACTION_STACK_VALUE_F64;
+-		VAL(double, &_nan_v.data.numeric_value) = __builtin_nan("");
++		VAL(double, &_nan_v.data.numeric_value) = avm1NanGlobalValue(); // B11 atom id 0
+ 		setPropertyWithFlags(app_context, global_object, "NaN", 3, &_nan_v, PROPERTY_FLAGS_DEFAULT);
+ 		ASProperty* _np = findPropertyRaw(global_object, "NaN", 3);
+ 		if (_np) _np->flash_flags = 0x8000;
+@@ -50082,6 +50171,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 			// Set __proto__ → Function.prototype (DONT_ENUM + DONT_DELETE, if not already set)
+ 			if (getProperty(ctor->own_props, "__proto__", 9) == NULL)
+ 				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val, PROPERTY_FLAG_WRITABLE);
++				b6FlagFnProto(ctor->own_props);
+ 		}
+ 
+ 		// ---- textRenderer own_props: add specific properties AFTER Phase 8c-2 ----
+@@ -50136,7 +50226,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 			// Number static constants on g_ctors[3].own_props
+ 			if (g_ctors[3].own_props != NULL && getProperty(g_ctors[3].own_props, "MAX_VALUE", 9) == NULL) {
+ 				ActionVar cv;
+-				cv = makeF64(NAN);
++				cv = makeF64(avm1NanGlobalValue()); // B11: same atom as NaN (Number.as:51)
+ 				setProperty(app_context, g_ctors[3].own_props, "NaN", 3, &cv);
+ 				cv = makeF64(INFINITY);
+ 				setProperty(app_context, g_ctors[3].own_props, "POSITIVE_INFINITY", 17, &cv);
+@@ -50253,6 +50343,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 								ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
+ 								fpv.data.numeric_value = (u64)fn_proto;
+ 								setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, ei_f);
++								b6FlagFnProto(ctor->own_props);
+ 							}
+ 							if (ctor->prototype_obj) {
+ 								ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT; pv.str_size = 0;
+@@ -50287,6 +50378,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 										ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
+ 										fpv.data.numeric_value = (u64)fn_proto;
+ 										setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
++										b6FlagFnProto(ctor->own_props);
+ 									}
+ 								}
+ 								if (ctor->prototype_obj) {
+@@ -50332,9 +50424,17 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 		}
+ 		// __proto__ (READ_ONLY = 0x05)
+ 		{
+-			ActionVar* ex = getProperty(old, "__proto__", 9);
+-			if (ex) setPropertyWithFlags(app_context, new_props, "__proto__", 9, ex,
+-				PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
++			ASProperty* exp_ = findPropertyRaw(old, "__proto__", 9);
++			ActionVar* ex = exp_ ? &exp_->value : NULL;
++			if (ex) {
++				u16 ff = exp_->flash_flags;
++				setPropertyWithFlags(app_context, new_props, "__proto__", 9, ex,
++					PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
++				// B6: keep the SWF6 flag (Object.__proto__ is undefined in
++				// SWF5 until ASSetPropFlags(Object, null, 8, 129), Object.as:33)
++				ASProperty* np_ = findPropertyRaw(new_props, "__proto__", 9);
++				if (np_) np_->flash_flags = ff;
++			}
+ 		}
+ 		// registerClass (DONT_ENUM + READ_ONLY = 0x04)
+ 		{
+@@ -50345,7 +50445,6 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 		releaseObject(app_context, old);
+ 		g_ctors[0].own_props = new_props;
+ 	}
+-
+ }
+ 
+ // Copy all properties from src to dst, preserving flags
+@@ -50382,6 +50481,7 @@ static ASFunction* createConstructorCopy(SWFAppContext* app_context, ASFunction*
+ 		ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+ 		fp.data.numeric_value = (u64) fn_proto;
+ 		setProperty(app_context, copy->own_props, "__proto__", 9, &fp);
++		b6FlagFnProto(copy->own_props);
+ 	} else {
+ 		copy->own_props = NULL;
+ 	}
+@@ -50512,6 +50612,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
+ 			ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+ 			fp.data.numeric_value = (u64) fn_proto;
+ 			setProperty(app_context, sec_obj_ctor->own_props, "__proto__", 9, &fp);
++			b6FlagFnProto(sec_obj_ctor->own_props);
+ 		}
+ 	}
+ 	{
+@@ -50560,6 +50661,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
+ 			ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+ 			fp.data.numeric_value = (u64) sec_fn_proto;
+ 			setProperty(app_context, sec_extra_ctors[i]->own_props, "__proto__", 9, &fp);
++			b6FlagFnProto(sec_extra_ctors[i]->own_props);
+ 		}
+ 		// Set Function's prototype_obj to secondary Function.prototype (for instanceof Function)
+ 		if (i == 3 && sec_fn_proto) { // i==3 is "Function"
+@@ -50663,6 +50765,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
+ 		ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
+ 		fp.data.numeric_value = (u64) sec_fn_proto;
+ 		setProperty(app_context, sec_error_ctor->own_props, "__proto__", 9, &fp);
++		b6FlagFnProto(sec_error_ctor->own_props);
+ 	}
+ 
+ 	// Stub constructors — fresh instances
+@@ -51903,7 +52006,7 @@ check_special_vars:
+ 			                    : (strncmp    ((_buf), (_lit), (_len)) == 0))
+ 		if (var_name_len == 3 && _CMP_BUILTIN_NAME(var_name, "NaN", 3))
+ 		{
+-			double nan_val = NAN;
++			double nan_val = avm1NanGlobalValue(); // B11: the `NaN` global atom
+ 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &nan_val));
+ 			return;
+ 		}
+@@ -52055,6 +52158,7 @@ check_special_vars:
+ 						_fpv.type = ACTION_STACK_VALUE_OBJECT;
+ 						_fpv.data.numeric_value = (u64) _fn_proto;
+ 						setPropertyWithFlags(app_context, g_string_constructor.own_props, "__proto__", 9, &_fpv, PROPERTY_FLAGS_DONTENUM);
++						b6FlagFnProto(g_string_constructor.own_props);
+ 					}
+ 				}
+ 
+@@ -52156,7 +52260,7 @@ check_special_vars:
+ 				// Register Number static constants as own_props
+ 				g_number_constructor.own_props = allocObject(app_context, 8);
+ 				retainObject(g_number_constructor.own_props);
+-				ActionVar _ncp_nan = makeF64(NAN);
++				ActionVar _ncp_nan = makeF64(avm1NanGlobalValue()); // B11: same atom as NaN (Number.as:51)
+ 				setProperty(app_context, g_number_constructor.own_props, "NaN", 3, &_ncp_nan);
+ 				ActionVar _ncp_posinf = makeF64(INFINITY);
+ 				setProperty(app_context, g_number_constructor.own_props, "POSITIVE_INFINITY", 17, &_ncp_posinf);
+@@ -52235,6 +52339,7 @@ check_special_vars:
+ 						ActionVar _pv = {0}; _pv.type = ACTION_STACK_VALUE_OBJECT;
+ 						_pv.data.numeric_value = (u64)fn_proto;
+ 						setPropertyWithFlags(app_context, g_number_constructor.own_props, "__proto__", 9, &_pv, PROPERTY_FLAGS_DEFAULT);
++						b6FlagFnProto(g_number_constructor.own_props);
+ 					}
+ 					ActionVar _proto = {0}; _proto.type = ACTION_STACK_VALUE_OBJECT;
+ 					_proto.data.numeric_value = (u64)g_number_constructor.prototype_obj;
+@@ -52811,6 +52916,7 @@ void actionSetVariable(SWFAppContext* app_context)
+ 
+ 	u32 value_sp = SP;
+ 	u32 var_name_sp = SP_SECOND_TOP;
++	avm1NanTagStackSlot(app_context, value_sp); // B11 NaN atom id on store
+ 
+ 	// Read variable name info.
+ 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
+@@ -53612,6 +53718,7 @@ void actionDefineLocal(SWFAppContext* app_context)
+ 
+ 	u32 value_sp = SP;
+ 	u32 var_name_sp = SP_SECOND_TOP;
++	avm1NanTagStackSlot(app_context, value_sp); // B11 NaN atom id on store
+ 
+ 	// Read variable name info
+ 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
+@@ -56198,6 +56305,37 @@ void actionEquals2(SWFAppContext* app_context)
+ 	ActionVar b;
+ 	popVar(app_context, &b);
+ 
++	// B6 (s28 w2b-gnash-holds): in SWF5 a function converts like an object,
++	// and with its Function.prototype hidden only an OWN valueOf/toString can
++	// give it a primitive; otherwise it is undefined. So `fn == undefined`,
++	// `fn == null`, `Number.prototype == Object`, `Object.prototype.toString
++	// == undefined` and "any function is equal to any other in SWF5" are
++	// all true (FP32: gnash Function.as:53-54, Number.as:332-334,
++	// toString_valueOf.as:96-101).
++	if (g_swf_version < 6 && (a.type == ACTION_STACK_VALUE_FUNCTION || b.type == ACTION_STACK_VALUE_FUNCTION))
++	{
++		ActionVar* fvs[2] = { &a, &b };
++		for (int fi = 0; fi < 2; fi++)
++		{
++			ActionVar* fv = fvs[fi];
++			if (fv->type != ACTION_STACK_VALUE_FUNCTION) continue;
++			ASFunction* ff = (ASFunction*)(uintptr_t) fv->data.numeric_value;
++			int has_own = ff != NULL && ff->own_props != NULL &&
++			              (getProperty(ff->own_props, "valueOf", 7) != NULL ||
++			               getProperty(ff->own_props, "toString", 8) != NULL);
++			if (!has_own) {
++				fv->type = ACTION_STACK_VALUE_UNDEFINED;
++				fv->data.numeric_value = 0;
++			} else {
++				int f_ok = 1;
++				ActionVar fprim = objectToPrimitive(app_context, fv, &f_ok);
++				if (fprim.type != ACTION_STACK_VALUE_OBJECT && fprim.type != ACTION_STACK_VALUE_ARRAY &&
++				    fprim.type != ACTION_STACK_VALUE_FUNCTION)
++					*fv = fprim;
++			}
++		}
++	}
++
+ 	// Object-to-primitive conversion via valueOf/toString
+ 	int a_is_obj = (a.type == ACTION_STACK_VALUE_OBJECT || a.type == ACTION_STACK_VALUE_ARRAY);
+ 	int b_is_obj = (b.type == ACTION_STACK_VALUE_OBJECT || b.type == ACTION_STACK_VALUE_ARRAY);
+@@ -56726,6 +56864,7 @@ void actionStoreRegister(SWFAppContext* app_context, u8 register_num)
+ 	}
+ 
+ 	// Peek the top of stack (don't pop!)
++	avm1NanTagStackSlot(app_context, SP); // B11 NaN atom id on store
+ 	ActionVar value;
+ 	peekVar(app_context, &value);
+ 
+@@ -57891,6 +58030,7 @@ void actionSetMember(SWFAppContext* app_context)
+ 	// Pop the value to assign
+ 	ActionVar value_var;
+ 	popVar(app_context, &value_var);
++	avm1NanTagVar(&value_var); // B11 NaN atom id on store
+ 
+ 	// Pop the property name
+ 	// The property name should be a string on the stack
+@@ -58774,9 +58914,15 @@ void actionSetMember(SWFAppContext* app_context)
+ 					ActionVar* _np = getProperty(obj, "__proto__", 9);
+ 					ASObject* _cur = resolveProtoVar(_np);
+ 					int _md = 256;
++					// s28 w2b-gnash-holds (B19), FP32 SWF6 (gnash
++					// Global.as:258-307): an inherited virtual setter hidden
++					// by flag 256 or 1024 is STILL called (and stops the
++					// walk); one hidden by 4096 is walked past. I.e. the SWF6
++					// setter search uses the SWF7 visibility mask.
++					u16 _set_mask_ff = (g_swf_version == 6) ? (u16)~(0x100 | 0x400) : (u16)0xFFFF;
+ 					while (_cur != NULL && _md-- > 0) {
+ 						ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
+-						if (_ps != NULL && !isPropertyHiddenAtVersion(_ps->flash_flags)
++						if (_ps != NULL && !isPropertyHiddenAtVersion(_ps->flash_flags & _set_mask_ff)
+ 						    && (_ps->getter != NULL || _ps->setter != NULL)) {
+ 							setter_prop = _ps;
+ 							break;
+@@ -58868,8 +59014,19 @@ void actionSetMember(SWFAppContext* app_context)
+ 				    !(_existing->flags & PROPERTY_FLAG_WRITABLE)))
+ 					return;  // Property is read-only, silently ignore the assignment
+ 			}
+-			// Set the property on the object
++			// Set the property on the object. B19: FP32 SWF6 keeps flag 1024
++			// on an own property it overwrites (256 and 4096 are cleared;
++			// gnash Global.as:255/274/295).
++			u16 _keep_ff = 0;
++			if (g_swf_version == 6) {
++				ASProperty* _kp = findPropertyRaw(obj, prop_name, prop_name_len);
++				if (_kp != NULL) _keep_ff = _kp->flash_flags & 0x400;
++			}
+ 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
++			if (_keep_ff) {
++				ASProperty* _kp = findPropertyRaw(obj, prop_name, prop_name_len);
++				if (_kp != NULL) _kp->flash_flags |= _keep_ff;
++			}
+ 			xml_name_value_exclusive_after_set(app_context, obj, prop_name, prop_name_len);
+ 			if (obj->native_type == NATIVE_ARRAY)
+ 				asArrayObjectAfterSet(app_context, obj, prop_name, prop_name_len);
+@@ -62810,6 +62967,23 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 					found = 1;
+ 				}
+ 			}
++			// B6: in SWF5 the creation-time __proto__ (flagged 0x80, or the
++			// virtual one of a function without an own __proto__) is hidden,
++			// so nothing is inherited through it. `constructor` stays
++			// visible (FP32 SWF5: typeof(Object.constructor),
++			// typeof(Email.constructor) are 'function'; Object.as:31,
++			// Function.as:692).
++			if (!found && g_swf_version <= 5 &&
++			    !(prop_name_len == 11 && strncmp(prop_name, "constructor", 11) == 0))
++			{
++				ASProperty* _fpp = (func->own_props != NULL)
++					? findPropertyRaw(func->own_props, "__proto__", 9) : NULL;
++				if (_fpp == NULL || isPropertyHiddenAtVersion(_fpp->flash_flags))
++				{
++					pushUndefined(app_context);
++					found = 1;
++				}
++			}
+ 			if (!found)
+ 			{
+ 				// Virtual __proto__: return version-group Function.prototype
+@@ -67885,6 +68059,21 @@ static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
+ 	setProperty(app_context, dprops, name, name_len, value);
+ }
+ 
++// s28 w2b-gnash-holds: the recompiler passes the kind of code the ActionWith
++// sits in (0 = frame/event script, 1 = DefineFunction, 2 = DefineFunction2);
++// -1 = legacy entry point (no kind known: frame-level cap everywhere).
++static int g_with_fn_kind = -1;
++// Tick on which a frame-level `with` overflowed the nesting cap (+1; 0 = none).
++static size_t g_with_frame_overflow_tick1 = 0;
++
++int actionWithStartK(SWFAppContext* app_context, int fn_kind)
++{
++	g_with_fn_kind = fn_kind;
++	int r = actionWithStart(app_context);
++	g_with_fn_kind = -1;
++	return r;
++}
++
+ int actionWithStart(SWFAppContext* app_context)
+ {
+ 	// Pop object from stack
+@@ -67897,16 +68086,33 @@ int actionWithStart(SWFAppContext* app_context)
+ 		return 0;
+ 	}
+ 
+-	// w1b-rm-gnash prototype: Flash Player 32 enters at most 13 nested `with`
+-	// blocks (every SWF version; gnash with.as:566-625, golden
+-	// "abcdefghijklm"). The 14th ActionWith skips its body silently. Push a
+-	// NULL marker so the matching actionWithEnd pop stays balanced. Counted
++	// `with` nesting cap (B2, w1b-rm-gnash; refit to FP32 in s28
++	// w2b-gnash-holds from regression/avm1_gnash_flash_probes{,_v6,_v5} P2).
++	// An ActionWith over the cap skips its body silently; push a NULL marker
++	// so the matching actionWithEnd pop stays balanced. Nesting is counted
+ 	// down to the nearest function-scope entry (scope_is_with == 0).
++	//  - frame level, every SWF version: 13 (gnash with.as:625
++	//    "abcdefghijklm"; probe P2 frame);
++	//  - inside a SWF6+ function: 12 (probe P2 func2: the activation object
++	//    takes a level); SWF5 functions: 13 (probe v5 func/func2);
++	//  - once a frame-level `with` has overflowed, a SWF6+ DefineFunction
++	//    (type 1) called later in that script cannot enter any `with` (probe
++	//    P2 SWF6/8: no "func depth" line at all, while DefineFunction2 called
++	//    right after still gets 12). FITTED: Flash's exact lifetime of that
++	//    state is not pinned; we hold it for the rest of the tick.
+ 	{
++		extern size_t g_tick_count;
++		int kind = g_with_fn_kind;
++		u32 cap = (kind > 0 && g_swf_version >= 6) ? 12 : 13;
++		if (kind == 1 && g_swf_version >= 6 &&
++		    g_with_frame_overflow_tick1 == g_tick_count + 1)
++			cap = 0;
+ 		u32 nest = 0;
+ 		for (u32 k = scope_depth; k > 0 && scope_is_with[k - 1]; k--) nest++;
+-		if (nest >= 13)
++		if (nest >= cap)
+ 		{
++			if (kind == 0 && cap == 13)
++				g_with_frame_overflow_tick1 = g_tick_count + 1;
+ 			scope_is_with[scope_depth] = 1;
+ 			scope_mc[scope_depth] = NULL;
+ 			scope_chain[scope_depth++] = NULL;
+@@ -70208,6 +70414,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 		if (num_args >= 1)
+ 		{
+ 			result = varToDoubleSWF(app_context, &args[0], g_swf_version);
++			// B11: Number(<object>) makes a fresh number, never the wrapped
++			// atom (FP32: Number(new Number(NaN)) != NaN, ops.as:102).
++			if (result != result && args[0].type != ACTION_STACK_VALUE_F64 &&
++			    args[0].type != ACTION_STACK_VALUE_F32)
++				result = NAN;
+ 		}
+ 		// else Number() → 0
+ 		if (args != NULL) FREE(args);
+@@ -72166,6 +72377,20 @@ double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version)
+ 				return (swf_version < 7) ? 0.0 : NAN;
+ 			return NAN;
+ 		}
++		case ACTION_STACK_VALUE_FUNCTION:
++			// B6 (s28 w2b-gnash-holds): SWF5 ToNumber(function) is the
++			// convertFloat model (own valueOf, else 0: "2+Number" == 2), so
++			// isNaN(fn) is false in SWF5 (FP32: gnash Number.as:323,
++			// Function.as:57). SWF6+: NaN as before.
++			if (swf_version < 6) {
++				pushVar(app_context, v);
++				convertFloat(app_context);
++				ActionVar cv; popVar(app_context, &cv);
++				return (cv.type == ACTION_STACK_VALUE_F32)
++					? (double) VAL(float, &cv.data.numeric_value)
++					: VAL(double, &cv.data.numeric_value);
++			}
++			return NAN;
+ 		default: return NAN;
+ 	}
+ }
+@@ -84506,6 +84731,24 @@ static void selection_broadcast_on_set_focus(SWFAppContext* app_context, MovieCl
+ 
+ // Selection.setFocus(target) — move keyboard focus to a specific object.
+ // Returns: true if focus was changed, false otherwise.
++// s28 w2b-gnash-holds (B10): programmatic Selection.setFocus on a text field
++// selects all of it, and the getters report it at once: FP32 prints
++// begin=0 end=len caret=len right after setFocus (regression/
++// avm1_gnash_flash_probes P3; gnash Selection.as:186-195 is the len=0 case,
++// 0/0/0). Before this, 0/0/0 was reported for any length.
++static void selection_set_focus_select_all_indices(MovieClip* mc)
++{
++	int text_len = 0;
++	if (mc != NULL && mc->dynamic_props != NULL) {
++		ActionVar* tv = getProperty((ASObject*)mc->dynamic_props, "text", 4);
++		if (tv != NULL && tv->type == ACTION_STACK_VALUE_STRING)
++			text_len = (int)tv->str_size;
++	}
++	g_selection_begin = 0;
++	g_selection_caret = text_len;
++	g_selection_end = text_len;
++}
++
+ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	(void)registers; (void)this_obj;
+@@ -84556,11 +84799,7 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
+ 		g_mouse_hovered_mc = NULL;
+ 		if (MC_IS_TEXTFIELD(new_mc)) {
+ 			g_tf_select_all = tfSetFocusSelectAll(new_mc);
+-			// Flash reports 0/0/0 for Selection.getBeginIndex/getCaretIndex/getEndIndex
+-			// immediately after programmatic setFocus (even though visual is select-all)
+-			g_selection_begin = 0;
+-			g_selection_caret = 0;
+-			g_selection_end = 0;
++			selection_set_focus_select_all_indices(new_mc);
+ 		}
+ 		ret.data.numeric_value = 1; return ret;
+ 	}
+@@ -84573,9 +84812,7 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
+ 	// Programmatic setFocus selects all text (mouse click does not)
+ 	if (MC_IS_TEXTFIELD(new_mc)) {
+ 		g_tf_select_all = tfSetFocusSelectAll(new_mc);
+-		g_selection_begin = 0;
+-		g_selection_caret = 0;
+-		g_selection_end = 0;
++		selection_set_focus_select_all_indices(new_mc);
+ 	}
+ 	ret.data.numeric_value = 1;
+ 	return ret;
+@@ -84661,6 +84898,13 @@ static ActionVar builtin_selection_setSelection(SWFAppContext* app_context, Acti
+ 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+ 	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return ret;
+ 	if (arg_count == 0) return ret;  // no-op, keep previous indices
++	// s28 w2b-gnash-holds (B10), FP32 (regression/avm1_gnash_flash_probes P3,
++	// gnash Selection.as:253-296): 3+ args are a no-op, and the 1-arg form is a
++	// no-op while a selection exists (begin >= 0). From "no selection"
++	// (begin -1) the 1-arg form still applies (a, end of text): avm1/selection
++	// (.fla, Flash golden) prints 0/15/15 for setSelection(0) there.
++	if (arg_count >= 3) return ret;
++	if (arg_count == 1 && g_selection_begin >= 0) return ret;
+ 
+ 	// Get text length from the "text" property on dynamic_props
+ 	int text_len = 0;
+diff --git a/SWFModernRuntime/src/actionmodern/avm1_amf.c b/SWFModernRuntime/src/actionmodern/avm1_amf.c
+index 3a94e0975..fc9964219 100644
+--- a/SWFModernRuntime/src/actionmodern/avm1_amf.c
++++ b/SWFModernRuntime/src/actionmodern/avm1_amf.c
+@@ -750,9 +750,18 @@ static void w0_value(Amf0Wr* w, ActionVar* v)
+ 			amf_buf_f64be(w->out, (double) VAL(float, &v->data.numeric_value));
+ 			break;
+ 		case ACTION_STACK_VALUE_F64:
++		{
++			// s28 w2b-gnash-holds: a NaN carrying the runtime's atom-identity
++			// payload (action.c avm1NanTagVar) goes on the wire as the plain
++			// quiet NaN of the same sign, as before that tagging existed.
++			u64 nb = v->data.numeric_value;
++			if ((nb & 0x7FFFFFFF00000000ULL) == 0x7FFCA5A500000000ULL)
++				nb = (nb & 0x8000000000000000ULL) | 0x7FF8000000000000ULL;
++			double nd; memcpy(&nd, &nb, sizeof(nd));
+ 			amf_buf_u8(w->out, M0_NUM);
+-			amf_buf_f64be(w->out, VAL(double, &v->data.numeric_value));
++			amf_buf_f64be(w->out, nd);
+ 			break;
++		}
+ 		case ACTION_STACK_VALUE_I32:
+ 			amf_buf_u8(w->out, M0_NUM);
+ 			amf_buf_f64be(w->out, (double) (int32_t) v->data.numeric_value);
+diff --git a/SWFRecomp/src/action/action.cpp b/SWFRecomp/src/action/action.cpp
+index 007d55e92..94365c551 100644
+--- a/SWFRecomp/src/action/action.cpp
++++ b/SWFRecomp/src/action/action.cpp
+@@ -2164,7 +2164,7 @@ namespace SWFRecomp
+ 					// Emit actionWithStart to push object onto scope chain
+ 					// Returns 1 if body should execute, 0 to skip (null/undefined)
+ 					out_script << "\t" << "// WITH block (size=" << block_size << ")" << endl;
+-					out_script << "\t" << "if (actionWithStart(app_context)) {" << endl;
++					out_script << "\t" << "if (actionWithStartK(app_context, " << lift_fn_kind << ")) {" << endl;
+ 
+ 					// Copy the WITH block content and add END marker for parseActions
+ 					// This is necessary because parseActions parses until it hits END (0x00)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/create_test_swf.py
+new file mode 100644
+index 000000000..c635317a3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/create_test_swf.py
+@@ -0,0 +1,167 @@
++#!/usr/bin/env python3
++"""avm1_gnash_flash_probes: s28 w1b-rm-gnash Flash-oracle probes for the
++mechanisms behind gnash `ruffle_matched` rows. One SWF per version.
++
++Landed s28 w2b-gnash-holds as regression/avm1_gnash_flash_probes (SWF8),
++_v6 and _v5 (same generator, version arg). Every output.txt is a real
++Flash Player 32 (LNX, direct pinned) trace captured by the coordinator
++(session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/). Pins: XMLNode
++name/value exclusivity (P1, B1), the `with` nesting cap at frame level and
++inside DefineFunction/DefineFunction2 per SWF version (P2, B2),
++Selection.setFocus select-all + setSelection arg-count rule (P3, B10), NaN
++atom identity in == (P4, B11), "" ordering in Less2 (P5), and
++String.prototype.valueOf on non-String receivers (P6, B4).
++
++  P1 XML   nodeName/nodeValue exclusivity + nodeType after the write
++           (XMLNode.as:79-83, XML.as:381/494; prototype models "writing one
++           nulls the other", nodeType unchanged).
++  P2 WITH  nesting limit at frame level and inside a function (with.as:625
++           says 13 at frame level; is it 13 inside a function too?).
++  P3 SEL   Selection.setSelection arg-count rule (Selection.as:253-296 vs
++           avm1/selection's setSelection(0) from "no selection").
++  P4 NAN   pairwise == over NaN producers (ops.as:82/102-104/766/794).
++  P5 LESS  "" < "0" and friends (ops.as:174-177).
++  P6 SVO   String.prototype.valueOf on non-String receivers.
++
++Usage: create_test_swf.py <out.swf> [swf_version, default 8]
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++DIV = op(0x0D)
++MUL = op(0x0C)
++LESS2 = op(0x48)
++DEC = op(0x51)
++
++
++def callm_code(target, meth, argcode, nargs, keep=False):
++    """target.meth(<values pushed by argcode, already reversed>)"""
++    code = argcode + push(nargs) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def setv(name, code):
++    return push(name) + code + SETVAR
++
++
++def setm(path, prop, valcode):
++    return get(path) + push(prop) + valcode + SETMEM
++
++
++def new(cls, *args):
++    return (push(*reversed(args)) if args else b'') + push(len(args), cls) + NEWOBJ
++
++
++# ---- P1 XML ----
++p1 = (
++    setv('x', new('XML'))
++    + setv('t', push('v') + push(1) + get('x') + push('createTextNode') + CALLM)
++    + T('P1 text init name=', get('t.nodeName'), ' value=', get('t.nodeValue'), ' type=', get('t.nodeType'))
++    + setm('t', 'nodeName', push('foo'))
++    + T('P1 text after nodeName=foo: name=', get('t.nodeName'), ' value=', get('t.nodeValue'), ' type=', get('t.nodeType'), ' str=', callm('t', 'toString', keep=True))
++    + setm('t', 'nodeValue', push('bar'))
++    + T('P1 text after nodeValue=bar: name=', get('t.nodeName'), ' value=', get('t.nodeValue'), ' type=', get('t.nodeType'), ' str=', callm('t', 'toString', keep=True))
++    + setv('e', push('e') + push(1) + get('x') + push('createElement') + CALLM)
++    + setm('e.attributes', 'a', push('1'))
++    + setm('e', 'nodeValue', push(4))
++    + T('P1 elem after nodeValue=4: name=', get('e.nodeName'), ' value=', get('e.nodeValue'), ' type=', get('e.nodeType'), ' str=', callm('e', 'toString', keep=True))
++    + setm('e', 'nodeName', push('f'))
++    + T('P1 elem after nodeName=f: name=', get('e.nodeName'), ' value=', get('e.nodeValue'), ' type=', get('e.nodeType'), ' str=', callm('e', 'toString', keep=True))
++)
++
++# ---- P2 WITH ----
++def nest(n, tag_):
++    body = b''
++    for i in reversed(range(n)):
++        body = with_block(T(tag_ + str(i + 1)) + body)
++        body = get('wo') + body
++    return body
++
++
++p2 = (
++    setv('wo', push(0) + INITOBJ)
++    + nest(16, 'P2 frame depth ')
++    + deffunc1('wfn', [], nest(16, 'P2 func depth '))
++    + callf('wfn')
++    + deffunc2('wfn2', [], nest(16, 'P2 func2 depth '), nregs=2)
++    + callf('wfn2')
++)
++
++# ---- P3 SEL ----
++def sel(label):
++    return T('P3 ' + label + ': b=', callm('Selection', 'getBeginIndex', keep=True),
++             ' e=', callm('Selection', 'getEndIndex', keep=True),
++             ' c=', callm('Selection', 'getCaretIndex', keep=True))
++
++
++p3 = (
++    callm('this', 'createTextField', 'tf', 10, 0, 0, 200, 20)
++    + setm('tf', 'type', push('input'))
++    + setm('tf', 'text', push('abcdefghi'))
++    + callm('this', 'createTextField', 'tg', 11, 0, 30, 200, 20)
++    + setm('tg', 'type', push('input'))
++    + setm('tg', 'text', push('abcdefghi'))
++    + callm_code('Selection', 'setFocus', get('tf'), 1)
++    + sel('after setFocus(tf)')
++    + callm('Selection', 'setSelection', 3) + sel('setSelection(3) fresh')
++    + callm('Selection', 'setSelection', 2, 6) + sel('setSelection(2,6)')
++    + callm('Selection', 'setSelection', 3) + sel('setSelection(3)')
++    + callm('Selection', 'setSelection', 1, 2, 3) + sel('setSelection(1,2,3)')
++    + callm('Selection', 'setSelection', 0) + sel('setSelection(0)')
++    + callm_code('Selection', 'setFocus', get('tg'), 1)
++    + sel('after setFocus(tg)')
++    + callm('Selection', 'setSelection', 0) + sel('tg setSelection(0) fresh')
++)
++
++# ---- P4 NAN ----
++names = ['glob', 'lit', 'div', 'mul', 'num', 'sqrt', 'pint', 'box', 'dec', 'undef', 'glob2']
++p4 = (
++    setv('n_glob', get('NaN'))
++    + setv('n_lit', push(float('nan')))
++    + setv('n_div', push(0, 0) + DIV)
++    + setv('n_mul', push('abc', 0) + MUL)
++    + setv('n_num', callf('Number', 'a', keep=True))
++    + setv('n_sqrt', callm('Math', 'sqrt', -1, keep=True))
++    + setv('n_pint', callf('parseInt', 'x', keep=True))
++    + setv('n_box', get('NaN') + push(1, 'Number') + NEWOBJ + push(1, 'Number') + CALLF)
++    + setv('n_dec', push('a') + DEC)
++    + setv('n_undef', push(UNDEF, 1) + ADD2)
++    + setv('n_glob2', get('NaN'))
++)
++for i, a in enumerate(names):
++    row = b''
++    parts = ['P4 ' + a + ':']
++    for b in names:
++        parts += [' ' + b + '=', get('n_' + a) + get('n_' + b) + EQ2]
++    p4 += T(*parts)
++
++# ---- P5 LESS ----
++p5 = b''
++for a, b in (('', '0'), ('', 'a'), ('0', ''), ('a', 'b'), ('', ''), ('', ' ')):
++    p5 += T('P5 "' + a + '"<"' + b + '"=', push(a, b) + LESS2)
++
++# ---- P6 SVO ----
++p6 = (
++    setv('svo', get('String.prototype.valueOf'))
++    + setv('on', new('Number', 5)) + setm('on', 'vo', get('svo'))
++    + setv('ob', new('Boolean', False)) + setm('ob', 'vo', get('svo'))
++    + setv('oo', push(0) + INITOBJ) + setm('oo', 'vo', get('svo'))
++    + setv('os', new('String', 'str')) + setm('os', 'vo', get('svo'))
++    + setv('fn', get('svo')) + setm('fn', 'vo', get('svo'))
++    + setm('_root', 'vo', get('svo'))
++    + T('P6 Number(5).vo=', callm('on', 'vo', keep=True), ' typeof=', callm('on', 'vo', keep=True) + TYPEOF)
++    + T('P6 Boolean(false).vo=', callm('ob', 'vo', keep=True), ' typeof=', callm('ob', 'vo', keep=True) + TYPEOF)
++    + T('P6 {}.vo=', callm('oo', 'vo', keep=True))
++    + T('P6 String(str).vo=', callm('os', 'vo', keep=True))
++    + T('P6 function.vo=', callm('fn', 'vo', keep=True))
++    + T('P6 _root.vo=', callm('_root', 'vo', keep=True))
++    + T('P6 svo()=', callf('svo', keep=True))
++    + T('P6 String.prototype.valueOf()=', callm('String.prototype', 'valueOf', keep=True), ' typeof=', callm('String.prototype', 'valueOf', keep=True) + TYPEOF)
++)
++
++ver = int(sys.argv[2]) if len(sys.argv) > 2 else 8
++open(sys.argv[1], 'wb').write(swf(ver, b'', [doaction(p1 + p2 + p3 + p4 + p5 + p6 + STOP)], w=400, h=300))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/output.txt b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/output.txt
+new file mode 100644
+index 000000000..877b9cbad
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/output.txt
+@@ -0,0 +1,63 @@
++P1 text init name=null value=v type=3
++P1 text after nodeName=foo: name=foo value=null type=3 str=
++P1 text after nodeValue=bar: name=null value=bar type=3 str=bar
++P1 elem after nodeValue=4: name=null value=4 type=1 str= a="1"
++P1 elem after nodeName=f: name=f value=null type=1 str=<f a="1" />
++P2 frame depth 1
++P2 frame depth 2
++P2 frame depth 3
++P2 frame depth 4
++P2 frame depth 5
++P2 frame depth 6
++P2 frame depth 7
++P2 frame depth 8
++P2 frame depth 9
++P2 frame depth 10
++P2 frame depth 11
++P2 frame depth 12
++P2 frame depth 13
++P2 func2 depth 1
++P2 func2 depth 2
++P2 func2 depth 3
++P2 func2 depth 4
++P2 func2 depth 5
++P2 func2 depth 6
++P2 func2 depth 7
++P2 func2 depth 8
++P2 func2 depth 9
++P2 func2 depth 10
++P2 func2 depth 11
++P2 func2 depth 12
++P3 after setFocus(tf): b=0 e=9 c=9
++P3 setSelection(3) fresh: b=0 e=9 c=9
++P3 setSelection(2,6): b=2 e=6 c=6
++P3 setSelection(3): b=2 e=6 c=6
++P3 setSelection(1,2,3): b=2 e=6 c=6
++P3 setSelection(0): b=2 e=6 c=6
++P3 after setFocus(tg): b=0 e=9 c=9
++P3 tg setSelection(0) fresh: b=0 e=9 c=9
++P4 glob: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
++P4 lit: glob=false lit=true div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 div: glob=false lit=false div=true mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 mul: glob=false lit=false div=false mul=true num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 num: glob=false lit=false div=false mul=false num=true sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 sqrt: glob=false lit=false div=false mul=false num=false sqrt=true pint=false box=false dec=false undef=false glob2=false
++P4 pint: glob=false lit=false div=false mul=false num=false sqrt=false pint=true box=false dec=false undef=false glob2=false
++P4 box: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=true dec=false undef=false glob2=false
++P4 dec: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=true undef=false glob2=false
++P4 undef: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=true glob2=false
++P4 glob2: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
++P5 ""<"0"=false
++P5 ""<"a"=false
++P5 "0"<""=true
++P5 "a"<"b"=true
++P5 ""<""=false
++P5 ""<" "=false
++P6 Number(5).vo=5 typeof=string
++P6 Boolean(false).vo=false typeof=string
++P6 {}.vo=[object Object]
++P6 String(str).vo=str
++P6 function.vo=[type Function]
++P6 _root.vo=_level0
++P6 svo()=_level0
++P6 String.prototype.valueOf()=[type Object] typeof=string
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/test.swf b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..94893cf3aa78873a1dcf35c3e93d89acde2f7b09
+GIT binary patch
+literal 10928
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/test.toml b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/test.toml
+new file mode 100644
+index 000000000..8f57f7628
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes/test.toml
+@@ -0,0 +1,2 @@
++# output.txt = FP32 capture (session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/test.flash32.txt)
++num_ticks = 2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/output.txt b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/output.txt
+new file mode 100644
+index 000000000..6e76fa09a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/output.txt
+@@ -0,0 +1,77 @@
++P1 text init name=null value=v type=3
++P1 text after nodeName=foo: name=foo value=null type=3 str=
++P1 text after nodeValue=bar: name=null value=bar type=3 str=bar
++P1 elem after nodeValue=4: name=null value=4 type=1 str= a="1"
++P1 elem after nodeName=f: name=f value=null type=1 str=<f a="1" />
++P2 frame depth 1
++P2 frame depth 2
++P2 frame depth 3
++P2 frame depth 4
++P2 frame depth 5
++P2 frame depth 6
++P2 frame depth 7
++P2 frame depth 8
++P2 frame depth 9
++P2 frame depth 10
++P2 frame depth 11
++P2 frame depth 12
++P2 frame depth 13
++P2 func depth 1
++P2 func depth 2
++P2 func depth 3
++P2 func depth 4
++P2 func depth 5
++P2 func depth 6
++P2 func depth 7
++P2 func depth 8
++P2 func depth 9
++P2 func depth 10
++P2 func depth 11
++P2 func depth 12
++P2 func depth 13
++P2 func2 depth 1
++P2 func2 depth 2
++P2 func2 depth 3
++P2 func2 depth 4
++P2 func2 depth 5
++P2 func2 depth 6
++P2 func2 depth 7
++P2 func2 depth 8
++P2 func2 depth 9
++P2 func2 depth 10
++P2 func2 depth 11
++P2 func2 depth 12
++P2 func2 depth 13
++P3 after setFocus(tf): b=-1 e=-1 c=-1
++P3 setSelection(3) fresh: b=-1 e=-1 c=-1
++P3 setSelection(2,6): b=-1 e=-1 c=-1
++P3 setSelection(3): b=-1 e=-1 c=-1
++P3 setSelection(1,2,3): b=-1 e=-1 c=-1
++P3 setSelection(0): b=-1 e=-1 c=-1
++P3 after setFocus(tg): b=-1 e=-1 c=-1
++P3 tg setSelection(0) fresh: b=-1 e=-1 c=-1
++P4 glob: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
++P4 lit: glob=false lit=true div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 div: glob=false lit=false div=true mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 mul: glob=false lit=false div=false mul=true num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 num: glob=false lit=false div=false mul=false num=true sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 sqrt: glob=false lit=false div=false mul=false num=false sqrt=true pint=false box=false dec=false undef=false glob2=false
++P4 pint: glob=false lit=false div=false mul=false num=false sqrt=false pint=true box=false dec=false undef=false glob2=false
++P4 box: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=true dec=false undef=false glob2=false
++P4 dec: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=true undef=false glob2=false
++P4 undef: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=true glob2=false
++P4 glob2: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
++P5 ""<"0"=false
++P5 ""<"a"=false
++P5 "0"<""=true
++P5 "a"<"b"=true
++P5 ""<""=false
++P5 ""<" "=false
++P6 Number(5).vo=5 typeof=string
++P6 Boolean(false).vo=false typeof=string
++P6 {}.vo=[object Object]
++P6 String(str).vo=str
++P6 function.vo=[type Function]
++P6 _root.vo=_level0
++P6 svo()=_level0
++P6 String.prototype.valueOf()=[type Object] typeof=string
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/test.swf b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..18b4dd62f1547b736990eabae989552ea96413b7
+GIT binary patch
+literal 10928
+zcmds-&yO5O701hKoXrnAhJaWUW}{|7W*u49{;)U1u)>NH8%tzt><Dr|TJ`Mq%#O6%
+zz0CADj-n`$a>y+Qg!+Pn5SLtY;Kqpq5)ya*0uJ1`=4QU{RrS=X?pM>!1+B2;-QKEC
+zRlWDVudA!8>-Mi6p8MieV@}M)KN|CwkIgG*%$wgZ_;+jR$&)8PJ^LvttFy*DHr4ZH
+znJUb?Z~xrfT&2R2s~(x^oLN4D8VmNSuN$*J$<i`=CwpA>i-XKOSgpQg%>B)zL`gEv
+z$7PbI$Js77DNPTZn;c*tg{FU}dd`^SQF=53amS9-t6s3kFR7TAXTg;3pGd^@@(xNt
+zT&i2j&S9$=7KOQ2ecv0D4$Ewk)CTOL{>J~nz6$Y7rsafuL<A|e!s4=cSWd?I$UN|l
+z1R)?#2I&Nz{6O=B<FpIl^tqC;pZM9xn~QbcymgcvXL(6!gEY&KALorpOT=R^E3>KT
+zQ*p|@Y{GxXG^4ZpHAM7YwZ_rO&}HIvw$ZsJV?)EpOi|L1kYJQ{8j4<A8b)MxU{hw%
+zo^J+nZU`^Fr+God?(md3fvCS%u(p)Zw^l1#(EHtzd3C9J34UxP!wD=;4ziQ-FxfPh
+z1hT9lTLJQ~GfFSp0rFQ3xfURQ(2(l^@_~lz1jxG@@>+mg*N`6t$V(dXdVu`LRNrie
+zZX;m+p)z57KUbMBz@Mm07~wsY2}As2l?h|KqB02b@1HgA4Rd7B50^xGyu4K5@kALk
+z%lFj;`tnSh2;KXqLWIu!Ss_B#eyb3nV<!p`=1yNB!qmB<5Mky#uMlD4{M*!bi-=g5
+zH-FQRFm3*%Az@fQ(vUE&zt)g2u&--K7};-Y2!*y@p-|rJu6%Z$5@-t<v}DX{GKu^&
+zgph2hS>&f7frS40X-FWUzkV7LNa(Mhh6ED&>!%@sgsJ4GA%TRs<fkElgvsQmA%TS1
+z<fkElY=-INry<FN`Q)b|$%Fy+(~xAs2>WSBGGU1QG$ffY#(o--3<dcGx9sIy+Fhwu
+z%`%p<X8G^*1OMF*tQ@c)9`bYV8C+KQQ67$`STSJ2^2_1d<Lv0bJXoPQ4S0_^TCdVF
+zVVs}LN<8dk9Tv=n79Hte{~#NV4#%huY<OjE11NMl`f4_e7T8eNX*Se0)@wKn{t%0-
+z{c>F7=o0amX65Z-e>Np=zl%wG+pWLq^7V3f`9?CpOF+H)ZS;Zl;3zBK$VTJ*ZhnwG
+z#!{FTy$LV*BW*5lo44|VpvAsiW2>XwN+(%ax4A?XVd2G=@taMf&5P`v_ZJ>Q26zbH
+z=B4Y~m$A^vriZ81Nz9j&s>_%k*;D@A?di*HPq(h@{2xjAowkG9r`ElTHd9$d`xaj3
+zZnu)XwxgR@wyvCBXX~3Dzn}89RJ7bUwOZ1gN^@?+y{DQ}N2k`iuPz?F^lm5RD4bR|
+zPWiNojj4QZbW{vzQZ@awZ+ffrbkFyW#(0)LXE5o0`4Q$^<BAW)*h6!RS6)(Fa23b1
+zBdVZhzg=dWcNO{Un0G(02XevQ3Z_3h9%K`<yGk2l`QG$56O4tBV;k?uJfSf1+i7`d
+zANh=6i-q}<G4@+%vjIDOm{REOGAHR|n%zY?I%WF@1!`-bnj_zA7Syc{vVCXlFIH)1
+zFW;NtX^y4RGv+K0bjKA_%(nahtK|CqYY7$KFudPKm-Hz2A@0fRyLWiA1z~PN^YHf^
+zgP5xfX;Cu>zsis-H3KD7h7=+OmL?SFCgeq`DN;bCSekk~NYI4l($owBt}-M9F|@nN
+z5;Q3xPR+3<DreOKcZoWLP6&HLCLi^<N`mp1p-8^mrlF!y6Hz2;BAP;ii3`+(G<^ia
+zmvrYe<Y^+RIs#fGP7`ZsgOF+3a3njlv5X%<(MBMA=@57Sa8rTAv=K;D8_RTPBcP}@
+zVz8Jt0*Py5p-ycC*3t&?(6r$&b!cOmh1v*&jZm}^2wytHO>Nw}K%&}Mrb8P6MYR!w
+z#k3JfTpJ5@Y9p|gHgHzchGWp7jb#>UBaoOj0%1E9Z3M!XKp?{Wslygnrb8P6MYR!w
+z#k3JfTpJ5@Y9lbAja?VeW3?fUa4@cpgktiv7)75JqX^Vu*rA3(5)#*rA}Qt%U|zGi
+zHIJr|XzrJ6jR#MQQB{)EBAHrTODD2Z)5+T3p_79a>Li(%PLhe~B$=pA4iau_I!Vf2
+zgMt$YZkoB6ay;c`;vpmx*U3?xI!R9GgmzfJ!GwlP9CfxVu99G4A~g|3qb8zA)I>Ce
+z1QQpi3E7~8`Uu8fIs`J1gudLZO10IsfEJ0<#9G>5Oidfkhz@Nm!z0l9=X^4-FF;%_
+zkeD_CiD@H{s5X}A&_+N}ZNy;8t<&-<s*UZZQyYN^ZLq_J`-Weo8tTXn<N5?tOrbWU
+zXw-%jmD-S|Q$WR)YGayK0mU9FYPBH_H*Po7_&3!6lYcmng`qoB*4aN=nsI@qnIk(i
+ztEq*W1yD@00E%fAKvB(Vszb8?i)vO=3pER%xMnpbbx}17K=%jjFW~gg{p-ov+E3Ot
+z*7$P~Hm5es&w`qCUX#k24K#8!8)!vs@QH|eOHnhRDr}0SI7-EJbVu8fs0RD7u8p@K
+znU9lj3v7o?AK|<UqV5iC@fo3$Nl_MbJPn7H;5Q#;yEim_J`RH~WV9uRrmg)uoUFsB
+z{0R-esbe=lk3S32rs9%0XQ~(79^D&7ag?Pwoyenh18nW7?YJX|S)a(k5x59BwL_K@
+zZ<}+>jX~cuwK4G3eQqpUg93$w5qp!Opi_UXUg&htPSWSC%=PP+uRbco*Fo~n_lR$S
+zcn#nafW?sR`g(i0fxQXESGZdjs`X)dG|iO0ee4$YEimevGG-_F;KR19KEiZ_kIp~t
+zBsP-k({iF1-~&qy=$y+ApL3y4s;%xtaEZnjNzfeF5N(B<Xlpd`cKtE}T%VhuJl;iZ
+gB22wHPvomEhq*}|?5E56Xgr^?IpVx*ZX$R83rpC1mjD0&
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/test.toml b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/test.toml
+new file mode 100644
+index 000000000..cfb87724a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v5/test.toml
+@@ -0,0 +1,3 @@
++# Same generator as ../avm1_gnash_flash_probes: create_test_swf.py test.swf 5
++# output.txt = FP32 capture (session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/test_v5.flash32.txt)
++num_ticks = 2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/output.txt b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/output.txt
+new file mode 100644
+index 000000000..877b9cbad
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/output.txt
+@@ -0,0 +1,63 @@
++P1 text init name=null value=v type=3
++P1 text after nodeName=foo: name=foo value=null type=3 str=
++P1 text after nodeValue=bar: name=null value=bar type=3 str=bar
++P1 elem after nodeValue=4: name=null value=4 type=1 str= a="1"
++P1 elem after nodeName=f: name=f value=null type=1 str=<f a="1" />
++P2 frame depth 1
++P2 frame depth 2
++P2 frame depth 3
++P2 frame depth 4
++P2 frame depth 5
++P2 frame depth 6
++P2 frame depth 7
++P2 frame depth 8
++P2 frame depth 9
++P2 frame depth 10
++P2 frame depth 11
++P2 frame depth 12
++P2 frame depth 13
++P2 func2 depth 1
++P2 func2 depth 2
++P2 func2 depth 3
++P2 func2 depth 4
++P2 func2 depth 5
++P2 func2 depth 6
++P2 func2 depth 7
++P2 func2 depth 8
++P2 func2 depth 9
++P2 func2 depth 10
++P2 func2 depth 11
++P2 func2 depth 12
++P3 after setFocus(tf): b=0 e=9 c=9
++P3 setSelection(3) fresh: b=0 e=9 c=9
++P3 setSelection(2,6): b=2 e=6 c=6
++P3 setSelection(3): b=2 e=6 c=6
++P3 setSelection(1,2,3): b=2 e=6 c=6
++P3 setSelection(0): b=2 e=6 c=6
++P3 after setFocus(tg): b=0 e=9 c=9
++P3 tg setSelection(0) fresh: b=0 e=9 c=9
++P4 glob: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
++P4 lit: glob=false lit=true div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 div: glob=false lit=false div=true mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 mul: glob=false lit=false div=false mul=true num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 num: glob=false lit=false div=false mul=false num=true sqrt=false pint=false box=false dec=false undef=false glob2=false
++P4 sqrt: glob=false lit=false div=false mul=false num=false sqrt=true pint=false box=false dec=false undef=false glob2=false
++P4 pint: glob=false lit=false div=false mul=false num=false sqrt=false pint=true box=false dec=false undef=false glob2=false
++P4 box: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=true dec=false undef=false glob2=false
++P4 dec: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=true undef=false glob2=false
++P4 undef: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=true glob2=false
++P4 glob2: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
++P5 ""<"0"=false
++P5 ""<"a"=false
++P5 "0"<""=true
++P5 "a"<"b"=true
++P5 ""<""=false
++P5 ""<" "=false
++P6 Number(5).vo=5 typeof=string
++P6 Boolean(false).vo=false typeof=string
++P6 {}.vo=[object Object]
++P6 String(str).vo=str
++P6 function.vo=[type Function]
++P6 _root.vo=_level0
++P6 svo()=_level0
++P6 String.prototype.valueOf()=[type Object] typeof=string
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/test.swf b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..2153c83b45de2955cdf1fd6b5fe3588aa2a56b56
+GIT binary patch
+literal 10928
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/test.toml b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/test.toml
+new file mode 100644
+index 000000000..800654d04
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_gnash_flash_probes_v6/test.toml
+@@ -0,0 +1,3 @@
++# Same generator as ../avm1_gnash_flash_probes: create_test_swf.py test.swf 6
++# output.txt = FP32 capture (session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/test_v6.flash32.txt)
++num_ticks = 2

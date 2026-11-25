@@ -1123,3 +1123,21 @@ max_outliers 500), so a regression to Ruffle's untinted rect fails by ~12x the b
 - Evidence: `SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/` and
   `…/w1-render-flash-headroom/` (2026-11-25). An earlier s28 note ("Flash never prints it") was a harness artifact
   (captures without ErrorReporting).
+
+### s28 w2b-gnash-holds: gnash hidden-gap HOLDs answered by FP32 (2026-11-25)
+
+Oracle: FP32 LNX direct traces of `regression/avm1_gnash_flash_probes{,_v6,_v5}` (SWF 8/6/5; captures in
+`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/`), plus the FP32 gnash goldens. Ruffle
+fails every gnash row below (`known_failure`, `output.ruffle.txt` = Ruffle's own lines); we now match Flash.
+
+| mechanism | Flash (FP32) | Ruffle | rows |
+|---|---|---|---|
+| B10 `Selection.setSelection` arg count | programmatic `setFocus(tf)` selects all: begin 0, end = caret = len. 3+ args: no-op. 1 arg: no-op while a selection exists; from "no selection" (begin -1) it applies `(a, end of text)` (avm1/selection, Flash golden) | 1 arg = `(a, INT_MAX)` always, extra args ignored | `Selection-v6..v8` |
+| B11 NaN `==` | two NaNs are equal only if they are the same number atom (one variable read twice; the `NaN` global and `Number.NaN`); `0/0`, `"abc"*0`, `Number(new Number(NaN))`, `--"a"`, a pushed NaN literal, ... are all distinct | every NaN != every NaN | `ops-v5..v8` |
+| B11b `Less2` with `""` | `"" < X` false and `X < ""` true for every non-empty X (`"" < "0"`, `"" < " "` false) | lexicographic | `ops-v5..v8` (ops.as:177) |
+| P6 `String.prototype.valueOf()` | the STRING `"[type Object]"` | returns the prototype object | probe only |
+| B2 `with` cap | 13 levels at frame level (all versions); 12 inside a SWF6+ function; 13 inside a SWF5 function; after a frame-level overflow a SWF6+ DefineFunction (type 1) called later in the script enters none (FITTED, lifetime unpinned) | no cap | `with-v5..v8` (frame part, landed `ace9d2f88`) |
+| B6 SWF5 function `__proto__` | a function's creation-time `__proto__` is SWF6-flagged: SWF5 GetMember sees no `__proto__`, `valueOf`, `toString` on it (`constructor` stays visible), a function compares `== undefined` / `== null` and `isNaN(fn)` is false | visible | `Object-v5`, `Number-v5` |
+| B19 SWF6 inherited setter | `a.m = v` calls an inherited addProperty setter hidden by flag 256 or 1024 (not 4096); writing an own property keeps flag 1024 (256/4096 cleared) | visible setters only; write clears all | `Global-v6` |
+
+**Decision:** match Flash (user ruling). Unpinned parts are listed in `w2b-gnash-holds-report.md` §LOCAL ORACLE REQUESTS.

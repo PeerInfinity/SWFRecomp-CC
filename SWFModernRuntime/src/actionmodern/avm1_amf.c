@@ -750,9 +750,18 @@ static void w0_value(Amf0Wr* w, ActionVar* v)
 			amf_buf_f64be(w->out, (double) VAL(float, &v->data.numeric_value));
 			break;
 		case ACTION_STACK_VALUE_F64:
+		{
+			// s28 w2b-gnash-holds: a NaN carrying the runtime's atom-identity
+			// payload (action.c avm1NanTagVar) goes on the wire as the plain
+			// quiet NaN of the same sign, as before that tagging existed.
+			u64 nb = v->data.numeric_value;
+			if ((nb & 0x7FFFFFFF00000000ULL) == 0x7FFCA5A500000000ULL)
+				nb = (nb & 0x8000000000000000ULL) | 0x7FF8000000000000ULL;
+			double nd; memcpy(&nd, &nb, sizeof(nd));
 			amf_buf_u8(w->out, M0_NUM);
-			amf_buf_f64be(w->out, VAL(double, &v->data.numeric_value));
+			amf_buf_f64be(w->out, nd);
 			break;
+		}
 		case ACTION_STACK_VALUE_I32:
 			amf_buf_u8(w->out, M0_NUM);
 			amf_buf_f64be(w->out, (double) (int32_t) v->data.numeric_value);

@@ -1,0 +1,77 @@
+P1 text init name=null value=v type=3
+P1 text after nodeName=foo: name=foo value=null type=3 str=
+P1 text after nodeValue=bar: name=null value=bar type=3 str=bar
+P1 elem after nodeValue=4: name=null value=4 type=1 str= a="1"
+P1 elem after nodeName=f: name=f value=null type=1 str=<f a="1" />
+P2 frame depth 1
+P2 frame depth 2
+P2 frame depth 3
+P2 frame depth 4
+P2 frame depth 5
+P2 frame depth 6
+P2 frame depth 7
+P2 frame depth 8
+P2 frame depth 9
+P2 frame depth 10
+P2 frame depth 11
+P2 frame depth 12
+P2 frame depth 13
+P2 func depth 1
+P2 func depth 2
+P2 func depth 3
+P2 func depth 4
+P2 func depth 5
+P2 func depth 6
+P2 func depth 7
+P2 func depth 8
+P2 func depth 9
+P2 func depth 10
+P2 func depth 11
+P2 func depth 12
+P2 func depth 13
+P2 func2 depth 1
+P2 func2 depth 2
+P2 func2 depth 3
+P2 func2 depth 4
+P2 func2 depth 5
+P2 func2 depth 6
+P2 func2 depth 7
+P2 func2 depth 8
+P2 func2 depth 9
+P2 func2 depth 10
+P2 func2 depth 11
+P2 func2 depth 12
+P2 func2 depth 13
+P3 after setFocus(tf): b=-1 e=-1 c=-1
+P3 setSelection(3) fresh: b=-1 e=-1 c=-1
+P3 setSelection(2,6): b=-1 e=-1 c=-1
+P3 setSelection(3): b=-1 e=-1 c=-1
+P3 setSelection(1,2,3): b=-1 e=-1 c=-1
+P3 setSelection(0): b=-1 e=-1 c=-1
+P3 after setFocus(tg): b=-1 e=-1 c=-1
+P3 tg setSelection(0) fresh: b=-1 e=-1 c=-1
+P4 glob: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
+P4 lit: glob=false lit=true div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
+P4 div: glob=false lit=false div=true mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
+P4 mul: glob=false lit=false div=false mul=true num=false sqrt=false pint=false box=false dec=false undef=false glob2=false
+P4 num: glob=false lit=false div=false mul=false num=true sqrt=false pint=false box=false dec=false undef=false glob2=false
+P4 sqrt: glob=false lit=false div=false mul=false num=false sqrt=true pint=false box=false dec=false undef=false glob2=false
+P4 pint: glob=false lit=false div=false mul=false num=false sqrt=false pint=true box=false dec=false undef=false glob2=false
+P4 box: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=true dec=false undef=false glob2=false
+P4 dec: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=true undef=false glob2=false
+P4 undef: glob=false lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=true glob2=false
+P4 glob2: glob=true lit=false div=false mul=false num=false sqrt=false pint=false box=false dec=false undef=false glob2=true
+P5 ""<"0"=false
+P5 ""<"a"=false
+P5 "0"<""=true
+P5 "a"<"b"=true
+P5 ""<""=false
+P5 ""<" "=false
+P6 Number(5).vo=5 typeof=string
+P6 Boolean(false).vo=false typeof=string
+P6 {}.vo=[object Object]
+P6 String(str).vo=str
+P6 function.vo=[type Function]
+P6 _root.vo=_level0
+P6 svo()=_level0
+P6 String.prototype.valueOf()=[type Object] typeof=string

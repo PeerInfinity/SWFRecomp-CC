@@ -542,6 +542,7 @@ typedef ActionVar (*Function2Ptr)(SWFAppContext* app_context, ActionVar* args, u
 
 void actionDefineFunction2(SWFAppContext* app_context, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags);
 int actionWithStart(SWFAppContext* app_context);
+int actionWithStartK(SWFAppContext* app_context, int fn_kind);
 void actionWithEnd(SWFAppContext* app_context);
 
 // Exception handling (try-catch-finally)
