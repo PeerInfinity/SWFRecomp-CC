@@ -1,0 +1,113 @@
+=== intersection: 677 comparisons (7e8aa52af -> 947443a23, image_results_graphics) ===
+
+PROVENANCE
+  old  7e8aa52af              json built at 13b40eabb  2026-11-25T20:23:13  (run 45687311987)   [11 suite(s)]
+                              https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45687311987
+                              !! STALE SIDE: old ref 7e8aa52af resolves to 7e8aa52af but the JSON was built at 13b40eabb
+                                 run's code is NOT an ancestor of the ref (normal if the ref is a raw
+                                 ruffle-test-results commit, which branches off the results branch; a real
+                                 problem if you believed your change was in this run). Verdicts below describe the run at 13b40eabb, NOT the code at 7e8aa52af.
+  new  947443a23              json built at 10a5b515a  2026-11-25T21:42:13  (run 45694673542)   [11 suite(s)]
+                              https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45694673542
+                              !! STALE SIDE: new ref 947443a23 resolves to 947443a23 but the JSON was built at 10a5b515a
+                                 run's code is NOT an ancestor of the ref (normal if the ref is a raw
+                                 ruffle-test-results commit, which branches off the results branch; a real
+                                 problem if you believed your change was in this run). Verdicts below describe the run at 10a5b515a, NOT the code at 947443a23.
+
+STATUS HISTOGRAM
+  fail                                  39 ->    90 (+51)
+  ignored                                6 ->     6 (+0)
+  pass                                 629 ->   578 (-51)
+  skip                                   3 ->     3 (+0)
+
+BAND HISTOGRAM (failures, binned on excess_outliers)
+  a_epsilon (<=100 channels over)        5 ->    11 (+6)
+  b_tiny (<0.1% of channels)             6 ->    24 (+18)
+  c_small (0.1-1%)                       7 ->    29 (+22)
+  d_moderate (1-10%)                    17 ->    21 (+4)
+  e_large (10-50%)                       2 ->     3 (+1)
+  f_catastrophic (>=50%)                 2 ->     2 (+0)
+
+FAIL-REASON HISTOGRAM
+  pixel_mismatch                        39 ->    90 (+51)
+
+SKIP-REASON HISTOGRAM
+  (a rise in test_segfault/test_timeout/test_recomp_fail is a crash the pixel verdict cannot see)
+  no_expected_image                      3 ->     3 (+0)
+
+GAINS (-> pass): 0
+
+REGRESSIONS (pass -> not pass): 51
+  avm1/mouse_events_visible_enabled [output]: pass -> fail (pixel_mismatch, excess 3610; failing tol 0: 3610/0)
+  avm2/symbol_class_conflict [output]: pass -> fail (pixel_mismatch, excess 5022; failing tol 0: 5022/0)
+  from_gnash/misc-ming.all/loop/simple_loop_test [frame1]: pass -> fail (pixel_mismatch, excess 242; failing tol 1: 242/0)
+  from_gnash/misc-ming.all/loop/simple_loop_test [frame2]: pass -> fail (pixel_mismatch, excess 482; failing tol 1: 482/0)
+  from_gnash/misc-ming.all/loop/simple_loop_test [frame3]: pass -> fail (pixel_mismatch, excess 722; failing tol 1: 722/0)
+  from_gnash/misc-ming.all/loop/simple_loop_test [frame5]: pass -> fail (pixel_mismatch, excess 242; failing tol 1: 242/0)
+  from_gnash/misc-ming.all/loop/simple_loop_test [frame6]: pass -> fail (pixel_mismatch, excess 482; failing tol 1: 482/0)
+  from_gnash/misc-ming.all/loop/simple_loop_test [frame7]: pass -> fail (pixel_mismatch, excess 722; failing tol 1: 722/0)
+  from_shumway/acid/acid-chars [output]: pass -> fail (pixel_mismatch, excess 1272; failing tol 0: 1272/0)
+  from_shumway/acid/acid-gradient-2 [output]: pass -> fail (pixel_mismatch, excess 61; failing tol 1: 61/0)
+  from_shumway/acid/acid-scale [output]: pass -> fail (pixel_mismatch, excess 274; failing tol 0: 274/0)
+  from_shumway/acid/acid-text [output]: pass -> fail (pixel_mismatch, excess 2598; failing tol 0: 2598/0)
+  from_shumway/doubleAndRegister [output]: pass -> fail (pixel_mismatch, excess 56; failing tol 0: 56/0)
+  regression/avm1_hairline_scaled_instances [output]: pass -> fail (pixel_mismatch, excess 1533; failing tol 0: 1533/0)
+  regression/avm1_stroke_style_id_order [output]: pass -> fail (pixel_mismatch, excess 1952; failing tol 0: 1952/0)
+  regression/avm2_layer_group_alpha [output]: pass -> fail (pixel_mismatch, excess 1876; failing tol 2: 1876/0)
+  regression/avm2_layer_group_erase [output]: pass -> fail (pixel_mismatch, excess 1796; failing tol 3: 1796/0)
+  visual/blend_modes/add [output]: pass -> fail (pixel_mismatch, excess 695; failing tol 2: 695/0)
+  visual/blend_modes/alpha_no_layer [output]: pass -> fail (pixel_mismatch, excess 1888; failing tol 2: 1888/0)
+  visual/blend_modes/darken [output]: pass -> fail (pixel_mismatch, excess 1774; failing tol 2: 1774/0)
+  visual/blend_modes/difference [output]: pass -> fail (pixel_mismatch, excess 777; failing tol 2: 777/0)
+  visual/blend_modes/erase_no_layer [output]: pass -> fail (pixel_mismatch, excess 1880; failing tol 3: 1880/0)
+  visual/blend_modes/hardlight [output]: pass -> fail (pixel_mismatch, excess 1742; failing tol 4: 1742/0)
+  visual/blend_modes/invert [output]: pass -> fail (pixel_mismatch, excess 1758; failing tol 2: 1758/0)
+  visual/blend_modes/layer_alpha [output]: pass -> fail (pixel_mismatch, excess 1876; failing tol 2: 1876/0)
+  visual/blend_modes/layer_erase [output]: pass -> fail (pixel_mismatch, excess 1796; failing tol 3: 1796/0)
+  visual/blend_modes/lighten [output]: pass -> fail (pixel_mismatch, excess 325; failing tol 2: 325/0)
+  visual/blend_modes/multiply [output]: pass -> fail (pixel_mismatch, excess 1749; failing tol 2: 1749/0)
+  visual/blend_modes/overlay [output]: pass -> fail (pixel_mismatch, excess 1623; failing tol 2: 1623/0)
+  visual/blend_modes/screen [output]: pass -> fail (pixel_mismatch, excess 544; failing tol 2: 544/0)
+  visual/blend_modes/subtract [output]: pass -> fail (pixel_mismatch, excess 739; failing tol 2: 739/0)
+  visual/drawing_api/drawing_order [output]: pass -> fail (pixel_mismatch, excess 5985; failing tol 0: 5985/0)
+  visual/filters/bevel [output]: pass -> fail (pixel_mismatch, excess 4070; failing tol 3: 4076/6)
+  visual/filters/bevel_full [output]: pass -> fail (pixel_mismatch, excess 1938; failing tol 4: 1956/18)
+  visual/filters/bevel_inner [output]: pass -> fail (pixel_mismatch, excess 2047; failing tol 4: 2065/18)
+  visual/filters/bevel_outer [output]: pass -> fail (pixel_mismatch, excess 2168; failing tol 3: 2186/18)
+  visual/filters/blur_scales_with_screen [output]: pass -> fail (pixel_mismatch, excess 73042; failing tol 2: 73042/0)
+  visual/filters/blur_size_grows [output]: pass -> fail (pixel_mismatch, excess 360; failing tol 3: 360/0)
+  visual/filters/color_matrix [output]: pass -> fail (pixel_mismatch, excess 12; failing tol 0: 12/0)
+  visual/filters/displacement_map [output]: pass -> fail (pixel_mismatch, excess 1933; failing tol 20: 2005/72)
+  visual/filters/drop_shadow [output]: pass -> fail (pixel_mismatch, excess 8052; failing tol 2: 8052/0)
+  visual/filters/drop_shadow_angles [output]: pass -> fail (pixel_mismatch, excess 13495; failing tol 2: 13495/0)
+  visual/filters/glow [output]: pass -> fail (pixel_mismatch, excess 5387; failing tol 2: 5387/0)
+  visual/filters/glow_with_alpha_strength [output]: pass -> fail (pixel_mismatch, excess 2396; failing tol 4: 2414/18)
+  visual/filters/glow_without_composite_source [output]: pass -> fail (pixel_mismatch, excess 5850; failing tol 3: 5850/0)
+  visual/opaque_background [output]: pass -> fail (pixel_mismatch, excess 2780; failing tol 1: 2780/0)
+  visual/simple_shapes/gradients/focal_radial [output]: pass -> fail (pixel_mismatch, excess 10366; failing tol 13: 10366/0)
+  visual/simple_shapes/gradients/gradients [output]: pass -> fail (pixel_mismatch, excess 1243; failing tol 1: 1243/0)
+  visual/simple_shapes/layers [output]: pass -> fail (pixel_mismatch, excess 3; failing tol 0: 3/0)
+  visual/simple_shapes/masks [output]: pass -> fail (pixel_mismatch, excess 12; failing tol 0: 12/0)
+  visual/simple_shapes/masks_equal_clipdepth [output]: pass -> fail (pixel_mismatch, excess 12; failing tol 0: 12/0)
+
+BAND MOVES (failing on both sides): improved 5 / worsened 2 / band-only 0   [floor 0%]
+  from_shumway/acid/acid-stroke-0 [output]  d_moderate -> d_moderate   excess 52702 -> 36466  (-31%)
+  from_gnash/misc-ming.all/shape_test [output]  c_small -> c_small   excess 15994 -> 11368  (-29%)
+  avm2/sprite_with_frames [output]  c_small -> c_small   excess 6342 -> 4956  (-22%)
+  visual/simple_shapes/strokes/scale [output]  d_moderate -> d_moderate   excess 23391 -> 19362  (-17%)
+  from_shumway/acid/acid-color-0 [output]  b_tiny -> b_tiny   excess 1135 -> 1214  (+7%)
+  from_gnash/misc-ming.all/place_object_test [output]  d_moderate -> d_moderate   excess 38238 -> 37408  (-2%)
+  from_gnash/misc-ming.all/Video-EmbedSquareTest [output]  d_moderate -> d_moderate   excess 1782 -> 1818  (+2%)
+
+STATUS/REASON CHANGES (fail<->skip, reason strings): 0
+
+IGNORED MOVES (into/out of `ignored`: denominator only, NOT gains/regressions): 0
+RENAMED ([subtests] split, compared through the rename above): 0
+RUFFLE-MATCHED FAILS (report-only; still fails): 9 -> 7
+
+NEW (absent from baseline): 4
+  regression/avm1_edittext_rotated_borders [output]  pass
+  regression/avm1_edittext_rotated_glyphs [output]  pass
+  regression/avm1_stroke_pixel_snap [output]  pass
+  regression/avm1_stroke_pixel_snap_matrix [output]  pass
+GONE (present in baseline, absent now): 0
