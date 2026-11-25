@@ -1,0 +1,14 @@
+{
+ "test": "visual/text/String_path_variable_button",
+ "mode": "direct",
+ "num_ticks": 1,
+ "quality": null,
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "error": "no capture"
+  }
+ },
+ "error": "FileNotFoundError(2, 'No such file or directory')",
+ "stop": []
+}

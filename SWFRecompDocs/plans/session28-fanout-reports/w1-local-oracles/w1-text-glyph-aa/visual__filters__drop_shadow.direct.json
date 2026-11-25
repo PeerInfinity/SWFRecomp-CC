@@ -1,0 +1,30 @@
+{
+ "test": "visual/filters/drop_shadow",
+ "mode": "direct",
+ "num_ticks": 1,
+ "quality": null,
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 22101,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 2,
+     "max_outliers": 0,
+     "outliers": 58906,
+     "outlier_pixels": 20367
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "static": true,
+ "pin": "settled 550x452",
+ "log_tail": [],
+ "stop": [
+  "direct"
+ ]
+}
