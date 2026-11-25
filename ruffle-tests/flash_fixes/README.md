@@ -39,3 +39,13 @@ download.
 | `avm2/bitmapdata_opaque` | `output.expected.png` | 2026-11-24 | same (LNX == WIN) | fails either way; 4 channels vs Flash at tol 0 |
 | `avm2/blend_scroll` | `output.expected.png` | 2026-11-24 | same (LNX == WIN) | fails either way; 195 px vs Flash |
 | `visual/definefont4` | `output.expected.png` | 2026-11-24 | same (LNX == WIN; embedded DefineFont4) | fails either way; we are closer to Flash (5325) than the old golden was (6331) |
+
+**Graded** in run `45547012629` at `7c3cfdcb7` (results `e1425f417`) vs `cb14cd063`: 0 status moves in either axis.
+Excess channels vs the new Flash goldens:
+- `blend_scroll` 296 → 391
+- `strokes/scale` 19 287 → 23 391
+- `graphics_draw_path` 664 → 704
+- `definefont4` 16 086 → 15 975 (closer)
+- `bitmapdata_opaque` unchanged
+
+That is the honest residual against Flash.

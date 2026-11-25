@@ -1559,7 +1559,7 @@ not a Flash target. Price it as headroom against Flash, not against the golden.
 
 **Goal-4 decision: DONE after closeout (Robert, 2026-11-24: "store a set of fixes, and apply the fixes after
 redownloading").** The 5 swaps below are landed as `ruffle-tests/flash_fixes/` (re-applied by `download_tests.sh`;
-RvF "s27 golden swaps"). The rest of the table stands:
+RvF "s27 golden swaps"). They were graded in run `45547012629` (results `e1425f417`): 0 status moves, 3 bands worse against Flash (`blend_scroll` +95, `strokes/scale` +4104, `graphics_draw_path` +40 channels) and `definefont4` −111. The rest of the table stands:
 - 5 per-row golden **swaps** to Flash captures: `visual/simple_shapes/strokes/scale`, `avm2/graphics_draw_path`,
   `avm2/bitmapdata_opaque`, `avm2/blend_scroll` and `visual/definefont4` (we are closer to Flash than its golden).
 - `gradientTransform` stays as a Flash target.
