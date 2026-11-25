@@ -961,7 +961,6 @@ Flash also runs a clip's onClipEvent(enterFrame) in the same exec-list walk as t
 `t EF, n EF, c clipEvent(enterFrame), s EF`).
 **Decision:** match Flash 32 (s28 w2-test12-land: action.c `ef_removal_keeps_enterframe` + tag.c clip-event interleave).
 
-```markdown
 ## s28: `hitTest(x, y, true)` uses the clip's last-RENDERED bounds in the frame its transform changes
 
 **Tests:** `avm1/movieclip_hittest_shapeflag` (lines 35/37/39), `regression/avm1_hittest_shape_stale_matrix`;
