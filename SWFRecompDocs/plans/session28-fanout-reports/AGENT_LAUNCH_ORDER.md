@@ -10,7 +10,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 
 ## Local one-task sessions
 
-- `trace-provenance` launched 2026-11-25 at startup (pid 1610143, cwd verified, handshake sent).
+- `trace-provenance` launched 2026-11-25 at startup (pid 1610143, cwd verified, handshake sent). DONE `9bb3276d7` (REPORT BACK verified on disk): 212/259 ruffle_matched rows have FLASH goldens (real gaps) → wave 1b `w1b-rm-{avm2,gnash,avm1-misc}`; 2 trace flash_fixes (`goto_rewind_movieclip_replace` rm→pass expected; `movieclip_hittest_shapeflag` stays mismatch). Successor local `flash-oracle-harness`.
 - Browser ladder: `browser-root-goto` launched 2026-11-25 (pid 1644617, cwd verified, handshake sent): OFFSCREEN inline root-goto catch-up → browser.
 - N ladder: `n-stroke-snap` launched 2026-11-25 (pid 1644898, cwd verified, handshake sent): Flash thin-stroke pixel snapping.
 
