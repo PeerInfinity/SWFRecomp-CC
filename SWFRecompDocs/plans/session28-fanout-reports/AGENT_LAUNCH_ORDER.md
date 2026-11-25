@@ -16,13 +16,13 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 
 | # | slug | task | session id |
 |---|---|---|---|
-| 1 | w1-acid-flash | `briefs/w1-acid-flash.md` | |
-| 2 | w1-avm2-vector-flash | `briefs/w1-avm2-vector-flash.md` | |
-| 3 | w1-drift | `briefs/w1-drift.md` | |
-| 4 | w1-filter-residuals | `briefs/w1-filter-residuals.md` | |
-| 5 | w1-leads | `briefs/w1-leads.md` | |
-| 6 | w1-loaded-shell-residuals | `briefs/w1-loaded-shell-residuals.md` | |
-| 7 | w1-render-flash-headroom | `briefs/w1-render-flash-headroom.md` | |
-| 8 | w1-test12-enterframe | `briefs/w1-test12-enterframe.md` | |
-| 9 | w1-text-edit-tail | `briefs/w1-text-edit-tail.md` | |
-| 10 | w1-text-glyph-aa | `briefs/w1-text-glyph-aa.md` | |
+| 1 | w1-acid-flash | `briefs/w1-acid-flash.md` | session_018CoDi6JnxfpNaNRyzuxogB — launched 2026-11-25 |
+| 2 | w1-avm2-vector-flash | `briefs/w1-avm2-vector-flash.md` | session_018CoDi3wZhe7zdvykrZukfV — launched 2026-11-25 |
+| 3 | w1-drift | `briefs/w1-drift.md` | session_018CoDi5UJfjUtnXKTsT6MEU — launched 2026-11-25 |
+| 4 | w1-filter-residuals | `briefs/w1-filter-residuals.md` | session_018CoDi5uWF1jhfrRDKG6F9B — launched 2026-11-25 |
+| 5 | w1-leads | `briefs/w1-leads.md` | session_018CoDi3t5rtjVnrzbpL8LRN — launched 2026-11-25 |
+| 6 | w1-loaded-shell-residuals | `briefs/w1-loaded-shell-residuals.md` | session_018CoDi6VXdE1GrhC7pebVyf — launched 2026-11-25 |
+| 7 | w1-render-flash-headroom | `briefs/w1-render-flash-headroom.md` | session_018CoDi3SHpVL9RmKCJ3YhgZ — launched 2026-11-25 |
+| 8 | w1-test12-enterframe | `briefs/w1-test12-enterframe.md` | session_018CoDi7N5Bch7zdwEeLUYZ4 — launched 2026-11-25 |
+| 9 | w1-text-edit-tail | `briefs/w1-text-edit-tail.md` | session_018CoDi59FTJJJPfNtJqs7E1 — launched 2026-11-25 |
+| 10 | w1-text-glyph-aa | `briefs/w1-text-glyph-aa.md` | session_018CoDi5Jv8Udc64LppZrHrZ — launched 2026-11-25 |
