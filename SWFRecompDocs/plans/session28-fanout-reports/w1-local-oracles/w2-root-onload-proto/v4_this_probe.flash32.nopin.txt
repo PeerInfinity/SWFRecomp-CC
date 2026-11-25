@@ -1,0 +1,23 @@
+f1 of _level0.a
+root f1
+proto onLoad _global
+typeof this = movieclip
+this == _global: false
+this == _level0: false
+this._name = undefined
+this._target = undefined
+this._parent = undefined
+this._url = undefined
+proto ok: true
+proto onLoad _level0
+typeof this = movieclip
+this == _global: false
+this == _level0: true
+this._name = 
+this._target = /
+this._parent = undefined
+this._url = file:///home/robert/CC/SWFRecomp-CC/SWFRecompDocs/plans/session28-fanout-reports/w2-root-onload-proto-fixtures/v4_this_probe/test.swf
+proto ok: true
+f1 of _level0.b
+root f2
+root f3 stop
