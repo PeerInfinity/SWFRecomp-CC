@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `cceb5133a189` (2026-11-24T07:25:12.322320+00:00)
-**Current:** `78fee9e13f85` (2026-11-24T17:26:56.786625+00:00)
+**Previous:** `78fee9e13f85` (2026-11-24T17:26:56.786625+00:00)
+**Current:** `8f4f6e395305` (2026-11-25T03:46:34.854099+00:00)
 
 ## Summary
 
@@ -10,11 +10,6 @@
 | Passing | 7 | 7 | 0 |
 | Total | 9 | 9 | 0 |
 | Pass rate | 77.8% | 77.8% | 0% |
-| Mismatched lines | 20 | 16 | -4 |
-|   Decreased | | | -4 |
+| Mismatched lines | 16 | 16 | 0 |
 
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `levels` | ruffle_matched | 49/68 | 53/68 | -4 |
+No changes detected.
