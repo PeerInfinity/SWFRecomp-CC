@@ -1017,3 +1017,31 @@ FP32 captures in session28-fanout-reports/w1-local-oracles):**
 All three move Flash-ward. Both goldens are Ruffle renders that also depend on the
 default font, so they stay far from FP32 in text either way.
 **Decision:** match Flash. These rows are priced losses under this entry.
+
+## gnash `simple_loop_test` (image): Flash pixel-snaps the 1-px outline; the Ruffle golden AA-straddles it (s28 n-stroke-snap)
+
+**Test:** `from_gnash/misc-ming.all/loop/simple_loop_test`
+
+<!-- image-axis: frames 1 2 3 5 6 7 only -->
+
+**Diff (ours vs the upstream goldens, local graphics, `09b2c9130`):**
+- frame1, 5: 242 outlier channels; frame2, 6: 482; frame3, 7: 722 (tolerance 1).
+- Before the stroke snap these frames passed at 0.
+- frame4 passes, as before.
+
+**Flash:** ours now equals the s27 golden-provenance Flash Player 32 captures **exactly** on all six frames (0 px over
+max diff 1; `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/from_gnash__misc-ming.all__loop__simple_loop_test__frameN.png`).
+Those six goldens were already graded "not Flash" (121/241/361 px off Flash, max 255). frame4's golden is Flash-exact
+and still passes. The cause is Flash's thin-stroke rule:
+- axis-aligned strokes of ≤ 1 px, 2 px or 3 px device width are drawn solid on whole pixels;
+- Ruffle centres them on the edge with AA.
+
+Rule and captures: `SWFRecompDocs/plans/n-stroke-snap-report.md` §1.
+
+**Decision:** match Flash (user ruling: Flash over Ruffle). These image comparisons fail against the Ruffle goldens.
+The trace row passes and is NOT ignored.
+
+**Scope:** frames 1, 2, 3, 5, 6, 7 at up to ~722 outlier channels. Any difference from the Flash PNGs is NOT covered:
+re-triage the stroke snap.
+
+**Prune criterion:** upstream replaces these goldens with Flash references, or our render drifts off the Flash PNGs.

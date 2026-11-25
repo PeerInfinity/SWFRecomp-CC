@@ -27,8 +27,12 @@ Brief: `SWFRecompDocs/plans/session28-fanout-reports/n-stroke-snap-prompt.md`.
   | puppies | 2774 | **235** |
   | little dipper | 2073 | **421** |
 
-- **Image corpus (§3):** 73 image tests carry timeline strokes. See §3 for the Flash-golden A/B and the rows priced
-  as Flash-over-Ruffle losses.
+- **Image corpus (§3):** 73 image tests carry timeline strokes. Local A/B on the 17 Flash-golden rows:
+  - `button3` 3480 → 3, `avm1_imports_avm1` 455 → 36, `acid-stroke-0` 52702 → 36466, `sprite_with_frames`
+    6342 → 4956.
+  - Only `acid-small` moves slightly away (507 → 606, still passing).
+  - One priced Flash-over-Ruffle loss: `simple_loop_test` frames 1–3 and 5–7 go pass→fail against Ruffle goldens,
+    and are now pixel-identical to Flash (RvF entry).
 
 ## 1. The rule (Flash Player 32 LNX 32,0,0,465, quality HIGH unless noted)
 
@@ -129,8 +133,29 @@ slice does not touch them.
 
 ### 3.1 Local A/B on the Flash-golden rows (graphics, same build, `SWF_STROKE_SNAP=0` vs on)
 
-(Filled in by the follow-up commit once the serial local A/B finishes; the coordinator's `images=true` CI run on
-the code SHA is the full-corpus grade.)
+Outlier channels at each row's own tolerance. Golden provenance is from the s27 sweep. "→F" means toward Flash.
+
+| row | golden | off → on | status | note |
+|---|---|---|---|---|
+| `from_shumway/button3` output.1–4 | Flash (.1) | 3480 → **3** | pass | →F |
+| `import_assets/avm1_imports_avm1` | Flash | 455 → **36** | pass | →F |
+| `from_shumway/acid/acid-stroke-0` | Flash | 52702 → **36466** | fail (tol 0) | →F. w2-flash-stroke-width owns the width model (its own 52702 → 18381); the two merge in `hairline_restage` |
+| `avm2/sprite_with_frames` | Flash | 6342 → **4956** | fail (tol 0) | →F. The border is fixed; the rest is the "Frame 1" text (w1-avm2-vector-flash predicted 4953) |
+| `from_gnash/…/shape_test` | not Flash (Flash root capture is the oracle) | 15994 → 11368 vs golden | fail | to be graded vs the Flash root capture in CI |
+| `from_gnash/…/place_object_test` | not Flash (same) | 38238 → 37408 vs golden | fail | same |
+| `from_shumway/3_joystick`, `acid-clip`, `acid-morph` | Flash | pass → pass (diff channels slightly down) | pass | — |
+| `from_shumway/acid/acid-small` output.01 / .05 | Flash | 507 / 426 → **606 / 474** | pass (limit 3000) | **slightly AWAY from Flash.** Small-scale 1-twip strokes; not chased (next slice §5.2) |
+| `from_shumway/gradientTransform` | Flash | 9 → 9 | fail (tol 3) | unchanged. Its rings come from the gradient fill's own bevel, not this pass |
+| `cache_as_bitmap/scroll_rect`, `shape_changed`, `blend_across_masks_issue_24549`, `MaskTest-3`, `focus_highlight_render` ×6 | Flash | 0 → 0 | pass | — |
+| `from_gnash/…/loop/simple_loop_test` frames 1–3, 5–7 | **not Flash** | 0 → 242 / 482 / 722 | **pass → FAIL** | ours is now **pixel-identical to the Flash PNGs** on all six. Priced Flash-over-Ruffle loss, RvF entry + `image-axis` marker written. frame4 (Flash golden) still passes |
+
+- **Image status moves:**
+  - 6 pass→fail comparisons, all on one test (simple_loop_test), all now exact Flash.
+  - 0 fail→pass.
+  - Trace status unaffected (image comparisons never gate).
+- **Not graded locally:** the other ~50 stroke rows (Ruffle goldens: `blend_modes/*`, `simple_shapes/*`,
+  `filters/*`, `acid` ×18, …). The coordinator's `images=true` CI run on `09b2c9130` grades them. Expect excess to
+  move on every one, since every timeline stroke is re-staged.
 
 ## 4. N vs Flash after
 
