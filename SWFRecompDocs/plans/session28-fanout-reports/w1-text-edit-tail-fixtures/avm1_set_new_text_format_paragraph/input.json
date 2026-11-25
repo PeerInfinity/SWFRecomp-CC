@@ -1,0 +1,4 @@
+[
+  { "type": "TextInput", "codepoint": "E" },
+  { "type": "Wait" }
+]

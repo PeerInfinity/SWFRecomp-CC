@@ -1,0 +1,4 @@
+num_frames = 8
+
+# s28 w1-text-edit-tail (a). Golden: FLASH request (run_trace.py --type X5Y
+# --type-after ready). Until it lands, output.txt is Ruffle's analytic answer.

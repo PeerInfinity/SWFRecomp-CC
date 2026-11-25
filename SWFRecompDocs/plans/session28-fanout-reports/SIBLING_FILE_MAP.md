@@ -10,3 +10,4 @@
 | w2-lowq-sample-point | `render_webgpu.c` stage uploads (`render_webgpu_upload_stage_transform`, pass-open upload), `shade_main` paint fix, clip/mask/filter-layer/text quad passes (MSAA_SAMPLES==1 only); maybe `tag.c` `cab_snap_delta` |
 | w2-avm1-leads-land | `action.c` `avm1QueueFormDataEvent`/`avm1FireFormDataEvents`, `actionLoadedMovieDeliveredThisTick`/`actionNoteLoadedMovieDelivered`/`actionFirePendingDirectLoadsImpl`, onUnload dispatch (`actionFireOnUnload`); `sprite_frame_scripts.c` `actionQueuePendingSpriteScript`; `tag.c` `queue_pending_finalize_mc`, `run_pending_finalize` |
 | w2-hittest-shape-stale | `action.c` hitTest arm of `actionCallMethod` (~80573) + a per-clip render-time matrix snapshot (trailing MovieClip field) |
+| w2-text-edit-land | `action.c` `actionTextFieldInput` restrict branch, setNewTextFormat span model (`tf_snf`), getTextFormat getters; `avm2_display.c` (selection, keep tint) |
