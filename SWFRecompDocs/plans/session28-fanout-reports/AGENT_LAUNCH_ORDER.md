@@ -11,7 +11,7 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 ## Local one-task sessions
 
 - `trace-provenance` launched 2026-11-25 at startup (pid 1610143, cwd verified, handshake sent). DONE `9bb3276d7` (REPORT BACK verified on disk): 212/259 ruffle_matched rows have FLASH goldens (real gaps) → wave 1b `w1b-rm-{avm2,gnash,avm1-misc}`; 2 trace flash_fixes (`goto_rewind_movieclip_replace` rm→pass expected; `movieclip_hittest_shapeflag` stays mismatch). Successor local `flash-oracle-harness`.
-- Browser ladder: `browser-root-goto` launched 2026-11-25 (pid 1644617, cwd verified, handshake sent): OFFSCREEN inline root-goto catch-up → browser.
+- Browser ladder: `browser-root-goto` DONE `dc6c75a64` (REPORT BACK verified; browser-only, CI preprocess-equivalent; new CI row `regression/avm1_clipevent_root_goto_stopped` Flash golden; self-goto port now M; found Tetris wasm build break at HEAD). Successor `browser-attached-goto` (Tetris build first).
 - N ladder: `n-stroke-snap` launched 2026-11-25 (pid 1644898, cwd verified, handshake sent): Flash thin-stroke pixel snapping. DONE `09b2c9130` + docs `ac3294c6b` (REPORT BACK verified): width/position ¼-px quantised, snap only axis-aligned u≤4/8/12 (pixelHinting all), fills never snap; button3 3480→3; priced simple_loop_test frames 1–3,5–7 pass→fail (ours == Flash PNGs, RvF). Successor `n-drawapi-stroke-snap` (perf A/B first). Overlaps cloud w2-flash-stroke-width (flags table: theirs `stroke_run_flags[]` vs w2's `stroke_run_data` bits 30/31 — pick at merge).
 - `snap-pixel-audit` (local) launched: attribute + Flash-grade interim #2's 51 pixel pass→fail.
 - `lowq-recapture` (local) launched: Flash-LOW recapture of w2-lowq-sample-point's 72-row swap table.
