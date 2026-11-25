@@ -57,3 +57,4 @@ Upstream: `efb612fd7..c2f7d24b7` → w1-drift.
 | run | code | trace (vs `e1425f417`) | pixels | no-graphics |
 |---|---|---|---|---|
 | `45687311987` interim #1 (graphics full images) | `13b40eabb`: culling `958313b73` + trace-provenance flash_fixes `9bb3276d7` | **exact**: rm→pass `avm1/goto_rewind_movieclip_replace` (flash fix); rm→mismatch gnash `test4` (upstream drift, w1-drift); +1 new row `avm1/root_onload_loaded_level` pass. 4820 rows: 4524 pass + 257 rm, 39 failing. Results `7e8aa52af` | **exact**: 0 flips, 0 regressions; band `graphics_draw_triangles` 1812 → 996 | — |
+| w2b-stroke-width-merge | w2-flash-stroke-width timeline half on top of n-stroke-snap | acid-stroke-0 / strokes/scale bands; acid-scale flash_fix | session_018CoDi53GnJqseLZyeMYMMc — launched |
