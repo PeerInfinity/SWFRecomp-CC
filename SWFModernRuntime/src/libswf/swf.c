@@ -1054,6 +1054,7 @@ void tagMain(SWFAppContext* app_context)
 		// func runs this tick.
 		// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
 		// nested sprites first, then their root-level parents (Phase 1).
+		{ extern void actionSnapshotEnterFrameCandidates(void); actionSnapshotEnterFrameCandidates(); }  // s28 w2-test12-land
 		const int nested_early = exec_order_nested_early();
 		if (nested_early)
 		{

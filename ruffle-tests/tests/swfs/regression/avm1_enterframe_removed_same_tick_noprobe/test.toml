@@ -1,0 +1,2 @@
+num_ticks = 8
+# Golden: Flash Player 32 trace (direct pinned), s28 coordinator capture; == the slot's output.predicted.txt.

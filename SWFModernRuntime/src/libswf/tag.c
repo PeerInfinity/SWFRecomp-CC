@@ -7166,6 +7166,121 @@ static void dispatch_enterframe_clip_actions_recursive(SWFAppContext* app_contex
 	}
 }
 
+// One flat-list clip-event ENTER_FRAME entry (body of the flat dispatch loop;
+// s28 w2-test12-land split it out so the interleaved root pass below can fire
+// entries one at a time from actionDispatchEnterFrameHandlers).
+static void clip_ef_fire_entry(SWFAppContext* app_context, ClipEFEntry* entries, size_t e)
+{
+	DisplayObject* obj = entries[e].obj;
+	MovieClip* entry_parent = entries[e].parent_mc;
+	if (obj == NULL) return;        // entry's DL freed mid-dispatch (scrubbed)
+	if (obj->char_id == 0) return;  // entry may have been removed mid-dispatch
+	if (obj->sprite_initialized < 2) return;
+	if (obj->clip_action_count == 0) return;
+
+	// Set correct MC context for the clip action. Skip if the MC or any
+	// ancestor is Marked (queued for removal by tag-stream tagRemoveObject2)
+	// so ENTER_FRAME doesn't fire for clips being removed in this frame —
+	// see DEFERRED_CLIP_UNLOAD_PLAN, avm1/clip_events.
+	MovieClip* saved_ctx = g_current_context;
+	MovieClip* saved_base = actionGetBaseClip();
+	MovieClip* event_mc = NULL;
+	if (obj->instance_name != NULL) {
+		event_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, entry_parent);
+		if (event_mc) {
+			int _ef_skip = 0;
+			for (MovieClip* p = event_mc; p != NULL; p = p->parent) {
+				if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
+			}
+			if (_ef_skip) return;
+			actionSetCurrentContext(event_mc);
+			// Set base_clip so actionBaseClipRemoved() detects removal during
+			// gotoAndPlay catch-up that removes this clip (e.g. opcode_guard_test
+			// mc2 EnterFrame: gotoAndPlay(8) removes mc2 mid-handler — Ruffle
+			// aborts the rest of the handler via the same base-clip check).
+			actionSetBaseClip(event_mc);
+		}
+	} else {
+		// Anonymous obj: skip if parent is Marked.
+		int _ef_skip = 0;
+		for (MovieClip* p = entry_parent; p != NULL; p = p->parent) {
+			if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
+		}
+		if (_ef_skip) return;
+	}
+	for (size_t a = 0; a < obj->clip_action_count; a++)
+	{
+		if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME) {
+			obj->clip_actions[a].action(app_context);
+			// The handler may have grown (moved) or freed the display list
+			// holding this entry; entries[] is rebased by ng_spriteDLRealloc
+			// (or NULLed by ng_freeSpriteDL), so re-read the entry pointer
+			// before touching obj again.
+			obj = entries[e].obj;
+			if (obj == NULL) break;
+		}
+	}
+	actionSetCurrentContext(saved_ctx);
+	actionSetBaseClip(saved_base);
+}
+
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// s28 w2-test12-land: Flash dispatches a clip's onClipEvent(enterFrame) and its
+// onEnterFrame method together, in ONE exec-list walk (newest first), not all
+// clip events before all methods (FP32 regression/
+// avm1_enterframe_removed_same_tick: `t EF, n EF, c clipEvent(enterFrame), s EF`
+// for t/n/c/s placed in depth order 3..6). The ROOT per-tick pass therefore
+// only GATHERS its sorted entries (tagClipEFCollectRootPass); the method pass
+// (action.c actionDispatchEnterFrameHandlers) fires the pending entries whose
+// place_seq >= a visited clip's own before that clip's method
+// (tagClipEFFireNewerOrEqual), and the rest at its end (tagClipEFFireRemaining).
+// A clip's own clip event still precedes its method (avm1/clip_events).
+static int g_clip_ef_collect = 0;
+static int g_clip_ef_pend_active = 0;
+static ClipEFEntry* g_clip_ef_pend = NULL;
+static size_t g_clip_ef_pend_n = 0, g_clip_ef_pend_pos = 0;
+static ClipEFRebaseFrame g_clip_ef_pend_frame;
+
+static void clip_ef_pend_end(void)
+{
+	if (!g_clip_ef_pend_active) return;
+	g_clip_ef_pend_active = 0;
+	if (g_clip_ef_rebase_head == &g_clip_ef_pend_frame) {
+		g_clip_ef_rebase_head = g_clip_ef_pend_frame.prev;
+	} else {
+		for (ClipEFRebaseFrame* f = g_clip_ef_rebase_head; f != NULL; f = f->prev)
+			if (f->prev == &g_clip_ef_pend_frame) { f->prev = g_clip_ef_pend_frame.prev; break; }
+	}
+	free(g_clip_ef_pend);
+	g_clip_ef_pend = NULL;
+	g_clip_ef_pend_n = g_clip_ef_pend_pos = 0;
+}
+
+void tagClipEFFireNewerOrEqual(SWFAppContext* app_context, size_t place_seq)
+{
+	while (g_clip_ef_pend_active && g_clip_ef_pend_pos < g_clip_ef_pend_n
+	       && g_clip_ef_pend[g_clip_ef_pend_pos].place_seq >= place_seq) {
+		size_t e = g_clip_ef_pend_pos++;
+		// Clip events always ran outside the method pass's
+		// g_inside_enterframe_dispatch window (it changes root-goto handling).
+		extern int g_inside_enterframe_dispatch;
+		int saved_inside = g_inside_enterframe_dispatch;
+		g_inside_enterframe_dispatch = 0;
+		clip_ef_fire_entry(app_context, g_clip_ef_pend, e);
+		g_inside_enterframe_dispatch = saved_inside;
+	}
+}
+
+void tagClipEFFireRemaining(SWFAppContext* app_context)
+{
+	tagClipEFFireNewerOrEqual(app_context, 0);
+	clip_ef_pend_end();
+}
+#else
+void tagClipEFFireNewerOrEqual(SWFAppContext* app_context, size_t place_seq) { (void)app_context; (void)place_seq; }
+void tagClipEFFireRemaining(SWFAppContext* app_context) { (void)app_context; }
+#endif
+
 // Dispatch CLIP_EVENT_ENTER_FRAME in flat global LIFO order (place_seq DESC
 // across the entire display tree, not per-subtree). Mirrors Ruffle's
 // clip_exec_list which is a single global linked list traversed in reverse-
@@ -7246,64 +7361,34 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 		entries[b+1] = key;
 	}
 
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// s28 w2-test12-land: the root pass hands its sorted entries to the
+	// method pass instead of firing them here (see clip_ef_fire_entry).
+	if (g_clip_ef_collect && include_attached && n > 0) {
+		g_clip_ef_collect = 0;
+		clip_ef_pend_end();
+		g_clip_ef_pend = (ClipEFEntry*) malloc(n * sizeof(ClipEFEntry));
+		if (g_clip_ef_pend != NULL) {
+			memcpy(g_clip_ef_pend, entries, n * sizeof(ClipEFEntry));
+			g_clip_ef_pend_n = n;
+			g_clip_ef_pend_pos = 0;
+			g_clip_ef_pend_frame.entries = g_clip_ef_pend;
+			g_clip_ef_pend_frame.n = n;
+			g_clip_ef_pend_frame.prev = g_clip_ef_rebase_head;
+			g_clip_ef_rebase_head = &g_clip_ef_pend_frame;
+			g_clip_ef_pend_active = 1;
+			return;
+		}
+	}
+#endif
+
 	// Register the gathered array for pointer rebase while handlers run
 	// (see ClipEFRebaseFrame above).
 	ClipEFRebaseFrame _ef_frame = { entries, n, g_clip_ef_rebase_head };
 	g_clip_ef_rebase_head = &_ef_frame;
 
-	for (size_t e = 0; e < n; e++) {
-		DisplayObject* obj = entries[e].obj;
-		MovieClip* entry_parent = entries[e].parent_mc;
-		if (obj == NULL) continue;        // entry's DL freed mid-dispatch (scrubbed)
-		if (obj->char_id == 0) continue;  // entry may have been removed mid-dispatch
-		if (obj->sprite_initialized < 2) continue;
-		if (obj->clip_action_count == 0) continue;
-
-		// Set correct MC context for the clip action. Skip if the MC or any
-		// ancestor is Marked (queued for removal by tag-stream tagRemoveObject2)
-		// so ENTER_FRAME doesn't fire for clips being removed in this frame —
-		// see DEFERRED_CLIP_UNLOAD_PLAN, avm1/clip_events.
-		MovieClip* saved_ctx = g_current_context;
-		MovieClip* saved_base = actionGetBaseClip();
-		MovieClip* event_mc = NULL;
-		if (obj->instance_name != NULL) {
-			event_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, entry_parent);
-			if (event_mc) {
-				int _ef_skip = 0;
-				for (MovieClip* p = event_mc; p != NULL; p = p->parent) {
-					if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
-				}
-				if (_ef_skip) continue;
-				actionSetCurrentContext(event_mc);
-				// Set base_clip so actionBaseClipRemoved() detects removal during
-				// gotoAndPlay catch-up that removes this clip (e.g. opcode_guard_test
-				// mc2 EnterFrame: gotoAndPlay(8) removes mc2 mid-handler — Ruffle
-				// aborts the rest of the handler via the same base-clip check).
-				actionSetBaseClip(event_mc);
-			}
-		} else {
-			// Anonymous obj: skip if parent is Marked.
-			int _ef_skip = 0;
-			for (MovieClip* p = entry_parent; p != NULL; p = p->parent) {
-				if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
-			}
-			if (_ef_skip) continue;
-		}
-		for (size_t a = 0; a < obj->clip_action_count; a++)
-		{
-			if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME) {
-				obj->clip_actions[a].action(app_context);
-				// The handler may have grown (moved) or freed the display list
-				// holding this entry; entries[] is rebased by ng_spriteDLRealloc
-				// (or NULLed by ng_freeSpriteDL), so re-read the entry pointer
-				// before touching obj again.
-				obj = entries[e].obj;
-				if (obj == NULL) break;
-			}
-		}
-		actionSetCurrentContext(saved_ctx);
-		actionSetBaseClip(saved_base);
-	}
+	for (size_t e = 0; e < n; e++)
+		clip_ef_fire_entry(app_context, entries, e);
 
 	g_clip_ef_rebase_head = _ef_frame.prev;
 }
@@ -7352,6 +7437,20 @@ void dispatch_root_enterframe_clip_actions(SWFAppContext* app_context)
 	extern MovieClip root_movieclip;
 	dispatch_enterframe_clip_actions_impl(app_context, display_list, max_depth,
 		&root_movieclip, 1);
+}
+
+// s28 w2-test12-land: the per-tick root pass, interleaved with the onEnterFrame
+// method pass that MUST follow it (actionDispatchEnterFrameHandlers fires the
+// gathered entries; browser-WASM keeps the separate pass).
+void tagClipEFCollectRootPass(SWFAppContext* app_context)
+{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	g_clip_ef_collect = 1;
+	dispatch_root_enterframe_clip_actions(app_context);
+	g_clip_ef_collect = 0;
+#else
+	dispatch_root_enterframe_clip_actions(app_context);
+#endif
 }
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
@@ -7478,7 +7577,9 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	set_enterframe_eligible_recursive(display_list, max_depth);
 	// Dispatch clip event ENTER_FRAME (recursive, children before parents).
 	// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
-	dispatch_root_enterframe_clip_actions(app_context);
+	// s28 w2-test12-land: CI modes gather here and fire interleaved with the
+	// onEnterFrame methods in actionDispatchEnterFrameHandlers below.
+	tagClipEFCollectRootPass(app_context);
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: fire enterFrame for clip actions on sprites nested inside
 	// attachMovie'd clips (e.g. Doodle Jump blue platform charId 32 "aaa"),

@@ -42979,18 +42979,172 @@ static void dispatch_root_dprops_enterframe(SWFAppContext* app_context)
 }
 
 
+// s28 w2-test12-land: a clip's queued onEnterFrame survives its removal later
+// in the same tick when the removal is DEFERRED by an onUnload handler.
+// Flash queues each clip's enterFrame at the start of the tick (exec-list
+// order, newest first) and runs the queue after every timeline advanced; a
+// clip the advance removes (a parent's loop-back or a root RemoveObject2)
+// still runs that queued onEnterFrame iff
+//   (a) it carries an onUnload function (Flash keeps it alive, name-reachable,
+//       until the unload ran; without one it is destroyed at once), and
+//   (b) it has NO PlaceObject clip actions (a clip-event clip's queued entry is
+//       dropped, its onEnterFrame method with it).
+// Flash 32 captures that fit this ONE rule byte for byte (s28 w1 oracles):
+// gnash action_execution_order_test12 fp10 (mc1/mc2/mc11/mc12/mc21, onUnload,
+// no clip actions: fire), action_execution_order_extend_test fp10 (mc_blu
+// fires; mc_red has onUnload + onClipEvent(load): dropped), avm1/clip_events
+// (onUnload + clip actions: dropped), avm1/movieclip_in_removed_button (no
+// onUnload: dropped), regression/avm1_enterframe_removed_same_tick{,_swf7}
+// (b, s, k fire; t, n, c, a dropped; SWF 7 == SWF 8, so no version gate).
+// Ruffle's run_actions (player.rs) drops every queued action of a removed or
+// pending-removal clip, which is Flash 9's behaviour (test12 output.fp9.txt).
+// We dispatch AFTER the advance, so snapshot the would-fire set before it and
+// fire the entries the advance removed, in their newest-first slot.
+// SWF_EF_SNAPSHOT=0 restores the pre-s28 behaviour (A/B only).
+typedef struct { MovieClip* mc; ASFunction* func; int idx; size_t place_seq; } EfSnapEntry;
+static EfSnapEntry* g_ef_snap = NULL;
+static int g_ef_snap_n = 0, g_ef_snap_cap = 0;
+static size_t g_ef_snap_tick = (size_t)-1;
+
+static int ef_snapshot_enabled(void)
+{
+	static int s = -1;
+	if (s < 0) { const char* e = getenv("SWF_EF_SNAPSHOT"); s = !(e && e[0] == '0'); }
+	return s;
+}
+
+static int ef_mc_or_ancestor_removed(MovieClip* mc)
+{
+	for (MovieClip* p = mc; p != NULL; p = p->parent)
+		if (p->avm1_removed || p->pending_removal) return 1;
+	return 0;
+}
+
+// Rule (a)+(b) above, evaluated at snapshot time (tick start).
+static int ef_removal_keeps_enterframe(MovieClip* mc)
+{
+	if (mc->display_obj != NULL) {
+		DisplayObject* d = (DisplayObject*) mc->display_obj;
+		if (d->clip_action_count > 0 || d->accumulated_clip_action_count > 0) return 0;
+	}
+	ActionVar* un = getPropertyWithPrototype((ASObject*)mc->dynamic_props, "onUnload", 8);
+	return un != NULL && un->type == ACTION_STACK_VALUE_FUNCTION && un->data.numeric_value != 0;
+}
+
+void actionSnapshotEnterFrameCandidates(void)
+{
+	extern size_t g_tick_count;
+	g_ef_snap_n = 0;
+	g_ef_snap_tick = g_tick_count;
+	if (!ef_snapshot_enabled()) return;
+	for (int i = 0; i < child_mc_count; i++)
+	{
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL || mc->is_button_mc) continue;
+		if (ef_mc_or_ancestor_removed(mc)) continue;
+		if (mc->display_obj != NULL && !actionIsLoadedLevelRootMC(mc)) {
+			if (((DisplayObject*)mc->display_obj)->sprite_initialized < 2) continue;
+		} else if (!mc->mc_enterframe_eligible) continue;
+		ActionVar* ef = getPropertyWithPrototype((ASObject*)mc->dynamic_props, "onEnterFrame", 12);
+		if (ef == NULL || ef->type != ACTION_STACK_VALUE_FUNCTION) continue;
+		ASFunction* f = (ASFunction*) ef->data.numeric_value;
+		if (f == NULL) continue;
+		if (!ef_removal_keeps_enterframe(mc)) continue;
+		if (g_ef_snap_n >= g_ef_snap_cap) {
+			int nc = g_ef_snap_cap ? g_ef_snap_cap * 2 : 32;
+			EfSnapEntry* nq = (EfSnapEntry*) realloc(g_ef_snap, (size_t)nc * sizeof(EfSnapEntry));
+			if (nq == NULL) return;
+			g_ef_snap = nq; g_ef_snap_cap = nc;
+		}
+		g_ef_snap[g_ef_snap_n].mc = mc;
+		g_ef_snap[g_ef_snap_n].func = f;
+		g_ef_snap[g_ef_snap_n].idx = i;
+		g_ef_snap[g_ef_snap_n].place_seq = (mc->display_obj != NULL && !actionIsLoadedLevelRootMC(mc))
+			? ((DisplayObject*)mc->display_obj)->place_seq : 0;
+		g_ef_snap_n++;
+	}
+}
+
+static void ef_invoke_handler(SWFAppContext* app_context, MovieClip* mc, ASFunction* func)
+{
+	MovieClip* saved_ctx = g_current_context;
+	actionSetCurrentContext(mc);
+	ActionVar _ef_this = {0};
+	_ef_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_ef_this.data.numeric_value = (u64)(uintptr_t)mc;
+	MovieClip* ef_saved_base = g_current_context;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, mc);
+	u32 _ef_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
+	if (func->function_type == 2)
+		_ef_flags |= INV_MC_THIS_NULL_PTR;
+	else
+		_ef_flags |= INV_LOCAL_SCOPE | INV_BIND_THIS;
+	InvokeOpts _ef_opts = { .flags = _ef_flags };
+	g_call_depth++;
+	invokeFunctionValue(app_context, func, &_ef_this, NULL, 0, &_ef_opts);
+	g_call_depth--;
+	g_current_context = ef_saved_base;
+	actionSetCurrentContext(saved_ctx);
+}
+
+// s28 w2-test12-land: clip-event ENTER_FRAME interleave (tag.c
+// tagClipEFCollectRootPass). Set only by the outermost method pass, so a
+// nested re-run of this dispatcher (goto catch-up) never fires the outer
+// pass's pending clip entries.
+extern void tagClipEFFireNewerOrEqual(SWFAppContext* app_context, size_t place_seq);
+extern void tagClipEFFireRemaining(SWFAppContext* app_context);
+static int g_ef_clip_interleave = 0;
+static int g_ef_dispatch_nest = 0;
+
+// Fire the snapshot entries for cache slot `idx` whose clip the advance removed.
+static void ef_fire_removed_snapshot_slot(SWFAppContext* app_context, int idx)
+{
+	extern size_t g_tick_count;
+	for (int k = g_ef_snap_n - 1; k >= 0; k--)
+	{
+		EfSnapEntry* e = &g_ef_snap[k];
+		if (e->idx != idx) continue;
+		MovieClip* mc = e->mc;
+		int still_live = (idx < child_mc_count && child_mc_cache[idx] == mc && !ef_mc_or_ancestor_removed(mc));
+		if (still_live) continue;               // the normal arm handles it
+		if (mc->ef_fired_tick == g_tick_count) continue;
+		mc->ef_fired_tick = g_tick_count;
+		if (g_ef_clip_interleave) tagClipEFFireNewerOrEqual(app_context, e->place_seq);
+		ef_invoke_handler(app_context, mc, e->func);
+	}
+}
+
 // Called from tagShowFrame after sprite/button initialization. Iterates the
 // MC cache in reverse creation order (most recently created = highest depth = front)
 // to match Flash's front-to-back dispatch order.
 void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 {
 	g_inside_enterframe_dispatch = 1;
+	// s28 w2-test12-land: snapshot slots may lie above a trimmed
+	// child_mc_count (the advance NULLed and trimmed the removed clip's slot).
+	int _ef_top = child_mc_count;
+	{
+		extern size_t g_tick_count;
+		if (g_ef_snap_tick != g_tick_count) g_ef_snap_n = 0;
+		for (int k = 0; k < g_ef_snap_n; k++)
+			if (g_ef_snap[k].idx + 1 > _ef_top) _ef_top = g_ef_snap[k].idx + 1;
+	}
 	// Dispatch children first, then root — Flash fires enterFrame in creation
 	// order (children before parents).
-	for (int i = child_mc_count - 1; i >= 0; i--)
+	int _ef_saved_interleave = g_ef_clip_interleave;
+	g_ef_clip_interleave = (++g_ef_dispatch_nest == 1);
+	for (int i = _ef_top - 1; i >= 0; i--)
 	{
+		if (g_ef_snap_n > 0) ef_fire_removed_snapshot_slot(app_context, i);
+		if (i >= child_mc_count) continue;
 		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		if (mc == NULL) continue;
+		// s28 w2-test12-land: fire the clip-event ENTER_FRAME entries placed
+		// at or after this clip before its own onEnterFrame (one exec-list walk).
+		if (g_ef_clip_interleave && mc->display_obj != NULL && !actionIsLoadedLevelRootMC(mc))
+			tagClipEFFireNewerOrEqual(app_context, ((DisplayObject*)mc->display_obj)->place_seq);
+		if (mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
 		// Skip Marked MCs and any descendants of Marked MCs (queued for removal
 		// by RemoveObject2 in this frame — see DEFERRED_CLIP_UNLOAD_PLAN).
@@ -43024,6 +43178,13 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 			// Dynamic MCs (createEmptyMovieClip, etc.) without display_obj:
 			// Skip on creation tick, allow on subsequent ticks.
 			if (!mc->mc_enterframe_eligible) continue;
+		}
+		// s28 w2-test12-land: a clip with no timeline place_seq (dynamic clip,
+		// _levelN root) keeps the pre-interleave order: every pending clip
+		// event fires before its method.
+		if (g_ef_clip_interleave && (mc->display_obj == NULL || actionIsLoadedLevelRootMC(mc))) {
+			tagClipEFFireRemaining(app_context);
+			if (ef_mc_or_ancestor_removed(mc) || mc->dynamic_props == NULL) continue;
 		}
 
 		ASObject* props = (ASObject*) mc->dynamic_props;
@@ -43097,6 +43258,9 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		g_current_context = ef_saved_base;
 		actionSetCurrentContext(saved_ctx);
 	}
+	if (g_ef_clip_interleave) tagClipEFFireRemaining(app_context);
+	g_ef_dispatch_nest--;
+	g_ef_clip_interleave = _ef_saved_interleave;
 
 	// Dispatch root MovieClip last (after children).
 	// Skip on the first tick — root's first frame fires LOAD (frame script),

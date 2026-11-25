@@ -940,3 +940,23 @@ regression goldens swapped to Flash).
 |---|---|---|---|
 | `avm1/watch_recursion_swf6` | FP32 prints `  o2.prop: ` with a trailing space (1 line); the golden's trailing whitespace was stripped | **0** (byte-identical) | flash_fixes entry (golden = FP32 capture `session28-fanout-reports/trace-provenance/avm1__watch_recursion_swf6.r1.txt`); expected `ruffle_matched` → pass |
 | `avm1/watch_recursion_double_swf6` | same, 4 lines | **0** | same; expected `ruffle_matched` → pass |
+
+## gnash action_execution_order_test12 (fp10): onEnterFrame of a clip removed later in the same tick
+
+**Test:** `from_gnash/misc-swfc.all/action_execution_order_test12` (graded `output.fp10.txt`; Ruffle runs it as
+`known_failure`). Flash 32 prints `output.fp10.txt` (trace-provenance: golden = Flash). Ruffle prints `output.fp9.txt`
+line 17:
+
+    FAILED: _root.enterFrameOrder: expected: "0+1+2+3+1+2+3+1+2+1+2+" , obtained: "0+1+2+3+1+2+4+3+1+2+5+3+1+2+1+2+"
+
+Flash 10+ keeps the onEnterFrame queued for a clip at the start of a frame when that frame's timeline advance then
+removes the clip (a parent's loop-back or a RemoveObject2), PROVIDED the clip has an onUnload function and no
+PlaceObject clip actions. mc2.mc21 / mc1.mc12 / mc1.mc11 (removed by their parent's loop-back) and mc1 / mc2 (removed by
+the root's RemoveObject2) all carry onUnload and fire. Discriminators, all FP32: regression/avm1_enterframe_removed_same_tick{,_swf7}
+(b/s/k fire; n/t without onUnload and c with clip actions do not; SWF 7 == SWF 8), gnash action_execution_order_extend_test
+fp10 (mc_blu fires; mc_red, onUnload + onClipEvent(load), does not), avm1/clip_events and avm1/movieclip_in_removed_button
+(goldens = FP32: clip actions / no onUnload, no fire). Ruffle (`core/src/player.rs` `run_actions`) skips every queued
+non-unload action whose clip is `avm1_removed()` or `avm1_pending_removal()`, which is Flash 9's behaviour.
+Flash also runs a clip's onClipEvent(enterFrame) in the same exec-list walk as the onEnterFrame methods (the fixture's
+`t EF, n EF, c clipEvent(enterFrame), s EF`).
+**Decision:** match Flash 32 (s28 w2-test12-land: action.c `ef_removal_keeps_enterframe` + tag.c clip-event interleave).

@@ -1207,6 +1207,7 @@ void swfStart(SWFAppContext* app_context)
 			// Phase 3: Advance nested children of sprites
 			// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
 			// nested sprites first, then their root-level parents (Phase 1).
+			{ extern void actionSnapshotEnterFrameCandidates(void); actionSnapshotEnterFrameCandidates(); }  // s28 w2-test12-land
 			const int nested_early = exec_order_nested_early();
 			if (nested_early)
 				advance_nested_sprite_frames(app_context);
@@ -1382,8 +1383,10 @@ void swfStart(SWFAppContext* app_context)
 			}
 			// Dispatch clip event ENTER_FRAME (recursive, children before parents)
 			{
-				extern void dispatch_root_enterframe_clip_actions(SWFAppContext*);
-				dispatch_root_enterframe_clip_actions(app_context);
+				// s28 w2-test12-land: gathered here, fired interleaved with
+				// the onEnterFrame methods by actionDispatchEnterFrameHandlers.
+				extern void tagClipEFCollectRootPass(SWFAppContext*);
+				tagClipEFCollectRootPass(app_context);
 			}
 			actionDispatchEnterFrameHandlers(app_context);
 			actionDispatchRootVarMapEnterFrame(app_context);
