@@ -836,3 +836,9 @@ regression/avm2_edittext_selection_cxform   # tinted selection rects, 5 rows  1 
 # ng_under entry; no other member can see this render path. Golden is non-Flash (fails; md5 A/B only).
 # tier=1
 from_gnash/misc-ming.all/place_object_test   # two pairs at one depth, newcomer behind  1 cmp
+# s28 w2b-stroke-width-merge: Flash device-space stroke width on NON-similar matrices (single
+# noH/noV flags, device round joins/caps; render_webgpu.c hairline_restage/hairline_flash_offset)
+# stacked on the n-stroke-snap pass. Flash goldens.
+# tier=1
+from_shumway/acid/acid-stroke-0                     # 5 line styles x 11 matrices, LOW   1 cmp
+regression/avm1_stroke_pixel_snap_matrix            # 224 snapped/AA strokes, skew rows  1 cmp
