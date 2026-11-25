@@ -1,0 +1,12 @@
+num_ticks = 30
+# flash_fixes (s28): this golden is Flash 32 WITHOUT ErrorReportingEnable (FP32 --log-warnings adds
+# "Warning: ..." lines, e.g. "Failed to place object"); grade with warnings stripped.
+log_warnings = false
+known_failure = true
+
+[image_comparisons.output]
+known_failure = true
+tolerance = 50
+
+[player_options]
+with_renderer = { optional = true, quality = "low" }

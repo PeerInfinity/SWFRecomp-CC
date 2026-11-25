@@ -174,5 +174,38 @@
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/place_object_test",
+    "file": "test.toml",
+    "upstream_sha256": "a00127670c9e62ea1cb1a7b65124344f2038b7562c154a1c1284b68ffe5553f7",
+    "fix": "from_gnash/misc-ming.all/place_object_test/test.toml",
+    "kind": "toml",
+    "evidence": "SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/place_object_test.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
+    "reason": "Corpus convention mismatch: Ruffle's runner defaults log_warnings=true (ErrorReporting on), but this gnash golden is Flash with ErrorReporting off. Set log_warnings=false so Flash's debug-warning lines are stripped from our output, as Ruffle does for such rows.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-occupied-depth",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/place_object_test2",
+    "file": "test.toml",
+    "upstream_sha256": "3ec2bea767cbe6fc88e029ea64d1e0986de82e1d72931bfe1f3116dfb596724d",
+    "fix": "from_gnash/misc-ming.all/place_object_test2/test.toml",
+    "kind": "toml",
+    "evidence": "SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/place_object_test2.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
+    "reason": "Corpus convention mismatch: Ruffle's runner defaults log_warnings=true (ErrorReporting on), but this gnash golden is Flash with ErrorReporting off. Set log_warnings=false so Flash's debug-warning lines are stripped from our output, as Ruffle does for such rows.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-occupied-depth",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/path_format_test",
+    "file": "test.toml",
+    "upstream_sha256": "3ec2bea767cbe6fc88e029ea64d1e0986de82e1d72931bfe1f3116dfb596724d",
+    "fix": "from_gnash/misc-ming.all/path_format_test/test.toml",
+    "kind": "toml",
+    "evidence": "SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/path_format_test.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
+    "reason": "Corpus convention mismatch: Ruffle's runner defaults log_warnings=true (ErrorReporting on), but this gnash golden is Flash with ErrorReporting off. Set log_warnings=false so Flash's debug-warning lines are stripped from our output, as Ruffle does for such rows.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-occupied-depth",
+    "added": "2026-11-25"
   }
 ]

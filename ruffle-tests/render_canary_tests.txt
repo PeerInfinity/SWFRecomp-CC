@@ -831,3 +831,8 @@ avm1/movieclip_methods_with_loaded_image            # loadMovie'd image + clip m
 # avm2_render_text); Flash TINTS it (Ruffle does not). Flash golden, tol 48 / 500.
 # tier=1
 regression/avm2_edittext_selection_cxform   # tinted selection rects, 5 rows  1 cmp
+# s28 w2-occupied-depth: SWF-5 keep-both (tag.c ng_under chain: render_display_list / root loops /
+# compose_children / attached-pass exclusion). The only corpus row whose display list holds an
+# ng_under entry; no other member can see this render path. Golden is non-Flash (fails; md5 A/B only).
+# tier=1
+from_gnash/misc-ming.all/place_object_test   # two pairs at one depth, newcomer behind  1 cmp

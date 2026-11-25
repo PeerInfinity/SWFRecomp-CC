@@ -52917,6 +52917,34 @@ check_special_vars:
 				? ng_rootDLEnter(&_gvr_dl, &_gvr_max, &_gvr_cap) : 0;
 #define _GV_RDL_LEAVE() ng_rootDLLeave(_gvr_sw, _gvr_dl, _gvr_max, _gvr_cap)
 			size_t child_depth = ng_findDisplayEntryByName(name_buf);
+			if (child_depth == SIZE_MAX)
+			{
+				// s28 w2-occupied-depth: a SWF-5 keep-both entry lives in its
+				// occupant's under chain, not in a display_list slot. Same
+				// resolution as a slot entry: a non-scriptable (shape) name
+				// aliases the parent, a sprite resolves to its own MC.
+				extern DisplayObject* ng_findUnderEntryByName(const char* name, int* out_scriptable);
+				int _ue_scr = 0;
+				DisplayObject* _ue = ng_findUnderEntryByName(name_buf, &_ue_scr);
+				if (_ue != NULL)
+				{
+					extern MovieClip root_movieclip;
+					MovieClip* _ue_mc = _ue_scr
+						? findOrCreateMovieClip(app_context, name_buf, &root_movieclip) : NULL;
+					_GV_RDL_LEAVE();
+					if (!_ue_scr) {
+						g_shape_alias_resolution = 1;
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+						return;
+					}
+					if (_ue_mc != NULL) {
+						g_shape_alias_resolution = 0;
+						_ue_mc->display_obj = (void*)_ue;
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ue_mc);
+						return;
+					}
+				}
+			}
 			if (child_depth == SIZE_MAX) _GV_RDL_LEAVE();
 			if (child_depth != SIZE_MAX)
 			{

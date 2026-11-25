@@ -4148,6 +4148,10 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 	{
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
+		// s28 w2-occupied-depth: SWF-5 keep-both entries compose as siblings
+		// of this entry, under the same parent (1-element list walk).
+		if (obj->ng_under != NULL)
+			compose_children(app_context, obj->ng_under, 0, parent_composed, parent_cx, parent_cxform_id);
 
 		Character* ch = &dictionary[obj->char_id];
 
@@ -4760,6 +4764,21 @@ static int g_tf_filter_depth = -1;
 static int g_tf_filter_max_depth = 0;
 static void tf_draw_filtered_root_entry(SWFAppContext* app_context);
 #endif
+
+// s28 w2-occupied-depth: compose a ROOT entry's SWF-5 keep-both chain. Root
+// entries have no parent matrix (identity) and no parent colour transform;
+// compose_children's per-frame override slots handle the rest exactly as for
+// a nested child.
+static void ng_compose_root_under(SWFAppContext* app_context, DisplayObject* obj)
+{
+	static const float ident[16] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	compose_children(app_context, obj->ng_under, 0, ident, NULL, 0);
+}
 
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
@@ -5730,6 +5749,8 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
+		// s28 w2-occupied-depth: SWF-5 keep-both entries draw BEHIND this one.
+		if (obj->ng_under != NULL) render_display_list(app_context, obj->ng_under, 0);
 
 		// AVM1 setMask pairing (mask defect B). One branch when nothing in the
 		// movie ever called setMask.
@@ -9714,6 +9735,10 @@ static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, fl
 static int offscreen_attached_pass_member(MovieClip* mc)
 {
 	extern MovieClip root_movieclip;
+	// s28 w2-occupied-depth: a SWF-5 keep-both entry is drawn by its
+	// occupant's walk (ng_under), never as a standalone attached clip.
+	if (mc->display_obj != NULL && ((DisplayObject*)mc->display_obj)->ng_is_under)
+		return 0;
 	if (mc->parent == &root_movieclip) return 1;
 	MovieClip* p = mc->parent;
 	if (p == NULL) return 0;
@@ -9826,6 +9851,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	{
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
+		if (obj->ng_under != NULL) ng_compose_root_under(app_context, obj);   // s28 SWF-5 keep-both
 		Character* ch = &dictionary[obj->char_id];
 		// cacheAsBitmap PixelSnapping::Always for a ROOT LEAF entry. Sprites
 		// and buttons snap through cab_snap_world in their own arms below
@@ -9980,6 +10006,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			tf_draw_at_root_depth(app_context, (int) i, (int) max_depth);
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
+		if (obj->ng_under != NULL) render_display_list(app_context, obj->ng_under, 0);   // s28 SWF-5 keep-both (behind)
 		// AVM1 setMask pairing (mask defect B) — see render_display_list.
 		MovieClip* avm1_masker = NULL;
 		if (actionAvm1MaskPairCount() != 0) {
@@ -10350,6 +10377,7 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
 	uintptr_t dobj = (uintptr_t)_content;
 	if (dobj >= dl_lo && dobj < dl_hi) return;
+	if (_content->ng_is_under) return;   // s28 keep-both: drawn via its occupant
 
 	DisplayObject* d = _content;
 	if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) return;
@@ -10944,6 +10972,7 @@ void tagShowFrame(SWFAppContext* app_context)
 	{
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
+		if (obj->ng_under != NULL) ng_compose_root_under(app_context, obj);   // s28 SWF-5 keep-both
 
 		Character* ch = &dictionary[obj->char_id];
 		// cacheAsBitmap PixelSnapping::Always for a ROOT LEAF entry. Sprites
@@ -11121,6 +11150,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		{
 			continue;
 		}
+		if (obj->ng_under != NULL) render_display_list(app_context, obj->ng_under, 0);   // s28 SWF-5 keep-both (behind)
 
 		// AVM1 setMask pairing (mask defect B) — see render_display_list.
 		MovieClip* avm1_masker = NULL;
@@ -12652,6 +12682,128 @@ static void ng_script_only_place(SWFAppContext* app_context, size_t depth, size_
 }
 #endif
 
+// s28 w2-occupied-depth: Flash's SWF <= 5 keep-both rule for a PlaceObject
+// (Move=0, HasCharacter=1) onto an occupied depth.
+//
+// Measured on FP32 (direct pinned) with gnash misc-ming place_object_test
+// (SWF 5): both objects stay, the NEWCOMER goes BEHIND the occupant, both are
+// addressable by name and report the same getDepth() (`#passed: 7`). The same
+// SWF with only the header version byte patched to 6/7/8/10 refuses the
+// newcomer (`#passed: 3 #failed: 4`), which is the Ruffle/our SWF6+ path
+// below. Flash never prints Ruffle's "Failed to place object" log line.
+//
+// Mechanism (an "under chain", not a sub-depth key): display_list is a dense
+// array keyed by depth, which every walk (render, advance, name lookup,
+// remove, swapDepths) indexes directly, so a fractional sub-depth would have
+// to be taught to all of them. Instead the newcomer is built by the ORDINARY
+// fresh-place path (so naming, MC creation, eager sprite init and the
+// child list all come from the code every other placement uses) with the
+// occupant parked aside, then moved into a standalone heap DisplayObject
+// chained off the occupant's `ng_under` and the occupant is restored. The
+// render walks (render_display_list + the two root loops) draw the chain
+// behind the occupant, and compose_children / ng_compose_root_under compose
+// it as a sibling under the same parent. Semantics on the pair:
+//   - the occupant keeps the depth slot: getInstanceAtDepth / swapDepths /
+//     a later Move=1 modify / RemoveObject act on it; removing it drops the
+//     whole depth (clear_display_entry clears the chain);
+//   - the newcomer's MovieClip keeps its name and AS depth (getDepth() ==
+//     the occupant's) and points at the heap entry (this loop).
+// Not modelled (no corpus row exercises them; Flash unpinned): hit-testing
+// the under entry, advancing a multi-frame under sprite's timeline, and
+// depth-keyed queued events (clip LOAD / registerClass ctor) for the
+// newcomer, which resolve through display_list[depth] to the occupant.
+static int ng_keep_both_applies(void)
+{
+	extern int g_swf_version;
+	return g_swf_version > 0 && g_swf_version <= 5;
+}
+
+static void ng_place_under_park(size_t depth, DisplayObject* parked)
+{
+	*parked = display_list[depth];
+	memset(&display_list[depth], 0, sizeof(DisplayObject));
+}
+
+static void ng_place_under_restore(SWFAppContext* app_context, size_t depth,
+                                   const DisplayObject* parked)
+{
+	extern MovieClip root_movieclip;
+	DisplayObject* slot = &display_list[depth];
+	DisplayObject* under = NULL;
+	if (slot->char_id != 0)
+	{
+		// Finish the newcomer's init now, while it still owns the slot: the
+		// ShowFrame init pass walks display_list and would never reach the
+		// heap entry.
+		if (slot->sprite_needs_init)
+		{
+			MovieClip* parent = g_current_context ? g_current_context : &root_movieclip;
+			process_sprite_init_at_depth(app_context, parent, depth);
+			slot = &display_list[depth];
+		}
+		under = (DisplayObject*) malloc(sizeof(DisplayObject));
+		if (under != NULL)
+		{
+			*under = *slot;
+			under->ng_under = NULL;
+			under->ng_is_under = 1;
+			// An unnamed newcomer's MC is keyed "__anon_depth_N__", the same
+			// key as an unnamed occupant's; rebinding that would steal the
+			// occupant's MC, so only a distinctly named newcomer is rebound.
+			if (under->instance_name != NULL
+			    && (parked->instance_name == NULL
+			        || strcmp(under->instance_name, parked->instance_name) != 0))
+			{
+				extern MovieClip* child_mc_cache[];
+				extern int child_mc_count;
+				for (int ci = 0; ci < child_mc_count; ci++) {
+					MovieClip* m = child_mc_cache[ci];
+					if (m == NULL || m->depth == INT_MIN) continue;
+					if (m->display_obj != (void*) slot) continue;
+					if (strcmp(m->name, under->instance_name) != 0) continue;
+					m->display_obj = (void*) under;
+				}
+			}
+		}
+	}
+	display_list[depth] = *parked;
+	if (under != NULL)
+	{
+		DisplayObject** tail = &display_list[depth].ng_under;
+		while (*tail != NULL) tail = &(*tail)->ng_under;
+		*tail = under;
+	}
+}
+
+// Name lookup into the current list's SWF-5 keep-both chains (the
+// display_list slot scans never see them). Returns the lowest-depth match;
+// *out_scriptable mirrors ng_isScriptableAtDepth for the entry (sprite, button,
+// edit text, video), else the name aliases the parent like a named shape.
+DisplayObject* ng_findUnderEntryByName(const char* name, int* out_scriptable)
+{
+	extern int ng_find_button(size_t char_id);
+	extern int ng_find_textfield(size_t char_id);
+	extern int ng_find_video(size_t char_id);
+	if (out_scriptable != NULL) *out_scriptable = 0;
+	if (name == NULL || display_list == NULL) return NULL;
+	for (size_t d = 0; d <= max_depth; d++)
+	{
+		if (display_list[d].char_id == 0) continue;
+		for (DisplayObject* u = display_list[d].ng_under; u != NULL; u = u->ng_under)
+		{
+			if (u->char_id == 0 || u->instance_name == NULL) continue;
+			if (!swf_name_match(u->instance_name, name)) continue;
+			if (out_scriptable != NULL)
+				*out_scriptable = (dictionary[u->char_id].type == CHAR_TYPE_SPRITE)
+					|| ng_find_button(u->char_id)
+					|| (ng_find_textfield(u->char_id) >= 0)
+					|| ng_find_video(u->char_id);
+			return u;
+		}
+	}
+	return NULL;
+}
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth, u8 is_replace)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -12857,12 +13009,24 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	    && !g_loopback_replay
 	    && !catch_up_backward)
 	{
-		// Match Ruffle's avm_warning on a refused Place (and the existing
-		// same-frame check at ~line 5362, which this earlier-firing gate would
-		// otherwise mask — e.g. avm1/placeobject_occupied_depth expects two
-		// such lines on stdout).
-		if (!g_nested_loopback_quiet)
+		// SWF <= 5: Flash keeps both (newcomer behind). See
+		// ng_place_under_restore.
+		if (ng_keep_both_applies())
+		{
+			// SWF <= 5 keeps both, but FP32 (ErrorReporting) still prints
+			// the warning (s28 coordinator capture, place_object_test.logwarn).
 			printf("Warning: Failed to place object at depth %zu.\n", depth);
+			DisplayObject parked;
+			ng_place_under_park(depth, &parked);
+			tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth, is_replace);
+			ng_place_under_restore(app_context, depth, &parked);
+			return;
+		}
+		// SWF >= 6: refuse the newcomer. Flash's debug player prints this
+		// warning under ErrorReportingEnable (the corpus convention: FP32
+		// --log-warnings == avm1/placeobject_occupied_depth's golden; gnash
+		// goldens were captured without it and grade with log_warnings=false).
+		printf("Warning: Failed to place object at depth %zu.\n", depth);
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 		g_pending_instance_name = NULL;
@@ -13679,13 +13843,43 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 	// Phase 3: Refuse Place (move=0, has_character=1) of a DIFFERENT character on
 	// an already-occupied depth. See tagPlaceObject2 for full rationale.
+	//
+	// s28 w2-occupied-depth: also the SAME character re-placed from a later
+	// frame's tag stream, mirroring tagPlaceObject2's
+	// ng_same_char_forward_replace (with its replay guards, which this gate
+	// otherwise lacks). gnash misc-ming place_object_test2 frame 4: a
+	// ratio-carrying Move=0 Place of the occupant's own char 4 as
+	// "static_mc4" at depth 3 — FP32 and Ruffle both refuse it (static_mc1
+	// survives, static_mc4 stays undefined); we used to fall through and
+	// rename the occupant.
 	extern int ng_depth_has_pending_finalize(size_t);
+	extern int g_loopback_replay;
+	extern int catch_up_backward;
+	int ng_ratio_same_char_forward =
+	    (display_list[depth].char_id == char_id
+	     && display_list[depth].place_gen != g_place_gen
+	     && display_list[depth].placed_at_frame < current_frame
+	     && !catch_up_mode && !g_loopback_replay && !catch_up_backward);
 	if (char_id != 0 && !is_replace
 	    && display_list[depth].char_id != 0
-	    && display_list[depth].char_id != char_id
+	    && (display_list[depth].char_id != char_id || ng_ratio_same_char_forward)
 	    && display_list[depth].placed_at_frame <= current_frame
 	    && !ng_depth_has_pending_finalize(depth))
 	{
+		// SWF <= 5 keep-both (see ng_place_under_restore). This gate lacks
+		// tagPlaceObject2's replay guards, so keep-both additionally requires
+		// a forward (non-replay) execution; a replay keeps the old refusal.
+		if (ng_keep_both_applies() && !g_loopback_replay && !catch_up_backward)
+		{
+			// SWF <= 5 keeps both, but FP32 (ErrorReporting) still prints
+			// the warning (s28 coordinator capture, place_object_test.logwarn).
+			printf("Warning: Failed to place object at depth %zu.\n", depth);
+			DisplayObject parked;
+			ng_place_under_park(depth, &parked);
+			tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio, is_replace);
+			ng_place_under_restore(app_context, depth, &parked);
+			return;
+		}
 		printf("Warning: Failed to place object at depth %zu.\n", depth);
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
@@ -14871,6 +15065,22 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	{
 		display_list[depth].sticky_char_id = display_list[depth].char_id;
 		display_list[depth].sticky_button_state = display_list[depth].button_state;
+	}
+	// s28 w2-occupied-depth: removing the occupant removes the whole depth,
+	// including any SWF-5 keep-both entries chained behind it. Their MCs
+	// die with it (the heap entries are not freed: a dead MC's display_obj
+	// may still be read).
+	if (display_list[depth].ng_under != NULL)
+	{
+		extern MovieClip* child_mc_cache[];
+		extern int child_mc_count;
+		for (DisplayObject* u = display_list[depth].ng_under; u != NULL; u = u->ng_under)
+			for (int ci = 0; ci < child_mc_count; ci++) {
+				MovieClip* m = child_mc_cache[ci];
+				if (m != NULL && m->depth != INT_MIN && m->display_obj == (void*) u)
+					actionInvalidateCachedMovieClipDirect(app_context, m);
+			}
+		display_list[depth].ng_under = NULL;
 	}
 	display_list[depth].char_id = 0;
 	display_list[depth].transform_id = 0;

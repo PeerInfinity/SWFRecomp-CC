@@ -1,0 +1,9 @@
+# s28 w2-occupied-depth fixture. Goldens = Flash Player 32 (coordinator capture): trace direct pinned WITHOUT
+# ErrorReporting (log_warnings = false: our "Failed to place" warnings are stripped), image draw() wrapper.
+# Known 1-line gap at landing: SWF 5 has no MovieClip.getDepth (Flash prints empty values) -> w3 fix slot.
+num_frames = 1
+log_warnings = false
+
+[image_comparisons.output]
+tolerance = 1
+max_outliers = 0

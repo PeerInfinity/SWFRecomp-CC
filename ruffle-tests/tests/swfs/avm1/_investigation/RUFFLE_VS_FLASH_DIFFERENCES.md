@@ -1109,3 +1109,17 @@ render vs the Flash golden: 230 channels > 48 (glyph raster only); Ruffle's unti
 **Decision:** match Flash (keep the tint). The fixture's `output.expected.png` is the Flash capture (tolerance 48,
 max_outliers 500), so a regression to Ruffle's untinted rect fails by ~12x the budget.
 
+
+## s28: PlaceObject onto an occupied depth — SWF 5 keeps both; and the "Failed to place" warning is Flash (ErrorReporting)
+
+- **SWF ≤ 5:** Flash 32 keeps BOTH objects placed at one depth, the newcomer BEHIND the occupant (gnash
+  `place_object_test` xtrace `#passed: 7`; the same SWF with its version byte patched to 6/7/8/10 refuses, `#passed: 3`).
+  Ruffle refuses at every version. We now match Flash (`tag.c` ng_under chain, s28 `w2-occupied-depth`).
+- **The warning line:** `Warning: Failed to place object at depth N.` is printed by Flash's DEBUG player when
+  `ErrorReportingEnable=1` (FP32 `--log-warnings` == `avm1/placeobject_occupied_depth`'s golden byte for byte; it prints
+  it even on the SWF-5 keep-both path). Ruffle-authored goldens are captured that way (`log_warnings` defaults true);
+  gnash goldens were captured WITHOUT ErrorReporting (they also lack Flash's other warnings). We keep printing it, and
+  the 3 gnash rows get `log_warnings = false` via `flash_fixes` (test.toml) so it is stripped there.
+- Evidence: `SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/` and
+  `…/w1-render-flash-headroom/` (2026-11-25). An earlier s28 note ("Flash never prints it") was a harness artifact
+  (captures without ErrorReporting).

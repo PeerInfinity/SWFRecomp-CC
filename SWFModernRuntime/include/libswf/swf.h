@@ -369,6 +369,19 @@ typedef struct DisplayObject
 	// with cm_live.
 	u8 cm_folded;
 	u32 cm_plain_cxform_id;
+
+	// s28 w2-occupied-depth: SWF <= 5 keep-both rule. Flash 5-era players keep a
+	// PlaceObject (Move=0) whose depth is already occupied: the newcomer is
+	// inserted BEHIND the occupant and both stay rendered and addressable
+	// (FP32 on gnash misc-ming place_object_test: `#passed: 7`; the same SWF
+	// patched to v6+ refuses the newcomer). The newcomer lives in a standalone
+	// heap DisplayObject chained here (deepest last); the render walks draw the
+	// chain behind this entry. NULL for every SWF >= 6 movie. See tag.c
+	// ng_place_under_occupant.
+	struct DisplayObject* ng_under;
+	// 1 on a keep-both heap entry itself (it is drawn by its occupant's
+	// render walk; the root-attached-MC passes must not draw it again).
+	u8 ng_is_under;
 } DisplayObject;
 
 typedef struct KeyState {
