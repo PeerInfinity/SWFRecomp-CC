@@ -1,19 +1,34 @@
 # Ruffle Test Results Diff
 
-**Previous:** `16033a154646` (2026-11-25T22:36:53.004806+00:00)
-**Current:** `b030ed745d4f` (2026-11-26T00:30:59.151015+00:00)
+**Previous:** `b030ed745d4f` (2026-11-26T00:30:59.151015+00:00)
+**Current:** `4a25debc987e` (2026-11-26T04:57:43.324357+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1304 | 1305 | +1 |
-| Total | 1347 | 1348 | +1 |
-| Pass rate | 96.8% | 96.8% | 0% |
-| Mismatched lines | 1669 | 1669 | 0 |
+| Passing | 1305 | 1306 | +1 |
+| Total | 1348 | 1351 | +3 |
+| Pass rate | 96.8% | 96.7% | -0.1% |
+| Mismatched lines | 1669 | 1664 | -5 |
+|   Decreased | | | -8 |
 
-## Added Tests (1)
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `mouse_pick_avm1_root` | output_mismatch | 1/2 | 2/2 |
+
+## Added Tests (3)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `pixelbender_ordered_dither` | pass | 16/16 |
+| `timer_checks_per_frame` | timeout | - |
+| `timer_tie_order` | timeout | - |
+| `timer_timeout_ids` | output_mismatch | 8/11 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `avm1_root` | output_mismatch | 5/58 | 12/58 | -7 |

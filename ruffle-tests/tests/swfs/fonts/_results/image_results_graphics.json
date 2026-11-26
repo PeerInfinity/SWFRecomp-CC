@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-26T00:31:02.326120+00:00",
+    "timestamp": "2026-11-26T04:57:44.932403+00:00",
     "suite": "fonts",
     "stem": "results_graphics",
-    "git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
+    "git_sha": "4a25debc987ecbd0c8bc286bb498428558cc5a49",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45718037295",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45718037295",
+    "run_id": "45750698566",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45750698566",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 5,
