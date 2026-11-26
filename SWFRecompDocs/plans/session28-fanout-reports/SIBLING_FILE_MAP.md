@@ -20,3 +20,4 @@
 | w2b-avm2-d2a | `avm2_number.c` number→string (`avm2_format_number`, toFixed/toExponential/toPrecision/radix) |
 | w2b-stroke-width-merge | `render_webgpu.c` `hairline_restage` + new `hairline_flash_offset`; recompiler `swf.hpp` `LineStyle` / `swf.cpp` LINESTYLE2 (via `stroke_run_flags[]`) |
 | w3-interim2-regressions | `action.c` `builtin_string_proto_valueOf`/`stringValueOfFunc`, `builtin_asnative`, MovieClip method version gates |
+| w3-enterframe-root-goto | `action.c` `actionGotoFrame` `g_inside_enterframe_dispatch` arm |
