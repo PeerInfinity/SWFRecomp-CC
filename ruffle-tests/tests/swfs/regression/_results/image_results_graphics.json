@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-26T00:31:02.407975+00:00",
+    "timestamp": "2026-11-26T04:57:44.975952+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
+    "git_sha": "4a25debc987ecbd0c8bc286bb498428558cc5a49",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45718037295",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45718037295",
+    "run_id": "45750698566",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45750698566",
     "run_attempt": "1"
   },
-  "tests_with_comparisons": 84,
-  "comparisons": 84,
+  "tests_with_comparisons": 87,
+  "comparisons": 87,
   "ignored": 0,
-  "pass": 77,
-  "fail": 4,
+  "pass": 82,
+  "fail": 2,
   "skip": 3,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 91.7,
+  "pass_rate": 94.3,
   "results": [
     {
       "suite": "regression",
@@ -449,6 +449,66 @@
     },
     {
       "suite": "regression",
+      "test": "avm1_drawapi_stroke_snap",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 2442 outliers (limit 2800), max difference 143",
+      "max_diff": 143,
+      "expected_source": "repo",
+      "width": 450,
+      "height": 220,
+      "total_channels": 396000,
+      "diff_channels": 3528,
+      "mean_diff": 0.2673,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 2800,
+          "outliers": 2442,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 2442,
+      "max_outliers": 2800,
+      "tolerance": 2,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_drawing_stroke_scale",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 12315 outliers (limit 14000), max difference 239",
+      "max_diff": 239,
+      "expected_source": "repo",
+      "width": 480,
+      "height": 360,
+      "total_channels": 691200,
+      "diff_channels": 13383,
+      "mean_diff": 0.9799,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 14000,
+          "outliers": 12315,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 12315,
+      "max_outliers": 14000,
+      "tolerance": 2,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
       "test": "avm1_dynclip_color_transform",
       "comparison": "output",
       "trace_status": "pass",
@@ -753,30 +813,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 1533 outliers exceed limit of 0, max difference 136",
-      "reason": "pixel_mismatch",
-      "max_diff": 136,
+      "status": "pass",
+      "message": "Image check passed: 366 outliers (limit 366), max difference 181",
+      "max_diff": 181,
       "expected_source": "repo",
       "width": 200,
       "height": 150,
       "total_channels": 120000,
-      "diff_channels": 1533,
-      "mean_diff": 0.5193,
+      "diff_channels": 366,
+      "mean_diff": 0.2977,
       "checks": [
         {
           "tolerance": 0,
-          "max_outliers": 0,
-          "outliers": 1533,
-          "passed": false
+          "max_outliers": 366,
+          "outliers": 366,
+          "passed": true
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 1,
-      "outliers": 1533,
-      "max_outliers": 0,
+      "failed_checks": 0,
+      "outliers": 366,
+      "max_outliers": 366,
       "tolerance": 0,
-      "excess_outliers": 1533
+      "excess_outliers": 0
     },
     {
       "suite": "regression",
@@ -1450,30 +1509,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 1952 outliers exceed limit of 0, max difference 191",
-      "reason": "pixel_mismatch",
-      "max_diff": 191,
+      "status": "pass",
+      "message": "Image check passed: 56 outliers (limit 56), max difference 112",
+      "max_diff": 112,
       "expected_source": "repo",
       "width": 200,
       "height": 100,
       "total_channels": 80000,
-      "diff_channels": 1952,
-      "mean_diff": 2.699,
+      "diff_channels": 56,
+      "mean_diff": 0.0295,
       "checks": [
         {
           "tolerance": 0,
-          "max_outliers": 0,
-          "outliers": 1952,
-          "passed": false
+          "max_outliers": 56,
+          "outliers": 56,
+          "passed": true
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 1,
-      "outliers": 1952,
-      "max_outliers": 0,
+      "failed_checks": 0,
+      "outliers": 56,
+      "max_outliers": 56,
       "tolerance": 0,
-      "excess_outliers": 1952
+      "excess_outliers": 0
     },
     {
       "suite": "regression",
@@ -1532,6 +1590,36 @@
       "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
+      "tolerance": 2,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm2_drawapi_stroke_snap",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 2559 outliers (limit 2950), max difference 143",
+      "max_diff": 143,
+      "expected_source": "repo",
+      "width": 450,
+      "height": 220,
+      "total_channels": 396000,
+      "diff_channels": 3660,
+      "mean_diff": 0.2965,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 2950,
+          "outliers": 2559,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 2559,
+      "max_outliers": 2950,
       "tolerance": 2,
       "excess_outliers": 0
     },
