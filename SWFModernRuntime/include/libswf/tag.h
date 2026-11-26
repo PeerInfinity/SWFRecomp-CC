@@ -369,6 +369,7 @@ void ng_ensureDisplayListSize(SWFAppContext* app_context, size_t depth);
 // registered holder of pointers into it, then FREEs. Raw FREE() strands them.
 void ng_freeSpriteDL(SWFAppContext* app_context, DisplayObject* base, size_t cap);
 void ng_gotoFrameCurrentSprite(u16 frame);
+void ng_setStubAppContext(SWFAppContext* app_context);
 void ng_record_sprite_self_goto(DisplayObject* obj);
 void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);
 size_t ng_getSpriteFrameCount(void);

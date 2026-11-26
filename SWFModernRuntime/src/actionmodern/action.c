@@ -79006,80 +79006,32 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 						if (is_play) is_playing = 1;
 					}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+					// Browser only: gotoAndStop(N) on a clip already showing N
+					// rebuilds nothing, but still STOPS it (Flash: a goto to the
+					// current frame is a no-op beyond the stop). Without it, Doodle
+					// Jump's breakable re-calls block.gotoAndStop(4) on every
+					// re-collision and each call re-placed the break piece (charId 37)
+					// at _y=0, restarting its fall and pinning the platform's
+					// collision bounds at the hero. N's tileMC (attach, then
+					// gotoAndStop(1) on frame 1) needs the stop. CI's
+					// ng_gotoFrameByMC same-frame branch re-runs the frame's tags
+					// instead (open question, s28 browser-attached-goto report §4).
+					else if (!is_play && mc->display_obj != NULL &&
+					         mc->currentframe == (int)frame0 + 1) {
+						((DisplayObject*)mc->display_obj)->sprite_is_playing = 0;
+					}
+#endif
+					// Every build since s28 browser-attached-goto. The browser used
+					// to defer an attachMovie'd clip's goto to a tagShowFrame pass
+					// (advance_attached_clip_frames, deleted) whenever
+					// ng_gotoFrameByMC declined it.
 					else if (actionChildMovieGoto(app_context, mc, frame0, is_play)) {
 						// s26: a loaded movie's holder -- its own playhead.
 					} else if (!ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
 						actionGotoFrame(app_context, frame0);
 						if (is_play) is_playing = 1;
 					}
-#else
-					else {
-						{
-							// Browser-WASM: MC-targeted gotoAndStop/Play
-							// (mc != &root_movieclip). Do NOT call
-							// actionGotoFrame here — it treats
-							// targeted_sprite==NULL as a ROOT goto and sets
-							// next_frame/manual_next_frame on the root
-							// timeline. For Doodle Jump, attached platform
-							// MCs' physics handler calls block.gotoAndStop(1)
-							// every hit, which would otherwise advance the
-							// root timeline (e.g., to frame_2 gameover) and
-							// terminate gameplay in under a second. Set the
-							// sprite-local navigation fields on the MC's
-							// display_obj instead. For timeline-placed
-							// sprites the display_obj is in display_list and
-							// advance_sprite_frames consumes the flags; for
-							// attached MCs the display_obj is a standalone
-							// allocation, and the goto is effectively a
-							// no-op (cloud platforms are single-frame).
-							if (mc != NULL && mc->display_obj != NULL) {
-								DisplayObject* dobj = (DisplayObject*)mc->display_obj;
-								// Flash: gotoAndStop(N) while already stopped on frame N
-								// is a no-op — it does NOT re-run the frame's content.
-								// For attachMovie'd clips, re-running rebuilds the
-								// sub-list and RESETS any playing nested clip. Doodle
-								// Jump's breakable: the break handler re-calls
-								// block.gotoAndStop(4) on EVERY re-collision; without
-								// this guard each call re-places the break piece
-								// (charId 37) at _y=0, restarting its fall animation
-								// and pinning the platform's collision bounds at the
-								// hero forever. Skip when already settled on frame N.
-								// (Guard on the 1-indexed currentframe, which
-								// ng_gotoFrameByMC keeps in sync — sprite_current_frame
-								// is the *next* frame to run, not the displayed one.)
-								if (!is_play && mc->currentframe == (int)frame0 + 1) {
-									// already on this frame — no rebuild, but still
-									// STOP it: gotoAndStop(N) on a PLAYING clip that
-									// shows N stops it in Flash. Since s24 attached
-									// clips really play (shared attached-clip pump), so
-									// N's tileMC (attach, then gotoAndStop(1) while on
-									// frame 1) kept animating its 34 tile frames.
-									dobj->sprite_is_playing = 0;
-								}
-								// Tetris board cells (b_mc.attachMovie("block",...)
-								// then b_mc[pos].gotoAndStop(color+1)) need the
-								// attached clip's display list REBUILT to the target
-								// frame's content — the old flag-only path left every
-								// cell on frame 0 (the empty "bang_mc"), so the board
-								// and falling piece rendered blank. ng_gotoFrameByMC
-								// runs the frame funcs synchronously into the MC's
-								// standalone sprite_display_list (and, unlike
-								// actionGotoFrame, never touches the root timeline, so
-								// the Doodle Jump concern above is moot).
-								else if (!ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
-									// Fallback for clips ng_gotoFrameByMC can't handle
-									// (no name, or no display content): record the
-									// target so a later pump can pick it up.
-									dobj->sprite_next_frame = (size_t)frame0;
-									dobj->sprite_manual_next_frame = 1;
-									dobj->sprite_is_playing = is_play ? 1 : 0;
-									mc->currentframe = frame0 + 1;
-								}
-							}
-						}
-					}
-#endif
 				}
 			}
 			if (args != NULL) FREE(args);

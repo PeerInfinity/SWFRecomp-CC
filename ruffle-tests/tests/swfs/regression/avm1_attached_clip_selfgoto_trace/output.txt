@@ -1,0 +1,14 @@
+root f1 h.cf=1
+a f1
+a f2
+root f2 h.cf=4
+a f4 cf=4
+a f5
+root f3 h.cf=6
+a f6 cf=6
+root f4 h.cf=6
+root f5 h.cf=6
+root f6 h.cf=6
+root f7 h.cf=6
+root f8 h.cf=6
+root f9 h.cf=6

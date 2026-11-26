@@ -1107,8 +1107,7 @@ void tagMain(SWFAppContext* app_context)
 		// Browser-WASM: the same pump (s24 browser follow-up; before it these
 		// clips froze on frame 1 there). Clips attached this tick are skipped
 		// until ng_promote_attached_playheads at the end of the tick, and a
-		// pending manual nav is left to advance_attached_clip_frames
-		// (tagShowFrame).
+		// pending manual nav is left to ng_apply_pending_sprite_self_gotos.
 		{
 			extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
 			ng_advance_attached_clip_playheads(app_context);
@@ -1306,6 +1305,14 @@ void tagMain(SWFAppContext* app_context)
 			advance_nested_sprite_frames(app_context);
 		}
 		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+		// s28 browser-attached-goto: the OFFSCREEN slot's self-goto apply pass.
+		// In this build it applies attachMovie'd roots only (the goto an
+		// attached clip's frame script could not run inline); timeline sprites
+		// keep the deferred advance_sprite_frames path (tag.c).
+		{
+			extern void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);
+			ng_apply_pending_sprite_self_gotos(app_context);
+		}
 		{
 			extern void actionMarkDynamicMCsEnterFrameEligible(void);
 			actionMarkDynamicMCsEnterFrameEligible();
@@ -1923,6 +1930,7 @@ void ng_predeclareChildBitmaps(void)
 
 void swfStart(SWFAppContext* app_context)
 {
+	ng_setStubAppContext(app_context);
 	// Multi-SWF render slice: fold every linked child movie's geometry and
 	// style arrays into the root's, so what the renderer uploads below covers
 	// all of them. No-op unless a child movie carries render tables.

@@ -1197,6 +1197,25 @@ void ng_playCurrentSprite(void)
 		g_current_sprite_obj->sprite_is_playing = 1;
 }
 
+// The movie's app context, for the opcode-goto entry points below that the
+// action layer calls without one (ng_gotoFrameCurrentSprite). Set by swfStart.
+static SWFAppContext* g_ng_stub_app = NULL;
+void ng_setStubAppContext(SWFAppContext* app_context) { g_ng_stub_app = app_context; }
+
+// The MovieClip whose display_obj is this unnamed holder: an attachMovie'd
+// clip's root entry (ng_attachMovie never names the holder). NULL otherwise.
+static MovieClip* ng_mc_for_unnamed_holder(DisplayObject* obj)
+{
+	if (obj == NULL || obj->instance_name != NULL) return NULL;
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* c = child_mc_cache[i];
+		if (c != NULL && c->display_obj == (void*)obj && c->depth != INT_MIN) return c;
+	}
+	return NULL;
+}
+
 void ng_gotoFrameCurrentSprite(u16 frame)
 {
 	DisplayObject* obj = g_current_sprite_obj;
@@ -1207,6 +1226,28 @@ void ng_gotoFrameCurrentSprite(u16 frame)
 	// Clamp to last frame
 	if (frame >= ch->sprite_frame_count)
 		frame = (u16)(ch->sprite_frame_count - 1);
+	// An attachMovie'd clip's OWN frame script navigating itself (GotoFrame /
+	// GoToLabel opcode): apply it NOW, through the same path as the method
+	// form (`this.gotoAndPlay(n)` -> ng_gotoFrameByMC). Flash moves the playhead
+	// inline: the rest of the script and every later script this tick read the
+	// target's _currentframe, and the target's DoAction runs after the calling
+	// script, once. Left to the post-drain apply pass, the root read the
+	// issuing frame and the target DoAction ran under it (both CI modes); the
+	// browser's deferred tagShowFrame pass also ran it a second time.
+	// gotoAndStop semantics (play=0): gotoAndPlay's trailing Play opcode resumes
+	// via ng_playCurrentSprite on g_current_sprite_obj, which is restored here.
+	// Fixture: regression/avm1_attached_clip_selfgoto_trace (Flash 32 golden).
+	if (!catch_up_mode && g_ng_stub_app != NULL)
+	{
+		MovieClip* att = ng_mc_for_unnamed_holder(obj);
+		if (att != NULL)
+		{
+			DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+			int ok = ng_gotoFrameByMC(g_ng_stub_app, att, frame, 0);
+			g_current_sprite_obj = saved_sprite_obj;
+			if (ok) return;
+		}
+	}
 	obj->sprite_manual_next_frame = 1;
 	obj->sprite_next_frame = frame;
 	obj->sprite_is_playing = 0;
@@ -1215,13 +1256,11 @@ void ng_gotoFrameCurrentSprite(u16 frame)
 	// scripts are queued and drained AFTER advance_sprite_frames, so the manual
 	// flag is set too late for that pass — left to the next tick it produces a
 	// one-tick-late goto + a stutter. See ng_apply_pending_sprite_self_gotos.
-	// Scoped to the two modes whose pump calls the apply pass (swf_core.c /
-	// swf.c-OFFSCREEN_RENDER); browser-WASM keeps the established deferred path so
-	// the recorder never accumulates stale entries no apply pass would clear.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Every build: the browser's swf.c calls the apply pass too since s28
+	// browser-attached-goto. There it applies only attachMovie'd roots (the
+	// timeline-sprite port is still open) and drops the other entries each tick.
 	extern void ng_record_sprite_self_goto(DisplayObject* obj);
 	ng_record_sprite_self_goto(obj);
-#endif
 
 	// Phase B (GOTO_FIFO_UNIFICATION_INCREMENTAL): record the resolved
 	// target-frame script onto the deferred sprite-script queue. Nothing

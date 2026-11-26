@@ -2502,9 +2502,7 @@ void ng_record_sprite_self_goto(DisplayObject* obj)
 
 void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) { g_self_goto_count = 0; return; }
-#endif
 	size_t n = g_self_goto_count;
 	g_self_goto_count = 0;   // consume now so replays below don't re-enter the list
 	for (size_t i = 0; i < n; i++)
@@ -2529,6 +2527,13 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 		// top-of-loop path handles it next tick exactly as before. An attached
 		// root has no deferred path, so its gotoAndStop is applied here too.
 		if (!obj->sprite_manual_next_frame || (!obj->sprite_is_playing && att_mc == NULL)) continue;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser (s28 browser-attached-goto): attached roots only. A timeline
+		// sprite's self-goto keeps the browser's deferred advance_sprite_frames
+		// path: applying it here dropped a nested sprite from enumeration
+		// (browser-root-goto report §5a), not yet bisected.
+		if (att_mc == NULL) continue;
+#endif
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count == 0) continue;
 
@@ -2551,6 +2556,16 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 		max_depth = obj->sprite_max_depth;
 		display_list_capacity = obj->sprite_dl_capacity;
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser: retire the child MovieClips of the entries freed below, so
+		// they don't orphan in child_mc_cache (the replay re-materializes the
+		// target frame's placements). From the deleted advance_attached_clip_frames.
+		for (size_t j = 1; j <= max_depth; ++j)
+		{
+			if (display_list[j].char_id != 0)
+				invalidate_mc_for_dl_entry(app_context, &display_list[j]);
+		}
+#endif
 		for (size_t j = 1; j <= max_depth; ++j)
 		{
 			if (display_list[j].sprite_display_list != NULL)
@@ -2599,6 +2614,40 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 				MovieClip* parent_for_init = att_mc ? att_mc : ng_mc_for_sprite_obj(obj);
 				process_sprite_needs_init(app_context, parent_for_init ? parent_for_init : &root_movieclip);
 			}
+		}
+#endif
+
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser: the replay's RemoveObject2 only marked pending_remove; finalize
+		// them, then build the sprites the target frame placed (their frame 0),
+		// without advancing pre-existing siblings -- ng_gotoFrameByMC's browser
+		// tail, which the deleted advance_attached_clip_frames approximated.
+		if (att_mc)
+		{
+			for (size_t j = 1; j <= max_depth; ++j)
+			{
+				if (display_list[j].pending_remove)
+				{
+					if (display_list[j].sprite_display_list != NULL)
+					{
+						ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
+						                display_list[j].sprite_dl_capacity);
+						display_list[j].sprite_display_list = NULL;
+					}
+					display_list[j].char_id = 0;
+					display_list[j].pending_remove = 0;
+				}
+			}
+			extern int g_build_only;
+			int saved_defer = g_advance_defer_nested;
+			int saved_bo = g_build_only;
+			g_advance_defer_nested = 0;
+			g_build_only = 1;
+			actionSetCurrentContext(att_mc); actionSetBaseClip(att_mc);
+			advance_sprite_frames(app_context);
+			actionSetCurrentContext(sg_saved_ctx); actionSetBaseClip(sg_saved_base);
+			g_build_only = saved_bo;
+			g_advance_defer_nested = saved_defer;
 		}
 #endif
 
@@ -2785,127 +2834,11 @@ void presync_nested_sprite_currentframe(SWFAppContext* app_context)
 }
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-// ---------------------------------------------------------------------------
-// Browser-WASM: apply DEFERRED gotoAndStop/Play navigation to attachMovie'd
-// clips. The MC-targeted gotoAndStop handler (action.c) sets sprite-local nav
-// flags on an attached clip's standalone display_obj but does NOT execute the
-// frame inline — running it there would be reentrant (Doodle Jump calls
-// block.gotoAndStop(N) inside the levelcontainer's attachBlocks while-loop,
-// and a synchronous rebuild mid-loop caused game-overs). advance_sprite_frames
-// / advance_nested_sprite_frames only walk the root display list and timeline-
-// placed sprites, never the standalone display_obj of an attachMovie'd clip, so
-// nothing consumed those flags. This pass (called once per tick from
-// tagShowFrame, AFTER scripts/queues have drained) consumes them safely.
-//
-// For each attached clip with a pending nav flag it rebuilds the clip's own
-// sprite_display_list for the target frame, then runs advance_sprite_frames
-// over that list so any sprite the target frame placed (e.g. Doodle Jump's
-// blue moving platform: cloud frame 3 places sprite charId 32, which itself
-// contains the blue shape charId 35) gets its sub-display-list built and is
-// then recursed by render_display_list. Without the advance_sprite_frames step
-// the nested sprite stays empty and renders nothing. Gated to clips with the
-// flag set, so non-navigating attached clips (most Snake/Pong clips) are
-// untouched.
-void advance_attached_clip_frames(SWFAppContext* app_context)
-{
-	extern MovieClip* child_mc_cache[];
-	extern int child_mc_count;
-	extern size_t g_place_gen;
-	for (int i = 0; i < child_mc_count; i++)
-	{
-		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
-		DisplayObject* d = (DisplayObject*)mc->display_obj;
-		if (!d->sprite_manual_next_frame) continue;       // only pending navs
-		// Skip timeline-placed clips whose display_obj lives in the global
-		// display_list array — those are consumed by advance_sprite_frames.
-		uintptr_t dl_lo = (uintptr_t)display_list;
-		uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
-		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
-		if (d->char_id == 0) continue;
-		Character* ch = &dictionary[d->char_id];
-		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count == 0) continue;
-
-		d->sprite_manual_next_frame = 0;
-		size_t target = d->sprite_next_frame;
-		if (target >= ch->sprite_frame_count) target = ch->sprite_frame_count - 1;
-
-		DisplayObject* saved_dl = display_list;
-		size_t saved_max = max_depth;
-		size_t saved_cap = display_list_capacity;
-		MovieClip* saved_ctx = g_current_context;
-
-		display_list = d->sprite_display_list;
-		max_depth = d->sprite_max_depth;
-		display_list_capacity = d->sprite_dl_capacity;
-
-		// Full rebuild from frame 0 (gotoAndStop is a jump). Free nested
-		// sub-lists and clear so a backward jump doesn't leave stale entries.
-		// First invalidate the cached child MovieClips for the entries we're
-		// about to free, so a manual nav (gotoAndStop/Play) on an attached clip
-		// doesn't orphan its old auto-instance children in child_mc_cache (same
-		// leak as the natural loop-back in advance_sprite_frames). The rebuild
-		// below re-materializes the target frame's placements.
-		for (size_t j = 1; j <= max_depth; ++j)
-		{
-			if (display_list[j].char_id != 0)
-				invalidate_mc_for_dl_entry(app_context, &display_list[j]);
-		}
-		for (size_t j = 1; j <= max_depth; ++j)
-		{
-			if (display_list[j].sprite_display_list != NULL)
-			{
-				ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
-			                display_list[j].sprite_dl_capacity);
-				display_list[j].sprite_display_list = NULL;
-			}
-			display_list[j].char_id = 0;
-		}
-		max_depth = 0;
-
-		actionSetCurrentContext(mc);
-		g_place_gen++;
-		int saved_cm = catch_up_mode;
-		// Intermediate frames: placement tags only. The TARGET frame runs with
-		// the caller's mode so its DoAction QUEUES (drains post-frame) — Flash
-		// runs a goto's target-frame actions; ng_gotoFrameByMC (the CI path for
-		// the same goto) does the same. Queued, never inline, so the reentrancy
-		// that made this pass deferred (Doodle Jump's attachBlocks loop) cannot
-		// recur.
-		for (size_t f = 0; f <= target && f < ch->sprite_frame_count; f++)
-		{
-			catch_up_mode = (f < target) ? 1 : saved_cm;
-			if (ch->sprite_frame_funcs[f] != NULL)
-				exec_sprite_frame(app_context, d, ch->sprite_frame_funcs[f]);
-		}
-		catch_up_mode = saved_cm;
-
-		// Build/advance sprites the target frame placed (nested sub-lists).
-		advance_sprite_frames(app_context);
-
-		actionSetCurrentContext(saved_ctx);
-
-		d->sprite_display_list = display_list;
-		d->sprite_max_depth = max_depth;
-		d->sprite_dl_capacity = display_list_capacity;
-		// NEXT frame to run (the attached-root convention, see
-		// ng_record_attached_playable): gotoAndPlay(T) shows T now and the shared
-		// pump (ng_advance_attached_clip_playheads, next tick's Phase 1) runs T+1.
-		d->sprite_current_frame = (target + 1) % ch->sprite_frame_count;
-		mc->currentframe = (int)target + 1;
-
-		display_list = saved_dl;
-		max_depth = saved_max;
-		display_list_capacity = saved_cap;
-		{ extern size_t g_tick_count; d->placed_at_tick = g_tick_count; }
-	}
-}
-
 // Browser-WASM: promote sprite_initialized 1→2 inside attachMovie'd clips'
 // standalone display lists. upgrade_sprite_initialized (called from tagShowFrame)
 // only walks the global display_list, so nested sprites placed inside an attached
 // clip (e.g. Doodle Jump's blue platform charId 32 "aaa", placed by
-// advance_attached_clip_frames into the cloud's STANDALONE list) never reach 2 and
+// its goto into the cloud's STANDALONE list) never reach 2 and
 // gather_clip_ef_entries (which requires >=2) skips them — so their
 // onClipEvent(enterFrame) clip actions never fire. Run the same recursive
 // promotion over each attached clip's standalone list once per tick.
@@ -7535,7 +7468,7 @@ void tagClipEFCollectRootPass(SWFAppContext* app_context)
 // clip; its onEnterFrame clip action (clip_action_8) slides it left-right.
 //
 // Dispatch directly over each attached clip's AUTHORITATIVE standalone
-// sprite_display_list (the one advance_attached_clip_frames rebuilds), not the
+// sprite_display_list (the one an attached clip's goto rebuilds), not the
 // stale parent copy. No double-fire with the root walk for the reasons above.
 void dispatch_attached_clip_enterframe(SWFAppContext* app_context)
 {
@@ -10799,11 +10732,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	// DoAction and root scripts read stale playheads from tick 2 on. The
 	// nested pass is still what advances sprites in 1-frame containers
 	// (Pong's sprite_9 inside sprite_10, 2026-05-25-pong-browser-diagnosis).
-	{
-		// Apply deferred gotoAndStop/Play navs on attachMovie'd clips (e.g.
-		// Doodle Jump platforms) and build their nested sprite sub-lists.
-		advance_attached_clip_frames(app_context);
-	}
+	// (s28 browser-attached-goto: the deferred attached-clip goto pass that ran
+	// here is gone. An attachMovie'd clip's gotos run inline through
+	// ng_gotoFrameByMC, or in swf.c's ng_apply_pending_sprite_self_gotos, as in CI.)
 	// Upgrade sprite_initialized 1→2 so dispatch_enterframe_clip_actions
 	// fires from the next tick. tagPlaceObject2 in browser-WASM marks
 	// freshly-placed sprites as 1; this bump is the per-tick promotion

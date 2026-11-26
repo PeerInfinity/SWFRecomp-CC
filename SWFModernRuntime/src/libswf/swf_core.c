@@ -947,6 +947,7 @@ static int exec_order_nested_early(void)
 // Console-only swfStart implementation
 void swfStart(SWFAppContext* app_context)
 {
+	{ extern void ng_setStubAppContext(SWFAppContext*); ng_setStubAppContext(app_context); }
 	printf("=== SWF Execution Started (NO_GRAPHICS mode) ===\n");
 
 	// Allocate stack into app_context (use system malloc, not heap - stack is allocated before heap_init)
