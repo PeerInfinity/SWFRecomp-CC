@@ -677,7 +677,7 @@
     "fix": "visual/opaque_background/output.expected.png",
     "kind": "image",
     "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__opaque_background__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
-    "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 6248 channels over tol 1 vs Flash LOW. Ours vs Flash: master 3474, with the s28 lowq-corner-rule model 984 (s28 lowq-corner-rule swap).",
+    "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 6248 channels over tol 1 vs Flash LOW. Ours vs Flash: master 3474, with the s28 lowq-corner-rule model 1956 (s28 lowq-corner-rule swap).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
   }
