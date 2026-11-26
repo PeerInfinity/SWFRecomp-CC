@@ -1203,3 +1203,10 @@ differs from its golden by 200 px; `fills_and_lines` stays as far from the Flash
 **Decision:** keep the Flash rule (Flash over Ruffle). Both rows are LOW quality, where w2-lowq-sample-point owns
 the sample-point rule; re-grade them against Flash when that lands. Prune when either golden is replaced by a Flash
 reference or our render matches the golden again.
+
+**Also `avm2/stage3d_texture`** (image, LOW, Ruffle-made golden: "Driver: Dummy Ruffle driver"; graded in s28 interim
+#5 `45750698566`): pass → fail, 2219 outliers (limit 117), all on the 5 buttons' `lineStyle(1)` + `drawRect` borders.
+The AVM2 rounding rule moves the left border from x=4 to x=5 and the bottom border from y=393 to y=394. A Flash 32
+capture (`run_image.py --screen`, Linux, LOW) draws those two edges at **x=5 and y=394**, the same as ours. Both depend
+only on `PAD` and the stage size, not on font metrics. Flash does not render the Stage3D content and uses a different
+`_sans` font, so the whole frame can't be compared. Same decision. Prune with the rows above.
