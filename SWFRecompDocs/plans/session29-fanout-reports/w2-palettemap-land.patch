@@ -1,0 +1,207 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 061c42dd..325fc4d9 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -4954,6 +4954,72 @@ static Avm2Value bd_copy_channel(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// paletteMap (operations.rs palette_map): per pixel, look each unmultiplied
++// source channel up in its 256-entry array and wrap-add the four FULL 32-bit
++// entries (no per-channel mask: the AVM1 arm, bitmapDataPaletteMap, is FP32-
++// pinned on avm1/bitmap_data_thorough/paletteMap). A missing / null / non-
++// object array is the identity mapping (i << shift). The sum is premultiplied
++// with the TARGET's transparency, so an opaque target keeps alpha 0xFF and the
++// colour as is (avm2/bitmapdata_palettemap_opaque, upstream 31e07df77).
++// Entries are read as arr[i]. Ruffle's AVM2 arm reads get_enumerant_value(i),
++// which is arr[i-1] (and 0 for i == 0); that off-by-one is NOT replicated.
++static Avm2Value bd_palette_map(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2BitmapDataExt* dst = this_bd(act);
++	check_valid(ctx, dst);
++	Avm2BitmapDataExt* src = avm2_bitmapdata_ext_of(ctx, arg(act, 0));
++	if (src == NULL) return avm2_undefined();
++	int32_t sx, sy, sw, sh;
++	rect_to_xywh(ctx, arg(act, 1), &sx, &sy, &sw, &sh);
++	int32_t dx, dy;
++	read_point_i32(ctx, arg(act, 2), &dx, &dy);
++	static const int shifts[4] = {16, 8, 0, 24};
++	uint32_t lut[4][256];
++	for (int ch = 0; ch < 4; ch++)
++	{
++		Avm2Value a = arg(act, 3 + (uint32_t) ch);
++		Avm2Object* o = a.kind == AVM2_VALUE_OBJECT ? a.u.obj : NULL;
++		Avm2Object* arr = (o != NULL && avm2_array_ext(o) != NULL) ? o : NULL;
++		for (uint32_t i = 0; i < 256; i++)
++		{
++			if (o == NULL) { lut[ch][i] = i << shifts[ch]; continue; }
++			Avm2Value v;
++			if (arr != NULL)
++			{
++				v = avm2_array_get(arr, i);
++				if (v.kind == AVM2_VALUE_HOLE) v = avm2_undefined();
++			}
++			else
++			{
++				char key[12];
++				int kl = snprintf(key, sizeof(key), "%u", i);
++				v = avm2_get_public_property(ctx, a, key, (uint32_t) kl, NULL);
++			}
++			lut[ch][i] = avm2_coerce_to_u32(ctx, v);
++		}
++	}
++	PixelRegion source_region = pr_whole(src->width, src->height);
++	PixelRegion dest_region = pr_whole(dst->width, dst->height);
++	pr_clamp_intersection(&dest_region, dx, dy, sx, sy, sw, sh, &source_region);
++	if (pr_w(&dest_region) == 0 || pr_h(&dest_region) == 0) return avm2_undefined();
++	uint32_t rh = pr_h(&dest_region) < pr_h(&source_region)
++		? pr_h(&dest_region) : pr_h(&source_region);
++	uint32_t rw = pr_w(&dest_region) < pr_w(&source_region)
++		? pr_w(&dest_region) : pr_w(&source_region);
++	for (uint32_t y = 0; y < rh; y++)
++		for (uint32_t x = 0; x < rw; x++)
++		{
++			uint32_t sc = unmul(bd_get_raw(src, source_region.x_min + x,
++			                               source_region.y_min + y));
++			uint32_t sum = lut[0][CR(sc)] + lut[1][CG(sc)]
++			             + lut[2][CB(sc)] + lut[3][CA(sc)];
++			bd_set_raw(dst, dest_region.x_min + x, dest_region.y_min + y,
++			           premul(sum, dst->transparency));
++		}
++	return avm2_undefined();
++}
++
+ // scroll (operations.rs): in-place shift of all pixels by (x, y).
+ static Avm2Value bd_scroll(Avm2Activation* act)
+ {
+@@ -5337,6 +5403,7 @@ BD_MUTATOR(bd_apply_filter)
+ BD_MUTATOR(bd_color_transform)
+ BD_MUTATOR(bd_copy_channel)
+ BD_MUTATOR(bd_copy_pixels)
++BD_MUTATOR(bd_palette_map)
+ BD_MUTATOR(bd_dispose)
+ BD_MUTATOR(bd_draw)
+ BD_MUTATOR(bd_fill_rect)
+@@ -5414,7 +5481,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_apply_filter__mut);
+ 	avm2_builtin_add_method(ctx, bd, "generateFilterRect", bd_generate_filter_rect);
+ 	avm2_builtin_add_method(ctx, bd, "merge", bd_noop__mut);
+-	avm2_builtin_add_method(ctx, bd, "paletteMap", bd_noop__mut);
++	avm2_builtin_add_method(ctx, bd, "paletteMap", bd_palette_map__mut);
+ 	avm2_builtin_add_method(ctx, bd, "perlinNoise", bd_noop__mut);
+ 
+ 	// flash.display.BitmapDataChannel — the bit flags copyChannel /
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/Test.as b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/Test.as
+new file mode 100644
+index 00000000..ee82e8b3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/Test.as
+@@ -0,0 +1,45 @@
++// w1-drift (s29) Flash probe: how AVM2 BitmapData.paletteMap indexes its
++// channel arrays. Ruffle reads get_enumerant_value(i) = arr[i-1] (and 0 for
++// i == 0); the documented behaviour is arr[i]. Each line names both
++// predictions.
++package {
++    import flash.display.BitmapData;
++    import flash.display.Sprite;
++    import flash.geom.Point;
++    import flash.geom.Rectangle;
++
++    public class Test extends Sprite {
++        public function Test() {
++            var idR:Array = [], idG:Array = [], idB:Array = [], idA:Array = [];
++            var zero0:Array = [], zeros:Array = [];
++            for (var i:int = 0; i < 256; i++) {
++                idR.push(i << 16); idG.push(i << 8); idB.push(i); idA.push(uint(i) << 24);
++                zero0.push(i == 0 ? 0x00AA0000 : 0);
++                zeros.push(0);
++            }
++
++            // arr[i]: 0xFF102030   arr[i-1]: 0xFF0F1F2F
++            trace("identity arrays opaque: " + map(false, 0xFF102030, idR, idG, idB, idA));
++            // arr[i]: 0xFFAA0000   arr[i-1]: 0xFE000000
++            trace("index zero transparent: " + map(true, 0xFF000000, zero0, zeros, zeros, idA));
++            // arr[i]: 0x80102030 (premultiplied round trip may move rgb)
++            trace("identity arrays transparent half: " + map(true, 0x80102030, idR, idG, idB, idA));
++            // arr[i]: 0xFF102030   arr[i-1]: 0xFF101F2F (null red = identity)
++            trace("null red, identity rest opaque: " + map(false, 0xFF102030, null, idG, idB, idA));
++            trace("Done");
++        }
++
++        private function map(transparent:Boolean, srcColor:uint, r:Array, g:Array, b:Array, a:Array):String {
++            var src:BitmapData = new BitmapData(1, 1, transparent, srcColor);
++            var dst:BitmapData = new BitmapData(1, 1, transparent, 0xFF000000);
++            dst.paletteMap(src, new Rectangle(0, 0, 1, 1), new Point(0, 0), r, g, b, a);
++            return hex(dst.getPixel32(0, 0));
++        }
++
++        private function hex(v:uint):String {
++            var s:String = v.toString(16).toUpperCase();
++            while (s.length < 8) s = "0" + s;
++            return "0x" + s;
++        }
++    }
++}
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/build.sh b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/build.sh
+new file mode 100644
+index 00000000..ac57b493
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/build.sh
+@@ -0,0 +1,4 @@
++#!/bin/sh
++# Coordinator-local: build with the Flex SDK used by tools/flash-oracle.
++cd "$(dirname "$0")" && ~/CC/flex-sdk/bin/mxmlc -static-link-runtime-shared-libraries=true \
++  -omit-trace-statements=false -target-player=11.1 -default-size 100 100 -swf-version=15 -output test.swf Test.as
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/output.txt b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/output.txt
+new file mode 100644
+index 00000000..940bede6
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/output.txt
+@@ -0,0 +1,5 @@
++identity arrays opaque: 0xFF102030
++index zero transparent: 0xFFAA0000
++identity arrays transparent half: 0x80102030
++null red, identity rest opaque: 0xFF102030
++Done
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/test.swf b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..9833a6e51cf763754c40c90d330811d858935fbe
+GIT binary patch
+literal 1087
+zcmV-F1i<@4S5pr_1^@tf+J#h2ZyQAzp4qS2b&|&Ua@|79wlR%VCEkrAMT(VLq%np>
+zDybTZ5K@F^*JFF>dUx3!Ck_{)O8p-Z5)u*;e*p=J12@MN;lQQh)Ek_*ns?S|lIFsC
+zcRrqZo@d^9XU26@ITCLkqw3TRgwVG$uQ5XFaidv&QmvW2jvpjt=sj3ya~_o~>)_y^
+zc(76o<Ce9&wzg*3C970g0>)Bu7;xHK3X=JSN@`GLi5q(n_rkywed>f={$OF@%(da3
+zn?~K(Pc0j+#eCLb0Z**u;xZUD+;TIFJCs*w6#1S@g`L$~O4_0O?11jGrKV4l_PTXJ
+z6dLYvpH(&@>b99#^I6Z_xR9sh5kqhr7jah30&0SyNK<thSE{(o6S}DD_+HXx@tb*e
+z!zMqVF-#bCgT}>F7epa*V@7%SzoIuZA@OO@>e3dgu;9z5yXo*bl&*ksR{12{H%qIF
+zX2~wCj^Y*Qx^-nM&Jft$3aVyb%j;-U8V-kFWMtTW4L&9N?6(y-1PE>3&fWYDTEAvK
+zWeG<=&;AP>G181_hb^NlDkACV=m!-kLaY4s_lA(6S81&&(yNUE(sp_51ugP041Goe
+zrRxP;-H2m)s0i1Ibo+`8FNu75sO?6v$C=!rk=$mzJ7?QL8==FBZrHIlc2}&DZLeBR
+z*Ymj-C{Z_Qt30MI%X<wtHy%GUsc=usFrr^~S=r2cK?4rJH!KcKU<OG9=?-|=yn9t~
+zY1C{}zgafTpzHf)%o>a4IXQ-~&&`!;7_iJkk3+~+%4ue_o)!x`#uMgp*e0K;k3(2>
+zCZay$oIRpZrp5SUugCnAlFq|XhQ@gKG>TZfNfU-`&1XT2w<Wu$?Koe7(fG)i?TgDX
+z`Jt$)kTlBS5XBSKQT|5MsjYxBND24$*$BzKHNF|bP4xm6>p7ewc}+$7SZ+4=9?BCe
+z5iAp|5Udic5lJVCL6i(p#|fSw(hSk&h?XPxI>C9O-XQ8tg5M?hHX$aF?hxrNk>*u&
+z_Gnm=6?ov#VEGKgs%FSYOoJpHBXOV<tST6(K++AlZ+`@kp&OY$ao_H5q0i8f^1CQb
+zMe&CyTqP~lwA2d7CD|>6j1z|xvfu9*cmNGuG+sIcN=Mm~9a58VAum8jg<<sLG(l(y
+zKhHu01@v6t-~`n##3An=Npn99hkKdDYyAZapA23)N{wj8I~fevWdEKefr|#eOK=uo
+z`3iMP$j!I0X{cb0l5QB8M}2#5tbp&I47SIVqcN9^dX_Zm>W=P^z3~FN59s!|vNr+E
+z?Fk9|#QZzgNZ-)`s!d8Y9e<3FEXhXZUf(_`WNTSmn?f&6v#?HM@twi(i_<}Kx}eYf
+zGaN478XN;#ks#&seVd{Bj9s6#>vMKJXV<UWbq(In(XI4ps}QX*Bkq0rH}C;8{sZ?>
+FyqRQR6VU(w
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/test.toml b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/test.toml
+new file mode 100644
+index 00000000..b65f21e8
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_bitmapdata_palettemap_index/test.toml
+@@ -0,0 +1,4 @@
++# s29 w2-palettemap-land fixture (from w1-drift). output.txt = the FLASH Player 32 capture
++# (session29-fanout-reports/w1-local-oracles/w1-drift/palettemap_avm2_index.fp32.txt):
++# AVM2 BitmapData.paletteMap reads arr[i] (Ruffle reads arr[i-1]). Do NOT replace with a Ruffle trace.
++num_frames = 1

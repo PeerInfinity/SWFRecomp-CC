@@ -1,0 +1,5 @@
+identity arrays opaque: 0xFF102030
+index zero transparent: 0xFFAA0000
+identity arrays transparent half: 0x80102030
+null red, identity rest opaque: 0xFF102030
+Done

@@ -211,7 +211,7 @@ body are dropped, but pops are not undone. The asymmetry is load-bearing
 - **Latest fixes (2026-04-18, this session)**:
   - **`bitmap_data_thorough/threshold` PASS** — opaque BMD `getPixel32` returns raw stored pixel (no un-premul); `mask` arg defaults to `0xFFFFFFFF` only when missing (undefined coerces to 0).
   - **`bitmap_data_thorough/noise` PASS** — `high` arg defaults to `0xFF` only when missing (undefined → 0); alpha-channel RNG only fires for transparent BMDs; seed/low/high coerced via `doubleToUint32` so NaN/Infinity → 0 (ECMA ToInt32).
-  - **`bitmap_data_thorough/paletteMap` ruffle_matched** — channel-array args treat OBJECT (e.g. `{}`) as well as ARRAY, mask each LUT entry with `& 0xFF`.
+  - **`bitmap_data_thorough/paletteMap` ruffle_matched** — channel-array args treat OBJECT (e.g. `{}`) as well as ARRAY, mask each LUT entry with `& 0xFF`. *(Superseded: the `& 0xFF` mask was later dropped to match FP32 — Flash wrap-adds the full 32-bit entries — and the row now PASSES 951/951; upstream `31e07df77` also removed its `known_failure`. s29 w2-palettemap-land.)*
   - **`bitmap_data_thorough/pixelDissolve` improved** (97.2%) — require 5 args minimum, validate rect props, empty region returns `random_seed`. Remaining diffs in Feistel return values are Flash-specific; test added to `ignored_tests.txt` (Ruffle panics on this test, no `output.ruffle.txt` to subset against).
   - **`bitmap_data_thorough/copyChannel` PASS** — bumped `MAX_BITMAP_NATIVES` 256 → 8192. The side table was overflowing partway through the Opaque iteration; new BMDs went unregistered → `bdHeightGetter` returned -1 → `printBmd` skipped its loop.
   - **`bitmap_data_thorough/perlinNoise` ruffle_matched** (98.8%) — `MAX_BITMAP_NATIVES` bump unblocked it; further fixes for SWF7+ null/undefined→NaN coercion (baseX/Y), `channel_options=undefined` → 0 (was defaulting to 7), and ECMA ToInt32 NaN→0 for seed/numOctaves brought our diffs to a strict subset of Ruffle's.
@@ -356,8 +356,8 @@ Plan moved to `complete/BITMAP_DATA_THOROUGH_PLAN.md`. Final breakdown:
 
 | Status | Count | Notes |
 |--------|-------|-------|
-| PASS (100%) | 16 | colorTransform, compare, constructor, copyChannel, fillRect, floodFill, getColorBoundsRect, getPixel, getPixel32, hitTest, merge, noise, scroll, setPixel, setPixel32, threshold |
-| ruffle_matched | 3 | copyPixels (94.3%), paletteMap (94.5%), perlinNoise (98.8%) — diff sets are strict subsets of Ruffle's |
+| PASS (100%) | 17 | colorTransform, compare, constructor, copyChannel, fillRect, floodFill, getColorBoundsRect, getPixel, getPixel32, hitTest, merge, noise, paletteMap, scroll, setPixel, setPixel32, threshold |
+| ruffle_matched | 2 | copyPixels (94.3%), perlinNoise (98.8%) — diff sets are strict subsets of Ruffle's (historical snapshot; paletteMap moved to PASS once the `& 0xFF` mask was dropped for FP32 — s29) |
 | Ignored / accepted | 1 | pixelDissolve (97.2%) — Flash-specific Feistel coercion, Ruffle panics so no `output.ruffle.txt` for promotion |
 
 ## Near-Passing Tests (previously)

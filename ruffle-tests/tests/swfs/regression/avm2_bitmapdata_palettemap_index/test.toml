@@ -1,0 +1,4 @@
+# s29 w2-palettemap-land fixture (from w1-drift). output.txt = the FLASH Player 32 capture
+# (session29-fanout-reports/w1-local-oracles/w1-drift/palettemap_avm2_index.fp32.txt):
+# AVM2 BitmapData.paletteMap reads arr[i] (Ruffle reads arr[i-1]). Do NOT replace with a Ruffle trace.
+num_frames = 1

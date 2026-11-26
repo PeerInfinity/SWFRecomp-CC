@@ -1298,3 +1298,25 @@ The three gradient goldens are neither Windows nor Linux Flash, but Flash itself
 ramps (the s27/s28 WIN ≠ LNX radial/focal finding), so README rule 4 applies: no swap. They stay priced losses of the
 s28 LOW model. Prune criterion: a platform-stable Flash reference for the gradient rows, or a decision to target one
 FP32 host.
+
+## AVM2 `BitmapData.paletteMap` reads `arr[i]`; Ruffle reads `arr[i-1]` (s29 w2-palettemap-land, 2026-11-26)
+
+**Tests:** `regression/avm2_bitmapdata_palettemap_index` (our fixture, FP32 golden). The corpus row
+`avm2/bitmapdata_palettemap_opaque` cannot see it (all 256 entries per array are equal and index 0 is never sampled).
+
+Ruffle's AVM2 `paletteMap` builds each channel LUT with `arg.get_enumerant_value(i)`. For an `ArrayObject` that is the
+enumerant `i-1` (`core/src/avm2/object/array_object.rs`, `get_enumerant_value`: `index.checked_sub(1)`), so Ruffle's
+`lut[i] = arr[i-1]` and `lut[0]` reads undefined → 0. Real Flash Player 32 (LNX 32,0,0,465, coordinator capture
+`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-drift/palettemap_avm2_index.fp32.txt`) reads `arr[i]`:
+
+```
+identity arrays opaque: 0xFF102030            (Ruffle's arr[i-1] predicts 0xFF0F1F2F)
+index zero transparent: 0xFFAA0000            (Ruffle predicts 0xFE000000)
+identity arrays transparent half: 0x80102030
+null red, identity rest opaque: 0xFF102030    (Ruffle predicts 0xFF101F2F)
+Done
+```
+
+**Decision:** match Flash. `avm2_bitmap.c::bd_palette_map` reads `avm2_array_get(arr, i)`; the off-by-one is not
+replicated. Our AVM1 arm (`action.c::bitmapDataPaletteMap`) and Ruffle's AVM1 arm both already read `arr[i]`. Prune
+criterion: Ruffle's AVM2 `palette_map` switches to `arr[i]`.
