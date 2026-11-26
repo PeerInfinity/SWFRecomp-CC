@@ -1,114 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-25T21:10:43.773614+00:00",
-    "old_git_sha": "10a5b515a03a386400e27a68adeddb628a47bc82",
-    "new_timestamp": "2026-11-25T22:59:03.500161+00:00",
-    "new_git_sha": "16033a154646a877df742993221eafce207bede1",
+    "old_timestamp": "2026-11-25T22:59:03.500161+00:00",
+    "old_git_sha": "16033a154646a877df742993221eafce207bede1",
+    "new_timestamp": "2026-11-25T23:59:46.647297+00:00",
+    "new_git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1544,
-    "old_ruffle_matched": 27,
-    "old_effective_pass": 1571,
+    "old_pass": 1549,
+    "old_ruffle_matched": 23,
+    "old_effective_pass": 1572,
     "old_total": 1574,
-    "old_pass_rate": 98.1,
+    "old_pass_rate": 98.4,
     "new_pass": 1549,
     "new_ruffle_matched": 23,
     "new_effective_pass": 1572,
     "new_total": 1574,
     "new_pass_rate": 98.4,
-    "old_mismatched_lines": 402,
+    "old_mismatched_lines": 378,
     "new_mismatched_lines": 378,
     "increased_mismatches": 0,
-    "decreased_mismatches": 24,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 5,
-    "unchanged": 1569,
+    "status_changed": 0,
+    "unchanged": 1574,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "as3/Types/Number/e15_7_4_6_1/swf14",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 11
-      },
-      "new_lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 29
-      }
-    },
-    {
-      "test": "as3/Types/Number/e15_7_4_6_1/swf15",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 26
-      },
-      "new_lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 29
-      }
-    },
-    {
-      "test": "ecma3/JSON/AS3Types",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 26,
-        "expected_lines": 26,
-        "matching_lines": 25
-      },
-      "new_lines": {
-        "actual_lines": 26,
-        "expected_lines": 26,
-        "matching_lines": 26
-      }
-    },
-    {
-      "test": "ecma3/Number/eregress_121952",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 11
-      },
-      "new_lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      }
-    },
-    {
-      "test": "ecma3/Number/toStringLimits",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 3
-      },
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    }
-  ]
+  "changes": []
 }

@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 278/279 passing | Graphics: 278/279 passing
+Trace: 282/282 passing | Graphics: 278/279 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `avm1_place_occupied_depth_swf5` | Output Mismatch | 5/6 lines match |
 
 ## Graphics Improvements (0 tests)
 
