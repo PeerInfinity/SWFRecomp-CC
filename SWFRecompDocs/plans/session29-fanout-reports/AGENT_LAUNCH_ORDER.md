@@ -22,7 +22,7 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 | 2 | w1-disposition-audit | `briefs/w1-disposition-audit.md` | session_018CoDi6ePRNuHb1YPKktDNL — DELIVERED: +5 priced (native_objects_swf6, globals_swf5 [trade void: gnash v5 goldens Flash], loader_applicationDomain [securityError #2046 path], dependent_strings [swap only], tab edge case); 7 premises refuted; global_decls keep L with new mechanism (native table from FP32 golden). Coordinator FP32: for-in order hash-scattered + NONDETERMINISTIC (bom/loader_load NO-GO); tabIndex rule contradicted by MTASC fixtures (item 7 HOLD) → w2-disposition-land |
 | 3 | w1-timers-goto | `briefs/w1-timers-goto.md` | session_018CoDi7txoNJ1nDAZsFDGxN — DELIVERED: gotoFrameFromInterval{,2} = goto target runs children frame-1 scripts in TAG order (+2 measured); clock_model → bound check; NextFrame arm stale. Coordinator FP32 (10 captures): items 1/3/4-root confirmed, item 2 after-EF REFUTED (residue = timer-callback _currentframe), sprite inline nav = neither leg → w2-timers-goto-land |
 | 4 | w1-rm-avm1-gnash | `briefs/w1-rm-avm1-gnash.md` | session_018CoDi4vq5d18kxhw4u2ixo — launched |
-| 5 | w1-rm-avm2 | `briefs/w1-rm-avm2.md` | session_018CoDi3Zc75tdYLniTM5WCT — launched |
+| 5 | w1-rm-avm2 | `briefs/w1-rm-avm2.md` | session_018CoDi3Zc75tdYLniTM5WCT — DELIVERED: +19 rm→pass measured (D1 per-timestamp DST + `mock_timezone` + 15 toml fixes: all 15 avmplus Date rows incl. 'Windows-only' ones; P debug line info; O1/O2 verifier smalls; L1 scrollV), −1 priced (try_catch_typed, golden ≠ FP32). Coordinator FP32: try_catch_typed suffixes confirmed, 35_1 reproduced under PST8PDT → w2-rm-avm2-land |
 | 6 | w1-lowq-next | `briefs/w1-lowq-next.md` | session_018CoDi7qTxMBdBnSPwzNNpq — launched |
 | 7 | w1-aa-sizing | `briefs/w1-aa-sizing.md` | session_018CoDi7ory8zEi6jZLvD2Ba — launched |
 | 8 | w1-text-pixels | `briefs/w1-text-pixels.md` | session_018CoDi6VSAprpDm9DcBKpgn — DELIVERED: **Flash HIGH = 4 sub-scanlines at y+j/4 × exact x coverage, 1/16 quantised** (refutes 4×4 SSAA); CPU-coverage prototype for skewed text (rotated_glyphs 1034→198 px vs FP32; 0 status moves); wordwrap golden already FP32 (refuted); 22 'unpriced' losses all priced (morph_test1 ×6 = only real Flash losses, LOW glyph rule). Coordinator FP32 W1 colour + W2 shapes: shape/stroke edges also on the 255−16n ladder → w2-text-coverage-land |
@@ -37,6 +37,7 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 | w2-disposition-land | w1-disposition-audit + FP32 | native_objects_swf6, globals_swf5, loader_applicationDomain, dependent_strings mm→pass; swz mm (1/3); +2 regression rows; 3 flash_fixes | session_018CoDi5vBfv1NbGkZQQDNaU — launched |
 | w2-pixel-gaps-land | w1-pixel-flash-gaps + FP32 | bands toward Flash (place_object_test, shape_test, morph_test1, acid-shapes 243→88, avm1_color); 2 swaps (text_field_mask, gradientTransform) | session_018CoDi4gzPRPdoE9veAKVJK — launched |
 | w2-timers-goto-land | w1-timers-goto + FP32 | gnash gotoFrameFromInterval{,2} rm→pass; ~6 new regression rows | session_018CoDi7QhSDj7YUWLFHhnVN — launched |
+| w2-rm-avm2-land | w1-rm-avm2 + FP32 | 19 rm→pass; 3 trace flash_fixes; swz → pass together with w2-disposition-land | session_018CoDi7S9WQn3PdsJBA8GRr — launched |
 
 ## Grading runs
 
