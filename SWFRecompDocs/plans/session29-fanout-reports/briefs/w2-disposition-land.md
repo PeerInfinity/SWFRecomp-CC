@@ -1,0 +1,33 @@
+**Land the disposition audit (from w1-disposition-audit; S–M) — with two corrections from the coordinator's FP32 runs.**
+
+Read `session29-fanout-reports/w1-disposition-audit-report.md` (§0 verdicts, §4 doc edits, §5 patch scope) and apply
+`w1-disposition-audit-prototype.patch`. Coordinator FP32 results: `w1-local-oracles/w1-disposition-audit/README.md`.
+1. **Land items 2, 5, 6** as in the report (`native_objects_swf6`, `globals_swf5` — delete the `if (0)` block, do not
+   keep it — and the URLRequest.digest → securityError #2046 path for `loader_applicationDomain` / `swz`). Take the
+   `_global` DONT_ENUM hygiene change (§1 item 1, L5) too: it is Flash-correct; prove 0 moves on the report's 28-row
+   `_global` guard set.
+2. **flash_fixes (you add them this time):** `avm2/dependent_strings`, `avm2/loader_applicationDomain`, `avm2/swz`
+   `output.txt` → the s28 trace-provenance captures, per `ruffle-tests/flash_fixes/README.md` (verify each upstream sha256
+   against your fresh download; append JSON entries with `indent=2`; README table row; RvF entry). Run
+   `apply_flash_fixes.py --check` in your tree after the download.
+3. **Item 7 `tab_ordering_properties_tab_index_edge_case`: HOLD the prototype's tabIndex rule.** FP32 contradicts it:
+   MTASC class-main fixtures in SWF6/7/8 (`var r:Object = _root; r.tabIndex = "s"`, fresh clips too) all COERCE
+   (`-2147483648`), while the corpus row (SWF8 frame script `this.tabIndex = "asdf"`) reproduces its raw-string golden in
+   FP32. Find the discriminator from the bytecode (disassemble the corpus SWF vs `L3b_tabindex_v8/test.swf`: SetMember
+   target = `this` register vs GetVariable `_root` vs a local; frame DoAction vs function scope), build a small set of
+   fixture SWFs that isolate each candidate (Python SWF writers like `regression/*/create_test_swf.py` work in the
+   cloud), and put them under LOCAL ORACLE REQUESTS. Implement only a rule that predicts BOTH the corpus row and the
+   L3b captures; otherwise leave item 7 out of the patch.
+4. **`avm2/bom` / `avm2/loader_load`:** FP32 for-in order is hash-scattered AND nondeterministic between runs (README
+   row 1). Re-disposition them as Flash-nondeterministic (ACCEPTED category like `eforin_*`; keep ignored), correct the
+   RvF text (the report's RvF block claims "Ruffle's order coincides with FP32's": restate as "FP32 order is
+   nondeterministic; the golden is one run").
+5. Regression fixtures with FP32 goldens: `L3a_v6` and `L3a_v7` (`w1-local-oracles/w1-disposition-audit/L3a_v*/`,
+   golden = `flash.txt`), as `regression/avm1_textfield_ctor_shadow_swf6` / `_swf7` (copy `Test.as`, `test.swf`,
+   `test.toml`; read `regression/README.md`). Both must pass with the patch.
+6. Apply the report's §4 doc edits (ignored_tests prunes, ACCEPTED_DIFFS deletions/restatements, Category 13, h263),
+   minus item 7's and plus item 4's corrections. Leave `NO_GO_REGISTER.md` to the coordinator, but list the exact edits.
+Ledger (expected, CI graphics full): `native_objects_swf6` mm→pass, `globals_swf5` mm→pass, `loader_applicationDomain`
+mm→pass, `dependent_strings` mm→pass, `swz` stays mm (1/3 vs FP32), 2 new regression rows pass; nothing else moves.
+No-graphics leg on the headline rows (shared runtime). Siblings: w1-rm-avm2 (AVM2 debug-line bucket P overlaps the `swz`
+suffix lead L1: do not implement L1), w1-rm-avm1-gnash (AVM1 builtins in action.c). Name every function you touch.

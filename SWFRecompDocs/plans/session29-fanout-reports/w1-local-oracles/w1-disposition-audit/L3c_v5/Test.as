@@ -1,0 +1,1 @@
+class Test { static function main(mc) { trace(typeof LocalConnection); trace(LocalConnection == undefined); trace(typeof NetConnection); trace(NetConnection == undefined); trace(typeof Video); trace(Camera == undefined); } }
