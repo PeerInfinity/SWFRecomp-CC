@@ -3782,6 +3782,8 @@ Commits `7c3cfdcb7..bfa47037b` on master: 87 non-results commits. There are 31 c
 
 Every report, patch, probe and local Flash capture is under `session28-fanout-reports/`. The slot table and every grading run are in its `AGENT_LAUNCH_ORDER.md`. The 31 `fanout/*` branches were pruned at closeout after a blob check against master. Three branches had final reports or patches newer than the interim copies on master, and one had 2 logs missing from master. All of them were archived to master first.
 
+Pages REAL deploy: `45898148485` (Deploy step ran). Two earlier attempts built and uploaded the artifact, but `deploy-pages@v4` failed to list it ("No artifacts named github-pages"; GitHub showed no incident). Re-running the failed job in the same run then found 2 artifacts. A FRESH dispatch is the retry, not `gh run rerun`.
+
 **What changed the method: Robert's Flash-over-Ruffle ruling (2026-11-24).** "The goal is still to match Flash, not to match Ruffle." Every confirmed Ruffle≠Flash difference gets an RvF entry. A golden that FP32 proves bad is swapped through the sha-pinned `ruffle-tests/flash_fixes/` package, which `download_tests.sh` re-applies after every upstream refresh. A Flash-correct pass is never traded for a Ruffle golden. This session is where the ruling bit:
 - On the trace axis, `trace-provenance` found that 212 of the 259 `ruffle_matched` rows have FLASH goldens. That makes them real gaps, not passes. Wave 1b turned 73 of them into passes.
 - On the pixel axis, three Flash models landed knowing they would lose Ruffle-made goldens: the stroke snap, the drawing-API snap and the LOW sample-point model. Each loss was priced by name before landing.
