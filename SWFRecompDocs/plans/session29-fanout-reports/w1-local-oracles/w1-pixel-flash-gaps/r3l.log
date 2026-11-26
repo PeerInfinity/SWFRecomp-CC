@@ -1,0 +1,1 @@
+tick 1: SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.low.png 101x25 quality=low stop=done vs ruffle-tests/tests/swfs/from_shumway/gradientTransform/output.expected.png: {'outliers': 9, 'outlier_pixels': 3, 'max_difference': 15}
