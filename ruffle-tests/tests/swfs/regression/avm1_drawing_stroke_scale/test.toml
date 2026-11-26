@@ -1,0 +1,14 @@
+# Golden = Flash Player 32 (LNX) oracle, quality HIGH (s28 coordinator capture for
+# w2-flash-stroke-width; fixture by that slot). Drawing-API stroke width under
+# scaled / rotated / sheared clips x lineStyle noScale modes.
+# s28 n-drawapi-stroke-snap: 33528 -> 12315 outliers. Residual = the
+# R(45)diag(1,2) "vertical" cell Flash draws as a hairline (unmodelled), round
+# join fans under shear, AA.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 14000
+
+[player_options]
+with_renderer = { optional = false, quality = "high" }

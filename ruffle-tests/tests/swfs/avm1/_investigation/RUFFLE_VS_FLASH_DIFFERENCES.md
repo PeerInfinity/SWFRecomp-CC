@@ -1141,3 +1141,17 @@ fails every gnash row below (`known_failure`, `output.ruffle.txt` = Ruffle's own
 | B19 SWF6 inherited setter | `a.m = v` calls an inherited addProperty setter hidden by flag 256 or 1024 (not 4096); writing an own property keeps flag 1024 (256/4096 cleared) | visible setters only; write clears all | `Global-v6` |
 
 **Decision:** match Flash (user ruling). Unpinned parts are listed in `w2b-gnash-holds-report.md` §LOCAL ORACLE REQUESTS.
+## Drawing-API strokes: Flash's device-space stroke rule (s28 n-drawapi-stroke-snap)
+
+**Tests:** `visual/drawing_api/cursor`, `visual/drawing_api/fills_and_lines` (image; quality LOW; Ruffle-made goldens)
+
+Flash rasterises Drawing-API strokes like timeline strokes (n-stroke-snap rule): width in device quarter pixels,
+exactly axis-aligned 1/2/3 px segments snapped to whole pixels, AVM1 thickness truncated to whole pixels, AVM2
+rounded. Ruffle's goldens tessellate the nominal width and AA-straddle pixel edges. With the rule, `cursor` moves
+from 399 to 200 px off the archived Flash PNG (`golden-provenance/visual__drawing_api__cursor__output.png`) but now
+differs from its golden by 200 px; `fills_and_lines` stays as far from the Flash screen capture as before
+(20166 → 20239 px of a mostly-different LOW frame) and differs from its golden by 394.
+
+**Decision:** keep the Flash rule (Flash over Ruffle). Both rows are LOW quality, where w2-lowq-sample-point owns
+the sample-point rule; re-grade them against Flash when that lands. Prune when either golden is replaced by a Flash
+reference or our render matches the golden again.

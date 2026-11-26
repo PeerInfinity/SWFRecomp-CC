@@ -9,6 +9,7 @@
 #include <setjmp.h>
 #include "tesselator.h"
 #include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
+#include <stroke_snap.h>    // s28 n-drawapi-stroke-snap: Flash device-space stroke rule
 #include <gradient_ramp.h>  // w2-gfx-gradient: Ruffle CommonGradient::new ramp walk
 #include <html_img.h>       // w2-htmltext: shared AVM1/AVM2 htmlText <img> rules
 
@@ -34865,22 +34866,27 @@ static u32 drawing_emit_stroke_join(float* out,
 
 // (Re)build the stroke triangle geometry for `path` at the given half-width
 // (twips) from the retained contour polyline (path->stroke_poly, in pixels).
-static void drawingUnionTranslucentStroke(DrawPath* path)
+static int drawingStrokeIsTranslucent(const DrawPath* path)
 {
-	if (path->line_verts == NULL || path->line_vert_count < 6) return;
-	int translucent = 0;
 	if (path->has_line_gradient) {
 		for (int i = 0; i < 256; i++)
-			if (path->line_gradient_ramp[i * 4 + 3] != 255) { translucent = 1; break; }
-	} else {
-		translucent = path->line_a < 0.999f;
+			if (path->line_gradient_ramp[i * 4 + 3] != 255) return 1;
+		return 0;
 	}
-	if (!translucent) return;
+	return path->line_a < 0.999f;
+}
+
+// Non-zero union of a triangle soup (`*verts`, `*count` vertices), replacing
+// the array. Also the renderer's post-pass for a restaged translucent soup
+// (StrokeSnapSrc.post).
+static void drawingUnionTris(float** verts_io, unsigned* count_io)
+{
+	if (*verts_io == NULL || *count_io < 6) return;
 	TESStesselator* tess = tessNewTess(NULL);
 	if (tess == NULL) return;
-	u32 ntri_in = path->line_vert_count / 3;
+	u32 ntri_in = *count_io / 3;
 	for (u32 t = 0; t < ntri_in; t++) {
-		float* v = &path->line_verts[t * 6];
+		float* v = &(*verts_io)[t * 6];
 		float area = (v[2] - v[0]) * (v[5] - v[1]) - (v[4] - v[0]) * (v[3] - v[1]);
 		if (fabsf(area) < 1e-4f) continue;
 		float tri[6];
@@ -34900,12 +34906,21 @@ static void drawingUnionTranslucentStroke(DrawPath* path)
 					out[i*6 + j*2]     = verts[idx * 2];
 					out[i*6 + j*2 + 1] = verts[idx * 2 + 1];
 				}
-			free(path->line_verts);
-			path->line_verts = out;
-			path->line_vert_count = (u32)ntris * 3;
+			free(*verts_io);
+			*verts_io = out;
+			*count_io = (unsigned)ntris * 3;
 		}
 	}
 	tessDeleteTess(tess);
+}
+
+static void drawingUnionTranslucentStroke(DrawPath* path)
+{
+	if (path->line_verts == NULL || path->line_vert_count < 6) return;
+	if (!drawingStrokeIsTranslucent(path)) return;
+	unsigned n = path->line_vert_count;
+	drawingUnionTris(&path->line_verts, &n);
+	path->line_vert_count = n;
 }
 
 // Called once at finalize with the nominal half-width and again at render time
@@ -34924,6 +34939,10 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 	free(path->line_verts);
 	path->line_verts = NULL;
 	path->line_vert_count = 0;
+	free(path->stroke_soup); path->stroke_soup = NULL;
+	free(path->stroke_soup_cen); path->stroke_soup_cen = NULL;
+	free(path->stroke_soup_sf); path->stroke_soup_sf = NULL;
+	path->stroke_soup_n = 0;
 	path->stroke_built_half_w = half_w;
 	if (poly == NULL || contour_count == 0) return;
 
@@ -34965,6 +34984,24 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 		u32 alloc_verts = total_segs * 6 + poly_count * extra_per_vert;
 		path->line_verts = (float*)malloc(alloc_verts * 2 * sizeof(float));
 		u32 wv = 0;  // verts written so far (each vert = 2 floats)
+		// s28 n-drawapi-stroke-snap: per emitted vertex, the polyline vertex
+		// it was offset from (every stroke vertex is centre + offset), and per
+		// polyline vertex the STROKE_SNAP_* flags of its segments.
+		u32* vcen = (u32*)malloc(alloc_verts * sizeof(u32));
+		u8* pflag = (u8*)calloc(poly_count ? poly_count : 1, 1);
+		#define _DR_AXIS_FLAG(_ka, _kb) do { \
+			float _dx = poly[(_kb)*2] - poly[(_ka)*2], _dy = poly[(_kb)*2+1] - poly[(_ka)*2+1]; \
+			u8 _f = (_dx == 0.0f && _dy != 0.0f) ? STROKE_SNAP_VERT \
+			      : (_dy == 0.0f && _dx != 0.0f) ? STROKE_SNAP_HORZ : 0; \
+			if (pflag) { pflag[_ka] |= _f; pflag[_kb] |= _f; } \
+		} while (0)
+		#define _DR_CEN_RANGE(_from, _k) do { \
+			if (vcen) for (u32 _q = (_from); _q < wv; _q++) vcen[_q] = (_k); \
+		} while (0)
+		#define _DR_CEN_SEG(_ka, _kb) do { \
+			if (vcen) { vcen[wv-6] = (_ka); vcen[wv-5] = (_ka); vcen[wv-4] = (_kb); \
+			            vcen[wv-3] = (_ka); vcen[wv-2] = (_kb); vcen[wv-1] = (_kb); } \
+		} while (0)
 		#define _DR_EMIT_STROKE_SEG(_x0, _y0, _x1, _y1) do { \
 			float x0 = (_x0) * 20.0f, y0 = (_y0) * 20.0f; \
 			float x1 = (_x1) * 20.0f, y1 = (_y1) * 20.0f; \
@@ -34978,17 +35015,21 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 			wv += 6; \
 		} while (0)
 		#define _DR_EMIT_JOIN(_kp, _kv, _kn) do { \
+			u32 _w0 = wv; \
 			wv += drawing_emit_stroke_join(&path->line_verts[wv * 2], \
 				poly[(_kp)*2], poly[(_kp)*2+1], \
 				poly[(_kv)*2], poly[(_kv)*2+1], \
 				poly[(_kn)*2], poly[(_kn)*2+1], half_w, \
 				joints, miter_limit); \
+			_DR_CEN_RANGE(_w0, (_kv)); \
 		} while (0)
 		// End cap on the open end `_ke`, whose inbound segment starts at `_kp`.
 		#define _DR_EMIT_CAP(_kp, _ke) do { \
+			u32 _w0 = wv; \
 			wv += drawing_emit_stroke_cap(&path->line_verts[wv * 2], \
 				poly[(_kp)*2], poly[(_kp)*2+1], \
 				poly[(_ke)*2], poly[(_ke)*2+1], half_w, caps); \
+			_DR_CEN_RANGE(_w0, (_ke)); \
 		} while (0)
 		for (u32 ci = 0; ci < contour_count; ci++) {
 			u32 cstart = contour_starts[ci];
@@ -34999,10 +35040,14 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 			for (u32 i = cstart; i + 1 < cend; i++) {
 				_DR_EMIT_STROKE_SEG(poly[i*2], poly[i*2+1],
 				                    poly[(i+1)*2], poly[(i+1)*2+1]);
+				_DR_CEN_SEG(i, i + 1);
+				_DR_AXIS_FLAG(i, i + 1);
 			}
 			if (needs_close) {
 				_DR_EMIT_STROKE_SEG(poly[(cend-1)*2], poly[(cend-1)*2+1],
 				                    poly[cstart*2], poly[cstart*2+1]);
+				_DR_CEN_SEG(cend - 1, cstart);
+				_DR_AXIS_FLAG(cend - 1, cstart);
 			}
 			// Joins at interior vertices (each shared by two segments).
 			for (u32 k = cstart + 1; k + 1 < cend; k++) {
@@ -35033,7 +35078,43 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 		#undef _DR_EMIT_CAP
 		#undef _DR_EMIT_JOIN
 		#undef _DR_EMIT_STROKE_SEG
+		#undef _DR_CEN_SEG
+		#undef _DR_CEN_RANGE
+		#undef _DR_AXIS_FLAG
 		path->line_vert_count = wv;
+		// The soup the renderer restages (before the union below).
+		if (vcen != NULL && pflag != NULL && wv > 0) {
+			// An explicitly closed contour repeats its first point as its last:
+			// the seam vertex carries both copies' flags.
+			for (u32 ci = 0; ci < contour_count; ci++) {
+				u32 cs = contour_starts[ci];
+				u32 ce = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
+				if (_DR_CONTOUR_EXPLICIT_CLOSED(cs, ce)) {
+					u8 f = pflag[cs] | pflag[ce - 1];
+					pflag[cs] = f; pflag[ce - 1] = f;
+				}
+			}
+			path->stroke_soup = (float*)malloc((size_t)wv * 2 * sizeof(float));
+			path->stroke_soup_cen = (float*)malloc((size_t)wv * 2 * sizeof(float));
+			path->stroke_soup_sf = (u8*)malloc(wv);
+			if (path->stroke_soup && path->stroke_soup_cen && path->stroke_soup_sf) {
+				memcpy(path->stroke_soup, path->line_verts, (size_t)wv * 2 * sizeof(float));
+				for (u32 q = 0; q < wv; q++) {
+					u32 k = vcen[q];
+					path->stroke_soup_cen[q * 2]     = poly[k * 2] * 20.0f;
+					path->stroke_soup_cen[q * 2 + 1] = poly[k * 2 + 1] * 20.0f;
+					path->stroke_soup_sf[q] = pflag[k];
+				}
+				path->stroke_soup_n = wv;
+				path->stroke_soup_gen = stroke_snap_next_gen(1);
+			} else {
+				free(path->stroke_soup); path->stroke_soup = NULL;
+				free(path->stroke_soup_cen); path->stroke_soup_cen = NULL;
+				free(path->stroke_soup_sf); path->stroke_soup_sf = NULL;
+			}
+		}
+		free(vcen);
+		free(pflag);
 		// s25 w1-pixel-drawing PROTOTYPE: a translucent stroke is one coverage
 		// region in Flash (the outline is filled once), but our per-segment
 		// quads + join wedges overlap at every corner and blend twice there.
@@ -35136,6 +35217,7 @@ static void drawingFinalizePath(DrawingState* ds)
 	path->line_joints = ds->line_joints;
 	path->line_caps = ds->line_caps;
 	path->line_miter = ds->line_miter;
+	path->line_flags = ds->line_flags;
 	path->line_r = ds->line_r; path->line_g = ds->line_g;
 	path->line_b = ds->line_b; path->line_a = ds->line_a;
 	// Copy gradient fill state
@@ -35309,6 +35391,29 @@ static void drawingParseLineJoinCaps(SWFAppContext* app_context,
 	}
 }
 
+// AVM1 lineStyle args 3 (pixelHinting) and 4 (noScale: "normal" | "none" |
+// "vertical" | "horizontal") -> STROKE_FLAG_* (stroke_snap.h).
+static u8 drawingParseLineFlags(SWFAppContext* app_context, ActionVar* args, u32 num_args)
+{
+	u8 f = 0;
+	if (num_args >= 4 && args[3].type != ACTION_STACK_VALUE_UNDEFINED
+	    && as_truthy(app_context, &args[3]))
+		f |= STROKE_FLAG_PIXEL_HINTING;
+	if (num_args >= 5 && args[4].type != ACTION_STACK_VALUE_UNDEFINED
+	    && args[4].type != ACTION_STACK_VALUE_NULL) {
+		char buf[16];
+		int n = varToStringBuf(app_context, &args[4], buf, sizeof(buf));
+		// AVM1's names are the OPPOSITE of AS3 LineScaleMode's: "vertical"
+		// keeps only the X scale (Ruffle avm1 movie_clip.rs line_style;
+		// Flash: the "vertical" row thickens under _xscale).
+		u8 m = (u8) stroke_scale_mode_flags(buf, n);
+		if (m == STROKE_FLAG_NO_HSCALE) m = STROKE_FLAG_NO_VSCALE;
+		else if (m == STROKE_FLAG_NO_VSCALE) m = STROKE_FLAG_NO_HSCALE;
+		f |= m;
+	}
+	return f;
+}
+
 // lineStyle() ENDS the current stroke and starts a new one at the cursor, so a
 // style change mid-polyline yields two separately-styled paths (Ruffle
 // `Drawing::set_line_style`: it pushes `current_line` and re-opens a fresh
@@ -35355,6 +35460,9 @@ static void drawingClear(MovieClip* mc)
 		free(ds->paths[i].line_verts);
 		free(ds->paths[i].stroke_poly);
 		free(ds->paths[i].stroke_contours);
+		free(ds->paths[i].stroke_soup);
+		free(ds->paths[i].stroke_soup_cen);
+		free(ds->paths[i].stroke_soup_sf);
 	}
 	free(ds->paths); ds->paths = NULL;
 	ds->path_count = ds->path_capacity = 0;
@@ -35554,8 +35662,33 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 			info->line_verts = path->line_verts;
 			info->line_count = path->has_line ? path->line_vert_count : 0;
 		}
+		// s28 n-drawapi-stroke-snap: hand the soup to the renderer's Flash
+		// stroke rule. AVM1 declares the width in WHOLE pixels, truncated
+		// (Flash oracle: lineStyle(1.5) draws as 1, 2.25 as 2).
+		info->line_soup = NULL;
+		info->line_soup_n = 0;
+		if (path->has_line && path->stroke_soup != NULL && path->stroke_soup_n > 0) {
+			float lw = path->line_width;
+			if (!(lw > 0.0f)) lw = 0.0f;
+			if (lw > 255.0f) lw = 255.0f;
+			info->line_soup = path->stroke_soup;
+			info->line_soup_cen = path->stroke_soup_cen;
+			info->line_soup_sf = path->stroke_soup_sf;
+			info->line_soup_n = path->stroke_soup_n;
+			info->line_soup_gen = path->stroke_soup_gen;
+			info->line_decl_twips = floorf(lw) * 20.0f;
+			info->line_emitted_twips = 2.0f * path->stroke_built_half_w;
+			info->line_snap_flags = path->line_flags;
+			info->line_translucent = drawingStrokeIsTranslucent(path);
+		}
 	}
 	return count;
+}
+
+// StrokeSnapSrc.post for a translucent drawing-API stroke (tag.c).
+void actionDrawingUnionTris(float** verts, unsigned* count)
+{
+	drawingUnionTris(verts, count);
 }
 
 // ---------------------------------------------------------------------------
@@ -70242,6 +70375,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					ds->line_joints = ln_joints;
 					ds->line_caps = ln_caps;
 					ds->line_miter = ln_miter;
+					ds->line_flags = drawingParseLineFlags(app_context, args, num_args);
 					ds->has_line = 1;
 				}
 			} else if (func_name_len == 5 && strncmp(func_name, "clear", 5) == 0) {
@@ -82369,6 +82503,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ds->line_joints = ln_joints;
 					ds->line_caps = ln_caps;
 					ds->line_miter = ln_miter;
+					ds->line_flags = drawingParseLineFlags(app_context, args, num_args);
 					ds->has_line = 1;
 				}
 			}

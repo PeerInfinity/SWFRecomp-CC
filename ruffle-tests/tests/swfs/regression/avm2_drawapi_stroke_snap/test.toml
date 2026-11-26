@@ -1,0 +1,9 @@
+# Golden = Flash Player 32 (LNX) oracle (s28 n-stroke-snap capture drawapi_as3):
+# AVM2 Graphics.lineStyle widths 0..4 x 8 subpixel offsets, pixelHinting off / on.
+# s28 n-drawapi-stroke-snap: 33471 -> 2559 outliers (same residual class as the
+# AVM1 twin).
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 2950

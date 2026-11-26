@@ -11,6 +11,7 @@
 
 #include <common.h>
 #include <render_webgpu.h>
+#include <stroke_snap.h>
 #include <swf.h>
 #include <heap.h>
 
@@ -1947,17 +1948,30 @@ static int hairline_flash_width = 1;
 static float* hairline_xform = NULL;
 static u32 hairline_xform_slots = 0;
 static float hairline_stage[16];
+// Drawing-API stroke snap on/off (SWF_STROKE_SNAP=0 turns both passes off,
+// SWF_STROKE_SNAP_DRAWAPI=0 only this one).
+static int stroke_snap_dyn_on = 1;
+
+static void stroke_snap_cache_clear(void);
 
 static void hairline_init(WebGPURenderContext* ctx)
 {
 	hairline_run_n = 0;
+	stroke_snap_cache_clear();
 	free(hairline_xform);
 	hairline_xform = NULL;
 	hairline_xform_slots = 0;
-#ifndef DYNAMIC_HOST
-	if (&stroke_run_count == NULL || stroke_run_data == NULL || stroke_centre_data == NULL)
-		return;
-	if (stroke_run_count == 0 || ctx->xform_slot_count == 0)
+	{
+		// SWF_STROKE_SNAP=0: both passes off. SWF_STROKE_SNAP_DRAWAPI=0: only
+		// the drawing-API pass (prices it apart from the timeline pass).
+		const char* e = getenv("SWF_STROKE_SNAP");
+		const char* e2 = getenv("SWF_STROKE_SNAP_DRAWAPI");
+		stroke_snap_dyn_on = !(e != NULL && e[0] == '0') && !(e2 != NULL && e2[0] == '0');
+	}
+	// The CPU xform mirror also serves the drawing-API stroke snap
+	// (render_webgpu_stroke_snap), so it exists whether or not the movie has
+	// timeline strokes.
+	if (ctx->xform_slot_count == 0)
 		return;
 	hairline_xform = (float*) calloc((size_t) ctx->xform_slot_count * 16, sizeof(float));
 	if (hairline_xform == NULL)
@@ -1972,6 +1986,11 @@ static void hairline_init(WebGPURenderContext* ctx)
 	}
 	if (ctx->stage_to_ndc)
 		memcpy(hairline_stage, ctx->stage_to_ndc, sizeof(hairline_stage));
+#ifndef DYNAMIC_HOST
+	if (&stroke_run_count == NULL || stroke_run_data == NULL || stroke_centre_data == NULL)
+		return;
+	if (stroke_run_count == 0)
+		return;
 	hairline_runs = (const u32 (*)[5]) stroke_run_data;
 	hairline_centres = (const u32 (*)[2]) stroke_centre_data;
 	hairline_run_flags = (&stroke_run_flags[0] != NULL) ? stroke_run_flags : NULL;
@@ -3343,6 +3362,29 @@ static void hairline_flash_offset(double m00, double m01, double m10, double m11
 	*io_dx = ox; *io_dy = oy;
 }
 
+// Drawing-API stroke snap cache (render_webgpu_stroke_snap), keyed on the
+// soup generation + device affine: a static drawing restages (and, when
+// translucent, re-unions) once instead of every frame.
+typedef struct {
+	unsigned long long gen;
+	double key[7];
+	float* xy;        // NULL = empty
+	unsigned n;
+} StrokeSnapCacheEntry;
+#define STROKE_SNAP_CACHE_SLOTS 1024u
+static StrokeSnapCacheEntry* stroke_snap_cache = NULL;
+static float* stroke_snap_scratch = NULL;
+static int stroke_snap_cache_on = -1;
+
+static void stroke_snap_cache_clear(void)
+{
+	if (stroke_snap_cache != NULL)
+	{
+		for (u32 i = 0; i < STROKE_SNAP_CACHE_SLOTS; i++) free(stroke_snap_cache[i].xy);
+		memset(stroke_snap_cache, 0, STROKE_SNAP_CACHE_SLOTS * sizeof(StrokeSnapCacheEntry));
+	}
+}
+
 static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
                                size_t num_verts, u32 transform_id)
 {
@@ -3532,6 +3574,178 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 	stage_dyn_verts(ctx, vert_base, verts, (u32) num_verts);
 	free(verts);
 	return vert_base;
+}
+
+// Local twips -> device px affine for `transform_id` (the matrices the vertex
+// shader composes; same expressions as hairline_restage) plus the stage-only
+// scale. Returns 0 for an unknown slot.
+static int stroke_device_affine(const WebGPURenderContext* ctx, u32 transform_id,
+                                double k[7], double* out_scale)
+{
+	if (hairline_xform == NULL || transform_id >= hairline_xform_slots) return 0;
+	const float* t = &hairline_xform[(size_t) transform_id * 16];
+	const float* p = hairline_stage;
+	const double a = (double) p[0] * t[0] + (double) p[4] * t[1];
+	const double b = (double) p[1] * t[0] + (double) p[5] * t[1];
+	const double c = (double) p[0] * t[4] + (double) p[4] * t[5];
+	const double d = (double) p[1] * t[4] + (double) p[5] * t[5];
+	const double hw = 20.0 * 0.5 * (double) ctx->width;
+	const double hh = 20.0 * 0.5 * (double) ctx->height;
+	const double sx = fabs(hw * (a + c));
+	const double sy = fabs(hh * (b + d));
+	const double Wh = 0.5 * (double) ctx->width, Hh = 0.5 * (double) ctx->height;
+	k[0] = Wh * a;
+	k[1] = Wh * c;
+	k[2] = Wh * ((double) p[0] * t[12] + (double) p[4] * t[13] + (double) p[12] + 1.0);
+	k[3] = -Hh * b;
+	k[4] = -Hh * d;
+	k[5] = Hh * (1.0 - ((double) p[1] * t[12] + (double) p[5] * t[13] + (double) p[13]));
+	k[6] = sqrt(((hw * p[0]) * (hw * p[0]) + (hh * p[5]) * (hh * p[5])) / 2.0);
+	if (out_scale != NULL) *out_scale = sqrt((sx * sx + sy * sy) / 2.0);
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_stroke_snap — Flash's device-space stroke rule for a
+// drawing-API stroke (AVM1 action.c / AVM2 avm2_display.c), the runtime twin
+// of hairline_restage (see stroke_snap.h for the contract). Returns the
+// restaged soup (local twips; *out_n vertices), owned by the renderer and
+// valid until the next call, or NULL to draw src->xy unchanged (snap off,
+// unknown transform, singular matrix, degenerate soup).
+//
+// Cached per (soup generation, device affine, stage scale): a static drawing
+// restages once (SWF_STROKE_SNAP_CACHE=0 disables the cache). Kill switch
+// SWF_STROKE_SNAP=0 (shared with the timeline pass).
+// ---------------------------------------------------------------------------
+
+const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSnapSrc* src,
+                                       u32 transform_id, u32* out_n)
+{
+	if (!stroke_snap_dyn_on || src == NULL || src->n == 0 || src->xy == NULL
+	    || src->cen == NULL || src->sf == NULL || !(src->emitted_twips > 1e-6))
+		return NULL;
+
+	double key[7], scale = 0.0;
+	if (!stroke_device_affine(ctx, transform_id, key, &scale)) return NULL;
+	const double Ax = key[0], Bx = key[1], Cx = key[2];
+	const double Ay = key[3], By = key[4], Cy = key[5], stage_scale = key[6];
+	const double det = Ax * By - Bx * Ay;
+	if (!(fabs(det) > 1e-12) || !(scale > 1e-9)) return NULL;
+
+	StrokeSnapCacheEntry* ce = NULL;
+	if (src->gen != 0 && stroke_snap_cache_on != 0)
+	{
+		if (stroke_snap_cache_on < 0)
+		{
+			const char* e = getenv("SWF_STROKE_SNAP_CACHE");
+			stroke_snap_cache_on = !(e != NULL && e[0] == '0');
+		}
+		if (stroke_snap_cache_on && stroke_snap_cache == NULL)
+			stroke_snap_cache = (StrokeSnapCacheEntry*) calloc(STROKE_SNAP_CACHE_SLOTS,
+			                                                   sizeof(StrokeSnapCacheEntry));
+		if (stroke_snap_cache_on && stroke_snap_cache != NULL)
+		{
+			uint64_t h = 1469598103934665603ull;
+			const unsigned char* kb = (const unsigned char*) key;
+			for (size_t i = 0; i < sizeof(key); i++) { h ^= kb[i]; h *= 1099511628211ull; }
+			h ^= src->gen * 0x9E3779B97F4A7C15ull;
+			ce = &stroke_snap_cache[(h ^ (h >> 29)) & (STROKE_SNAP_CACHE_SLOTS - 1)];
+			if (ce->xy != NULL && ce->gen == src->gen && memcmp(ce->key, key, sizeof(key)) == 0)
+			{
+				*out_n = ce->n;
+				return ce->xy;
+			}
+		}
+	}
+
+	// Width rule (stroke_snap.h). Device px per local px from v = M*(1,1)
+	// (Flash 32, s28 w2-flash-stroke-width on acid-stroke-0): normal
+	// |v|/sqrt2, "horizontal" (noVScale) |v.x|, "vertical" (noHScale) |v.y|,
+	// "none" the stage scale alone.
+	double dev_scale = scale;   // device twips per local twip
+	switch (src->flags & 6u)
+	{
+	case 6u: dev_scale = stage_scale; break;
+	case STROKE_FLAG_NO_VSCALE: dev_scale = 20.0 * fabs(Ax + Bx); break;
+	case STROKE_FLAG_NO_HSCALE: dev_scale = 20.0 * fabs(Ay + By); break;
+	default: break;
+	}
+	const double w_px = src->decl_twips * dev_scale / 20.0;
+	const int u = (int) floor(4.0 * w_px + 0.5);
+	int W = 0;
+	if (src->flags & STROKE_FLAG_PIXEL_HINTING) W = (u / 4 < 1) ? 1 : u / 4;
+	else if (u <= 4) W = 1;
+	else if (u == 8) W = 2;
+	else if (u == 12) W = 3;
+	double target_px = W ? (double) W : 2.0 * floor(u / 2.0) / 4.0;
+	if (target_px < 1.0) target_px = 1.0;
+	const double emitted = src->emitted_twips;
+	const double ax_x = fabs(Ax) + fabs(Bx), ax_y = fabs(Ay) + fabs(By);
+	int axis = 0;
+	if (fabs(Bx) <= 1e-6 * ax_x && fabs(Ay) <= 1e-6 * ax_y) axis = 1;
+	else if (fabs(Ax) <= 1e-6 * ax_x && fabs(By) <= 1e-6 * ax_y) axis = 2;
+	const double k_uni = target_px / (emitted * (scale / 20.0));
+	const double sdx = sqrt(Ax * Ax + Bx * Bx), sdy = sqrt(Ay * Ay + By * By);
+	const double kx = (sdx > 1e-12) ? target_px / (emitted * sdx) : k_uni;
+	const double ky = (sdy > 1e-12) ? target_px / (emitted * sdy) : k_uni;
+	const int snap_ok = (W != 0 && axis != 0);
+	// Not a similarity (non-uniform scale or shear): rebuild each offset in
+	// device space with the timeline pass's hairline_flash_offset (device
+	// offset lines, device-circle joins/caps, miters), as Flash does.
+	const double m_mag = fabs(Ax) + fabs(Bx) + fabs(Ay) + fabs(By);
+	const int similar = (fabs(Ax - By) + fabs(Bx + Ay) <= 1e-6 * m_mag)
+	                 || (fabs(Ax + By) + fabs(Bx - Ay) <= 1e-6 * m_mag);
+	const int flash_dev = hairline_flash_width && !similar;
+
+	float* out = (float*) malloc((size_t) src->n * 2 * sizeof(float));
+	if (out == NULL) return NULL;
+	for (unsigned v = 0; v < src->n; v++)
+	{
+		const double vx = src->xy[v * 2], vy = src->xy[v * 2 + 1];
+		const double cx = src->cen[v * 2], cy = src->cen[v * 2 + 1];
+		const unsigned char sf = src->sf[v];
+		const int fx = (axis == 1) ? (sf & 1) : (sf >> 1) & 1;
+		const int fy = (axis == 1) ? (sf >> 1) & 1 : (sf & 1);
+		double cdx = Ax * cx + Bx * cy + Cx;
+		double cdy = Ay * cx + By * cy + Cy;
+		const double ox = vx - cx, oy = vy - cy;
+		double odx = Ax * ox + Bx * oy;
+		double ody = Ay * ox + By * oy;
+		if (flash_dev)
+		{
+			double lx = ox, ly = oy;
+			hairline_flash_offset(Ax, Bx, Ay, By, det, 0.5 * emitted, 0.5 * target_px, &lx, &ly);
+			odx = Ax * lx + Bx * ly;
+			ody = Ay * lx + By * ly;
+		}
+		else if (axis != 0) { odx *= kx; ody *= ky; }
+		else { odx *= k_uni; ody *= k_uni; }
+		cdx = floor(4.0 * cdx + 0.5) * 0.25;
+		cdy = floor(4.0 * cdy + 0.5) * 0.25;
+		if (snap_ok && fx) cdx = stroke_snap_centre(cdx, W);
+		if (snap_ok && fy) cdy = stroke_snap_centre(cdy, W);
+		const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
+		out[v * 2]     = (float) (( By * ndx - Bx * ndy) / det);
+		out[v * 2 + 1] = (float) ((-Ay * ndx + Ax * ndy) / det);
+	}
+	unsigned n = src->n;
+	if (src->post != NULL) src->post(&out, &n);
+	if (out == NULL) return NULL;
+
+	if (ce != NULL)
+	{
+		free(ce->xy);
+		ce->gen = src->gen;
+		memcpy(ce->key, key, sizeof(key));
+		ce->xy = out;
+		ce->n = n;
+		*out_n = n;
+		return out;
+	}
+	free(stroke_snap_scratch);
+	stroke_snap_scratch = out;
+	*out_n = n;
+	return out;
 }
 
 // ---------------------------------------------------------------------------
