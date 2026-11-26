@@ -1,0 +1,27 @@
+{
+ "test": "text/auto_size/height",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 2599,
+   "pixels": 75000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 3,
+     "outliers": 7797,
+     "outlier_pixels": 2599
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

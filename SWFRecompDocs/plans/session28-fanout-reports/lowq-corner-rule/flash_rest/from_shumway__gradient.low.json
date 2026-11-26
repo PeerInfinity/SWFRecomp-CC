@@ -1,0 +1,27 @@
+{
+ "test": "from_shumway/gradient",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 9,
+   "diff_pixels": 70122,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 3,
+     "max_outliers": 0,
+     "outliers": 15897,
+     "outlier_pixels": 15897
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

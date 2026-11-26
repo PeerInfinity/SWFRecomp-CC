@@ -1,0 +1,43 @@
+{
+ "test": "from_shumway/acid/acid-clip-3",
+ "mode": "draw",
+ "num_ticks": 10,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 10,
+   "max_difference": 255,
+   "diff_pixels": 188,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 376,
+     "outlier_pixels": 188
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame3": {
+   "trigger": 3,
+   "max_difference": 255,
+   "diff_pixels": 276,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 552,
+     "outlier_pixels": 276
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

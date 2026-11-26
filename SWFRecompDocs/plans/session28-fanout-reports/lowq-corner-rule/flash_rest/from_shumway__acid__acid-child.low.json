@@ -1,0 +1,43 @@
+{
+ "test": "from_shumway/acid/acid-child",
+ "mode": "draw",
+ "num_ticks": 10,
+ "quality": "low",
+ "comparisons": {
+  "output": {
+   "trigger": 10,
+   "max_difference": 255,
+   "diff_pixels": 258,
+   "pixels": 122880,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 774,
+     "outlier_pixels": 258
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame5": {
+   "trigger": 5,
+   "max_difference": 255,
+   "diff_pixels": 174,
+   "pixels": 122880,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 522,
+     "outlier_pixels": 174
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}
