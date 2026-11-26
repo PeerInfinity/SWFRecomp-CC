@@ -9162,8 +9162,14 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 			uint32_t ce = (ci + 1 < ccount) ? cstarts[ci + 1] : poly_count;
 			if (_GEXPLCLOSED(cs, ce))
 			{
-				uint8_t f = pflag[cs] | pflag[ce - 1];
+				uint8_t f = pflag[cs] | pflag[ce - 1] | STROKE_SNAP_CLOSE;
 				pflag[cs] = f; pflag[ce - 1] = f;
+			}
+			else if (!_GNEEDCLOSE(cs, ce) && ce > cs + 1)
+			{
+				// s28 n-join-disc: open polyline ends (caps).
+				pflag[cs] |= STROKE_SNAP_END;
+				pflag[ce - 1] |= STROKE_SNAP_END;
 			}
 		}
 		path->soup = malloc((size_t) wv * 2 * sizeof(float));

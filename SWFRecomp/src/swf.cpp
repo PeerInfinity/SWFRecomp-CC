@@ -11491,6 +11491,36 @@ namespace SWFRecomp
 									pv_flags[k - 1] |= f;
 									pv_flags[k] |= f;
 								}
+								// s28 n-join-disc: bit 2 = open end (cap),
+								// bit 3 = seam of a closed contour (drawLines
+								// joins it; Flash caps it, and the runtime
+								// places its snapped corner accordingly).
+								if (pv.size() >= 2)
+								{
+									const bool closed = pv.size() > 2
+										&& pv.back().x == pv[0].x && pv.back().y == pv[0].y;
+									const u8 ef = closed ? 8 : 4;
+									// An open end that another path of the same
+									// line style starts or ends on is not a cap:
+									// the shape's edges were split at a style
+									// change and Flash strokes through the
+									// junction (acid-shapes-testing grid corners).
+									auto continued = [&](const Vertex& e)
+									{
+										for (size_t j = 0; j < paths.size(); ++j)
+										{
+											if (j == i || paths[j].verts.empty()
+											    || paths[j].line_style != paths[i].line_style
+											    || paths[j].line_style_list != paths[i].line_style_list) continue;
+											const Vertex& a = paths[j].verts.front();
+											const Vertex& b = paths[j].verts.back();
+											if ((a.x == e.x && a.y == e.y) || (b.x == e.x && b.y == e.y)) return true;
+										}
+										return false;
+									};
+									if (closed || !continued(pv[0])) pv_flags[0] |= ef;
+									if (closed || !continued(pv.back())) pv_flags[pv.size() - 1] |= ef;
+								}
 
 								for (const Tri& ct : centre_tris)
 								{

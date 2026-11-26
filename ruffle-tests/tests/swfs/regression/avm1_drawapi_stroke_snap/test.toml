@@ -3,6 +3,8 @@
 # s28 n-drawapi-stroke-snap: 33300 -> 2442 outliers. Residual = round-join corner
 # pixels of the snapped rects (Flash's join disc is not snapped with the band;
 # report §5) + AA rounding.
+# s28 n-join-disc: corner rule (round-join arc onto Flash's disc union) 2442 -> 2436;
+# residual = closed-seam spill (not placed) + 4x MSAA vs Flash's 16 samples.
 num_frames = 1
 
 [image_comparisons.output]

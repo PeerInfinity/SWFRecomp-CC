@@ -1,0 +1,10 @@
+# Golden = Flash Player 32 (LNX) HIGH oracle (s28 n-join-disc capture jc):
+# W = 1/2..4 px open polylines (4 caps + 8 corner orientations) x 16
+# quarter-pixel offsets, DefineShape1 round caps / joins.
+# s28 n-join-disc: cap / corner rule 19431 -> 16530 outliers; residual = W >= 2
+# disc edges at our 4x MSAA vs Flash's 16 samples per pixel.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 17000

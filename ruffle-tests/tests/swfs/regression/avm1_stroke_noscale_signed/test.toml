@@ -1,0 +1,10 @@
+# Golden = Flash Player 32 (LNX) HIGH oracle (s28 n-join-disc capture nsig):
+# 8 px strokes on 24 px rects under 34 matrices (rotations, flips, shears,
+# scales) x normal / noVScale / noHScale rows. s28 n-join-disc: the signed
+# noScale width max(0, a+c) / max(0, b+d) takes it 110025 -> 45795 outliers;
+# the residual is the general width model under shears / non-uniform scale.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 47000

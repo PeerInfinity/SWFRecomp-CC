@@ -2086,6 +2086,20 @@ static float hairline_stage[16];
 // Drawing-API stroke snap on/off (SWF_STROKE_SNAP=0 turns both passes off,
 // SWF_STROKE_SNAP_DRAWAPI=0 only this one).
 static int stroke_snap_dyn_on = 1;
+// s28 n-join-disc corner/cap rule (stroke_snap_place); SWF_STROKE_JOIN_RULE=0 off.
+static int stroke_join_rule = 1;
+// s28 n-join-disc goal 2: a single no*Scale flag scales the width by the
+// SIGNED device component of v = M*(1,1) (NoVScale v.x, NoHScale v.y, y
+// down), clamped at 0 -> hairline. Flash 32, 34 cells
+// (SWFRecompDocs/plans/n-join-disc-report.md §2): diag(-1,2) NoVScale is a
+// hairline, not 8 px; R45*diag(1,2) (v.x = -0.71) is acid-stroke-0's
+// hairline cell. SWF_STROKE_NOSCALE_SIGNED=0 restores |v.x| / |v.y|.
+static int stroke_noscale_signed = 1;
+static inline double stroke_noscale_axis(double v)
+{
+	if (!stroke_noscale_signed) return fabs(v);
+	return (v > 0.0) ? v : 0.0;
+}
 
 static void stroke_snap_cache_clear(void);
 
@@ -2102,6 +2116,10 @@ static void hairline_init(WebGPURenderContext* ctx)
 		const char* e = getenv("SWF_STROKE_SNAP");
 		const char* e2 = getenv("SWF_STROKE_SNAP_DRAWAPI");
 		stroke_snap_dyn_on = !(e != NULL && e[0] == '0') && !(e2 != NULL && e2[0] == '0');
+		const char* e3 = getenv("SWF_STROKE_JOIN_RULE");
+		stroke_join_rule = !(e3 != NULL && e3[0] == '0');
+		const char* e4 = getenv("SWF_STROKE_NOSCALE_SIGNED");
+		stroke_noscale_signed = !(e4 != NULL && e4[0] == '0');
 	}
 	// The CPU xform mirror also serves the drawing-API stroke snap
 	// (render_webgpu_stroke_snap), so it exists whether or not the movie has
@@ -3462,6 +3480,107 @@ static inline double stroke_snap_centre(double e, int W)
 	return L + 0.5 * W;
 }
 
+// s28 n-join-disc: Flash's ends and corners of a SNAPPED stroke (HIGH quality;
+// pinned with the Flash oracle, SWFRecompDocs/plans/n-join-disc-report.md).
+// Flash draws each snapped axis-aligned segment as its band (perpendicular
+// axis snapped) running between its QUANTISED, unsnapped endpoints, plus:
+//  - an open end (cap): W = 1 nothing (butt); W >= 2 a disc of radius W/2 on
+//    the snapped centreline at the quantised end, so it reaches past the
+//    band end along the axis;
+//  - a corner (join) between a vertical and a horizontal segment: the end
+//    discs of BOTH segments, (Xs, y_q) and (x_q, Ys), clipped to the corner
+//    square (the intersection of the two bands);
+//  - the seam of a CLOSED contour: Flash does not join it, it caps both ends
+//    there, so the two discs are NOT clipped (they paint up to half a pixel
+//    outside the bands; W = 1: nothing).
+// Implemented per vertex (stroke_snap_place): caps exactly; corners as the
+// join fan's arc points pushed onto that union, inside the corner square (the
+// seam's spill past the square is not placed; report §3). W = 1..3 only.
+// Kill switch SWF_STROKE_JOIN_RULE=0 restores the n-stroke-snap placement
+// (every vertex of a corner snapped on both axes).
+
+// Distance from P along unit u to the boundary of the disc (cx, cy, r); 0
+// when the ray misses.
+static inline double stroke_ray_disc(double px, double py, double ux, double uy,
+                                     double cx, double cy, double r)
+{
+	const double qx = px - cx, qy = py - cy;
+	const double b = ux * qx + uy * qy;
+	const double c = qx * qx + qy * qy - r * r;
+	const double disc = b * b - c;
+	if (disc <= 0.0) return 0.0;
+	const double t = -b + sqrt(disc);
+	return (t > 0.0) ? t : 0.0;
+}
+
+// Place one stroke vertex of a snapped run (W >= 1) in device px. In: the
+// quantised device centre (*cdx, *cdy), the device offset re-expanded to the
+// run's width (*odx, *ody), the device-axis snap flags fx / fy and the
+// centre's STROKE_SNAP_END / STROKE_SNAP_CLOSE bits. Out: snapped centre and
+// offset (vertex = centre + offset).
+static inline void stroke_snap_place(double* cdx, double* cdy, double* odx, double* ody,
+                                     int W, int fx, int fy, unsigned sf)
+{
+	const double xq = *cdx, yq = *cdy;
+	const double Xs = fx ? stroke_snap_centre(xq, W) : xq;
+	const double Ys = fy ? stroke_snap_centre(yq, W) : yq;
+	*cdx = Xs; *cdy = Ys;
+	if (stroke_join_rule == 0) return;
+#if MSAA_SAMPLES == 1
+	// quality LOW is a different raster (every cap butt, every corner
+	// square; report §1.4), owned by the LOW slots: keep the n-stroke-snap
+	// placement there.
+	return;
+#endif
+	const double h = 0.5 * W;
+	const double ol = sqrt((*odx) * (*odx) + (*ody) * (*ody));
+	if (W > 3) return;   // the rule is pinned for W = 1..3 only (pixelHinting W >= 4 unmeasured)
+	if (fx && fy)
+	{
+		// Only round-join ARC points move. The segment sides and the arc's two
+		// end points (axis-aligned offsets) stay at the snapped corner: they
+		// are shared with the stroke quads, and pulling a quad end back to
+		// x_q / y_q opens holes inside the corner square (the join fan only
+		// sweeps the outer quadrant). Inner corner / miter vertices
+		// (|offset| != h) keep the square too.
+		if (!(ol > 1e-9) || fabs(ol / h - 1.0) > 0.02) return;
+		const double ux = *odx / ol, uy = *ody / ol;
+		const double ax = fabs(ux), ay = fabs(uy);
+		if (ax < 1e-3 || ay < 1e-3) return;
+		// Each arc point goes to the farthest of, along its ray from the
+		// snapped corner: the horizontal band reaching x_q, the vertical band
+		// reaching y_q (the quads stop at the snapped corner, so the fan
+		// carries the bands' quantised ends), and the two end discs
+		// (Xs, y_q) / (x_q, Ys) -- not at a W = 1 closed seam, which Flash
+		// caps butt. Clipped to the corner square: Flash's closed seam spills
+		// past it ALONG the axes (two caps), which this topology cannot place
+		// without moving the shared quad ends; a diagonal spill would be wrong.
+		const int closed = (sf & STROKE_SNAP_CLOSE) != 0;
+		double t = 0.0;
+		const double dh = (xq - Xs) * ((ux > 0.0) ? 1.0 : -1.0);
+		const double dv = (yq - Ys) * ((uy > 0.0) ? 1.0 : -1.0);
+		if (dh > 0.0) { const double tb = fmin(h / ay, dh / ax); if (tb > t) t = tb; }
+		if (dv > 0.0) { const double tb = fmin(h / ax, dv / ay); if (tb > t) t = tb; }
+		if (!(closed && W == 1))
+		{
+			const double t1 = stroke_ray_disc(Xs, Ys, ux, uy, Xs, yq, h);
+			const double t2 = stroke_ray_disc(Xs, Ys, ux, uy, xq, Ys, h);
+			if (t1 > t) t = t1;
+			if (t2 > t) t = t2;
+		}
+		const double tsq = h / ((ax > ay) ? ax : ay);
+		if (t > tsq) t = tsq;
+		*odx = ux * t; *ody = uy * t;
+		return;
+	}
+	// W = 1 open end: no cap (the band stops at the quantised end).
+	if (W == 1 && (sf & STROKE_SNAP_END) && (fx ^ fy))
+	{
+		if (fy) *odx = 0.0;    // end of a horizontal segment
+		else    *ody = 0.0;    // end of a vertical one
+	}
+}
+
 // s28 w2-flash-stroke-width: one stroke vertex offset d (local twips, from its
 // centreline point) re-expanded to Flash's device-space stroke of half-width
 // hw (device px) under M = [[m00 m01],[m10 m11]] (local twips -> device px).
@@ -3658,8 +3777,8 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 		// normal |v|/sqrt2 under a uniform scale, as n-stroke-snap measured).
 		if (hairline_flash_width && !no_scale)
 		{
-			if (rf & 4u) s_dev = fabs(v_x);
-			else if (rf & 2u) s_dev = fabs(v_y);
+			if (rf & 4u) s_dev = stroke_noscale_axis(v_x);
+			else if (rf & 2u) s_dev = stroke_noscale_axis(v_y);
 		}
 		const double dev_per_twip = s_dev / 20.0;
 		const double w_px = (double) hairline_runs[r][3] * dev_per_twip;
@@ -3720,8 +3839,7 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 			// (with the half width a multiple of 1/4, so do the edges).
 			cdx = floor(4.0 * cdx + 0.5) * 0.25;
 			cdy = floor(4.0 * cdy + 0.5) * 0.25;
-			if (snap_ok && fx) cdx = stroke_snap_centre(cdx, W);
-			if (snap_ok && fy) cdy = stroke_snap_centre(cdy, W);
+			if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf);
 			const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
 			// Back to local.
 			vx.f = (float) (( By * ndx - Bx * ndy) / det);
@@ -3825,8 +3943,8 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 	switch (src->flags & 6u)
 	{
 	case 6u: dev_scale = stage_scale; break;
-	case STROKE_FLAG_NO_VSCALE: dev_scale = 20.0 * fabs(Ax + Bx); break;
-	case STROKE_FLAG_NO_HSCALE: dev_scale = 20.0 * fabs(Ay + By); break;
+	case STROKE_FLAG_NO_VSCALE: dev_scale = stroke_noscale_axis(20.0 * (Ax + Bx)); break;
+	case STROKE_FLAG_NO_HSCALE: dev_scale = stroke_noscale_axis(20.0 * (Ay + By)); break;
 	default: break;
 	}
 	const double w_px = src->decl_twips * dev_scale / 20.0;
@@ -3881,8 +3999,7 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 		else { odx *= k_uni; ody *= k_uni; }
 		cdx = floor(4.0 * cdx + 0.5) * 0.25;
 		cdy = floor(4.0 * cdy + 0.5) * 0.25;
-		if (snap_ok && fx) cdx = stroke_snap_centre(cdx, W);
-		if (snap_ok && fy) cdy = stroke_snap_centre(cdy, W);
+		if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf);
 		const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
 		out[v * 2]     = (float) (( By * ndx - Bx * ndy) / det);
 		out[v * 2 + 1] = (float) ((-Ay * ndx + Ax * ndy) / det);

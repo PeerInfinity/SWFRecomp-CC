@@ -27,6 +27,10 @@
 // Per-vertex axis flags (same bits as the recompiler's stroke_snap_data).
 #define STROKE_SNAP_VERT 1u   // centre ends an exactly vertical segment (x snaps)
 #define STROKE_SNAP_HORZ 2u   // centre ends an exactly horizontal one (y snaps)
+// s28 n-join-disc: where the centre sits on its contour (Flash caps a closed
+// contour's seam instead of joining it; render_webgpu.c stroke_snap_place).
+#define STROKE_SNAP_END   4u   // an open end of the polyline (cap)
+#define STROKE_SNAP_CLOSE 8u   // the seam vertex of a closed contour
 
 // Line flags (same bits as the recompiler's stroke_run_flags).
 #define STROKE_FLAG_PIXEL_HINTING 1u

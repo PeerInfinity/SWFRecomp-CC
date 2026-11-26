@@ -35090,8 +35090,12 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 				u32 cs = contour_starts[ci];
 				u32 ce = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
 				if (_DR_CONTOUR_EXPLICIT_CLOSED(cs, ce)) {
-					u8 f = pflag[cs] | pflag[ce - 1];
+					u8 f = pflag[cs] | pflag[ce - 1] | STROKE_SNAP_CLOSE;
 					pflag[cs] = f; pflag[ce - 1] = f;
+				} else if (!_DR_CONTOUR_NEEDS_CLOSE(cs, ce) && ce > cs + 1) {
+					// s28 n-join-disc: open polyline ends (caps).
+					pflag[cs] |= STROKE_SNAP_END;
+					pflag[ce - 1] |= STROKE_SNAP_END;
 				}
 			}
 			path->stroke_soup = (float*)malloc((size_t)wv * 2 * sizeof(float));
