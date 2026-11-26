@@ -43,4 +43,4 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
-| `45907020469` interim #1 | `4989a9dfb` 2 flash_fixes + fresh upstream download | expected: drift rows only (2 paletteMap rows new) | expected: invalidClipDepth fail→pass; acid-filter stays fail | — |
+| `45907020469` interim #1 | `4989a9dfb` 2 flash_fixes + fresh upstream download | **= ledger**: 4866 rows (4643 pass + 185 rm, 38 failing); only moves = 2 new rows (`avm1/bitmapdata_palettemap_values` pass, `avm2/bitmapdata_palettemap_opaque` mm, fixed later in `ab49742e5`). flash-fixes: APPLIED 64, 0 STALE / 0 UPSTREAMED. Results `e081322b5` | **= ledger**: `invalidClipDepth` fail→pass; `acid-filter` 432→104; 0 regressions (548 pass / 139 fail) | — |
