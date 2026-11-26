@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T18:40:51.543666+00:00",
-    "old_git_sha": "ed63ce7c439940520a8fa7596ef7dd928337d36b",
-    "new_timestamp": "2026-11-26T20:41:28.486803+00:00",
-    "new_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
+    "old_timestamp": "2026-11-26T20:41:28.486803+00:00",
+    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
+    "new_timestamp": "2026-11-26T23:43:06.072006+00:00",
+    "new_git_sha": "4989a9dfb572fafd91b26d56c6b01d24066ba00c",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 778,
     "old_total": 790,
     "old_pass_rate": 97.5,
-    "new_pass": 770,
+    "new_pass": 771,
     "new_ruffle_matched": 8,
-    "new_effective_pass": 778,
-    "new_total": 790,
+    "new_effective_pass": 779,
+    "new_total": 791,
     "new_pass_rate": 97.5,
     "old_mismatched_lines": 12145,
     "new_mismatched_lines": 12145,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 790,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "bitmapdata_palettemap_values",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      }
+    }
+  ]
 }
