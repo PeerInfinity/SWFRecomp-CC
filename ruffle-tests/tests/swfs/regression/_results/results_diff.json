@@ -1,85 +1,153 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-25T22:59:03.581137+00:00",
-    "old_git_sha": "16033a154646a877df742993221eafce207bede1",
-    "new_timestamp": "2026-11-25T23:59:46.689225+00:00",
-    "new_git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
+    "old_timestamp": "2026-11-25T23:59:46.689225+00:00",
+    "old_git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
+    "new_timestamp": "2026-11-26T21:04:08.187674+00:00",
+    "new_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 278,
+    "old_pass": 282,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 278,
-    "old_total": 279,
-    "old_pass_rate": 99.6,
-    "new_pass": 282,
+    "old_effective_pass": 282,
+    "old_total": 282,
+    "old_pass_rate": 100.0,
+    "new_pass": 292,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 282,
-    "new_total": 282,
+    "new_effective_pass": 292,
+    "new_total": 292,
     "new_pass_rate": 100.0,
-    "old_mismatched_lines": 1,
+    "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
     "increased_mismatches": 0,
-    "decreased_mismatches": 1,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 278,
-    "added": 3,
+    "status_changed": 0,
+    "unchanged": 282,
+    "added": 10,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_gnash_flash_probes",
+      "test": "avm1_attached_clip_selfgoto_trace",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 63,
-        "expected_lines": 63,
-        "matching_lines": 63
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
       }
     },
     {
-      "test": "avm1_gnash_flash_probes_v5",
+      "test": "avm1_clipevent_root_goto_stopped",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 77,
-        "expected_lines": 77,
-        "matching_lines": 77
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
       }
     },
     {
-      "test": "avm1_gnash_flash_probes_v6",
+      "test": "avm1_drawapi_stroke_snap",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 63,
-        "expected_lines": 63,
-        "matching_lines": 63
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
       }
     },
     {
-      "test": "avm1_place_occupied_depth_swf5",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
+      "test": "avm1_drawing_stroke_scale",
+      "change_type": "added",
+      "old_status": null,
       "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 5
-      },
+      "old_lines": null,
       "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1_enterframe_root_goto_opcode",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "avm1_stroke_join_cap_snap",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1_stroke_noscale_signed",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm2_drawapi_stroke_snap",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "lowq_gradient_orient_probe",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "lowq_sample_point_probe",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
       }
     }
   ]

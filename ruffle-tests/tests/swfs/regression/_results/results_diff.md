@@ -1,28 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `16033a154646` (2026-11-25T22:59:03.581137+00:00)
-**Current:** `b030ed745d4f` (2026-11-25T23:59:46.689225+00:00)
+**Previous:** `b030ed745d4f` (2026-11-25T23:59:46.689225+00:00)
+**Current:** `bfa47037b19e` (2026-11-26T21:04:08.187674+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 278 | 282 | +4 |
-| Total | 279 | 282 | +3 |
-| Pass rate | 99.6% | 100.0% | +0.4% |
-| Mismatched lines | 1 | 0 | -1 |
-|   Decreased | | | -1 |
+| Passing | 282 | 292 | +10 |
+| Total | 282 | 292 | +10 |
+| Pass rate | 100.0% | 100.0% | 0% |
+| Mismatched lines | 0 | 0 | 0 |
 
-## Newly Passing (1)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `avm1_place_occupied_depth_swf5` | output_mismatch | 5/6 | 6/6 |
-
-## Added Tests (3)
+## Added Tests (10)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm1_gnash_flash_probes` | pass | 63/63 |
-| `avm1_gnash_flash_probes_v5` | pass | 77/77 |
-| `avm1_gnash_flash_probes_v6` | pass | 63/63 |
+| `avm1_attached_clip_selfgoto_trace` | pass | 14/14 |
+| `avm1_clipevent_root_goto_stopped` | pass | 3/3 |
+| `avm1_drawapi_stroke_snap` | pass | 1/1 |
+| `avm1_drawing_stroke_scale` | pass | 0/0 |
+| `avm1_enterframe_root_goto_opcode` | pass | 7/7 |
+| `avm1_stroke_join_cap_snap` | pass | 0/0 |
+| `avm1_stroke_noscale_signed` | pass | 0/0 |
+| `avm2_drawapi_stroke_snap` | pass | 1/1 |
+| `lowq_gradient_orient_probe` | pass | 0/0 |
+| `lowq_sample_point_probe` | pass | 0/0 |
