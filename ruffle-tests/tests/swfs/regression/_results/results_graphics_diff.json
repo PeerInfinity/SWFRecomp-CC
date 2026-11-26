@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T18:40:51.634852+00:00",
-    "old_git_sha": "ed63ce7c439940520a8fa7596ef7dd928337d36b",
-    "new_timestamp": "2026-11-26T20:41:28.577341+00:00",
-    "new_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
+    "old_timestamp": "2026-11-26T20:41:28.577341+00:00",
+    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
+    "new_timestamp": "2026-11-26T23:43:06.163007+00:00",
+    "new_git_sha": "4989a9dfb572fafd91b26d56c6b01d24066ba00c",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 289,
+    "old_pass": 292,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 289,
-    "old_total": 289,
+    "old_effective_pass": 292,
+    "old_total": 292,
     "old_pass_rate": 100.0,
     "new_pass": 292,
     "new_ruffle_matched": 0,
@@ -25,46 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 289,
-    "added": 3,
+    "unchanged": 292,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1_attached_clip_selfgoto_trace",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      }
-    },
-    {
-      "test": "avm1_stroke_join_cap_snap",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "avm1_stroke_noscale_signed",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    }
-  ]
+  "changes": []
 }
