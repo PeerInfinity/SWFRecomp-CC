@@ -19,7 +19,7 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 | # | slug | task | session id |
 |---|---|---|---|
 | 1 | w1-drift | `briefs/w1-drift.md` | session_018CoDi4ZFZ828kpeR8p1qoM — DELIVERED: only the 2 paletteMap rows are new (rest of range already in FINAL); AVM2 paletteMap was a no-op → prototype (+1 new row pass); 62 fixes ALREADY, 0 STALE/UPSTREAMED; FP32: both goldens Flash, AVM2 reads arr[i] (Ruffle arr[i-1], RvF) → w2-palettemap-land |
-| 2 | w1-disposition-audit | `briefs/w1-disposition-audit.md` | session_018CoDi6ePRNuHb1YPKktDNL — launched |
+| 2 | w1-disposition-audit | `briefs/w1-disposition-audit.md` | session_018CoDi6ePRNuHb1YPKktDNL — DELIVERED: +5 priced (native_objects_swf6, globals_swf5 [trade void: gnash v5 goldens Flash], loader_applicationDomain [securityError #2046 path], dependent_strings [swap only], tab edge case); 7 premises refuted; global_decls keep L with new mechanism (native table from FP32 golden). Coordinator FP32: for-in order hash-scattered + NONDETERMINISTIC (bom/loader_load NO-GO); tabIndex rule contradicted by MTASC fixtures (item 7 HOLD) → w2-disposition-land |
 | 3 | w1-timers-goto | `briefs/w1-timers-goto.md` | session_018CoDi7txoNJ1nDAZsFDGxN — launched |
 | 4 | w1-rm-avm1-gnash | `briefs/w1-rm-avm1-gnash.md` | session_018CoDi4vq5d18kxhw4u2ixo — launched |
 | 5 | w1-rm-avm2 | `briefs/w1-rm-avm2.md` | session_018CoDi3Zc75tdYLniTM5WCT — launched |
@@ -34,6 +34,7 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 |---|---|---|---|
 | w2-palettemap-land | w1-drift + FP32 | `avm2/bitmapdata_palettemap_opaque` new→pass; new `regression/avm2_bitmapdata_palettemap_index` | session_018CoDi4Bkz9NG5UkK7xk674 — launched |
 | w2-text-coverage-land | w1-text-pixels + FP32 W1/W2 | rotated_glyphs/borders + edittext_border_transform .04/.06 bands toward goldens; new fixtures; 0 status moves | session_018CoDi3xgg2pUfZeojNd8Fe — launched |
+| w2-disposition-land | w1-disposition-audit + FP32 | native_objects_swf6, globals_swf5, loader_applicationDomain, dependent_strings mm→pass; swz mm (1/3); +2 regression rows; 3 flash_fixes | session_018CoDi5vBfv1NbGkZQQDNaU — launched |
 
 ## Grading runs
 
