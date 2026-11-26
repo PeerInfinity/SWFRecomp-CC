@@ -1,0 +1,20 @@
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 8cfe77145..9668b0245 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -3517,8 +3517,13 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
+ 			else { odx *= k_uni; ody *= k_uni; }
+ 			// Flash rasterises on a quarter-pixel grid: centres land on it
+ 			// (with the half width a multiple of 1/4, so do the edges).
+-			cdx = floor(4.0 * cdx + 0.5) * 0.25;
+-			cdy = floor(4.0 * cdy + 0.5) * 0.25;
++			{
++				static int qlow = -1;
++				if (qlow < 0) { const char* e = getenv("SWF_EXP_QLOW"); qlow = (e && *e) ? atoi(e) : 0; }
++				const int skipq = (MSAA_SAMPLES == 1) && qlow;
++				if (!(skipq && !(snap_ok && fx))) cdx = floor(4.0 * cdx + 0.5) * 0.25;
++				if (!(skipq && !(snap_ok && fy))) cdy = floor(4.0 * cdy + 0.5) * 0.25;
++			}
+ 			if (snap_ok && fx) cdx = stroke_snap_centre(cdx, W);
+ 			if (snap_ok && fy) cdy = stroke_snap_centre(cdy, W);
+ 			const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
