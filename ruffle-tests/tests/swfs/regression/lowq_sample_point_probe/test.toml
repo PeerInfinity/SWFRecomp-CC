@@ -1,0 +1,12 @@
+num_ticks = 1
+
+# Golden = Flash Player 32 quality LOW (see create_test_swf.py). Residual at
+# s28 w2-lowq-sample-point: row 1 strokes (n-stroke-snap rule, LOW not
+# modelled), the hairline cell (static width-0 lines draw nothing here), the
+# focal/repeat radial, the rotated bitmap fill, and one AS3 .5-tie rect row.
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 2000
+
+[player_options]
+with_renderer = { optional = false, quality = "low" }

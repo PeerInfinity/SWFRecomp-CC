@@ -1210,3 +1210,68 @@ The AVM2 rounding rule moves the left border from x=4 to x=5 and the bottom bord
 capture (`run_image.py --screen`, Linux, LOW) draws those two edges at **x=5 and y=394**, the same as ours. Both depend
 only on `PAD` and the stage size, not on font metrics. Flash does not render the Stage3D content and uses a different
 `_sans` font, so the whole frame can't be compared. Same decision. Prune with the rows above.
+
+### s28 lowq-recapture: quality=LOW image goldens that are not FP32 at LOW (2026-11-25)
+
+Oracle: Flash Player 32 at `--quality low`, using the wrapper's `draw()`, or `--screen` for the non-LAYER blends
+`alpha_no_layer`, `erase_no_layer`, `layer_alpha` and `layer_erase`. Linux captures were byte-identical over 2 runs.
+Windows `draw()` == Linux within each row's tolerance.
+Captures: `SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/`. Report: `…/lowq-recapture-report.md`.
+
+The Ruffle goldens below are Ruffle renders at quality low: GPU pixel-centre sampling and the hardware-lerp
+gradient ramp. FP32 LOW samples slanted fill edges at the scanline TOP. Its horizontal and vertical edges follow
+the pixel-centre rule, and radial and axis-aligned linear gradients are painted at the pixel corner. The
+w2-lowq-sample-point model reproduces this.
+
+| test | cmp | golden vs FP32-LOW (channels > tol) |
+|---|---|---:|
+| `avm2/displayobject_mask` | output | 56 |
+| `avm2/displayobject_scrollrect` | output | 428 |
+| `avm2/graphics_bad_direct_commands` | output | 588 |
+| `avm2/loader_loadbytes_events` | output | 188 |
+| `avm2/mouse_pick_dobj_mask` / `mouse_pick_non_interactive_dobj_mask` | output | 177 / 168 |
+| `from_gnash/misc-ming.all/morph_test1` | frame1–6 | 393 / 1563 ×4 / 760 |
+| `visual/blend_modes/*` (14) | output | 5 465 – 13 763 |
+| `visual/cache_as_bitmap/drawing_api` / `nested_rotation` | output | 1 798 / 387 |
+| `visual/drawing_api/gradient_focal_point` | output | 28 805 |
+| `visual/filters/color_matrix` | output | 16 717 |
+| `visual/fonts/glyph` | output | 1 656 |
+| `visual/simple_shapes/gradients/focal_radial` | output | 10 366 (ours with the model: 0) |
+| `visual/simple_shapes/layers` | output | 1 759 |
+| `visual/simple_shapes/gradients/gradients` (s28 lowq-corner-rule) | output | 6 959 (ours with the model: 3) |
+| `visual/simple_shapes/gradients/reflect` / `repeat` (s28 lowq-corner-rule) | output | 644 343 / 649 083 (ours: 5 628 each) |
+| `visual/opaque_background` (s28 lowq-corner-rule) | output | 6 248 (ours: 1 956) |
+
+**Decision:** match Flash. The FP32 captures are stored as `flash_fixes` entries on branch `lowq-fixes`, to land
+with the model. Rows not swapped (FP32 platform-dependent, device font, or load timing) are listed in the report, §6.
+
+Also measured: three corpus goldens that an earlier audit counted as Flash at LOW are FP32 at **HIGH**.
+- `from_shumway/gradientTransform`: direct pinned at LOW, 9 channels over tol 3.
+- `from_shumway/acid/acid-color` frame1 and `acid/acid-bitmap-draw_quality_low`: the wrapper at HIGH PASSES; at
+  LOW it does not.
+
+We keep these rows' goldens (test.toml says low; see the report, §5).
+
+## Flash quality=LOW gradient paint: corner sample, spread translation 255/256, snapped placement (s28 lowq-corner-rule)
+
+**Tests:** `visual/simple_shapes/gradients/{gradients,reflect,repeat,radial,focal_radial}`, `avm2/graphics_gradients`,
+`visual/drawing_api/{fills_and_lines,gradient_focal_point}`, `visual/opaque_background`; fixture
+`regression/lowq_gradient_orient_probe` (Flash 32 LOW golden, 71 cells).
+
+**Flash 32 at quality LOW** (probe fits, pixel-exact except fixed-point ties; report
+`SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule-report.md`):
+- gradient paint is evaluated at the pixel's TOP-LEFT corner, for every linear orientation, mirror, skew and
+  placement, and for radials;
+- linear ramps read entry floor(256 t); radial and focal ramps read round(256 t);
+- reflect / repeat spreads use the gradient matrix translation scaled by 255/256 (shape-local). On
+  `gradients/gradients`' big reflect field that is a constant +1.52 ramp entries. Pad fills have no such term;
+- in the main pass the object's device-pixel translation is rounded half-down for the paint (x.5 -> x, x.75 -> x+1);
+  inside blend / filter layers it is not;
+- an `opaqueBackground` rect fills device pixels floor(min) .. ceil(max) inclusive (applied to unsnapped entries;
+  a cacheAsBitmap entry keeps its snapped rect, `visual/cache_as_bitmap/avm2_button`).
+
+Ruffle's goldens at quality low use GPU pixel-centre sampling and the hardware-lerp ramp, so its reflect / repeat
+goldens sit 640k+ channels away from FP32 (ours with the rules: 5 628).
+
+**Decision:** match Flash (Flash over Ruffle). The affected goldens are swapped to the FP32 LOW captures on branch
+`lowq-fixes`. Prune criterion: when a row's golden is a Flash reference, or Ruffle's LOW renderer adopts these rules.

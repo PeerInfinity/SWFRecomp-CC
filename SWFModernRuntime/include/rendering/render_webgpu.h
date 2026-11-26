@@ -446,6 +446,9 @@ void render_webgpu_upload_cxform(WebGPURenderContext* context, float* cxform);
 void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_t num_verts, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_morph(WebGPURenderContext* context, size_t start_offset, size_t num_verts, const u32* start_verts, const float* end_xy, float t, u32 color_start, u32 color_count, const float* interp_colors, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
+// style_flags OR into the vertices' style word: 0x1000u = no LOWQ vertex
+// y rule; 0x8000u = Flash LOW outward rect fill (render_webgpu.c LOWQ notes).
+void render_webgpu_draw_rect_ex(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id, u32 style_flags);
 void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
 struct StrokeSnapSrc;
 const float* render_webgpu_stroke_snap(WebGPURenderContext* context, const struct StrokeSnapSrc* src, u32 transform_id, u32* out_n);

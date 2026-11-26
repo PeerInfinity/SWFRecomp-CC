@@ -3912,7 +3912,18 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
 static void cab_snap_in_place(DisplayObject* obj, float world[16])
 {
 	float dx, dy;
-	if (!cab_snap_delta(obj, world, &dx, &dy)) return;
+	int snapped = cab_snap_delta(obj, world, &dx, &dy);
+	// s28 w2-lowq-sample-point: an UNFILTERED cacheAsBitmap subtree is blitted
+	// from its own cache raster, which keeps the pixel-centre rule
+	// (visual/cache_as_bitmap/scroll_rect, Flash exact). Flag it in the
+	// matrix's z column (it multiplies z = 0, so it changes no position; it is
+	// inherited by every child composed from this matrix); vs_main skips the
+	// quality=low vector shift for flagged draws.
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	if (obj != NULL && obj->filter_type == 0 && cab_snaps(obj))
+		world[11] = 1.0f;
+#endif
+	if (!snapped) return;
 	world[12] += dx;
 	world[13] += dy;
 }
@@ -4271,7 +4282,17 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				u32 crop_slot = 0;
 				if (g_next_dynamic_xform_slot < g_xform_slot_capacity) {
 					crop_slot = g_next_dynamic_xform_slot++;
+					// s28 w2-lowq-sample-point: the scrollRect crop keeps the
+					// pixel-centre rule at quality=low (z-column flag, see
+					// cab_snap_in_place; it changes no position).
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+					float crop_m[16];
+					memcpy(crop_m, composed, sizeof(crop_m));
+					crop_m[11] = 1.0f;
+					renderer_write_transform(context, crop_slot, crop_m);
+#else
 					renderer_write_transform(context, crop_slot, composed);
+#endif
 					have_crop_slot = 1;
 				}
 				// transform_data translations are twips (apply_as_transform:
@@ -4738,11 +4759,24 @@ static void draw_entry_opaque_background(SWFAppContext* app_context,
 	u32 rgb = obj->opaque_bg_rgb;
 	// cxform slot 0 (identity): Ruffle's draw_rect takes a Color, never a
 	// ColorTransform, so the background ignores the placement cxform.
-	renderer_draw_rect(context, b[0], b[2], w, h,
-		(float) ((rgb >> 16) & 0xFF) / 255.0f,
-		(float) ((rgb >> 8) & 0xFF) / 255.0f,
-		(float) (rgb & 0xFF) / 255.0f,
-		1.0f, obj->transform_id, 0);
+	// s28 lowq-corner-rule: at quality=low the background rect takes neither
+	// the vertex y rule nor the centre rule: Flash fills device pixels
+	// floor(min) .. ceil(max) inclusive (visual/opaque_background). A
+	// cacheAsBitmap-snapped entry draws it from the SNAPPED slot, which Flash
+	// does not use (visual/cache_as_bitmap/avm2_button: Flash 12..112, the
+	// outward rule on the snapped slot 13..113), so it only skips the y rule.
+	if (cab_snaps(obj))
+		renderer_draw_rect_nolowq(context, b[0], b[2], w, h,
+			(float) ((rgb >> 16) & 0xFF) / 255.0f,
+			(float) ((rgb >> 8) & 0xFF) / 255.0f,
+			(float) (rgb & 0xFF) / 255.0f,
+			1.0f, obj->transform_id, 0);
+	else
+		renderer_draw_rect_centre(context, b[0], b[2], w, h,
+			(float) ((rgb >> 16) & 0xFF) / 255.0f,
+			(float) ((rgb >> 8) & 0xFF) / 255.0f,
+			(float) (rgb & 0xFF) / 255.0f,
+			1.0f, obj->transform_id, 0);
 }
 
 #ifndef NO_GRAPHICS

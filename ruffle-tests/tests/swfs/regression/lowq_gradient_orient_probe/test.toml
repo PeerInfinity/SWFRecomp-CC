@@ -1,0 +1,11 @@
+num_ticks = 1
+
+# Golden = Flash Player 32 LNX draw() at quality LOW (README.md). origin/master
+# before s28 lowq-corner-rule: 93 696 channels over tol 2; with the model: 915
+# (exact-integer ramp ties, radial centre pixels, the 4.5..35.5 rects' trailing edges).
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 1000
+
+[player_options]
+with_renderer = { optional = false, quality = "low" }

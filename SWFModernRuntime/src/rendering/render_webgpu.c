@@ -103,6 +103,115 @@ EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, d
 // Embedded WGSL shader sources
 // ---------------------------------------------------------------------------
 
+// s28 w2-lowq-sample-point: Flash Player's quality=LOW vector rasteriser
+// (Flash 32 captures: session28-fanout-reports/w1-local-oracles/
+// w1-avm2-vector-flash/lowq_sample_point.low.png and
+// n-stroke-snap-captures/fill_edges/flash_low.png; regression fixtures
+// lowq_sample_point_probe and lowq_fill_edges).
+// - Slanted edges cross a scanline at its TOP (sample (x + 0.5, y)), while
+//   the rows a horizontal edge covers follow the pixel-centre rule, an exact
+//   .5 included (y = 5.25 / 5.5 cover row 5, y = 5.55 starts at row 6).
+//   GPU equivalent (1 sample): move each vector vertex to
+//   y' = min(y, ceil(y - 0.5)) + 0.5 in device px. Integer vertices get the
+//   plain +0.5 shift (the top sample); a vertex in the upper half of a pixel
+//   is pulled onto the pixel line first, so its horizontal edge keeps the
+//   centre-rule row. x keeps the GPU centre rule (ties included).
+// - Only solid / gradient fills (strokes are solid fills) move. Bitmap fills
+//   and Bitmap quads keep the GPU rule (probe row 3: a Bitmap at x.5 / y.5
+//   starts on the floor pixel), and so do draws flagged in the transform's
+//   z column (transform[2].w != 0: a scrollRect crop or an unfiltered
+//   cacheAsBitmap subtree, tag.c; the column multiplies z = 0, so the flag
+//   moves nothing).
+// - Gradient paint is fixed in screen space and evaluated at the pixel's
+//   top-left corner with the object's translation snapped (lq_paint below;
+//   s28 lowq-corner-rule).
+// The target size W x H rides in the stage matrix's unused z column
+// (m[8], m[9], lowq_put_target; m[11] = the paint snap flag); vs_main resets
+// the column to (0, 0, 1, 0)
+// before using the matrix, so the projection itself is unchanged.
+// Everything here is preprocessor-dead at MSAA_SAMPLES != 1.
+#if MSAA_SAMPLES == 1
+#ifndef LOWQ_VS_COND
+#define LOWQ_VS_COND "(out.v_style_type & 0xF0u) != 0x40u && (in.style.x & 0x1000u) == 0u && transform[2].w == 0.0"
+#endif
+#ifndef LOWQ_SNAP_X
+#define LOWQ_SNAP_X "d.x"
+#endif
+#ifndef LOWQ_SNAP_Y
+#define LOWQ_SNAP_Y "min(d.y, ceil(d.y - 0.5)) + 0.5"
+#endif
+#define LOWQ_POS_DECL "var"
+// s28 lowq-corner-rule: gradient paint (lowq_gradient_orient_probe, Flash 32
+// LOW captures; lowq-corner-rule-report.md). The paint is fixed in screen
+// space (vertex snapping moves no paint) and Flash evaluates it
+//   - at the pixel's TOP-LEFT corner (every linear orientation, mirror, skew
+//     and placement; radials too),
+//   - with the object's device-px translation T rounded half-down,
+//     ceil(T - 0.5) (a placement at x.5 paints as if at x, x.75 as x + 1;
+//     lowq-corner-rule/sweep_placement). Main pass only (stage m[11] = 1,
+//     lowq_put_target): inside a blend / filter layer the snap moved
+//     visual/blend_modes/* and filters/bevel_* AWAY from Flash (add 3978 ->
+//     5347, bevel_full 87305 -> 92572 channels), so layers paint unsnapped,
+// so lq_paint is the local position of (centre - 0.5 - snap) for this
+// vertex's screen position. Reflect / repeat spreads add a further term in
+// the gradient branch (LOWQ_SPREAD_FIX).
+// Style bit 0x8000 (opaqueBackground rect, render_webgpu_draw_rect_ex with
+// RECT_LOWQ_OUTWARD): Flash LOW fills device pixels floor(min) .. ceil(max)
+// INCLUSIVE (visual/opaque_background: bounds 272.5..487.5 x 59.5..329.45
+// cover 272..488 x 59..330); bits 0x2000 / 0x4000 mark the vertex as the
+// rect's max x / max y. Axis-aligned, unflipped transforms only.
+#define LOWQ_VS_POSITION \
+"  var lq_stage = stage_transform.matrix;\n" \
+"  let lq_wh = lq_stage[2].xy;\n" \
+"  let lq_snap_t = lq_stage[2].w;\n" \
+"  lq_stage[2] = vec4f(0.0, 0.0, 1.0, 0.0);\n" \
+"  out.position = lq_stage * transform * pos;\n" \
+"  var lq_paint = pos;\n" \
+"  if (lq_wh.x > 0.0) {\n" \
+"    let p = out.position;\n" \
+"    let d = vec2f((p.x / p.w * 0.5 + 0.5) * lq_wh.x, (0.5 - p.y / p.w * 0.5) * lq_wh.y);\n" \
+"    var q = d;\n" \
+"    if (" LOWQ_VS_COND ") {\n" \
+"      q = vec2f(" LOWQ_SNAP_X ", " LOWQ_SNAP_Y ");\n" \
+"      out.position = vec4f((q.x / lq_wh.x * 2.0 - 1.0) * p.w, (1.0 - q.y / lq_wh.y * 2.0) * p.w, p.z, p.w);\n" \
+"    }\n" \
+"    let lq_m = lq_stage * transform;\n" \
+"    let a00 = lq_m[0].x * 0.5 * lq_wh.x; let a10 = -lq_m[0].y * 0.5 * lq_wh.y;\n" \
+"    let a01 = lq_m[1].x * 0.5 * lq_wh.x; let a11 = -lq_m[1].y * 0.5 * lq_wh.y;\n" \
+"    let det = a00 * a11 - a01 * a10;\n" \
+"    if ((in.style.x & 0x8000u) != 0u && a10 == 0.0 && a01 == 0.0 && a00 > 0.0 && a11 > 0.0) {\n" \
+"      q = vec2f(select(floor(d.x + 0.001), ceil(d.x - 0.001) + 1.0, (in.style.x & 0x2000u) != 0u),\n" \
+"                select(floor(d.y + 0.001), ceil(d.y - 0.001) + 1.0, (in.style.x & 0x4000u) != 0u));\n" \
+"      out.position = vec4f((q.x / lq_wh.x * 2.0 - 1.0) * p.w, (1.0 - q.y / lq_wh.y * 2.0) * p.w, p.z, p.w);\n" \
+"    }\n" \
+"    if (abs(det) > 1e-12) {\n" \
+"      let lq_o4 = lq_m * vec4f(0.0, 0.0, 0.0, 1.0);\n" \
+"      let lq_o = vec2f((lq_o4.x / lq_o4.w * 0.5 + 0.5) * lq_wh.x, (0.5 - lq_o4.y / lq_o4.w * 0.5) * lq_wh.y);\n" \
+"      let pp = q - d - 0.5 - lq_snap_t * (ceil(lq_o - 0.5) - lq_o);\n" \
+"      let dp = (q - d) * p.w;\n" \
+"      let dq = pp * p.w;\n" \
+"      lq_paint = vec4f(pos.x + (a11 * dq.x - a01 * dq.y) / det, pos.y + (a00 * dq.y - a10 * dq.x) / det, 0.0, 1.0);\n" \
+"      pos = vec4f(pos.x + (a11 * dp.x - a01 * dp.y) / det, pos.y + (a00 * dp.y - a10 * dp.x) / det, 0.0, 1.0);\n" \
+"    }\n" \
+"  }\n"
+// Reflect / repeat gradients: Flash uses the gradient matrix's translation
+// scaled by 255/256 (shape-local; the law fits every spread cell of the probe
+// pixel-exact, from 0.03 to 40 ramp entries, and gradients/gradients' reflect
+// field: +1.52 entries). inv_mats maps local -> [0,1]^2 with the gradient
+// origin at 0.5, so the shift is (0.5 - M * 0) / 256. Pad fills: no term.
+#define LOWQ_PAINT_POS "lq_paint"
+#define LOWQ_SPREAD_FIX \
+"    if (spread_mode != 0u) {\n" \
+"      let lq_c = inv_mats[out.v_style_id][3].xy;\n" \
+"      inv_pos = vec4f(inv_pos.xy + (vec2f(0.5) - lq_c) / 256.0, inv_pos.zw);\n" \
+"    }\n"
+#else
+#define LOWQ_POS_DECL "let"
+#define LOWQ_VS_POSITION "  out.position = stage_transform.matrix * transform * pos;\n"
+#define LOWQ_PAINT_POS "pos"
+#define LOWQ_SPREAD_FIX ""
+#endif
+
 static const char* vertex_wgsl =
 "@group(0) @binding(0) var<storage, read> transforms: array<mat4x4f>;\n"
 "@group(0) @binding(1) var<storage, read> colors: array<vec4f>;\n"
@@ -139,17 +248,18 @@ static const char* vertex_wgsl =
 "  let transform_id = instance_id & 0xFFFFu;\n"
 "  let cxform_id = instance_id >> 16u;\n"
 "  let transform = transforms[transform_id];\n"
-"  let pos = vec4f(in.position, 0.0, 1.0);\n"
+"  " LOWQ_POS_DECL " pos = vec4f(in.position, 0.0, 1.0);\n"
 "  let spread_mode = (in.style.x >> 8u) & 0x3u;\n"
 "  let is_linear_rgb = (in.style.x >> 10u) & 0x1u;\n"
 "  out.v_style_type = in.style.x & 0xFFu;\n"
 "  out.v_style_id = in.style.y & 0xFFFFu;\n"
 "  let style_upper = (in.style.y >> 16u) & 0xFFFFu;\n"
-"  out.position = stage_transform.matrix * transform * pos;\n"
+LOWQ_VS_POSITION
 "  if (out.v_style_type == 0x00u) {\n"
 "    out.v_args = colors[out.v_style_id];\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x10u) {\n"
-"    let inv_pos = inv_mats[out.v_style_id] * pos;\n"
+"    " LOWQ_POS_DECL " inv_pos = inv_mats[out.v_style_id] * " LOWQ_PAINT_POS ";\n"
+LOWQ_SPREAD_FIX
 "    var focal_z = 0.0;\n"
 "    if (out.v_style_type == 0x13u) {\n"
 "      focal_z = clamp((f32(style_upper) - 32768.0) / 16384.0, -0.98, 0.98);\n"
@@ -188,6 +298,30 @@ static const char* vertex_wgsl =
 "  out.v_cxform_id = cxform_id;\n"
 "  return out;\n"
 "}\n";
+
+// s28 lowq-corner-rule: radial / focal ramps are read at round(256 t),
+// linear ones at floor(256 t) (probe lowq_gradient_orient_probe: rad_c /
+// rad_frac / refl_rad fit round; every linear and step cell fits floor, an
+// exact integer tie reading the upper entry on axis-aligned ramps; rotated
+// ramps' ties go down from Flash's fixed-point error, not modelled). The
+// corner evaluation point moved to the vertex stage (LOWQ_VS_POSITION).
+#if MSAA_SAMPLES == 1
+#define LOWQ_RAD_BIAS " + 0.001953125"
+#else
+#define LOWQ_RAD_BIAS ""
+#endif
+
+// s28 w2-lowq-sample-point: Flash quality=low reads the 256-entry ramp at
+// the NEAREST-BELOW entry, floor(t * 256) (probe row 2: pixel k of a 32-px
+// black->white ramp is exactly 8k), not the hardware-linear lerp.
+#if MSAA_SAMPLES == 1
+#define LOWQ_GRADIENT_LOOKUP \
+"  if (row >= 0) {\n" \
+"    return textureLoad(gradient_tex, vec2i(i32(clamp(floor(clamp(t, 0.0, 1.0) * 256.0 + 0.001), 0.0, 255.0)), row), 0);\n" \
+"  }\n"
+#else
+#define LOWQ_GRADIENT_LOOKUP ""
+#endif
 
 static const char* fragment_wgsl =
 "@group(0) @binding(4) var<storage, read> cxforms: array<vec4f>;\n"
@@ -244,7 +378,7 @@ static const char* fragment_wgsl =
 "\n"
 "// UVs are now in [0,1] range (normalization baked into inverse matrix)\n"
 "fn linear_t(v_args: vec4f) -> f32 { return apply_spread(v_args.x, v_args.w); }\n"
-"fn radial_t(v_args: vec4f) -> f32 { return apply_spread(length(v_args.xy * 2.0 - 1.0), v_args.w); }\n"
+"fn radial_t(v_args: vec4f) -> f32 { return apply_spread(length(v_args.xy * 2.0 - 1.0)" LOWQ_RAD_BIAS ", v_args.w); }\n"
 "fn focal_radial_t(v_args: vec4f) -> f32 {\n"
 "  // Match Ruffle's focal gradient formula exactly (gradient.wgsl)\n"
 "  let f = v_args.z;\n"
@@ -255,7 +389,7 @@ static const char* fragment_wgsl =
 "  d = d / l;\n"
 "  let denom = sqrt(max(1.0 - f * f * d.y * d.y, 0.0)) + f * d.x;\n"
 "  if (abs(denom) < 0.00001) { return 0.0; }\n"
-"  return apply_spread(l / denom, v_args.w);\n"
+"  return apply_spread(l / denom" LOWQ_RAD_BIAS ", v_args.w);\n"
 "}\n"
 "\n"
 "fn linear_to_srgb_ch(c: f32) -> f32 {\n"
@@ -283,6 +417,7 @@ static const char* fragment_wgsl =
 "// and we lerp along U by hand to keep the smooth ramp. `t` is already in [0,1]\n"
 "// (spread/clamp applied by the *_t helpers).\n"
 "fn sample_gradient(t: f32, row: i32) -> vec4f {\n"
+LOWQ_GRADIENT_LOOKUP
 "  // Replicate Ruffle's HARDWARE linear sampler on a 256-texel ramp with\n"
 "  // clamp-to-edge addressing: texcoord t maps to texel-space coord t*256, with\n"
 "  // texel centers at i+0.5, so the effective fractional index is t*256-0.5\n"
@@ -3010,12 +3145,37 @@ void render_webgpu_set_background(WebGPURenderContext* ctx, u8 r, u8 g, u8 b)
 	ctx->blue = b;
 }
 
+#if MSAA_SAMPLES == 1
+// s28 w2-lowq-sample-point: hand vs_main the render target's size in the stage
+// matrix's z column (see the LOWQ_VS_POSITION comment).
+static void lowq_put_target(float* t, int w, int h, int snap_translation)
+{
+	t[8] = (float) w;
+	t[9] = (float) h;
+	// s28 lowq-corner-rule: m[11] = 1 enables the gradient paint's translation
+	// snap (see LOWQ_VS_POSITION); 0 inside blend / filter layers.
+	t[11] = snap_translation ? 1.0f : 0.0f;
+}
+#endif
+
+static void lowq_upload_stage(WebGPURenderContext* ctx, const float* m)
+{
+#if MSAA_SAMPLES == 1
+	float t[16];
+	memcpy(t, m, sizeof(t));
+	lowq_put_target(t, ctx->width, ctx->height, 1);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0, t, 16 * sizeof(float));
+#else
+	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0, m, 16 * sizeof(float));
+#endif
+}
+
 // Overwrites the stage_to_ndc uniform buffer. Called from tag.c after
 // render_webgpu_open_pass when _root has an AS-set transform to compose
 // (e.g. _root._x = 200 shifting the whole scene).
 void render_webgpu_upload_stage_transform(WebGPURenderContext* ctx, const float matrix[16])
 {
-	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0, matrix, 16 * sizeof(float));
+	lowq_upload_stage(ctx, matrix);
 	hairline_note_stage(matrix);
 }
 
@@ -3216,8 +3376,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
 
 	// Upload stage_to_ndc uniform
-	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0,
-	                     ctx->stage_to_ndc, 16 * sizeof(float));
+	lowq_upload_stage(ctx, ctx->stage_to_ndc);
 	hairline_note_stage(ctx->stage_to_ndc);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
 
@@ -3874,6 +4033,14 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 	float r, float g, float b, float a,      // fill color (0-1)
 	u32 transform_id, u32 cxform_id)
 {
+	render_webgpu_draw_rect_ex(ctx, x, y, w, h, r, g, b, a, transform_id, cxform_id, 0u);
+}
+
+void render_webgpu_draw_rect_ex(WebGPURenderContext* ctx,
+	float x, float y, float w, float h,
+	float r, float g, float b, float a,
+	u32 transform_id, u32 cxform_id, u32 style_flags)
+{
 	if (!ctx->renderer_ok) return;
 	if (ctx->dynamic_rect_count >= MAX_DYNAMIC_RECTS) return;
 	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
@@ -3894,16 +4061,22 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 	x0.f = x;       y0.f = y;
 	x1.f = x + w;   y1.f = y + h;
 
-	u32 sx = 0x00;   // solid color fill
+#if MSAA_SAMPLES != 1
+	style_flags = 0u;   // the LOWQ exemption bit only exists at quality=low
+#endif
+	u32 sx = 0x00 | style_flags;   // solid color fill (+ LOWQ exemption bit)
 	u32 sy = color_idx;
 
+	// LOWQ outward rect (0x8000): tell vs_main which corner each vertex is.
+	u32 mx = (style_flags & 0x8000u) ? 0x2000u : 0u;
+	u32 my = (style_flags & 0x8000u) ? 0x4000u : 0u;
 	u32 verts[6][4] = {
-		{ x0.u, y0.u, sx, sy },  // top-left
-		{ x1.u, y0.u, sx, sy },  // top-right
-		{ x0.u, y1.u, sx, sy },  // bottom-left
-		{ x1.u, y0.u, sx, sy },  // top-right
-		{ x1.u, y1.u, sx, sy },  // bottom-right
-		{ x0.u, y1.u, sx, sy },  // bottom-left
+		{ x0.u, y0.u, sx, sy },            // top-left
+		{ x1.u, y0.u, sx | mx, sy },       // top-right
+		{ x0.u, y1.u, sx | my, sy },       // bottom-left
+		{ x1.u, y0.u, sx | mx, sy },       // top-right
+		{ x1.u, y1.u, sx | mx | my, sy },  // bottom-right
+		{ x0.u, y1.u, sx | my, sy },       // bottom-left
 	};
 
 	// Stage vertices into the dynamic area (flushed once in close_pass)
@@ -6768,6 +6941,9 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 				float ky = (float) ctx->height / (float) (ctx->height + 2 * P);
 				m[0] *= kx; m[4] *= kx; m[8] *= kx; m[12] *= kx;
 				m[1] *= ky; m[5] *= ky; m[9] *= ky; m[13] *= ky;
+#if MSAA_SAMPLES == 1
+				lowq_put_target(m, ctx->width + 2 * P, ctx->height + 2 * P, 0);
+#endif
 				wgpuQueueWriteBuffer(ctx->queue, ps->stage_buf, 0, m, sizeof(m));
 				pad_swap(ctx, ps);
 				ctx->filter_pad = P;
