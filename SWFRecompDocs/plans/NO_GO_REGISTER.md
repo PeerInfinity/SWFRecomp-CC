@@ -97,6 +97,12 @@ whose reason was "it costs a Ruffle-golden pass" is suspect wherever the golden 
 | FileReference `download()`/`upload()`/`postData` | AVM1/AVM2 FileReference (23 rows pass) | NO-GO, nothing to do: AVM1 is a full Ruffle-mirroring implementation, and Ruffle's AVM2 versions are stubs too | s28/w1-leads #3 | A graded row or a game that needs it. Arc §28.4 still listed it as a "small leftover", so this verdict supersedes that |
 | Harness `G-d` tick emulation (`num_ticks` when runtime `stage.frameRate` ≠ header) | harness | HOLD until a row proves a gain | Arc §24.4 | A failing row whose diff is that tick mismatch |
 
+### 1d. Cancelled by user decision
+
+| item | scope | decision | ruled where | reopen criterion |
+|---|---|---|---|---|
+| **N procgen substrate arc** | level load/detect substrate, level generator (`n-level-generator-plan.md`, P0–P2 done), portals (`n-portals-plan.md`), JS physics (`n-physics-js-reimplementation-plan.md`) | CANCELLED: the whole arc. Existing code and docs stay in place; the N pixel-parity ladder is unaffected | Robert, 2026-11-26 | A new decision from Robert only |
+
 ---
 
 ## 2. Recently overturned in s26–s28 (do NOT cite these as NO-GO)

@@ -1,5 +1,9 @@
 # N physics — faithful JS reimplementation (plan)
 
+> **CANCELLED (Robert, 2026-11-26).** The whole N procgen substrate arc (level generator, portals, JS physics) is
+> cancelled. Kept for the record only; do not fund. See `SWFRecompDocs/plans/NO_GO_REGISTER.md` §1d.
+
+
 Date: 2026-06-30. Goal (user): a JavaScript implementation of N's physics that
 matches the original as closely as possible, so we can run cheap approximations in
 JS and confirm in real Flash physics. This UPGRADES the current motion model (a

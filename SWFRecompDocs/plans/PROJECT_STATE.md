@@ -146,10 +146,11 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
 
 ### 2. N procgen substrate: level generator, portals, JS physics
 
-- **State:** Injected-AS hooks load raw levels and detect completion (2026-06-30). Generator P0 (Level model + round-trip encode/decode of all 150 built-in levels) and P1 (batch-verify queue + seeded flat generator, 6/6 complete on real N under Ruffle) are DONE. Portals and `nPhysics.js` are planned only.
-- **Status:** PARKED. Nothing after 2026-06-30 was found in this repo. Whether Archipelago-CC carried it on is UNCONFIRMED.
-- **Next step:** If resumed, P2+ of `SWFRecompDocs/plans/n-level-generator-plan.md`, or the portals plan (`n-portals-plan.md`). Memory flags both as their own sessions, with no size given.
-- **Ruled out:** None recorded.
+- **Status: CANCELLED (Robert, 2026-11-26).** The whole arc is cancelled: the level-load/detect substrate, the level
+  generator (P0–P2 had been done), portals, and the `nPhysics.js` reimplementation. Do not fund any part of it.
+- **What stays:** the existing code and docs remain in place; nothing was deleted. The N pixel-parity ladder (§1) is a
+  separate track and is NOT affected.
+- **Reopen:** only by a new decision from Robert (`NO_GO_REGISTER.md` §1d).
 
 ### 3. Other AVM1 browser games (Doodle Jump, Pacman, Tetris, Minesweeper) and the DJ level loader
 
@@ -307,7 +308,7 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
 | track | status | last evidence | next step |
 |---|---|---|---|
 | N: play + Flash pixel parity | ACTIVE (ladder, between sessions) | 2026-11-26 (`03527a3f8`) | closed seam as two caps in builders/lyon; then LOW stroke raster |
-| N procgen substrate / portals / physics-js | PARKED | 2026-06-30 | generator P2+ or portals (own session) |
+| N procgen substrate / portals / physics-js | **CANCELLED** (Robert, 2026-11-26) | 2026-06-30 | none |
 | Other AVM1 games (DJ, Pacman, Tetris, Minesweeper) | PARKED | 2026-11-25 (Tetris build fix) | DJ browser busy-loop after PLAY (s29 board) |
 | Browser/WASM parity ladder | ACTIVE (ladder, between sessions) | 2026-11-26 (`a9fb68b42`) | gotoAndStop(current) FP32 fixture (S), then the DJ freeze, then self-goto port §5a (M) |
 | AVM1 perf | PARKED | 2026-11-21 (`10b5dff69`) | string-ID interning (planned, not started) |

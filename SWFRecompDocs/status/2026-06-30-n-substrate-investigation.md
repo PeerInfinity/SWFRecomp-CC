@@ -1,5 +1,9 @@
 # N ("the way of the ninja") as a procgen substrate — investigation
 
+> **CANCELLED (Robert, 2026-11-26).** The whole N procgen substrate arc (level generator, portals, JS physics) is
+> cancelled. Kept for the record only; do not fund. See `SWFRecompDocs/plans/NO_GO_REGISTER.md` §1d.
+
+
 Date: 2026-06-30. Goal (user): load a *specific level* into recompiled N and
 *detect when the level is completed*. Scope chosen: **arbitrary raw levels**,
 **native/headless fixture tier first** (mirrors the DJ loader's first increment).

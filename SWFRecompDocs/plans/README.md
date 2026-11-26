@@ -48,9 +48,9 @@ Grounded in the [upstream comparison analyses](../upstream-comparison/):
   umbrella; Phases 1 (native) + 2 (WASM bridge) done, Phase 3 next:
   [archipelago-phase3-substrate-and-item-application.md](archipelago-phase3-substrate-and-item-application.md).
 - N (Metanet) procgen substrate:
-  [n-level-generator-plan.md](n-level-generator-plan.md) (P0–P2 done, vertical/serpentine next),
-  [n-portals-plan.md](n-portals-plan.md) (future session),
-  [n-physics-js-reimplementation-plan.md](n-physics-js-reimplementation-plan.md) (future session).
+  [n-level-generator-plan.md](n-level-generator-plan.md) (**CANCELLED 2026-11-26**; P0–P2 had been done),
+  [n-portals-plan.md](n-portals-plan.md) (**CANCELLED 2026-11-26**),
+  [n-physics-js-reimplementation-plan.md](n-physics-js-reimplementation-plan.md) (**CANCELLED 2026-11-26**).
 - [graphics-native-test-mode-plan.md](graphics-native-test-mode-plan.md) —
   Phase 2 in progress (948/1125 as of 2026-05-11; 2 strict parity gaps remain).
   Operational companion: [graphics-native-test-mode-playbook.md](graphics-native-test-mode-playbook.md).

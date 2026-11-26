@@ -1,5 +1,9 @@
 # N level generator — plan
 
+> **CANCELLED (Robert, 2026-11-26).** The whole N procgen substrate arc (level generator, portals, JS physics) is
+> cancelled. Kept for the record only; do not fund. See `SWFRecompDocs/plans/NO_GO_REGISTER.md` §1d.
+
+
 Date: 2026-06-30. Goal: a JavaScript generator that emits **solvable** levels for
 the recompiled Flash game **N** (Metanet, momentum side-platformer), feeding them
 into the working N substrate (`ruffle-tests/tests/swfs/_swfbridge/livetest/n_loader/`,
