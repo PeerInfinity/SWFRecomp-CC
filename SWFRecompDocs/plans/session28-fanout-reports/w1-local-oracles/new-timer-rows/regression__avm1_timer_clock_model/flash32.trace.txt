@@ -1,0 +1,19 @@
+F1
+z1 f1
+z2 f1
+z3 f1
+F2
+b f2
+a1 f2
+n f2
+a2 f2
+a3 f3
+e f3
+F3
+a4 f3
+F4
+F5 cnt=10
+F6 cnt=12
+F7 cnt=10
+F8 cnt=0
+F9 end
