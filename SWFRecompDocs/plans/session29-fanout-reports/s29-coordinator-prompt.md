@@ -105,7 +105,7 @@ real gaps unless a disposition says otherwise):
   - gnash `gotoFrameFromInterval{,2}` are still rm against Flash goldens.
 - **goto/nav:**
   - `actionNextFrame`'s `g_inside_enterframe_dispatch` arm may be stale, like the GotoFrame one `4a25debc9` removed.
-  - A gotoAndStop(current) Flash fixture: the browser-only stop guard vs the CI same-frame branch.
+  - (The gotoAndStop(current) question belongs to the browser ladder: see below.)
 - **ruffle_matched pool:** the remaining w1b NO-GO buckets (`session28-fanout-reports/w1b-rm-*-report.md`) and the AVM2
   text-layout bucket. Re-price each against FP32 before funding it. Split by VM (memory
   `triage-bucket-by-vm-not-symptom`).
@@ -138,10 +138,20 @@ real gaps unless a disposition says otherwise):
 
 - **N ladder** (head, from `SWFRecompDocs/plans/n-join-disc-report.md`): emit a closed stroke seam as two caps in
   builders/lyon. The first cut opened holes, so price it on the n-join-disc ledger. Then the LOW stroke raster.
-- **Browser ladder** (head, from `session28-fanout-reports/browser-attached-goto-report.md`):
-  - the §5a timeline-sprite self-goto port (M; it broke nested gotos on the s28 HEAD);
-  - the gotoAndStop(current) fixture (shared with the trace slot above: pick one owner);
-  - the Doodle Jump browser busy-loop after PLAY (pre-existing).
+- **Browser ladder** (from `session28-fanout-reports/browser-attached-goto-report.md` §3.4–§5), in this order:
+  1. **gotoAndStop(current) (S + a corpus run; the ladder owns it, not a cloud slot).** On `gotoAndStop(N)` while the
+     clip already shows N, the browser-only guard just stops the clip, while CI's `ng_gotoFrameByMC` same-frame branch
+     re-runs the frame's tags. Doodle Jump's breakable `attachBlocks` and N's `tileMC` depend on the guard. Write an FP32
+     fixture (an attached clip whose current frame re-places a child), then make the guard all-build or change CI's
+     branch to match Flash.
+  2. **Doodle Jump browser freeze after PLAY (pre-existing).** A busy loop starts within about 1 s of PLAY (renderer at
+     ~104% CPU; 4/7 runs after the s28 change, and at base too). Levels are random because browser `Math.random` is
+     unseeded. Seed the build (`EMCC_CFLAGS=-DMOCK_DATE_TIME=…`, the N recipe), take a wasm stack sample, and check
+     memory `wasm-stack-overflow-64kb`.
+  3. **Timeline-sprite self-goto port (§5a, M).** Drop the `att_mc == NULL` skip in the browser apply pass, then bisect
+     why it drops nested `_root.c.n` (s28 tag.c candidates `613c0f100`, `0f2caed84`, `e7afd5ad2`). The oracle is
+     `nested_sprite_inframe_goto` via child_probe. Ride-alongs: delete the dead `pending_remove` code; measure
+     `graphics_stubs.c` Group 1.
 - **How to run them:** launch with
   `PATH="$PATH:/mnt/c/Windows/System32:/mnt/c/Windows" ~/bin/wsl-launch-claude.sh -m opus -C /home/robert/CC/SWFRecomp-CC -d : -t <slug> -f <brief>`,
   verify `/proc/<pid>/cwd`, and send a handshake. Write each brief from the previous report's "next" section. Verify

@@ -93,7 +93,7 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
    nulls, `avm1movie`, the FTE line model.
 3. **Timers tail:** `avm1_timer_clock_model` (Flash is nondeterministic, so use a bound check), an AVM1 timer check after
    enterFrame, gnash `gotoFrameFromInterval{,2}`.
-4. **Goto/nav:** a stale `actionNextFrame` enterframe arm? A gotoAndStop(current) Flash fixture.
+4. **Goto/nav:** a stale `actionNextFrame` enterframe arm? (The gotoAndStop(current) fixture belongs to the browser ladder, §4.)
 5. **Pixels: the LOW model next slice.** The .5-tie rule, the LOW stroke y rule (3 class-c rows), and a Windows FP32
    check of the 4 swap candidates.
 6. **Pixels: size the AA mode** (Flash 4×4 SSAA vs our MSAA) before anyone builds it.
@@ -170,10 +170,14 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
   - s27 local ladder ported CI's eager placement init, per-tick advance order, and parked-root frame behaviour into the browser. It also made every browser link fail on any wasm-ld warning (`c8ed0e679`).
   - s28 sent root gotos and attached-clip gotos through the CI arms and deleted `advance_attached_clip_frames` (`dc6c75a64`, `a9fb68b42`, 2026-11-26). Browser audio is now an AudioWorklet (`0cb5464e5`, 2026-10-19).
 - **Status:** ACTIVE. It is a local ladder between sessions.
-- **Next step (worth doing):** The timeline-sprite self-goto port §5a (**M**; it breaks nested gotos on the new HEAD). After that:
-  - a gotoAndStop(current) Flash fixture (the browser-only `stop` guard vs CI's same-frame branch);
-  - checking whether `actionNextFrame`'s `g_inside_enterframe_dispatch` arm is stale;
-  - the DJ busy-loop (all from arc §29.4).
+- **Next steps (worth doing), in order** (from `browser-attached-goto-report.md` §3.4–§5):
+  1. A gotoAndStop(current) FP32 fixture (S, plus a corpus run). It settles the browser-only `stop` guard vs CI's
+     same-frame branch, which Doodle Jump's `attachBlocks` and N's `tileMC` depend on.
+  2. The Doodle Jump browser freeze after PLAY: a busy loop, level-dependent because browser `Math.random` is
+     unseeded. Seed the build and take a wasm stack sample.
+  3. The timeline-sprite self-goto port §5a (**M**; it breaks nested gotos on the new HEAD), plus deleting the dead
+     `pending_remove` code.
+  - Separately, on the corpus side: check whether `actionNextFrame`'s `g_inside_enterframe_dispatch` arm is stale.
   - The gate inventory's triage column is still empty. It had 157 browser-none sites in July, and s27 deleted 18 action.c gates. The current count is UNCONFIRMED; regenerate it with `tools/gate_inventory.py`.
 - **Ruled out:**
   - "Browser gaps are action.c arms." The eager-init, advance-order and parked-frame gaps were in `tag.c`/`swf.c` (arc §28 standing verdicts).
@@ -305,7 +309,7 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
 | N: play + Flash pixel parity | ACTIVE (ladder, between sessions) | 2026-11-26 (`03527a3f8`) | closed seam as two caps in builders/lyon; then LOW stroke raster |
 | N procgen substrate / portals / physics-js | PARKED | 2026-06-30 | generator P2+ or portals (own session) |
 | Other AVM1 games (DJ, Pacman, Tetris, Minesweeper) | PARKED | 2026-11-25 (Tetris build fix) | DJ browser busy-loop after PLAY (s29 board) |
-| Browser/WASM parity ladder | ACTIVE (ladder, between sessions) | 2026-11-26 (`a9fb68b42`) | self-goto port §5a (M) |
+| Browser/WASM parity ladder | ACTIVE (ladder, between sessions) | 2026-11-26 (`a9fb68b42`) | gotoAndStop(current) FP32 fixture (S), then the DJ freeze, then self-goto port §5a (M) |
 | AVM1 perf | PARKED | 2026-11-21 (`10b5dff69`) | string-ID interning (planned, not started) |
 | AVM2 perf | DONE (30 fps met); levers PARKED | 2026-10-16 (`5367e2b33`) | optional: `add` Number+int, `coerce Entity` |
 | AVM2 browser memory | DONE | 2026-10-19 (`c1fa89bc2`) | none (Snailiad 603 MB flag) |
