@@ -1,0 +1,123 @@
+{
+ "test": "from_gnash/misc-ming.all/loop/simple_loop_test",
+ "mode": "draw-win",
+ "num_ticks": 30,
+ "quality": null,
+ "comparisons": {
+  "frame1": {
+   "trigger": 2,
+   "max_difference": 255,
+   "diff_pixels": 121,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 242,
+     "outlier_pixels": 121
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame2": {
+   "trigger": 3,
+   "max_difference": 255,
+   "diff_pixels": 241,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 482,
+     "outlier_pixels": 241
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame3": {
+   "trigger": 4,
+   "max_difference": 255,
+   "diff_pixels": 361,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 722,
+     "outlier_pixels": 361
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame4": {
+   "trigger": 5,
+   "max_difference": 0,
+   "diff_pixels": 0,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 0,
+     "outlier_pixels": 0
+    }
+   ],
+   "pass": true,
+   "exact": true
+  },
+  "frame5": {
+   "trigger": 6,
+   "max_difference": 255,
+   "diff_pixels": 121,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 242,
+     "outlier_pixels": 121
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame6": {
+   "trigger": 7,
+   "max_difference": 255,
+   "diff_pixels": 241,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 482,
+     "outlier_pixels": 241
+    }
+   ],
+   "pass": false,
+   "exact": false
+  },
+  "frame7": {
+   "trigger": 8,
+   "max_difference": 255,
+   "diff_pixels": 361,
+   "pixels": 480000,
+   "checks": [
+    {
+     "tolerance": 1,
+     "max_outliers": 0,
+     "outliers": 722,
+     "outlier_pixels": 361
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

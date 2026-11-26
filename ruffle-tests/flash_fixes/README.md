@@ -41,6 +41,7 @@ download.
 | `visual/definefont4` | `output.expected.png` | 2026-11-24 | same (LNX == WIN; embedded DefineFont4) | fails either way; we are closer to Flash (5325) than the old golden was (6331) |
 | `avm1/goto_rewind_movieclip_replace` | `output.txt` | 2026-11-25 | s28 trace-provenance (LNX pinned ×2 == no-pin == WIN) | expected `ruffle_matched` → pass (ours == FP32) |
 | `avm1/movieclip_hittest_shapeflag` | `output.txt` | 2026-11-25 | same | stays `output_mismatch`; 9 lines vs Flash |
+| `from_gnash/misc-ming.all/loop/simple_loop_test` | `frame{1,2,3,5,6,7}.expected.png` | 2026-11-25 | s28 snap-pixel-audit (draw, quality low, LNX == WIN) | 6 × fail → pass (ours == FP32, 0 channels) |
 
 **Graded** in run `45547012629` at `7c3cfdcb7` (results `e1425f417`) vs `cb14cd063`: 0 status moves in either axis.
 Excess channels vs the new Flash goldens:

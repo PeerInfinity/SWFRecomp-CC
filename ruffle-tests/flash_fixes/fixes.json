@@ -207,5 +207,71 @@
     "reason": "Corpus convention mismatch: Ruffle's runner defaults log_warnings=true (ErrorReporting on), but this gnash golden is Flash with ErrorReporting off. Set log_warnings=false so Flash's debug-warning lines are stripped from our output, as Ruffle does for such rows.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-occupied-depth",
     "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/loop/simple_loop_test",
+    "file": "frame1.expected.png",
+    "upstream_sha256": "9457577c0e2657edb6d76242a52918083c264e6b05f4aeddcba8c98b5c868f57",
+    "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame1.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame1.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "reason": "Linux == Windows; no text. The golden is not FP32 output: 242 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/loop/simple_loop_test",
+    "file": "frame2.expected.png",
+    "upstream_sha256": "fafe6f25840c65c9933dca081b615d0bd7095bb14489865fdac26548dd422455",
+    "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame2.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame2.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "reason": "Linux == Windows; no text. The golden is not FP32 output: 482 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/loop/simple_loop_test",
+    "file": "frame3.expected.png",
+    "upstream_sha256": "b8192efdd14b10301621acabc363709a9769f81dbe8cf8114fb8919b2f638b9d",
+    "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame3.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame3.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "reason": "Linux == Windows; no text. The golden is not FP32 output: 722 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/loop/simple_loop_test",
+    "file": "frame5.expected.png",
+    "upstream_sha256": "9457577c0e2657edb6d76242a52918083c264e6b05f4aeddcba8c98b5c868f57",
+    "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame5.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame5.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "reason": "Linux == Windows; no text. The golden is not FP32 output: 242 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/loop/simple_loop_test",
+    "file": "frame6.expected.png",
+    "upstream_sha256": "fafe6f25840c65c9933dca081b615d0bd7095bb14489865fdac26548dd422455",
+    "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame6.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame6.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "reason": "Linux == Windows; no text. The golden is not FP32 output: 482 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "from_gnash/misc-ming.all/loop/simple_loop_test",
+    "file": "frame7.expected.png",
+    "upstream_sha256": "b8192efdd14b10301621acabc363709a9769f81dbe8cf8114fb8919b2f638b9d",
+    "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame7.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame7.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "reason": "Linux == Windows; no text. The golden is not FP32 output: 722 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
+    "added": "2026-11-25"
   }
 ]

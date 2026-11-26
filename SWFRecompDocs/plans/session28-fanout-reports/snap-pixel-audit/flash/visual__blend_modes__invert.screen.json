@@ -1,0 +1,27 @@
+{
+ "test": "visual/blend_modes/invert",
+ "mode": "screen",
+ "num_ticks": 1,
+ "quality": null,
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 11128,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 2,
+     "max_outliers": 0,
+     "outliers": 12800,
+     "outlier_pixels": 4367
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}
