@@ -1,23 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b030ed745d4f` (2026-11-26T00:30:59.287656+00:00)
-**Current:** `4a25debc987e` (2026-11-26T04:57:43.399100+00:00)
+**Previous:** `4a25debc987e` (2026-11-26T04:57:43.399100+00:00)
+**Current:** `ed63ce7c4399` (2026-11-26T18:40:51.634852+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 282 | 287 | +5 |
-| Total | 282 | 287 | +5 |
+| Passing | 287 | 289 | +2 |
+| Total | 287 | 289 | +2 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (5)
+## Added Tests (2)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm1_clipevent_root_goto_stopped` | pass | 3/3 |
-| `avm1_drawapi_stroke_snap` | pass | 1/1 |
-| `avm1_drawing_stroke_scale` | pass | 0/0 |
-| `avm1_enterframe_root_goto_opcode` | pass | 7/7 |
-| `avm2_drawapi_stroke_snap` | pass | 1/1 |
+| `lowq_gradient_orient_probe` | pass | 0/0 |
+| `lowq_sample_point_probe` | pass | 0/0 |

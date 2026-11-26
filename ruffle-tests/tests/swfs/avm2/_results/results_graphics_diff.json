@@ -1,93 +1,73 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T00:30:59.151015+00:00",
-    "old_git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
-    "new_timestamp": "2026-11-26T04:57:43.324357+00:00",
-    "new_git_sha": "4a25debc987ecbd0c8bc286bb498428558cc5a49",
+    "old_timestamp": "2026-11-26T04:57:43.324357+00:00",
+    "old_git_sha": "4a25debc987ecbd0c8bc286bb498428558cc5a49",
+    "new_timestamp": "2026-11-26T18:40:51.560148+00:00",
+    "new_git_sha": "ed63ce7c439940520a8fa7596ef7dd928337d36b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1305,
+    "old_pass": 1306,
     "old_ruffle_matched": 34,
-    "old_effective_pass": 1339,
-    "old_total": 1348,
-    "old_pass_rate": 96.8,
-    "new_pass": 1306,
+    "old_effective_pass": 1340,
+    "old_total": 1351,
+    "old_pass_rate": 96.7,
+    "new_pass": 1309,
     "new_ruffle_matched": 34,
-    "new_effective_pass": 1340,
+    "new_effective_pass": 1343,
     "new_total": 1351,
-    "new_pass_rate": 96.7,
-    "old_mismatched_lines": 1669,
-    "new_mismatched_lines": 1664,
+    "new_pass_rate": 96.9,
+    "old_mismatched_lines": 1664,
+    "new_mismatched_lines": 1661,
     "increased_mismatches": 0,
-    "decreased_mismatches": 8,
-    "newly_passing": 1,
+    "decreased_mismatches": 3,
+    "newly_passing": 3,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 1346,
-    "added": 3,
+    "status_changed": 3,
+    "unchanged": 1348,
+    "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_root",
+      "test": "timer_checks_per_frame",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 16,
-        "expected_lines": 58,
-        "matching_lines": 5
-      },
+      "old_status": "timeout",
+      "new_status": "pass",
+      "old_lines": null,
       "new_lines": {
-        "actual_lines": 34,
-        "expected_lines": 58,
-        "matching_lines": 12
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     },
     {
-      "test": "mouse_pick_avm1_root",
+      "test": "timer_tie_order",
+      "change_type": "changed",
+      "old_status": "timeout",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      }
+    },
+    {
+      "test": "timer_timeout_ids",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "timer_checks_per_frame",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "timeout",
-      "old_lines": null,
-      "new_lines": null
-    },
-    {
-      "test": "timer_tie_order",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "timeout",
-      "old_lines": null,
-      "new_lines": null
-    },
-    {
-      "test": "timer_timeout_ids",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
         "actual_lines": 11,
         "expected_lines": 11,
         "matching_lines": 8
+      },
+      "new_lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
       }
     }
   ]
