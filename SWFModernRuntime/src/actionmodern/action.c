@@ -55267,6 +55267,9 @@ void actionGetTime(SWFAppContext* app_context)
 	if (delta_ms <= last_returned)
 		delta_ms = last_returned + 1;
 	last_returned = delta_ms;
+	// s28 w3-new-timer-rows: busy-loop accounting for the timer clock (timer.c).
+	extern void timerNoteGetTime(uint32_t ms);
+	timerNoteGetTime(delta_ms);
 
 	float delta_ms_f32 = (float) delta_ms;
 

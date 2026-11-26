@@ -109,6 +109,37 @@ static int g_next_timer_id = 1;
 #define TIMER_SANITY_TICKS 1000000
 static uint64_t g_timer_cur_us = 0;
 
+// s28 w3-new-timer-rows: busy code. Flash checks its timers continuously
+// while idle (the catch-up loop below models that), so timers are only ever
+// OVERDUE together after code that blocked: a `while (getTimer() - start <
+// 50) {}` loop. Flash then runs every overdue timer once, in creation order
+// (avm1/timer_tie_order "overdue together"/"overdue intervals", FP32; Ruffle
+// 72d054edd). getTimer is a wall clock here (actionGetTime, which also bumps
+// it 1 ms per call when the wall clock has not moved), so a busy loop is
+// detected by call count, like Ruffle's AVM1 time_offset heuristic: once a
+// window (one timer check / one callback) has made TIMER_FREE_GETTIMER
+// calls, the window's getTimer span becomes clock time.
+#define TIMER_FREE_GETTIMER 20
+static uint32_t g_gt_calls = 0;
+static uint32_t g_gt_first = 0;
+static uint32_t g_gt_busy_ms = 0;
+
+void timerNoteGetTime(uint32_t ms)
+{
+	if (g_gt_calls++ == 0) g_gt_first = ms;
+	if (g_gt_calls > TIMER_FREE_GETTIMER && ms > g_gt_first)
+		g_gt_busy_ms = ms - g_gt_first;
+}
+
+// Take (and reset) the busy time of the window that just ended, in µs.
+static uint64_t timerTakeBusyUs(void)
+{
+	uint64_t us = (uint64_t) g_gt_busy_ms * 1000u;
+	g_gt_calls = 0;
+	g_gt_busy_ms = 0;
+	return us;
+}
+
 static uint64_t timerIntervalUs(double delay_int32)
 {
 	int32_t d = (int32_t) delay_int32;
@@ -530,13 +561,17 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 			g_current_context = actionClosureBaseClip(app_context, func->base_clip, NULL);
 
 		// this_var = NULL: the core passes NULL as the ABI receiver, as both
-		// arms always did. Type-1 keeps no captured scopes (a type-1 closure
-		// loses its defining chain here — a normalization candidate, not a
-		// migration change). Same silent fixes as the method-form above
+		// arms always did. Same silent fixes as the method-form above
 		// (clamp/pad, bounded scope push, scope_mc, NULL-checked dispatch).
+		// s28 w3-new-timer-rows: a type-1 (DefineFunction v1) closure now
+		// keeps its defining chain too (INV_CAPTURED_SCOPE, captured is_with
+		// copied as-is, same as the LC/receiver type-1 arms). Without it a
+		// `setInterval(function(){ trace(name); clearInterval(id); }, d)`
+		// closure read its enclosing function's `name`/`id` as undefined and
+		// never cleared (avm1/timer_tie_order, FP32 golden).
 		u32 _tf_flags = (func->function_type == 2)
 			? (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_VERSION_SWITCH)
-			: INV_VERSION_SWITCH;
+			: (INV_CAPTURED_SCOPE | INV_VERSION_SWITCH);
 		// s26 w1-avm1-dispatch-scope PROTOTYPE (item 2, s25 L3): a fresh local
 		// activation for both types (Ruffle timer.rs Avm1Function -> func.call(
 		// .., this = Undefined, params) -> Avm1Function::exec new_local_scope):
@@ -573,11 +608,98 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 	processTimersImpl(app_context, frame_duration_ms);
 	g_in_process_timers--;
 }
+// Fire one timer and settle it (shared by the idle loop and the overdue pass).
+// `late_from` != 0: a late interval is rescheduled from that time, skipping
+// its missed periods (Ruffle 72d054edd); 0: it keeps its rhythm. Returns 0
+// when execution halted.
+static int timerFireAndSettle(SWFAppContext* app_context, int idx, uint64_t late_from)
+{
+	TimerEntry* t = &g_timers[idx];
+	// A method-form timer whose target clip was removed is cancelled at
+	// fire time without a call (Ruffle: avm1_removed() -> cancel_timer).
+	int cancel = 0;
+	if (t->is_method && t->object.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		MovieClip* tmc = (MovieClip*)(uintptr_t)t->object.data.numeric_value;
+		if (tmc == NULL || tmc->depth == INT_MIN) cancel = 1;
+	}
+
+	int expected_id = t->id;
+	if (!cancel)
+	{
+		fireTimerCallback(app_context, t);
+
+		// Ruffle runs Player::run_actions after every callback.
+		// Fire deferred onChanged from replaceSel (if any)
+		actionFlushPendingOnChanged(app_context);
+		// Flush pending onLoads queued by attachMovie during this timer callback
+		actionFlushPendingOnLoads(app_context);
+	}
+
+	// The callback may have cleared this timer (or cleared it and a new
+	// one reused the slot): only reschedule the entry it fired. Re-derive
+	// the pointer: the callback may have grown (moved) the table.
+	t = &g_timers[idx];
+	if (t->active && t->id == expected_id)
+	{
+		if (!t->is_interval || cancel)
+			t->active = 0;
+		else
+		{
+			uint64_t next = t->tick_us + t->interval_us;
+			if (late_from != 0 && next < late_from) next = late_from + t->interval_us;
+			t->tick_us = next;
+		}
+	}
+	return !g_execution_halted;
+}
+
+// One Flash timer check after busy code: every timer due before the clock
+// runs ONCE, in id (creation) order, whatever its due time.
+static void timerRunOverduePass(SWFAppContext* app_context)
+{
+	uint64_t now = g_timer_cur_us;
+	int n = 0;
+	for (int i = 0; i < g_timers_cap; i++)
+		if (g_timers[i].active && g_timers[i].tick_us < now) n++;
+	if (n == 0) return;
+	int* ids = (int*) malloc((size_t) n * sizeof(int));
+	if (ids == NULL) return;
+	int k = 0;
+	for (int i = 0; i < g_timers_cap && k < n; i++)
+	{
+		if (!g_timers[i].active || !(g_timers[i].tick_us < now)) continue;
+		int j = k++;
+		while (j > 0 && ids[j - 1] > g_timers[i].id) { ids[j] = ids[j - 1]; j--; }
+		ids[j] = g_timers[i].id;
+	}
+	for (int q = 0; q < k; q++)
+	{
+		int idx = -1;
+		for (int i = 0; i < g_timers_cap; i++)
+			if (g_timers[i].active && g_timers[i].id == ids[q]) { idx = i; break; }
+		if (idx < 0) continue;  // cleared by an earlier callback
+		if (!timerFireAndSettle(app_context, idx, now)) break;
+	}
+	free(ids);
+}
+
 static void processTimersImpl(SWFAppContext* app_context, double frame_duration_ms)
 {
+	// Busy frame code since the last check: the clock moved under it, and
+	// the timers it made overdue get one check now (before the frame's
+	// end; a busy stretch longer than the frame makes the frame late).
+	uint64_t frame_end = g_timer_cur_us + (uint64_t) (frame_duration_ms * 1000.0);
+	uint64_t busy_us = timerTakeBusyUs();
+	int busy_pass = 0;
+	if (busy_us != 0)
+	{
+		g_timer_cur_us += busy_us;
+		busy_pass = 1;
+	}
+
 	// Ruffle Timers::update_timers: advance the clock first (also when no
 	// timer is active, so a later timer is scheduled against the real time).
-	g_timer_cur_us += (uint64_t) (frame_duration_ms * 1000.0);
 
 	// Method-form timers whose target clip was removed can never fire
 	// again (Ruffle cancels them when they come due, below); drop them now
@@ -591,15 +713,26 @@ static void processTimersImpl(SWFAppContext* app_context, double frame_duration_
 		if (tmc == NULL || tmc->depth == INT_MIN) g_timers[i].active = 0;
 	}
 
-	int tick_count = 0;
 	// s27 w1-timers-robustness (landed w2-timers-land): init actions queued by a goto in a
 	// callback run after the batch of timers due at the same instant
 	// (tagDrainGotoInitActions; gnash gotoFrameFromInterval `x0xx1x234`).
 	tagGotoInitTimerPass(1);
+	if (busy_pass)
+	{
+		timerRunOverduePass(app_context);
+		timerTakeBusyUs();  // a nested busy callback only moves the clock
+		tagDrainGotoInitActions(app_context, 1);
+		ng_runPendingRootGotoFromEvent(app_context);
+	}
+	if (g_timer_cur_us < frame_end) g_timer_cur_us = frame_end;
+	uint64_t bound = g_timer_cur_us;
+
+	int tick_count = 0;
 	int have_batch = 0;
 	uint64_t batch_tick = 0;
 	for (;;)
 	{
+		if (g_execution_halted) break;
 		// Earliest due active timer (ties: lowest id = creation order).
 		int best = -1;
 		for (int i = 0; i < g_timers_cap; i++)
@@ -609,7 +742,7 @@ static void processTimersImpl(SWFAppContext* app_context, double frame_duration_
 			    (g_timers[i].tick_us == g_timers[best].tick_us && g_timers[i].id < g_timers[best].id))
 				best = i;
 		}
-		if (best < 0 || !(g_timers[best].tick_us < g_timer_cur_us)) break;
+		if (best < 0 || !(g_timers[best].tick_us < bound)) break;
 
 		TimerEntry* t = &g_timers[best];
 		if (have_batch && t->tick_us != batch_tick)
@@ -625,41 +758,23 @@ static void processTimersImpl(SWFAppContext* app_context, double frame_duration_
 			break;
 		}
 
-		// A method-form timer whose target clip was removed is cancelled at
-		// fire time without a call (Ruffle: avm1_removed() -> cancel_timer).
-		int cancel = 0;
-		if (t->is_method && t->object.type == ACTION_STACK_VALUE_MOVIECLIP)
-		{
-			MovieClip* tmc = (MovieClip*)(uintptr_t)t->object.data.numeric_value;
-			if (tmc == NULL || tmc->depth == INT_MIN) cancel = 1;
-		}
-
-		int expected_id = t->id;
 		if (!have_batch) { have_batch = 1; batch_tick = t->tick_us; }
-		if (!cancel)
+		timerTakeBusyUs();  // open this callback's busy window
+		if (!timerFireAndSettle(app_context, best, 0)) break;
+		uint64_t cb_busy = timerTakeBusyUs();
+		if (cb_busy != 0)
 		{
-			fireTimerCallback(app_context, t);
-
-			// Ruffle runs Player::run_actions after every callback.
-			// Fire deferred onChanged from replaceSel (if any)
-			actionFlushPendingOnChanged(app_context);
-			// Flush pending onLoads queued by attachMovie during this timer callback
-			actionFlushPendingOnLoads(app_context);
+			// The callback blocked: the clock moved past the frame's end, and
+			// what it made overdue runs at once, in creation order.
+			g_timer_cur_us += cb_busy;
+			tagDrainGotoInitActions(app_context, 1);
+			ng_runPendingRootGotoFromEvent(app_context);
+			have_batch = 0;
+			timerRunOverduePass(app_context);
+			timerTakeBusyUs();
 		}
-
-		// The callback may have cleared this timer (or cleared it and a new
-		// one reused the slot): only reschedule the entry it fired. Re-derive
-		// the pointer: the callback may have grown (moved) the table.
-		t = &g_timers[best];
-		if (t->active && t->id == expected_id)
-		{
-			if (!t->is_interval || cancel)
-				t->active = 0;
-			else
-				t->tick_us += t->interval_us;
-		}
-		if (g_execution_halted) break;
 	}
+	timerTakeBusyUs();  // frame code after this check starts a fresh window
 	tagGotoInitTimerPass(0);
 	tagDrainGotoInitActions(app_context, 1);
 	ng_runPendingRootGotoFromEvent(app_context);

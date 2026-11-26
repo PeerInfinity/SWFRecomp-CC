@@ -3386,22 +3386,46 @@ static void render_apply_text_bounds(Avm2Context* ctx, Avm2Object* obj,
 
 // ---------------------------------------------------------------------------
 // Timers: flash.utils setTimeout/setInterval + the flash.utils.Timer class.
-// Ported from Ruffle core/src/timer.rs: ONE priority-ordered list on a µs
-// clock, fired at the TAIL of each tick (Ruffle runs update_timers AFTER
-// run_frame). tick_time fires when strictly < cur_time; intervals clamp to
-// MIN_INTERVAL; MAX_TICKS caps ticks per frame. AS3 Timer entries carry a
-// timer_obj and fire through timer_on_update (currentCount++/dispatch/
-// stop-on-complete); setTimeout/setInterval entries call a plain function
-// whose boolean return cancels an interval (Ruffle Timer.as _onUpdateClosure).
+// Ported from Ruffle core/src/timer.rs: ONE list on a µs clock, fired at the
+// TAIL of each tick (Ruffle runs update_timers AFTER run_frame). tick_time
+// fires when strictly < cur_time; intervals clamp to MIN_INTERVAL. AS3 Timer
+// entries carry a timer_obj and fire through timer_on_update (currentCount++/
+// dispatch/stop-on-complete); setTimeout/setInterval entries call a plain
+// function whose boolean return cancels an interval (Ruffle Timer.as
+// _onUpdateClosure).
+//
+// s28 w3-new-timer-rows (FP32 goldens avm2/timer_tie_order,
+// timer_checks_per_frame, timer_timeout_ids; Ruffle 72d054edd):
+// * every entry has a never-reused sequence number (`seq`); timers due at
+//   the same instant, and every OVERDUE batch, run in seq (creation) order.
+//   Changing a running Timer's delay gives it a new seq (Flash runs it after
+//   the timers created before the change);
+// * flash.utils.Timer does NOT use up setTimeout/setInterval ids (id 0 = no
+//   id; Timer entries are found by seq only, clearTimeout never sees them);
+// * getTimer() is the timer clock, and a busy loop moves it: past the first
+//   AVM2_TIMER_FREE_GETTIMER calls in a tick each call advances the clock
+//   1 ms (Ruffle's AVM1 time_offset heuristic; before this a
+//   `while (getTimer() - start < 50) {}` never ended — the two tie_order /
+//   checks_per_frame TIMEOUTs);
+// * timers made overdue by such busy code run ONCE each, in seq order, at
+//   the next check (timer_run_overdue_pass): right after the enterFrame
+//   broadcast and at the start of the tick tail (Flash checks there:
+//   timer_checks_per_frame), and after a tail callback that moved the clock.
+//   A late interval is rescheduled from now (missed periods skipped). The
+//   idle stretch to the frame's end keeps the per-due-time catch-up (Flash
+//   polls timers continuously while idle; no MAX_TICKS cap, as in the AVM1
+//   clock after s27 w2b-timers-tail).
 // ---------------------------------------------------------------------------
 
 #define AVM2_TIMER_MIN_INTERVAL 10       // ms (Ruffle Timers::MIN_INTERVAL)
-#define AVM2_TIMER_MAX_TICKS    10       // per frame (Ruffle Timers::MAX_TICKS)
+#define AVM2_TIMER_SANITY_TICKS 1000000  // hang guard only (no per-frame cap)
 #define AVM2_TIMER_SCALE        1000ULL  // µs per ms (Ruffle Timers::TIMER_SCALE)
+#define AVM2_TIMER_FREE_GETTIMER 20      // getTimer calls per tick that cost no time
 
 typedef struct Avm2TimerEntry
 {
-	int32_t id;
+	int32_t id;           // setTimeout/setInterval id; 0 for an AS3 Timer
+	uint64_t seq;         // creation order (never reused, never 0)
 	uint64_t tick_time;   // µs, absolute next fire
 	uint64_t interval;    // µs
 	uint8_t is_timeout;   // one-shot (setTimeout)
@@ -3415,7 +3439,10 @@ typedef struct Avm2TimerEntry
 static Avm2TimerEntry g_avm2_timers[256];
 static uint32_t g_avm2_timer_count;
 static int32_t g_avm2_timer_next_id;    // pre-incremented; Ruffle never issues 0
+static uint64_t g_avm2_timer_last_seq;
 static uint64_t g_avm2_timer_cur_time;  // µs
+static uint64_t g_avm2_timer_frame_end; // µs, scheduled end of the current frame
+static uint32_t g_avm2_gettimer_calls;  // getTimer calls this tick
 
 double avm2_timer_elapsed_ms(void)
 {
@@ -3430,7 +3457,7 @@ typedef struct Avm2TimerObjExt
 	double delay;
 	int32_t repeat_count;
 	int32_t current_count;
-	int32_t timer_entry_id;  // 0 = not running (running getter)
+	uint64_t timer_entry_seq;  // 0 = not running (running getter)
 } Avm2TimerObjExt;
 
 static Avm2TimerObjExt* timer_obj_ext(Avm2Object* obj)
@@ -3438,18 +3465,24 @@ static Avm2TimerObjExt* timer_obj_ext(Avm2Object* obj)
 	return obj != NULL ? (Avm2TimerObjExt*) obj->native_ext : NULL;
 }
 
-// Register a new list entry; interval clamps to MIN_INTERVAL. Returns the id.
-static int32_t timer_list_add(int32_t interval_ms, int is_timeout,
-                              Avm2Object* timer_obj, Avm2Value fn,
-                              const Avm2Value* args, uint32_t argc)
+// Register a new list entry; interval clamps to MIN_INTERVAL. Only a
+// setTimeout/setInterval entry (timer_obj == NULL) takes an id. Returns the
+// entry (NULL when the table is full).
+static Avm2TimerEntry* timer_list_add(int32_t interval_ms, int is_timeout,
+                                      Avm2Object* timer_obj, Avm2Value fn,
+                                      const Avm2Value* args, uint32_t argc)
 {
-	if (g_avm2_timer_count >= 256) return 0;
+	if (g_avm2_timer_count >= 256) return NULL;
 	if (interval_ms < AVM2_TIMER_MIN_INTERVAL) interval_ms = AVM2_TIMER_MIN_INTERVAL;
 	uint64_t interval = (uint64_t) interval_ms * AVM2_TIMER_SCALE;
 	Avm2TimerEntry* t = &g_avm2_timers[g_avm2_timer_count++];
 	memset(t, 0, sizeof(*t));
-	g_avm2_timer_next_id += 1;
-	t->id = g_avm2_timer_next_id;
+	if (timer_obj == NULL)
+	{
+		g_avm2_timer_next_id += 1;
+		t->id = g_avm2_timer_next_id;
+	}
+	t->seq = ++g_avm2_timer_last_seq;
 	t->tick_time = g_avm2_timer_cur_time + interval;
 	t->interval = interval;
 	t->is_timeout = (uint8_t) is_timeout;
@@ -3457,32 +3490,48 @@ static int32_t timer_list_add(int32_t interval_ms, int is_timeout,
 	t->timer_obj = timer_obj;
 	t->fn = fn;
 	for (uint32_t i = 0; i < argc && t->argc < 8; i++) t->args[t->argc++] = args[i];
-	return t->id;
+	return t;
 }
 
-static void timer_list_remove(int32_t id)
+// clearTimeout/clearInterval: setTimeout/setInterval entries only.
+static void timer_list_remove_id(int32_t id)
 {
+	if (id == 0) return;
 	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
 	{
-		if (g_avm2_timers[i].active && g_avm2_timers[i].id == id)
+		if (g_avm2_timers[i].active && g_avm2_timers[i].timer_obj == NULL &&
+		    g_avm2_timers[i].id == id)
 			g_avm2_timers[i].active = 0;
 	}
 }
 
-// Reschedule an existing entry from NOW (Ruffle Timers::set_delay).
-static void timer_list_set_delay(int32_t id, int32_t interval_ms)
+static void timer_list_remove_seq(uint64_t seq)
+{
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		if (g_avm2_timers[i].active && g_avm2_timers[i].seq == seq)
+			g_avm2_timers[i].active = 0;
+	}
+}
+
+// Reschedule an existing entry from NOW (Ruffle Timers::set_delay), ordered
+// after every timer created before the change. Returns the new seq (0 when
+// the entry is gone).
+static uint64_t timer_list_set_delay(uint64_t seq, int32_t interval_ms)
 {
 	if (interval_ms < AVM2_TIMER_MIN_INTERVAL) interval_ms = AVM2_TIMER_MIN_INTERVAL;
 	uint64_t interval = (uint64_t) interval_ms * AVM2_TIMER_SCALE;
 	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
 	{
-		if (g_avm2_timers[i].active && g_avm2_timers[i].id == id)
+		if (g_avm2_timers[i].active && g_avm2_timers[i].seq == seq)
 		{
 			g_avm2_timers[i].interval = interval;
 			g_avm2_timers[i].tick_time = g_avm2_timer_cur_time + interval;
-			return;
+			g_avm2_timers[i].seq = ++g_avm2_timer_last_seq;
+			return g_avm2_timers[i].seq;
 		}
 	}
+	return 0;
 }
 
 static Avm2Value timer_add(Avm2Activation* act, int repeating)
@@ -3493,9 +3542,9 @@ static Avm2Value timer_add(Avm2Activation* act, int repeating)
 	Avm2Value cbargs[8];
 	uint32_t n = 0;
 	for (uint32_t i = 2; i < act->argc && n < 8; i++) cbargs[n++] = act->args[i];
-	int32_t id = timer_list_add((int32_t) delay, !repeating, NULL, act->args[0],
-	                            cbargs, n);
-	return avm2_integer(id);
+	Avm2TimerEntry* e = timer_list_add((int32_t) delay, !repeating, NULL,
+	                                   act->args[0], cbargs, n);
+	return avm2_integer(e != NULL ? e->id : 0);
 }
 
 static Avm2Value utils_set_timeout(Avm2Activation* act)
@@ -3512,13 +3561,17 @@ static Avm2Value utils_clear_timer(Avm2Activation* act)
 {
 	if (act->argc < 1) return avm2_undefined();
 	int32_t id = avm2_coerce_to_i32(act->ctx, act->args[0]);
-	timer_list_remove(id);
+	timer_list_remove_id(id);
 	return avm2_undefined();
 }
 
 static Avm2Value utils_get_timer(Avm2Activation* act)
 {
 	(void) act;
+	// A busy loop moves the clock (see the Timers header): past the first
+	// AVM2_TIMER_FREE_GETTIMER calls in a tick, each call is 1 ms later.
+	if (++g_avm2_gettimer_calls > AVM2_TIMER_FREE_GETTIMER)
+		g_avm2_timer_cur_time += AVM2_TIMER_SCALE;
 	return avm2_integer((int32_t) avm2_timer_elapsed_ms());
 }
 
@@ -3557,7 +3610,7 @@ static int timer_on_update(Avm2Context* ctx, Avm2Object* timer)
 	avm2_dispatch_event(ctx, timer, ev);
 	if (ext->repeat_count != 0 && ext->current_count >= ext->repeat_count)
 	{
-		ext->timer_entry_id = 0;  // running == false during TIMER_COMPLETE
+		ext->timer_entry_seq = 0;  // running == false during TIMER_COMPLETE
 		Avm2Object* ev2 = avm2_timer_event_new(ctx, g_str_timer_complete, 0, 0);
 		avm2_dispatch_event(ctx, timer, ev2);
 		return 1;
@@ -3588,7 +3641,7 @@ static Avm2Value timer_ctor(Avm2Activation* act)
 	ext->delay = delay;
 	ext->repeat_count = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
 	ext->current_count = 0;
-	ext->timer_entry_id = 0;
+	ext->timer_entry_seq = 0;
 	return avm2_undefined();
 }
 
@@ -3596,11 +3649,11 @@ static Avm2Value timer_start(Avm2Activation* act)
 {
 	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
 	if (ext == NULL) return avm2_undefined();
-	if (ext->timer_entry_id == 0)
+	if (ext->timer_entry_seq == 0)
 	{
-		int32_t id = timer_list_add((int32_t) ext->delay, 0, act->this_val.u.obj,
-		                            avm2_null(), NULL, 0);
-		ext->timer_entry_id = id;
+		Avm2TimerEntry* e = timer_list_add((int32_t) ext->delay, 0,
+		                                   act->this_val.u.obj, avm2_null(), NULL, 0);
+		ext->timer_entry_seq = e != NULL ? e->seq : 0;
 	}
 	return avm2_undefined();
 }
@@ -3609,10 +3662,10 @@ static Avm2Value timer_stop(Avm2Activation* act)
 {
 	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
 	if (ext == NULL) return avm2_undefined();
-	if (ext->timer_entry_id != 0)
+	if (ext->timer_entry_seq != 0)
 	{
-		timer_list_remove(ext->timer_entry_id);
-		ext->timer_entry_id = 0;
+		timer_list_remove_seq(ext->timer_entry_seq);
+		ext->timer_entry_seq = 0;
 	}
 	return avm2_undefined();
 }
@@ -3648,9 +3701,9 @@ static Avm2Value timer_set_delay(Avm2Activation* act)
 	double v = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0;
 	timer_check_delay(ctx, v);
 	ext->delay = v;
-	if (ext->timer_entry_id != 0)
+	if (ext->timer_entry_seq != 0)
 	{
-		timer_list_set_delay(ext->timer_entry_id, (int32_t) v);
+		ext->timer_entry_seq = timer_list_set_delay(ext->timer_entry_seq, (int32_t) v);
 	}
 	return avm2_undefined();
 }
@@ -3676,7 +3729,7 @@ static Avm2Value timer_set_repeat_count(Avm2Activation* act)
 static Avm2Value timer_get_running(Avm2Activation* act)
 {
 	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
-	return avm2_bool(ext != NULL && ext->timer_entry_id != 0);
+	return avm2_bool(ext != NULL && ext->timer_entry_seq != 0);
 }
 
 void avm2_register_timer_class(Avm2Context* ctx)
@@ -3717,60 +3770,119 @@ static int timer_fire_entry(Avm2Context* ctx, Avm2TimerEntry* t)
 	return avm2_coerce_to_boolean(ret) ? 1 : 0;
 }
 
+// Earliest due active entry; ties on the due time go to the lower seq.
 static Avm2TimerEntry* timer_find_min(void)
 {
 	Avm2TimerEntry* best = NULL;
 	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
 	{
-		if (!g_avm2_timers[i].active) continue;
-		if (best == NULL || g_avm2_timers[i].tick_time < best->tick_time)
-			best = &g_avm2_timers[i];
+		Avm2TimerEntry* t = &g_avm2_timers[i];
+		if (!t->active) continue;
+		if (best == NULL || t->tick_time < best->tick_time ||
+		    (t->tick_time == best->tick_time && t->seq < best->seq))
+			best = t;
 	}
 	return best;
 }
 
-static Avm2TimerEntry* timer_find_by_id(int32_t id)
+static Avm2TimerEntry* timer_find_by_seq(uint64_t seq)
 {
 	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
-		if (g_avm2_timers[i].active && g_avm2_timers[i].id == id)
+		if (g_avm2_timers[i].active && g_avm2_timers[i].seq == seq)
 			return &g_avm2_timers[i];
 	return NULL;
 }
 
-// Ruffle Timers::update_timers: advance the µs clock by one frame, then fire
-// every entry whose tick_time is strictly < cur_time (earliest first), each at
-// most MAX_TICKS times per frame.
+// Fire one entry and settle it afterwards. `late_from` != 0: a late interval
+// is rescheduled from that time (missed periods skipped, Ruffle 72d054edd);
+// 0: it keeps its rhythm (tick += interval, the idle catch-up). The callback
+// may add/remove timers or change this one's delay (new seq): re-find by seq.
+static void timer_fire_and_settle(Avm2Context* ctx, Avm2TimerEntry* t,
+                                  uint64_t late_from)
+{
+	uint64_t fired_seq = t->seq;
+	uint8_t was_timeout = t->is_timeout;
+	Avm2Object* fired_obj = t->timer_obj;
+	int cancel = timer_fire_entry(ctx, t);
+	Avm2TimerEntry* e = timer_find_by_seq(fired_seq);
+	if (e == NULL)
+	{
+		// A Timer handler that set `delay` re-keyed the entry (new seq); a
+		// cancel (TIMER_COMPLETE) still removes that Timer's entry, as
+		// Ruffle's remove_timer(timer) does (avm2/timer_setdelay).
+		if ((was_timeout || cancel) && fired_obj != NULL)
+		{
+			for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+				if (g_avm2_timers[i].active && g_avm2_timers[i].timer_obj == fired_obj)
+					g_avm2_timers[i].active = 0;
+		}
+		return;
+	}
+	if (was_timeout || cancel) { e->active = 0; return; }
+	uint64_t next = e->tick_time + e->interval;
+	if (late_from != 0 && next < late_from) next = late_from + e->interval;
+	e->tick_time = next;
+}
+
+// One Flash timer check: every entry due before NOW runs once, in seq
+// (creation) order, whatever its due time. Only busy code (getTimer loops)
+// leaves timers overdue at a check, so without one this is a no-op.
+static void timer_run_overdue_pass(Avm2Context* ctx)
+{
+	uint64_t now = g_avm2_timer_cur_time;
+	uint64_t due[256];
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		Avm2TimerEntry* t = &g_avm2_timers[i];
+		if (!t->active || !(t->tick_time < now)) continue;
+		uint32_t j = n++;
+		while (j > 0 && due[j - 1] > t->seq) { due[j] = due[j - 1]; j--; }
+		due[j] = t->seq;
+	}
+	for (uint32_t k = 0; k < n; k++)
+	{
+		Avm2TimerEntry* t = timer_find_by_seq(due[k]);
+		if (t == NULL) continue;  // cleared by an earlier callback
+		timer_fire_and_settle(ctx, t, now);
+	}
+}
+
+// Tick tail (Ruffle Timers::update_timers position): first the check after
+// the frame's code (overdue timers, seq order), then the idle stretch to the
+// frame's scheduled end: every entry due strictly before it fires, earliest
+// due first (ties by seq), catching up on an interval's periods, with the
+// clock at the frame's end (so a timer created in a callback is due after
+// it). A callback that moves the clock (busy loop) leaves the timers it made
+// overdue to an immediate check, as Flash does.
 static void run_due_timers(Avm2Context* ctx)
 {
 	double fps = (double) (int16_t) avm2_generated_frame_rate / 256.0;
 	if (fps <= 0) fps = 24.0;
 	uint64_t dt_us = (uint64_t) (1000.0 / fps * 1000.0);
-	g_avm2_timer_cur_time += dt_us;
+
+	timer_run_overdue_pass(ctx);
+
+	g_avm2_timer_frame_end += dt_us;
+	if (g_avm2_timer_cur_time > g_avm2_timer_frame_end)
+		g_avm2_timer_frame_end = g_avm2_timer_cur_time;  // late frame
+	else
+		g_avm2_timer_cur_time = g_avm2_timer_frame_end;
+	uint64_t bound = g_avm2_timer_frame_end;
 
 	int ticks = 0;
 	for (;;)
 	{
 		Avm2TimerEntry* t = timer_find_min();
-		if (t == NULL || !(t->tick_time < g_avm2_timer_cur_time)) break;
-		if (++ticks > AVM2_TIMER_MAX_TICKS)
-		{
-			// SANITY backstop: rewind to just before the nearest timer.
-			g_avm2_timer_cur_time =
-				t->tick_time > 100 ? t->tick_time - 100 : 0;
-			break;
-		}
-		int32_t fired_id = t->id;
-		uint8_t was_timeout = t->is_timeout;
-		int cancel = timer_fire_entry(ctx, t);
-		// The callback may have added/removed timers; re-find by id.
-		Avm2TimerEntry* e = timer_find_by_id(fired_id);
-		if (e != NULL)
-		{
-			if (was_timeout || cancel) e->active = 0;
-			else e->tick_time += e->interval;
-		}
+		if (t == NULL || !(t->tick_time < bound)) break;
+		if (++ticks > AVM2_TIMER_SANITY_TICKS) break;
+		uint64_t before = g_avm2_timer_cur_time;
+		timer_fire_and_settle(ctx, t, 0);
+		if (g_avm2_timer_cur_time != before) timer_run_overdue_pass(ctx);
 	}
-	// Compact dead entries.
+	if (g_avm2_timer_cur_time > g_avm2_timer_frame_end)
+		g_avm2_timer_frame_end = g_avm2_timer_cur_time;
+	// Compact dead entries (order kept; seq is the order key anyway).
 	uint32_t w = 0;
 	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
 	{
@@ -3807,6 +3919,7 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// one, the AVM1 tick (a no-op) stays here and the pure-AVM2 order is
 	// untouched.
 	int mixed_avm1 = g_avm1_child_levels != 0;
+	g_avm2_gettimer_calls = 0;  // per-tick busy-loop counter (utils_get_timer)
 
 	// Before the AVM2 phases, and therefore before this tick's loader drain:
 	// a child booted by tick N's drain must first advance on tick N+1.
@@ -3828,6 +3941,10 @@ void avm2_display_run_tick(Avm2Context* ctx)
 		}
 		broadcast_named(ctx, "enterFrame");
 	}
+	// Flash checks its timers once right after the enterFrame broadcast
+	// (avm2/timer_checks_per_frame, FP32: an interval made overdue by a busy
+	// enterFrame handler runs exactly once before frameConstructed).
+	timer_run_overdue_pass(ctx);
 
 	ctx->frame_phase = PHASE_CONSTRUCT;
 	for (uint32_t i = 0, snap = orphan_walk_bound();
