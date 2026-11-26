@@ -26,15 +26,16 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 | 6 | w1-lowq-next | `briefs/w1-lowq-next.md` | session_018CoDi7qTxMBdBnSPwzNNpq — launched |
 | 7 | w1-aa-sizing | `briefs/w1-aa-sizing.md` | session_018CoDi7ory8zEi6jZLvD2Ba — launched |
 | 8 | w1-text-pixels | `briefs/w1-text-pixels.md` | session_018CoDi6VSAprpDm9DcBKpgn — DELIVERED: **Flash HIGH = 4 sub-scanlines at y+j/4 × exact x coverage, 1/16 quantised** (refutes 4×4 SSAA); CPU-coverage prototype for skewed text (rotated_glyphs 1034→198 px vs FP32; 0 status moves); wordwrap golden already FP32 (refuted); 22 'unpriced' losses all priced (morph_test1 ×6 = only real Flash losses, LOW glyph rule). Coordinator FP32 W1 colour + W2 shapes: shape/stroke edges also on the 255−16n ladder → w2-text-coverage-land |
-| 9 | w1-pixel-flash-gaps | `briefs/w1-pixel-flash-gaps.md` | session_018CoDi3zqAaCrHtF3TEjcQB — launched |
+| 9 | w1-pixel-flash-gaps | `briefs/w1-pixel-flash-gaps.md` | session_018CoDi3zqAaCrHtF3TEjcQB — DELIVERED: place_object_test 100% LOW glyph text (A: pen→whole px, non-FlashType: 5073→2604); shape_test 89% open-fill parity across objects (NO-GO L); acid-shapes 243→88 (B); avm1_color 1200→230 (C: cab snaps LOW only); shadow/bevel already landed s28; s24 zero-headroom obsolete. Coordinator FP32: text_field_mask + gradientTransform swap-safe, fills_and_lines WIN≠LNX → w2-pixel-gaps-land |
 
 ## Wave 2 (implementation, cloud)
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
-| w2-palettemap-land | w1-drift + FP32 | `avm2/bitmapdata_palettemap_opaque` new→pass; new `regression/avm2_bitmapdata_palettemap_index` | session_018CoDi4Bkz9NG5UkK7xk674 — launched |
+| w2-palettemap-land | w1-drift + FP32 | `avm2/bitmapdata_palettemap_opaque` new→pass; new `regression/avm2_bitmapdata_palettemap_index` | session_018CoDi4Bkz9NG5UkK7xk674 — DELIVERED, LANDED `ab49742e5` |
 | w2-text-coverage-land | w1-text-pixels + FP32 W1/W2 | rotated_glyphs/borders + edittext_border_transform .04/.06 bands toward goldens; new fixtures; 0 status moves | session_018CoDi3xgg2pUfZeojNd8Fe — launched |
 | w2-disposition-land | w1-disposition-audit + FP32 | native_objects_swf6, globals_swf5, loader_applicationDomain, dependent_strings mm→pass; swz mm (1/3); +2 regression rows; 3 flash_fixes | session_018CoDi5vBfv1NbGkZQQDNaU — launched |
+| w2-pixel-gaps-land | w1-pixel-flash-gaps + FP32 | bands toward Flash (place_object_test, shape_test, morph_test1, acid-shapes 243→88, avm1_color); 2 swaps (text_field_mask, gradientTransform) | session_018CoDi4gzPRPdoE9veAKVJK — launched |
 
 ## Grading runs
 
