@@ -1,301 +1,85 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-25T21:10:43.821519+00:00",
-    "old_git_sha": "10a5b515a03a386400e27a68adeddb628a47bc82",
-    "new_timestamp": "2026-11-25T22:59:03.581137+00:00",
-    "new_git_sha": "16033a154646a877df742993221eafce207bede1",
+    "old_timestamp": "2026-11-25T22:59:03.581137+00:00",
+    "old_git_sha": "16033a154646a877df742993221eafce207bede1",
+    "new_timestamp": "2026-11-25T23:59:46.689225+00:00",
+    "new_git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 262,
+    "old_pass": 278,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 262,
-    "old_total": 262,
-    "old_pass_rate": 100.0,
-    "new_pass": 278,
+    "old_effective_pass": 278,
+    "old_total": 279,
+    "old_pass_rate": 99.6,
+    "new_pass": 282,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 278,
-    "new_total": 279,
-    "new_pass_rate": 99.6,
-    "old_mismatched_lines": 0,
-    "new_mismatched_lines": 1,
+    "new_effective_pass": 282,
+    "new_total": 282,
+    "new_pass_rate": 100.0,
+    "old_mismatched_lines": 1,
+    "new_mismatched_lines": 0,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 1,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 258,
-    "added": 17,
+    "status_changed": 1,
+    "unchanged": 278,
+    "added": 3,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_applyfilter_dropshadow",
+      "test": "avm1_gnash_flash_probes",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 18
+        "actual_lines": 63,
+        "expected_lines": 63,
+        "matching_lines": 63
       }
     },
     {
-      "test": "avm1_display_filter_growth_edge_scale",
+      "test": "avm1_gnash_flash_probes_v5",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 77,
+        "expected_lines": 77,
+        "matching_lines": 77
       }
     },
     {
-      "test": "avm1_edittext_restrict_onchanged",
+      "test": "avm1_gnash_flash_probes_v6",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "avm1_loaded_bare_goto",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "avm1_loaded_goto_play_deferred",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      }
-    },
-    {
-      "test": "avm1_loaded_order_create_vs_load",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 33,
-        "expected_lines": 33,
-        "matching_lines": 33
-      }
-    },
-    {
-      "test": "avm1_loadvars_ondata_overflow",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 23,
-        "expected_lines": 23,
-        "matching_lines": 23
-      }
-    },
-    {
-      "test": "avm1_mcl_load_tick",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      },
-      "new_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      }
-    },
-    {
-      "test": "avm1_onunload_setvar_scope",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
+        "actual_lines": 63,
+        "expected_lines": 63,
+        "matching_lines": 63
       }
     },
     {
       "test": "avm1_place_occupied_depth_swf5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
         "actual_lines": 6,
         "expected_lines": 6,
         "matching_lines": 5
-      }
-    },
-    {
-      "test": "avm1_remove_unload_finalize_overflow",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "avm1_set_new_text_format_paragraph",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      }
-    },
-    {
-      "test": "avm1_sprite_goto_script_overflow",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 65,
-        "expected_lines": 65,
-        "matching_lines": 65
-      }
-    },
-    {
-      "test": "avm2_applyfilter_bevel_sample",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 441,
-        "expected_lines": 441,
-        "matching_lines": 441
-      }
-    },
-    {
-      "test": "avm2_applyfilter_glow_kernels",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
       },
       "new_lines": {
-        "actual_lines": 23,
-        "expected_lines": 23,
-        "matching_lines": 23
-      }
-    },
-    {
-      "test": "avm2_applyfilter_gradient_opaque",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 24,
-        "expected_lines": 24,
-        "matching_lines": 24
-      },
-      "new_lines": {
-        "actual_lines": 26,
-        "expected_lines": 26,
-        "matching_lines": 26
-      }
-    },
-    {
-      "test": "avm2_bitmapdata_draw_filtered",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "new_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      }
-    },
-    {
-      "test": "avm2_edittext_selection_cxform",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm2_group_alpha_shadow_shape_a50",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "group_alpha_shadow_shape_a50",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "lowq_fill_edges",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     }
   ]

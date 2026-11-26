@@ -1,24 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `10a5b515a03a` (2026-11-25T21:10:43.773614+00:00)
-**Current:** `16033a154646` (2026-11-25T22:59:03.500161+00:00)
+**Previous:** `16033a154646` (2026-11-25T22:59:03.500161+00:00)
+**Current:** `b030ed745d4f` (2026-11-25T23:59:46.647297+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1544 | 1549 | +5 |
+| Passing | 1549 | 1549 | 0 |
 | Total | 1574 | 1574 | 0 |
-| Pass rate | 98.1% | 98.4% | +0.3% |
-| Mismatched lines | 402 | 378 | -24 |
-|   Decreased | | | -24 |
+| Pass rate | 98.4% | 98.4% | 0% |
+| Mismatched lines | 378 | 378 | 0 |
 
-## Newly Passing (5)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `as3/Types/Number/e15_7_4_6_1/swf14` | ruffle_matched | 11/29 | 29/29 |
-| `as3/Types/Number/e15_7_4_6_1/swf15` | ruffle_matched | 26/29 | 29/29 |
-| `ecma3/JSON/AS3Types` | output_mismatch | 25/26 | 26/26 |
-| `ecma3/Number/eregress_121952` | ruffle_matched | 11/12 | 12/12 |
-| `ecma3/Number/toStringLimits` | ruffle_matched | 3/4 | 4/4 |
+No changes detected.
