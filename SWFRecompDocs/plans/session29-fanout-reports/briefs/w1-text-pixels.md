@@ -1,0 +1,13 @@
+**Text pixels vs Flash: `rotated_glyphs`, the wordwrap fixture's golden, and the 22 unpriced glyph-snap losses (M).**
+
+State of record: `session28-fanout-reports/w1-text-glyph-aa-report.md` (Flash snaps glyph outlines to ¼ px; rotated
+residual = border weight; 16-level glyph AA NO-GO L) and `w2-glyph-quarter-snap-report.md` (landed `b4b96919a`: snap for
+embedded + AA only; border pen 1+tan/2).
+1. `rotated_glyphs`: 1111 px vs Flash. Which pixels (glyph interior, glyph edge, border)? What rule is left? Prototype.
+2. The wordwrap fixture still carries an interim Ruffle golden: name it, and write the FLASH image request to replace it
+   (or find the s28 capture in `w1-local-oracles/`).
+3. The 22 glyph-snap Ruffle-golden losses w1-text-glyph-aa noted but never priced: list them by name, golden provenance
+   per row, current status at `014124ed5`. Which are Flash goldens (= real losses to fix) vs Ruffle goldens (priced RvF)?
+4. Re-attack NO-GO L (16-level glyph AA) with numbers only if (1)–(3) say it is the remaining residual.
+Deliver a ledger + prototype. Siblings: w1-aa-sizing (AA mode), w1-pixel-flash-gaps. Name every function you touch
+(`tag.c` `textfield_glyph_render_cb`, `avm2_display.c` `avm2_render_glyphs`…).

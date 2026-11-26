@@ -1,0 +1,23 @@
+**ruffle_matched pool, AVM2 side + the Date TZ harness override (S harness + S–M per bucket).**
+
+What is left from `session28-fanout-reports/w1b-rm-avm2-report.md` (§Buckets: I Date TZ, M frame/event lifecycle, N
+type-system, O verifier/interface traits, P debug line info, R platform, S FP crash) and the AVM2 rows of
+`w1b-rm-avm1-misc-report.md` §Rows (device-font metrics family, `MaskTest-3`, acid-shapes-testing bounds, acid-text-x,
+acid-textfield run coalescing, LoaderTest, getobjectsunderpoint, timeline clipDepth, frame_script_button_order — the
+"AVM2 text-layout bucket" is the acid-text*/flash_text_TextField*/device_font_no_ink group). Current rm list:
+`s29-baseline-trace-rm.txt`; provenance: `session28-fanout-reports/trace-provenance.md`.
+
+1. **Date TZ harness (S, implement):** a per-test timezone override in `test.toml` read by `verify_output.py` (set `TZ`
+   for the compiled test's run; CI too — check `.github/workflows/ruffle-tests.yml` passes nothing that overrides it).
+   Ship it as a `flash_fixes` toml entry or an upstream-compatible key: read `ruffle-tests/flash_fixes/README.md` and
+   decide which (the 6 avmplus Date rows' goldens are US-Pacific; upstream Ruffle's runner has its own TZ handling —
+   check how Ruffle's test harness pins TZ before inventing a key). Then: `e15_9_5_22_1` should pass as-is; fix the
+   `setMinutes`/`setUTCMinutes` DST-of-result bug (28_1/29_1, S–M) if it is real under the override. The Windows-DST rows
+   (35_1, 10_10, 10_11) stay soft NO-GO: say what they show.
+2. Bucket P (debug line info, M) and bucket O (verifier, M): price against the actual SWFs; prototype P if it is the M
+   the report says.
+3. The AVM2 text-layout bucket: re-price against FP32 (several rows have Windows-FP32 goldens = soft NO-GO); find any S.
+4. Bucket M (frame/event lifecycle): re-price only; name the smallest separable rule.
+Deliver `w1-rm-avm2-prototype.patch` with an exact rm→pass ledger by name; `regression`-suite + canary check.
+Siblings: w1-rm-avm1-gnash (AVM1 rows), w1-disposition-audit (`bom`, `dependent_strings`, `swz`,
+`loader_applicationDomain`). Name every function you touch.
