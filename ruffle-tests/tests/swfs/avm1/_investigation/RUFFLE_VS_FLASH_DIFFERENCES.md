@@ -1275,3 +1275,26 @@ goldens sit 640k+ channels away from FP32 (ours with the rules: 5 628).
 
 **Decision:** match Flash (Flash over Ruffle). The affected goldens are swapped to the FP32 LOW captures on branch
 `lowq-fixes`. Prune criterion: when a row's golden is a Flash reference, or Ruffle's LOW renderer adopts these rules.
+
+## s29 LOW swap candidates: Windows FP32 check (s29 coordinator, 2026-11-26)
+
+**Tests:** `from_shumway/invalidClipDepth`, `from_shumway/acid/acid-filter` (swapped); `from_shumway/gradient`,
+`from_shumway/acid/acid-gradient`, `from_shumway/acid/acid-gradient-0` (not swapped).
+
+s28 lowq-corner-rule named five quality=low rows whose Ruffle goldens differ from the Linux FP32 LOW capture while our
+LOW model is close to it (invalidClipDepth 0, gradient 16, acid-gradient-0 61, acid-gradient 1 686, acid-filter 104).
+The Windows FP32 projector (`run_image.py --windows --quality low`, wrapper draw()) decides which are platform-stable.
+Captures: `SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/`.
+
+| test | WIN vs LNX FP32 (tol 0) | golden vs WIN / LNX (tol 3) | decision |
+|---|---|---|---|
+| `invalidClipDepth` | byte-identical | 0 / 0 px, max 1 (tol-0 row) | **flash_fix** (ours == FP32) |
+| `acid/acid-filter` | 0 outliers | 268 / 268 px, max 255 | **flash_fix** |
+| `gradient` | 15 871 ch, max 8 | 15 873 / 15 897 px | keep golden: host-dependent (WIN ≠ LNX) |
+| `acid/acid-gradient-0` | 49 151 ch, max 3 | 18 325 / 18 274 px | keep golden: host-dependent |
+| `acid/acid-gradient` | 71 241 ch, max 8 | 4 378 / 3 916 px | keep golden: host-dependent |
+
+The three gradient goldens are neither Windows nor Linux Flash, but Flash itself is not platform-stable on these
+ramps (the s27/s28 WIN ≠ LNX radial/focal finding), so README rule 4 applies: no swap. They stay priced losses of the
+s28 LOW model. Prune criterion: a platform-stable Flash reference for the gradient rows, or a decision to target one
+FP32 host.

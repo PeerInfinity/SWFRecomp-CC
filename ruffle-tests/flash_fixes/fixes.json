@@ -680,5 +680,27 @@
     "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 6248 channels over tol 1 vs Flash LOW. Ours vs Flash: master 3474, with the s28 lowq-corner-rule model 1956 (s28 lowq-corner-rule swap).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
+  },
+  {
+    "test": "from_shumway/invalidClipDepth",
+    "file": "output.expected.png",
+    "upstream_sha256": "33840d2058e77411b8afe35defb2257a97ef47b9e8b17d7d5b0912165126b1f1",
+    "fix": "from_shumway/invalidClipDepth/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule/flash_rest/from_shumway__invalidClipDepth__output.low.png (s28 lowq-corner-rule, Linux, quality=low, wrapper draw()); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/from_shumway__invalidClipDepth.win.low.png byte-identical (s29 coordinator)",
+    "reason": "Flash LOW, Linux == Windows byte for byte. Golden differs from Flash by max 1 per channel (tolerance 0 row). Ours (s28 LOW model) == FP32: 1800 -> 0 channels (lowq-corner-rule §6).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW swap candidates (Windows check)",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_shumway/acid/acid-filter",
+    "file": "output.expected.png",
+    "upstream_sha256": "d4783ec2c59a4bffde181d90cb38dcd9e7308cb1d4d7acf7a156b82da488b624",
+    "fix": "from_shumway/acid/acid-filter/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule/flash_rest/from_shumway__acid__acid-filter__output.low.png (s28 lowq-corner-rule, Linux, quality=low, wrapper draw()); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/from_shumway__acid__acid-filter.win.low.png 0 outliers at tol 0 (s29 coordinator)",
+    "reason": "Flash LOW, Linux == Windows exactly. Golden is 268 px over tol 3 (max 255) from Flash. Ours vs FP32 with the s28 LOW model: 104 (was 536).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW swap candidates (Windows check)",
+    "added": "2026-11-26"
   }
 ]
