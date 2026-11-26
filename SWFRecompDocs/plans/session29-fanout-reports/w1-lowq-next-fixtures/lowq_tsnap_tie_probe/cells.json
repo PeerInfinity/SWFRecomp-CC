@@ -1,0 +1,382 @@
+[
+ {
+  "row": 0,
+  "col": 0,
+  "what": "x TSNAP rect",
+  "fx": 0.0,
+  "left_px_centre_rule": 5,
+  "left_px_tsnap": 5
+ },
+ {
+  "row": 1,
+  "col": 0,
+  "what": "y TSNAP rect",
+  "fy": 0.0,
+  "top_px_centre_rule": 45,
+  "top_px_tsnap": 45
+ },
+ {
+  "row": 2,
+  "col": 0,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.0
+ },
+ {
+  "row": 0,
+  "col": 1,
+  "what": "x TSNAP rect",
+  "fx": 0.25,
+  "left_px_centre_rule": 45,
+  "left_px_tsnap": 45
+ },
+ {
+  "row": 1,
+  "col": 1,
+  "what": "y TSNAP rect",
+  "fy": 0.25,
+  "top_px_centre_rule": 45,
+  "top_px_tsnap": 45
+ },
+ {
+  "row": 2,
+  "col": 1,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.25
+ },
+ {
+  "row": 0,
+  "col": 2,
+  "what": "x TSNAP rect",
+  "fx": 0.35,
+  "left_px_centre_rule": 86,
+  "left_px_tsnap": 85
+ },
+ {
+  "row": 1,
+  "col": 2,
+  "what": "y TSNAP rect",
+  "fy": 0.35,
+  "top_px_centre_rule": 46,
+  "top_px_tsnap": 45
+ },
+ {
+  "row": 2,
+  "col": 2,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.35
+ },
+ {
+  "row": 0,
+  "col": 3,
+  "what": "x TSNAP rect",
+  "fx": 0.45,
+  "left_px_centre_rule": 126,
+  "left_px_tsnap": 125
+ },
+ {
+  "row": 1,
+  "col": 3,
+  "what": "y TSNAP rect",
+  "fy": 0.45,
+  "top_px_centre_rule": 46,
+  "top_px_tsnap": 45
+ },
+ {
+  "row": 2,
+  "col": 3,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.45
+ },
+ {
+  "row": 0,
+  "col": 4,
+  "what": "x TSNAP rect",
+  "fx": 0.5,
+  "left_px_centre_rule": 166,
+  "left_px_tsnap": 165
+ },
+ {
+  "row": 1,
+  "col": 4,
+  "what": "y TSNAP rect",
+  "fy": 0.5,
+  "top_px_centre_rule": 46,
+  "top_px_tsnap": 45
+ },
+ {
+  "row": 2,
+  "col": 4,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.5
+ },
+ {
+  "row": 0,
+  "col": 5,
+  "what": "x TSNAP rect",
+  "fx": 0.55,
+  "left_px_centre_rule": 206,
+  "left_px_tsnap": 206
+ },
+ {
+  "row": 1,
+  "col": 5,
+  "what": "y TSNAP rect",
+  "fy": 0.55,
+  "top_px_centre_rule": 46,
+  "top_px_tsnap": 46
+ },
+ {
+  "row": 2,
+  "col": 5,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.55
+ },
+ {
+  "row": 0,
+  "col": 6,
+  "what": "x TSNAP rect",
+  "fx": 0.65,
+  "left_px_centre_rule": 246,
+  "left_px_tsnap": 246
+ },
+ {
+  "row": 1,
+  "col": 6,
+  "what": "y TSNAP rect",
+  "fy": 0.65,
+  "top_px_centre_rule": 46,
+  "top_px_tsnap": 46
+ },
+ {
+  "row": 2,
+  "col": 6,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.65
+ },
+ {
+  "row": 0,
+  "col": 7,
+  "what": "x TSNAP rect",
+  "fx": 0.75,
+  "left_px_centre_rule": 286,
+  "left_px_tsnap": 286
+ },
+ {
+  "row": 1,
+  "col": 7,
+  "what": "y TSNAP rect",
+  "fy": 0.75,
+  "top_px_centre_rule": 46,
+  "top_px_tsnap": 46
+ },
+ {
+  "row": 2,
+  "col": 7,
+  "what": "slanted TSNAP triangle",
+  "fx": 0.75
+ },
+ {
+  "row": 3,
+  "col": 0,
+  "what": "nested TSNAP",
+  "pf": 0.35,
+  "cf": 0.35,
+  "left_px_centre_rule": 6,
+  "left_px_snap_world": 6,
+  "left_px_snap_per_level": 5
+ },
+ {
+  "row": 3,
+  "col": 1,
+  "what": "nested TSNAP",
+  "pf": 0.25,
+  "cf": 0.25,
+  "left_px_centre_rule": 46,
+  "left_px_snap_world": 45,
+  "left_px_snap_per_level": 45
+ },
+ {
+  "row": 3,
+  "col": 2,
+  "what": "nested TSNAP",
+  "pf": 0.5,
+  "cf": 0.0,
+  "left_px_centre_rule": 86,
+  "left_px_snap_world": 85,
+  "left_px_snap_per_level": 85
+ },
+ {
+  "row": 3,
+  "col": 3,
+  "what": "nested TSNAP",
+  "pf": 0.0,
+  "cf": 0.5,
+  "left_px_centre_rule": 126,
+  "left_px_snap_world": 125,
+  "left_px_snap_per_level": 125
+ },
+ {
+  "row": 3,
+  "col": 4,
+  "what": "nested TSNAP",
+  "pf": 0.5,
+  "cf": 0.5,
+  "left_px_centre_rule": 166,
+  "left_px_snap_world": 166,
+  "left_px_snap_per_level": 165
+ },
+ {
+  "row": 3,
+  "col": 5,
+  "what": "nested TSNAP",
+  "pf": 0.75,
+  "cf": 0.75,
+  "left_px_centre_rule": 207,
+  "left_px_snap_world": 206,
+  "left_px_snap_per_level": 207
+ },
+ {
+  "row": 3,
+  "col": 6,
+  "what": "nested TSNAP",
+  "pf": 0.35,
+  "cf": -0.35,
+  "left_px_centre_rule": 245,
+  "left_px_snap_world": 245,
+  "left_px_snap_per_level": 245
+ },
+ {
+  "row": 3,
+  "col": 7,
+  "what": "nested TSNAP",
+  "pf": 0.65,
+  "cf": 0.0,
+  "left_px_centre_rule": 286,
+  "left_px_snap_world": 286,
+  "left_px_snap_per_level": 286
+ },
+ {
+  "row": 4,
+  "col": 0,
+  "what": "static 45deg X stroke",
+  "width": 1,
+  "row_span_perpendicular": 1.414,
+  "row_span_minor_axis": 1
+ },
+ {
+  "row": 4,
+  "col": 1,
+  "what": "static 45deg X stroke",
+  "width": 2,
+  "row_span_perpendicular": 2.828,
+  "row_span_minor_axis": 2
+ },
+ {
+  "row": 4,
+  "col": 2,
+  "what": "static 45deg X stroke",
+  "width": 3,
+  "row_span_perpendicular": 4.243,
+  "row_span_minor_axis": 3
+ },
+ {
+  "row": 4,
+  "col": 3,
+  "what": "static 45deg X stroke",
+  "width": 4,
+  "row_span_perpendicular": 5.657,
+  "row_span_minor_axis": 4
+ },
+ {
+  "row": 4,
+  "col": 4,
+  "what": "static 45deg X stroke",
+  "width": 5,
+  "row_span_perpendicular": 7.071,
+  "row_span_minor_axis": 5
+ },
+ {
+  "row": 4,
+  "col": 5,
+  "what": "static 45deg X stroke",
+  "width": 6,
+  "row_span_perpendicular": 8.485,
+  "row_span_minor_axis": 6
+ },
+ {
+  "row": 4,
+  "col": 6,
+  "what": "static 45deg X stroke",
+  "width": 8,
+  "row_span_perpendicular": 11.314,
+  "row_span_minor_axis": 8
+ },
+ {
+  "row": 4,
+  "col": 7,
+  "what": "static 45deg X stroke",
+  "width": 10,
+  "row_span_perpendicular": 14.142,
+  "row_span_minor_axis": 10
+ },
+ {
+  "row": 5,
+  "col": 0,
+  "what": "3px stroke + fill rect (drawing_order shape)",
+  "place_frac": 0.5
+ },
+ {
+  "row": 5,
+  "col": 1,
+  "what": "3px stroke + fill rect (drawing_order shape)",
+  "place_frac": 0.0
+ },
+ {
+  "row": 5,
+  "col": 2,
+  "what": "4px stroke square under acid-stroke-0 matrix para41",
+  "matrix": [
+   2.0,
+   0.0,
+   -1.4142,
+   1.4142
+  ]
+ },
+ {
+  "row": 5,
+  "col": 3,
+  "what": "4px stroke square under acid-stroke-0 matrix para51",
+  "matrix": [
+   2.0,
+   0.0,
+   1.4142,
+   1.4142
+  ]
+ },
+ {
+  "row": 5,
+  "col": 4,
+  "what": "4px stroke square under acid-stroke-0 matrix rot81",
+  "matrix": [
+   0.7071,
+   0.7071,
+   -1.4142,
+   1.4142
+  ]
+ },
+ {
+  "row": 5,
+  "col": 7,
+  "what": "static rect 5.5..25.5 (vertex .5 tie)"
+ },
+ {
+  "row": 5,
+  "col": 5,
+  "what": "AVM1 Drawing API lineStyle(5) 45deg line (4,4)-(36,36)"
+ },
+ {
+  "row": 5,
+  "col": 6,
+  "what": "AVM1 Drawing API filled rect 5.5..25.5 (vertex .5 tie)"
+ }
+]

@@ -1,0 +1,1 @@
+tick 1: SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-lowq-next/drawing_order.high.png 500x500 quality=high stop=done vs ruffle-tests/tests/swfs/visual/drawing_api/drawing_order/output.expected.png: {'outliers': 9768, 'outlier_pixels': 4898, 'max_difference': 255}

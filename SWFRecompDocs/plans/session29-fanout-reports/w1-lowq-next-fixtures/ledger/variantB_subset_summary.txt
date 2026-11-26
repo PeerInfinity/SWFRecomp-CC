@@ -1,0 +1,8 @@
+visual/blend_modes/add ] FAIL img: image:output] FAIL - Image comparison failed: 15316 outliers exceed limit of 0;
+visual/filters/glow ] FAIL img: image:output] FAIL - Image comparison failed: 24196 outliers exceed limit of 0;
+visual/opaque_background ] FAIL img: image:output] FAIL - Image comparison failed: 4300 outliers exceed limit of 0;
+visual/simple_shapes/layers ] FAIL img: image:output] FAIL - Image comparison failed: 3437 outliers exceed limit of 0;
+visual/cache_as_bitmap/scroll_rect ] FAIL img: image:output] FAIL - Image comparison failed: 2056 outliers exceed limit of 0;
+visual/cache_as_bitmap/drawing_api ] FAIL img: image:output] FAIL - Image comparison failed: 1795 outliers exceed limit of 0;
+visual/simple_shapes/masks ] FAIL img: image:output] FAIL - Image comparison failed: 3141 outliers exceed limit of 0;
+visual/avm2_button_scroll_rect ] FAIL img: image:output] FAIL - Image comparison failed: 45 outliers exceed limit of 0;

@@ -1,0 +1,58 @@
+from_shumway/acid/acid-gc output: no FP32 LOW reference
+from_shumway/acid/acid-gradient-1 output: no FP32 LOW reference
+visual/cache_as_bitmap/scroll_rect output: no FP32 LOW reference
+avm2/sprite_with_frames output: no FP32 LOW reference
+avm2/stage3d_texture output: vs png: master 622075 -> tsnap 622294  (AWAY)
+avm2/symbol_class_conflict output: vs png: master 449 -> tsnap 1169  (AWAY)
+from_shumway/acid/acid-blend output: vs flash_rest: master 9971 -> tsnap 9506  (toward)
+from_shumway/acid/acid-chars output: no FP32 LOW reference
+from_shumway/acid/acid-clip-3 output: vs flash_rest: master 358 -> tsnap 312  (toward)
+from_shumway/acid/acid-clip-3 frame3: vs flash_rest: master 512 -> tsnap 386  (toward)
+from_shumway/acid/acid-child output: vs flash_rest: master 774 -> tsnap 1578  (AWAY)
+from_shumway/acid/acid-child frame5: vs flash_rest: master 504 -> tsnap 381  (toward)
+from_shumway/acid/acid-color-0 output: no FP32 LOW reference
+from_shumway/acid/acid-filter output: vs flash_rest: master 104 -> tsnap 176  (AWAY)
+from_shumway/acid/acid-gradient-2 output: no FP32 LOW reference
+from_shumway/acid/acid-scale output: no FP32 LOW reference
+from_shumway/acid/acid-stroke-0 output: no FP32 LOW reference
+from_shumway/acid/acid-text-5 output: no FP32 LOW reference
+from_shumway/acid/acid-text-6 output: vs flash_rest: master 13119 -> tsnap 13191  (AWAY)
+from_shumway/acid/acid-text-6 frame5: vs flash_rest: master 327 -> tsnap 336  (AWAY)
+from_shumway/acid/acid-textfield output: no FP32 LOW reference
+regression/avm2_layer_group_alpha output: no FP32 LOW reference
+regression/avm2_layer_group_erase output: no FP32 LOW reference
+regression/lowq_sample_point_probe output: no FP32 LOW reference
+regression/lowq_gradient_orient_probe output: no FP32 LOW reference
+visual/avm2_button_scroll_rect output: vs png: master 288 -> tsnap 15  (toward)
+visual/blend_modes/add output: vs golden=FP32 (flash_fixes): master 5347 -> tsnap 15316  (AWAY)
+visual/blend_modes/alpha_no_layer output: vs golden=FP32 (flash_fixes): master 9586 -> tsnap 18319  (AWAY)
+visual/blend_modes/darken output: vs golden=FP32 (flash_fixes): master 6385 -> tsnap 15813  (AWAY)
+visual/blend_modes/erase_no_layer output: vs golden=FP32 (flash_fixes): master 9320 -> tsnap 17883  (AWAY)
+visual/blend_modes/difference output: vs golden=FP32 (flash_fixes): master 8154 -> tsnap 19280  (AWAY)
+visual/blend_modes/hardlight output: vs golden=FP32 (flash_fixes): master 9815 -> tsnap 18235  (AWAY)
+visual/blend_modes/invert output: vs golden=FP32 (flash_fixes): master 10211 -> tsnap 22159  (AWAY)
+visual/blend_modes/layer_alpha output: vs golden=FP32 (flash_fixes): master 11067 -> tsnap 21799  (AWAY)
+visual/blend_modes/layer_erase output: vs golden=FP32 (flash_fixes): master 9032 -> tsnap 19608  (AWAY)
+visual/blend_modes/lighten output: vs golden=FP32 (flash_fixes): master 6915 -> tsnap 16825  (AWAY)
+visual/blend_modes/multiply output: vs golden=FP32 (flash_fixes): master 6639 -> tsnap 16057  (AWAY)
+visual/blend_modes/overlay output: vs golden=FP32 (flash_fixes): master 8791 -> tsnap 19677  (AWAY)
+visual/blend_modes/screen output: vs golden=FP32 (flash_fixes): master 5695 -> tsnap 15632  (AWAY)
+visual/blend_modes/subtract output: vs golden=FP32 (flash_fixes): master 6026 -> tsnap 15806  (AWAY)
+visual/cache_as_bitmap/drawing_api output: vs golden=FP32 (flash_fixes): master 603 -> tsnap 1795  (AWAY)
+visual/drawing_api/drawing_order output: vs png: master 12784 -> tsnap 12772  (toward)
+visual/filters/bevel output: vs png: master 107165 -> tsnap 129395  (AWAY)
+visual/filters/bevel_full output: vs png: master 92572 -> tsnap 132370  (AWAY)
+visual/filters/bevel_inner output: vs png: master 64795 -> tsnap 81176  (AWAY)
+visual/filters/bevel_outer output: vs png: master 112428 -> tsnap 147703  (AWAY)
+visual/filters/blur_size_grows output: vs png: master 98991 -> tsnap 100442  (AWAY)
+visual/filters/displacement_map output: vs png: master 37942 -> tsnap 40011  (AWAY)
+visual/filters/drop_shadow output: vs png: master 46460 -> tsnap 51035  (AWAY)
+visual/filters/drop_shadow_angles output: vs png: master 65470 -> tsnap 71976  (AWAY)
+visual/filters/glow output: vs png: master 29881 -> tsnap 33665  (AWAY)
+visual/filters/glow_with_alpha_strength output: vs png: master 57327 -> tsnap 73981  (AWAY)
+visual/filters/glow_without_composite_source output: vs png: master 29848 -> tsnap 32868  (AWAY)
+visual/fonts/duplicate_font output: vs png: master 8082 -> tsnap 8022  (toward)
+visual/opaque_background output: vs golden=FP32 (flash_fixes): master 1956 -> tsnap 4300  (AWAY)
+visual/simple_shapes/layers output: vs golden=FP32 (flash_fixes): master 1754 -> tsnap 3437  (AWAY)
+visual/simple_shapes/masks output: vs png: master 4398 -> tsnap 3206  (toward)
+visual/simple_shapes/masks_equal_clipdepth output: vs png: master 4398 -> tsnap 3206  (toward)
