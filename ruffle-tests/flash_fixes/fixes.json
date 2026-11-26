@@ -636,5 +636,49 @@
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1759 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1756, with the w2-lowq-sample-point model 1754.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
+  },
+  {
+    "test": "visual/simple_shapes/gradients/gradients",
+    "file": "output.expected.png",
+    "upstream_sha256": "368269ddb52fdd3c6223ffdb2fd48bb972373a56c5fa7f167bf53a49dbd7aaac",
+    "fix": "visual/simple_shapes/gradients/gradients/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__gradients__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 6959 channels over tol 1 vs Flash LOW. Ours vs Flash: master 5874, with the s28 lowq-corner-rule model 3 (s28 lowq-corner-rule swap).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "visual/simple_shapes/gradients/reflect",
+    "file": "output.expected.png",
+    "upstream_sha256": "ca27636699ca3f05d330f3974b213d9867b10a208e1c5d31c36a961b82489c9b",
+    "fix": "visual/simple_shapes/gradients/reflect/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__reflect__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 644343 channels over tol 1 vs Flash LOW. Ours vs Flash: master 645528, with the s28 lowq-corner-rule model 5628 (s28 lowq-corner-rule swap).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "visual/simple_shapes/gradients/repeat",
+    "file": "output.expected.png",
+    "upstream_sha256": "ff4a4e8aa607b4d16f4edbb2202203b42617cb9c3815c593f502e9a2ff4163b3",
+    "fix": "visual/simple_shapes/gradients/repeat/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__repeat__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 649083 channels over tol 1 vs Flash LOW. Ours vs Flash: master 649083, with the s28 lowq-corner-rule model 5628 (s28 lowq-corner-rule swap).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
+    "added": "2026-11-25"
+  },
+  {
+    "test": "visual/opaque_background",
+    "file": "output.expected.png",
+    "upstream_sha256": "ad390a26fa486ee5547ba2db140ec0d1e7aea04dbcd942bfea71abd18994bdf8",
+    "fix": "visual/opaque_background/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__opaque_background__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 6248 channels over tol 1 vs Flash LOW. Ours vs Flash: master 3474, with the s28 lowq-corner-rule model 984 (s28 lowq-corner-rule swap).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
+    "added": "2026-11-25"
   }
 ]

@@ -1231,6 +1231,9 @@ w2-lowq-sample-point model reproduces this.
 | `visual/fonts/glyph` | output | 1 656 |
 | `visual/simple_shapes/gradients/focal_radial` | output | 10 366 (ours with the model: 0) |
 | `visual/simple_shapes/layers` | output | 1 759 |
+| `visual/simple_shapes/gradients/gradients` (s28 lowq-corner-rule) | output | 6 959 (ours with the model: 3) |
+| `visual/simple_shapes/gradients/reflect` / `repeat` (s28 lowq-corner-rule) | output | 644 343 / 649 083 (ours: 5 628 each) |
+| `visual/opaque_background` (s28 lowq-corner-rule) | output | 6 248 (ours: 984) |
 
 **Decision:** match Flash. The FP32 captures are stored as `flash_fixes` entries on branch `lowq-fixes`, to land
 with the model. Rows not swapped (FP32 platform-dependent, device font, or load timing) are listed in the report, §6.
