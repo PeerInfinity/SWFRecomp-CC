@@ -1,0 +1,29 @@
+F1
+ef1 cf=2
+F2
+ef2 cf=3
+F3
+TA armed
+TA cf=3 last=F3
+ef3 cf=4
+F4
+ef4 cf=5
+F5
+ef5 cf=6
+TB armed
+F6
+TB cf=6 last=F6
+ef6 cf=7
+F7
+ef7 cf=8
+F8
+ef8 cf=9
+TC armed
+F9
+TC cf=9 last=F9
+ef9 cf=10
+F10
+ef10 cf=11
+F11
+ef11 cf=12
+F12

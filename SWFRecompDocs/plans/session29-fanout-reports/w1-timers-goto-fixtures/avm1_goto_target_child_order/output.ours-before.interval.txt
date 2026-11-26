@@ -1,0 +1,7 @@
+F1
+tick cf=1
+after goto
+A cf=3
+B c1=movieclip
+child c1
+child c2

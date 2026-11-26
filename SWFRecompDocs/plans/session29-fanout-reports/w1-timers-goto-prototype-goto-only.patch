@@ -1,0 +1,103 @@
+diff --git a/SWFModernRuntime/src/libswf/swf.c b/SWFModernRuntime/src/libswf/swf.c
+index c411799b..3338a40e 100644
+--- a/SWFModernRuntime/src/libswf/swf.c
++++ b/SWFModernRuntime/src/libswf/swf.c
+@@ -424,7 +424,11 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
+ 		int saved_tag_skip_phase_e = g_tag_skip_mode;
+ 		g_tag_skip_mode = 1;
+ 		actionDrainSuppressEnter();
+-		funcs[target](app_context);
++		{ extern int g_goto_inline_tagorder; extern size_t g_goto_inline_target;
++		  int _sv_to = g_goto_inline_tagorder; size_t _sv_tt = g_goto_inline_target;
++		  g_goto_inline_tagorder = 1; g_goto_inline_target = target;
++		  funcs[target](app_context);
++		  g_goto_inline_tagorder = _sv_to; g_goto_inline_target = _sv_tt; }
+ 		actionDrainSuppressLeave();
+ 		NG_NOTE_ROOT_DOACTION_RAN(target);
+ 		g_tag_skip_mode = saved_tag_skip_phase_e;
+diff --git a/SWFModernRuntime/src/libswf/swf_core.c b/SWFModernRuntime/src/libswf/swf_core.c
+index 27b2bbd4..8bbf14da 100644
+--- a/SWFModernRuntime/src/libswf/swf_core.c
++++ b/SWFModernRuntime/src/libswf/swf_core.c
+@@ -392,7 +392,11 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
+ 		int saved_tag_skip_phase_e = g_tag_skip_mode;
+ 		g_tag_skip_mode = 1;
+ 		actionDrainSuppressEnter();
+-		funcs[target](app_context);
++		{ extern int g_goto_inline_tagorder; extern size_t g_goto_inline_target;
++		  int _sv_to = g_goto_inline_tagorder; size_t _sv_tt = g_goto_inline_target;
++		  g_goto_inline_tagorder = 1; g_goto_inline_target = target;
++		  funcs[target](app_context);
++		  g_goto_inline_tagorder = _sv_to; g_goto_inline_target = _sv_tt; }
+ 		actionDrainSuppressLeave();
+ 		g_tag_skip_mode = saved_tag_skip_phase_e;
+ 		ng_run_deferred_sprite_init_on_or_after(app_context, target);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 9a07be06..a67cdc41 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -712,6 +712,7 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
+ // ---------------------------------------------------------------------------
+ // Forward declaration for the inner processing logic (processes a single depth index).
+ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* parent_mc, size_t depth_idx);
++void ng_goto_inline_place_hook(SWFAppContext* app_context, size_t depth);
+ 
+ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* parent_mc)
+ {
+@@ -12799,7 +12800,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
+ {
+ 	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
+ 	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
+-	if (g_tag_skip_mode) return;
++	if (g_tag_skip_mode) {
++		ng_goto_inline_place_hook(app_context, depth);
++		return;
++	}
+ 	ng_ensureDisplayListSize(app_context, depth);
+ 
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+@@ -16830,6 +16834,44 @@ void ng_run_deferred_sprite_init(SWFAppContext* app_context)
+ 	ng_run_deferred_sprite_init_impl(app_context, 0, 0);
+ }
+ 
++// s29 w1-timers-goto PROTOTYPE: goto target frame queues child frame-1
++// scripts in TAG order (Flash, gnash misc-swfc.all/gotoFrameFromInterval{,2}:
++// DoAction A / PlaceObject c1..c3 / DoAction B runs A, c1, c2, c3, B — the same
++// order as a natural advance into that frame). Set by ng_executeGotoCatchUp
++// around the inline funcs[target] replay; tagPlaceObject2's g_tag_skip_mode
++// arm runs the deferred init of the child placed at that depth on the target
++// frame, so its script lands in the SCRIPT FIFO between A and B. Kill switch:
++// SWF_GOTO_TAGORDER=0.
++int g_goto_inline_tagorder = 0;
++size_t g_goto_inline_target = 0;
++void ng_goto_inline_place_hook(SWFAppContext* app_context, size_t depth)
++{
++	if (!g_goto_inline_tagorder) return;
++	static int s_on = -1;
++	if (s_on < 0) { const char* ev = getenv("SWF_GOTO_TAGORDER"); s_on = (ev && ev[0] == '0') ? 0 : 1; }
++	if (!s_on) return;
++	if (depth > max_depth) return;
++	DisplayObject* obj = &display_list[depth];
++	if (obj->char_id == 0 || !obj->sprite_needs_init) return;
++	if (obj->placed_at_frame != g_goto_inline_target) return;
++	{ const char* lp = getenv("SWF_GOTO_TAGORDER_LOG"); if (lp) { FILE* lf = fopen(lp, "a"); if (lf) { fprintf(lf, "hook depth=%zu target=%zu\n", depth, g_goto_inline_target); fclose(lf); } } }
++	extern void ng_sync_root_display_obj(void);
++	ng_sync_root_display_obj();
++	int saved_cu = catch_up_mode;
++	int saved_skip = g_tag_skip_mode;
++	g_tag_skip_mode = 0;
++	g_sprite_init_filter_active = 1;
++	g_sprite_init_before_target = 0;
++	g_sprite_init_target_frame = g_goto_inline_target;
++	catch_up_mode = 0;
++	actionDeferredSpriteInitEnter();
++	process_sprite_init_at_depth(app_context, &root_movieclip, depth);
++	actionDeferredSpriteInitLeave();
++	g_sprite_init_filter_active = 0;
++	catch_up_mode = saved_cu;
++	g_tag_skip_mode = saved_skip;
++}
++
+ // Run deferred sprite inits only for sprites placed BEFORE target_frame.
+ // Ruffle phase 1: children placed before target frame init before target DoAction.
+ void ng_run_deferred_sprite_init_before(SWFAppContext* app_context, size_t target_frame)
