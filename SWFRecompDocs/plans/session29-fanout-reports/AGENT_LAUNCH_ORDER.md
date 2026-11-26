@@ -10,7 +10,9 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 
 ## Local one-task sessions
 
-(ladders: N, browser — filled in as launched)
+- N ladder: `n-seam-caps` launched 2026-11-26 (brief `n-seam-caps-prompt.md`; handshake sent): closed stroke seam as two caps in builders/lyon.
+- Browser ladder: `browser-gotoandstop-current` launched 2026-11-26 (brief `browser-gotoandstop-current-prompt.md`; handshake sent): FP32 gotoAndStop(current) fixtures, then one all-build rule.
+- Coordinator-local: Windows FP32 check of the 5 LOW swap candidates (`w1-local-oracles/swapcheck-win/`): invalidClipDepth + acid-filter WIN == LNX → flash_fixes `4989a9dfb` (64 entries); gradient, acid-gradient, acid-gradient-0 WIN ≠ LNX → kept (host-dependent, RvF).
 
 ## Wave 1 (diagnosis, cloud)
 
@@ -35,3 +37,4 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
+| `45907020469` interim #1 | `4989a9dfb` 2 flash_fixes + fresh upstream download | expected: drift rows only (2 paletteMap rows new) | expected: invalidClipDepth fail→pass; acid-filter stays fail | — |
