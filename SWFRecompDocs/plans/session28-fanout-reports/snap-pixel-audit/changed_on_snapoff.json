@@ -1,0 +1,482 @@
+{
+ "from_gnash/misc-ming.all/loop/simple_loop_test|frame1": {
+  "changed": 121,
+  "A_exact": 121,
+  "B_exact": 0,
+  "A_closer": 121,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 30855,
+  "src": "draw"
+ },
+ "from_gnash/misc-ming.all/loop/simple_loop_test|frame2": {
+  "changed": 241,
+  "A_exact": 241,
+  "B_exact": 0,
+  "A_closer": 241,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 61455,
+  "src": "draw"
+ },
+ "from_gnash/misc-ming.all/loop/simple_loop_test|frame3": {
+  "changed": 361,
+  "A_exact": 361,
+  "B_exact": 0,
+  "A_closer": 361,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 92055,
+  "src": "draw"
+ },
+ "from_gnash/misc-ming.all/loop/simple_loop_test|frame5": {
+  "changed": 121,
+  "A_exact": 121,
+  "B_exact": 0,
+  "A_closer": 121,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 30855,
+  "src": "draw"
+ },
+ "from_gnash/misc-ming.all/loop/simple_loop_test|frame6": {
+  "changed": 241,
+  "A_exact": 241,
+  "B_exact": 0,
+  "A_closer": 241,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 61455,
+  "src": "draw"
+ },
+ "from_gnash/misc-ming.all/loop/simple_loop_test|frame7": {
+  "changed": 361,
+  "A_exact": 361,
+  "B_exact": 0,
+  "A_closer": 361,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 92055,
+  "src": "draw"
+ },
+ "from_shumway/acid/acid-chars|output": {
+  "changed": 424,
+  "A_exact": 424,
+  "B_exact": 0,
+  "A_closer": 424,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 108120,
+  "src": "draw"
+ },
+ "from_shumway/acid/acid-gradient-2|output": {
+  "changed": 24,
+  "A_exact": 5,
+  "B_exact": 14,
+  "A_closer": 6,
+  "B_closer": 18,
+  "L1_A": 4598,
+  "L1_B": 1557,
+  "src": "draw"
+ },
+ "from_shumway/acid/acid-scale|output": {
+  "changed": 137,
+  "A_exact": 80,
+  "B_exact": 57,
+  "A_closer": 80,
+  "B_closer": 57,
+  "L1_A": 14535,
+  "L1_B": 20400,
+  "src": "draw"
+ },
+ "from_shumway/acid/acid-text|output": {
+  "changed": 866,
+  "A_exact": 833,
+  "B_exact": 6,
+  "A_closer": 846,
+  "B_closer": 20,
+  "L1_A": 4565,
+  "L1_B": 216265,
+  "src": "draw"
+ },
+ "from_shumway/doubleAndRegister|output": {
+  "changed": 28,
+  "A_exact": 6,
+  "B_exact": 22,
+  "A_closer": 6,
+  "B_closer": 22,
+  "L1_A": 5610,
+  "L1_B": 1530,
+  "src": "draw"
+ },
+ "regression/avm1_hairline_scaled_instances|output": {
+  "changed": 511,
+  "A_exact": 399,
+  "B_exact": 6,
+  "A_closer": 409,
+  "B_closer": 101,
+  "L1_A": 11905,
+  "L1_B": 25561,
+  "src": "draw"
+ },
+ "regression/avm1_stroke_style_id_order|output": {
+  "changed": 876,
+  "A_exact": 874,
+  "B_exact": 0,
+  "A_closer": 875,
+  "B_closer": 1,
+  "L1_A": 223,
+  "L1_B": 104373,
+  "src": "draw"
+ },
+ "regression/avm2_layer_group_alpha|output": {
+  "changed": 675,
+  "A_exact": 638,
+  "B_exact": 12,
+  "A_closer": 653,
+  "B_closer": 17,
+  "L1_A": 4438,
+  "L1_B": 69271,
+  "src": "screen"
+ },
+ "regression/avm2_layer_group_erase|output": {
+  "changed": 653,
+  "A_exact": 633,
+  "B_exact": 3,
+  "A_closer": 639,
+  "B_closer": 11,
+  "L1_A": 2592,
+  "L1_B": 90472,
+  "src": "screen"
+ },
+ "visual/blend_modes/add|output": {
+  "changed": 276,
+  "A_exact": 248,
+  "B_exact": 20,
+  "A_closer": 265,
+  "B_closer": 7,
+  "L1_A": 796,
+  "L1_B": 20551,
+  "src": "screen"
+ },
+ "visual/blend_modes/alpha_no_layer|output": {
+  "changed": 675,
+  "A_exact": 650,
+  "B_exact": 1,
+  "A_closer": 661,
+  "B_closer": 11,
+  "L1_A": 3162,
+  "L1_B": 107587,
+  "src": "screen"
+ },
+ "visual/blend_modes/darken|output": {
+  "changed": 611,
+  "A_exact": 593,
+  "B_exact": 0,
+  "A_closer": 605,
+  "B_closer": 6,
+  "L1_A": 3244,
+  "L1_B": 126750,
+  "src": "screen"
+ },
+ "visual/blend_modes/difference|output": {
+  "changed": 276,
+  "A_exact": 240,
+  "B_exact": 20,
+  "A_closer": 267,
+  "B_closer": 6,
+  "L1_A": 1412,
+  "L1_B": 27849,
+  "src": "screen"
+ },
+ "visual/blend_modes/erase_no_layer|output": {
+  "changed": 675,
+  "A_exact": 650,
+  "B_exact": 1,
+  "A_closer": 661,
+  "B_closer": 11,
+  "L1_A": 3162,
+  "L1_B": 107587,
+  "src": "screen"
+ },
+ "visual/blend_modes/hardlight|output": {
+  "changed": 612,
+  "A_exact": 544,
+  "B_exact": 0,
+  "A_closer": 607,
+  "B_closer": 5,
+  "L1_A": 4569,
+  "L1_B": 136353,
+  "src": "screen"
+ },
+ "visual/blend_modes/invert|output": {
+  "changed": 586,
+  "A_exact": 572,
+  "B_exact": 11,
+  "A_closer": 575,
+  "B_closer": 11,
+  "L1_A": 1983,
+  "L1_B": 100725,
+  "src": "screen"
+ },
+ "visual/blend_modes/layer_alpha|output": {
+  "changed": 675,
+  "A_exact": 638,
+  "B_exact": 12,
+  "A_closer": 653,
+  "B_closer": 17,
+  "L1_A": 4438,
+  "L1_B": 69271,
+  "src": "screen"
+ },
+ "visual/blend_modes/layer_erase|output": {
+  "changed": 653,
+  "A_exact": 633,
+  "B_exact": 3,
+  "A_closer": 639,
+  "B_closer": 11,
+  "L1_A": 2592,
+  "L1_B": 90472,
+  "src": "screen"
+ },
+ "visual/blend_modes/lighten|output": {
+  "changed": 203,
+  "A_exact": 166,
+  "B_exact": 0,
+  "A_closer": 197,
+  "B_closer": 0,
+  "L1_A": 745,
+  "L1_B": 17172,
+  "src": "screen"
+ },
+ "visual/blend_modes/multiply|output": {
+  "changed": 611,
+  "A_exact": 593,
+  "B_exact": 0,
+  "A_closer": 605,
+  "B_closer": 6,
+  "L1_A": 3241,
+  "L1_B": 125628,
+  "src": "screen"
+ },
+ "visual/blend_modes/overlay|output": {
+  "changed": 611,
+  "A_exact": 592,
+  "B_exact": 1,
+  "A_closer": 604,
+  "B_closer": 7,
+  "L1_A": 2424,
+  "L1_B": 56303,
+  "src": "screen"
+ },
+ "visual/blend_modes/screen|output": {
+  "changed": 260,
+  "A_exact": 227,
+  "B_exact": 24,
+  "A_closer": 242,
+  "B_closer": 8,
+  "L1_A": 807,
+  "L1_B": 18707,
+  "src": "screen"
+ },
+ "visual/blend_modes/subtract|output": {
+  "changed": 273,
+  "A_exact": 250,
+  "B_exact": 20,
+  "A_closer": 262,
+  "B_closer": 8,
+  "L1_A": 1970,
+  "L1_B": 26246,
+  "src": "screen"
+ },
+ "visual/drawing_api/drawing_order|output": {
+  "changed": 2999,
+  "A_exact": 1492,
+  "B_exact": 1501,
+  "A_closer": 1492,
+  "B_closer": 1501,
+  "L1_A": 384285,
+  "L1_B": 381990,
+  "src": "draw"
+ },
+ "visual/filters/bevel|output": {
+  "changed": 34994,
+  "A_exact": 14352,
+  "B_exact": 13043,
+  "A_closer": 17572,
+  "B_closer": 13623,
+  "L1_A": 272323,
+  "L1_B": 282220,
+  "src": "draw"
+ },
+ "visual/filters/bevel_full|output": {
+  "changed": 60812,
+  "A_exact": 42390,
+  "B_exact": 41038,
+  "A_closer": 28188,
+  "B_closer": 22006,
+  "L1_A": 378526,
+  "L1_B": 384499,
+  "src": "draw"
+ },
+ "visual/filters/bevel_inner|output": {
+  "changed": 8822,
+  "A_exact": 3393,
+  "B_exact": 3554,
+  "A_closer": 2967,
+  "B_closer": 3545,
+  "L1_A": 222497,
+  "L1_B": 219796,
+  "src": "draw"
+ },
+ "visual/filters/bevel_outer|output": {
+  "changed": 52755,
+  "A_exact": 39317,
+  "B_exact": 37797,
+  "A_closer": 25465,
+  "B_closer": 18828,
+  "L1_A": 242278,
+  "L1_B": 247357,
+  "src": "draw"
+ },
+ "visual/filters/blur_size_grows|output": {
+  "changed": 12487,
+  "A_exact": 664,
+  "B_exact": 573,
+  "A_closer": 7266,
+  "B_closer": 4298,
+  "L1_A": 224919,
+  "L1_B": 230761,
+  "src": "draw"
+ },
+ "visual/filters/color_matrix|output": {
+  "changed": 4,
+  "A_exact": 4,
+  "B_exact": 0,
+  "A_closer": 4,
+  "B_closer": 0,
+  "L1_A": 2,
+  "L1_B": 1020,
+  "src": "draw"
+ },
+ "visual/filters/displacement_map|output": {
+  "changed": 1563,
+  "A_exact": 387,
+  "B_exact": 397,
+  "A_closer": 731,
+  "B_closer": 803,
+  "L1_A": 57297,
+  "L1_B": 55807,
+  "src": "draw"
+ },
+ "visual/filters/drop_shadow|output": {
+  "changed": 4022,
+  "A_exact": 713,
+  "B_exact": 596,
+  "A_closer": 2137,
+  "B_closer": 1846,
+  "L1_A": 138681,
+  "L1_B": 145129,
+  "src": "draw"
+ },
+ "visual/filters/drop_shadow_angles|output": {
+  "changed": 4707,
+  "A_exact": 1231,
+  "B_exact": 885,
+  "A_closer": 2760,
+  "B_closer": 1941,
+  "L1_A": 113491,
+  "L1_B": 123777,
+  "src": "draw"
+ },
+ "visual/filters/glow|output": {
+  "changed": 2699,
+  "A_exact": 508,
+  "B_exact": 433,
+  "A_closer": 1411,
+  "B_closer": 1281,
+  "L1_A": 119535,
+  "L1_B": 124657,
+  "src": "draw"
+ },
+ "visual/filters/glow_with_alpha_strength|output": {
+  "changed": 38828,
+  "A_exact": 32190,
+  "B_exact": 30985,
+  "A_closer": 16838,
+  "B_closer": 13177,
+  "L1_A": 202022,
+  "L1_B": 209197,
+  "src": "draw"
+ },
+ "visual/filters/glow_without_composite_source|output": {
+  "changed": 2949,
+  "A_exact": 588,
+  "B_exact": 463,
+  "A_closer": 1582,
+  "B_closer": 1366,
+  "L1_A": 114971,
+  "L1_B": 120321,
+  "src": "draw"
+ },
+ "visual/opaque_background|output": {
+  "changed": 1390,
+  "A_exact": 1388,
+  "B_exact": 1,
+  "A_closer": 1388,
+  "B_closer": 1,
+  "L1_A": 510,
+  "L1_B": 354195,
+  "src": "draw"
+ },
+ "visual/simple_shapes/gradients/focal_radial|output": {
+  "changed": 3667,
+  "A_exact": 3616,
+  "B_exact": 0,
+  "A_closer": 3667,
+  "B_closer": 0,
+  "L1_A": 1090,
+  "L1_B": 467007,
+  "src": "draw"
+ },
+ "visual/simple_shapes/gradients/gradients|output": {
+  "changed": 638,
+  "A_exact": 480,
+  "B_exact": 0,
+  "A_closer": 638,
+  "B_closer": 0,
+  "L1_A": 1167,
+  "L1_B": 161188,
+  "src": "draw"
+ },
+ "visual/simple_shapes/layers|output": {
+  "changed": 1,
+  "A_exact": 1,
+  "B_exact": 0,
+  "A_closer": 1,
+  "B_closer": 0,
+  "L1_A": 0,
+  "L1_B": 255,
+  "src": "draw"
+ },
+ "visual/simple_shapes/masks|output": {
+  "changed": 4,
+  "A_exact": 2,
+  "B_exact": 2,
+  "A_closer": 2,
+  "B_closer": 2,
+  "L1_A": 408,
+  "L1_B": 408,
+  "src": "draw"
+ },
+ "visual/simple_shapes/masks_equal_clipdepth|output": {
+  "changed": 4,
+  "A_exact": 2,
+  "B_exact": 2,
+  "A_closer": 2,
+  "B_closer": 2,
+  "L1_A": 408,
+  "L1_B": 408,
+  "src": "draw"
+ }
+}

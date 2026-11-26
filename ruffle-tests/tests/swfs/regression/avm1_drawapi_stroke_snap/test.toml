@@ -1,0 +1,10 @@
+# Golden = Flash Player 32 (LNX) oracle (s28 n-stroke-snap capture drawapi_as2):
+# AVM1 lineStyle widths 0..4 x 8 subpixel offsets, pixelHinting off (left) / on (right).
+# s28 n-drawapi-stroke-snap: 33300 -> 2442 outliers. Residual = round-join corner
+# pixels of the snapped rects (Flash's join disc is not snapped with the band;
+# report §5) + AA rounding.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 2800

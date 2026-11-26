@@ -106,6 +106,31 @@ if [ "$CLEAN_FLAG" = true ]; then
     rm -rf "${TEST_DIR}/RecompiledTags"
 fi
 
+# Stale generated C: the generated code is an ABI with the runtime headers
+# (e.g. 17ba3090d moved font_N_advances[] from s16 to s32), so a cache emitted by
+# an older recompiler fails to compile -- or worse, links against a changed
+# contract. Regenerate whenever the recompiler binary, test.swf or config.toml
+# is newer than the cache's stamp. A cache without a stamp (pre-dates this
+# check) is regenerated once. SWF_REUSE_RECOMPILED=1 keeps any existing cache.
+RECOMP_STAMP="${TEST_DIR}/RecompiledScripts/.recomp_stamp"
+if [ -d "${TEST_DIR}/RecompiledScripts" ] && [ "${SWF_REUSE_RECOMPILED:-0}" != "1" ]; then
+    STALE_REASON=""
+    if [ ! -f "$RECOMP_STAMP" ]; then
+        STALE_REASON="no stamp"
+    else
+        for dep in "${SWFRECOMP_ROOT}/build/SWFRecomp" "${TEST_DIR}/test.swf" "${TEST_DIR}/config.toml"; do
+            if [ -e "$dep" ] && [ "$dep" -nt "$RECOMP_STAMP" ]; then
+                STALE_REASON="$(basename "$dep") is newer"
+                break
+            fi
+        done
+    fi
+    if [ -n "$STALE_REASON" ]; then
+        echo "Generated C is stale (${STALE_REASON}); regenerating..."
+        rm -rf "${TEST_DIR}/RecompiledScripts" "${TEST_DIR}/RecompiledTags"
+    fi
+fi
+
 # Run SWFRecomp if needed
 if [ ! -d "${TEST_DIR}/RecompiledScripts" ]; then
     echo "Running SWFRecomp..."
@@ -114,6 +139,7 @@ if [ ! -d "${TEST_DIR}/RecompiledScripts" ]; then
     # Stack unlimited because interpretShape's johnson cycle walker is recursive
     # and SWFs with very deep paths (e.g. Duck Life 3) blow the default 8 MB stack.
     bash -c 'ulimit -v 4194304; ulimit -s unlimited; exec "$@"' -- "${SWFRECOMP_ROOT}/build/SWFRecomp" config.toml
+    [ -d "${TEST_DIR}/RecompiledScripts" ] && touch "$RECOMP_STAMP"
 fi
 
 # Setup build directory

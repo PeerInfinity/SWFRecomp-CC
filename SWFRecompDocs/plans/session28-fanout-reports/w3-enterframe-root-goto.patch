@@ -1,0 +1,118 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 99882c7b32..cb51df99a7 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -40370,17 +40370,17 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
+ 
+ 	extern int goto_from_action;
+ 
+-	// When called from inside an enterFrame handler, skip the goto entirely.
+-	// The frame loop will naturally advance on the next tick. The enterFrame
+-	// callback (e.g., Dejagnu checker) retries every tick until its condition
+-	// is met, so skipping one goto is safe. This prevents the enterFrame goto
+-	// from overriding the natural frame advance via manual_next_frame.
+-	{
+-		extern int g_inside_enterframe_dispatch;
+-		if (g_inside_enterframe_dispatch) {
+-			return;
+-		}
+-	}
++	// A root GotoFrame issued inside an onEnterFrame handler moves the playhead
++	// INLINE, exactly like one from a frame script (Flash 32, s28
++	// regression/avm1_enterframe_root_goto_opcode: `ef cf=1 / after cf=3 /
++	// f3 cf=3`). There used to be an early return here under
++	// g_inside_enterframe_dispatch (fc0f8e4fd5, 2026-03, for the gnash Dejagnu
++	// rows). s28 w3-enterframe-root-goto measured every gnash row: the only goto
++	// that rule ever dropped in the corpus is the Dejagnu harness's goto to
++	// frame 0 while the root is stopped ON frame 0, which is a same-frame goto,
++	// and ng_executeGotoCatchUp's self-goto guard (swf_core.c / swf.c) already
++	// makes it a no-op. With the rule gone, all 244 gnash rows it fired on print
++	// byte-identical output in both modes.
+ 
+ 	next_frame = frame;
+ 	manual_next_frame = 1;
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/create_test_swf.py
+new file mode 100644
+index 0000000000..c0ac92d375
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/create_test_swf.py
+@@ -0,0 +1,46 @@
++"""avm1_enterframe_root_goto_opcode: a bare GotoFrame OPCODE (gotoAndStop(3) in
++a function defined on _root) issued from _root.onEnterFrame on a stopped root.
++
++Pins: the root playhead moves INLINE inside the handler (`after cf=3`), and
++frame 3's DoAction runs right after the handler returns (`f3 cf=3`), as in
++Flash Player 32 (direct-mode capture, s28 browser-attached-goto goal 4:
++SWFRecompDocs/plans/session28-fanout-reports/browser-attached-goto-fixtures/
++avm1_enterframe_root_goto_opcode/flash32.trace.txt; output.txt = its first 7
++lines, the 5-tick span). Before the fix, actionGotoFrame returned early under
++g_inside_enterframe_dispatch (Dejagnu-era rule, fc0f8e4fd5) and printed
++`after cf=1`. Fixed by s28 w3-enterframe-root-goto (rule removed)."""
++import struct, sys
++def tag(code, data):
++    if len(data) < 63: return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++def s(x): return x.encode() + b'\0'
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str): b += b'\x00' + s(it)
++        elif isinstance(it, int): b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++GETVAR=b'\x1c'; SETMEM=b'\x4f'; GETMEM=b'\x4e'; ADD2=b'\x47'; TRACE=b'\x26'; STOP=b'\x07'
++def jif(off): return b'\x9d' + struct.pack('<Hh', 2, off)
++def deffunc(body):
++    d = s('') + struct.pack('<H', 0) + struct.pack('<H', len(body))
++    return b'\x9b' + struct.pack('<H', len(d)) + d + body
++def doaction(a): return tag(12, a + b'\0')
++SHOW = tag(1, b'')
++def goto(fr): return b'\x81' + struct.pack('<HH', 2, fr)
++cf = push('_root') + GETVAR + push('_currentframe') + GETMEM
++rest = (push('_root') + GETVAR + push('done', 1) + SETMEM + goto(2)
++        + push('after cf=') + cf + ADD2 + TRACE)
++body_ = (push('ef cf=') + cf + ADD2 + TRACE
++         + push('_root') + GETVAR + push('done') + GETMEM + jif(len(rest)) + rest)
++f1 = doaction(push('_root') + GETVAR + push('onEnterFrame') + deffunc(body_) + SETMEM
++              + push('f1') + TRACE + STOP)
++f2 = doaction(push('f2') + TRACE)
++f3 = doaction(push('f3 cf=') + cf + ADD2 + TRACE)
++frames = [f1, f2, f3]
++body = (tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + b''.join(f + SHOW for f in frames) + tag(0, b''))
++bits = '{:05b}'.format(13) + ''.join('{:013b}'.format(v) for v in (0, 4000, 0, 3000))
++bits += '0' * ((8 - len(bits) % 8) % 8)
++rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++hdr_rest = rect + struct.pack('<HH', 12 << 8, len(frames))
++open('test.swf', 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(hdr_rest) + len(body)) + hdr_rest + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/output.txt b/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/output.txt
+new file mode 100644
+index 0000000000..1d2d940b04
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/output.txt
+@@ -0,0 +1,7 @@
++f1
++ef cf=1
++after cf=3
++f3 cf=3
++ef cf=3
++ef cf=3
++ef cf=3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/test.swf b/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff4882652f5e892c43f1f2bffb0af72f9c30fbfe
+GIT binary patch
+literal 295
+zcma)0y$-=p6#m?+S|P+PVXDP~Su{aS+QDFyrtXc!y~#~IfLAcwMLdl6@Gf=Q7<B8I
+z&UeoD7akAZqybzo3gCQzF2`m7nl;Pwe8u0iS{FDOtuqX55726>GGRiKTm_y^L4Lq`
+zfRN)<E-UmtDbt%VLS?e#M?3%Dt_7U65{O<5`--yj`?%B&@tuLe(k+n`T`MNGO+e1z
+Wy9m(cC7Q!0Fy%#Cxu|7BeBcW>4o3k1
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/test.toml b/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/test.toml
+new file mode 100644
+index 0000000000..1e15fdf275
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_enterframe_root_goto_opcode/test.toml
+@@ -0,0 +1 @@
++num_frames = 5

@@ -31,6 +31,7 @@
 #include <avm2/avm2_filters.h>
 #include <tesselator.h>  // T4 Part B: runtime Graphics tessellation (libtess2)
 #include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
+#include <stroke_snap.h>    // s28 n-drawapi-stroke-snap: Flash device-space stroke rule
 #include <gradient_ramp.h>  // w2-gfx-gradient: Ruffle CommonGradient::new ramp walk
 #include <memory/heap.h>
 
@@ -8543,6 +8544,17 @@ typedef struct
 	uint8_t  ljoints;               // 0 round, 1 miter, 2 bevel
 	uint8_t  lcaps;                 // 0 round, 1 none (butt), 2 square
 	float    lmiter;                // miter limit; <1 degrades to bevel
+	// s28 n-drawapi-stroke-snap: the stroke soup BEFORE the translucent
+	// union, each vertex's centre (local twips) and axis flags, for the
+	// renderer's Flash stroke rule (stroke_snap.h). gen = cache key.
+	float*   soup;
+	float*   soup_cen;
+	uint8_t* soup_sf;
+	uint32_t soup_n;
+	unsigned long long soup_gen;
+	float    ldecl_twips;           // declared width, AVM2 rule (whole px, rounded)
+	float    lemit_twips;           // full width the soup was built at
+	uint8_t  lflags;                // STROKE_FLAG_*
 } Avm2GfxPath;
 
 typedef struct Avm2GraphicsExt
@@ -8570,6 +8582,7 @@ typedef struct Avm2GraphicsExt
 	// a hairline is exactly zero. Keeping them apart is what stops a
 	// `lineStyle(0)` from inflating getBounds by half a pixel per side.
 	float    clw_bnd;               // line width (pixels) for bounds only
+	uint8_t  clflags;               // STROKE_FLAG_* of the current line style
 	Avm2GfxStyle clsty;             // current non-solid stroke style
 	uint8_t  cur_winding;           // 0 evenOdd (Ruffle's Drawing default)
 	// Active pen-command buffer (flushed on begin*/endFill/clear/draw*).
@@ -8723,6 +8736,10 @@ static void gfx_free_path(Avm2GfxPath* p)
 {
 	free(p->fill_verts); p->fill_verts = NULL; p->fill_vert_count = 0;
 	free(p->line_verts); p->line_verts = NULL; p->line_vert_count = 0;
+	free(p->soup); p->soup = NULL;
+	free(p->soup_cen); p->soup_cen = NULL;
+	free(p->soup_sf); p->soup_sf = NULL;
+	p->soup_n = 0;
 	free(p->bmp_px); p->bmp_px = NULL; p->bmp_w = p->bmp_h = 0;
 	free(p->lsty.bmp_px); p->lsty.bmp_px = NULL;
 	p->lsty.bmp_w = p->lsty.bmp_h = 0;
@@ -8742,6 +8759,7 @@ static void gfx_reset(Avm2GraphicsExt* g)
 	g->cur_winding = 0;
 	g->cur_fill = g->cur_line = 0; g->pen_set = 0;
 	g->clw_bnd = 0.0f;
+	g->clflags = 0;
 	g->cljoints = 0; g->clcaps = 0; g->clmiter = 3.0f;
 }
 
@@ -8929,6 +8947,11 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 	const uint8_t caps = path->lcaps;
 	const float miter_limit = (path->lmiter > 0.0f) ? path->lmiter : 3.0f;
 	free(path->line_verts); path->line_verts = NULL; path->line_vert_count = 0;
+	free(path->soup); path->soup = NULL;
+	free(path->soup_cen); path->soup_cen = NULL;
+	free(path->soup_sf); path->soup_sf = NULL;
+	path->soup_n = 0;
+	path->lemit_twips = 2.0f * half_w;
 	if (poly == NULL || ccount == 0) return;
 	#define _GNEEDCLOSE(cs, ce) (filled && ((ce)-(cs)) >= 3 && ( \
 		fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   > 0.01f || \
@@ -8949,6 +8972,23 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 	                     + poly_count * gfx_stroke_extra_verts(half_w, joints, caps);
 	path->line_verts = malloc(alloc_verts * 2 * sizeof(float));
 	uint32_t wv = 0;
+	// s28 n-drawapi-stroke-snap: centre polyline vertex per emitted vertex,
+	// STROKE_SNAP_* flags per polyline vertex (see action.c drawingBuildStroke).
+	uint32_t* vcen = malloc(alloc_verts * sizeof(uint32_t));
+	uint8_t* pflag = calloc(poly_count ? poly_count : 1, 1);
+	#define _GAXIS(_ka,_kb) do { \
+		float _dx = poly[(_kb)*2] - poly[(_ka)*2], _dy = poly[(_kb)*2+1] - poly[(_ka)*2+1]; \
+		uint8_t _f = (_dx == 0.0f && _dy != 0.0f) ? STROKE_SNAP_VERT \
+		           : (_dy == 0.0f && _dx != 0.0f) ? STROKE_SNAP_HORZ : 0; \
+		if (pflag) { pflag[_ka] |= _f; pflag[_kb] |= _f; } \
+	} while (0)
+	#define _GCENR(_from,_k) do { \
+		if (vcen) for (uint32_t _q = (_from); _q < wv; _q++) vcen[_q] = (_k); \
+	} while (0)
+	#define _GCENS(_ka,_kb) do { \
+		if (vcen) { vcen[wv-6] = (_ka); vcen[wv-5] = (_ka); vcen[wv-4] = (_kb); \
+		            vcen[wv-3] = (_ka); vcen[wv-2] = (_kb); vcen[wv-1] = (_kb); } \
+	} while (0)
 	#define _GSEG(_x0,_y0,_x1,_y1) do { \
 		float x0=(_x0)*20.0f, y0=(_y0)*20.0f, x1=(_x1)*20.0f, y1=(_y1)*20.0f; \
 		float dx=x1-x0, dy=y1-y0, len=sqrtf(dx*dx+dy*dy); if(len<0.001f)len=0.001f; \
@@ -8957,14 +8997,18 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 		o[6]=x0-nx;o[7]=y0-ny;o[8]=x1-nx;o[9]=y1-ny;o[10]=x1+nx;o[11]=y1+ny; wv+=6; \
 	} while (0)
 	#define _GJOIN(_kp,_kv,_kn) do { \
+		uint32_t _w0 = wv; \
 		wv += gfx_stroke_join(&path->line_verts[wv*2], \
 			poly[(_kp)*2], poly[(_kp)*2+1], poly[(_kv)*2], poly[(_kv)*2+1], \
 			poly[(_kn)*2], poly[(_kn)*2+1], half_w, joints, miter_limit); \
+		_GCENR(_w0, (_kv)); \
 	} while (0)
 	#define _GCAP(_kp,_ke) do { \
+		uint32_t _w0 = wv; \
 		wv += gfx_stroke_cap(&path->line_verts[wv*2], \
 			poly[(_kp)*2], poly[(_kp)*2+1], poly[(_ke)*2], poly[(_ke)*2+1], \
 			half_w, caps); \
+		_GCENR(_w0, (_ke)); \
 	} while (0)
 	for (uint32_t ci = 0; ci < ccount; ci++)
 	{
@@ -8972,9 +9016,17 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 		uint32_t ce = (ci + 1 < ccount) ? cstarts[ci + 1] : poly_count;
 		int needs_close = _GNEEDCLOSE(cs, ce), expl = _GEXPLCLOSED(cs, ce);
 		for (uint32_t i = cs; i + 1 < ce; i++)
+		{
 			_GSEG(poly[i*2], poly[i*2+1], poly[(i+1)*2], poly[(i+1)*2+1]);
+			_GCENS(i, i + 1);
+			_GAXIS(i, i + 1);
+		}
 		if (needs_close)
+		{
 			_GSEG(poly[(ce-1)*2], poly[(ce-1)*2+1], poly[cs*2], poly[cs*2+1]);
+			_GCENS(ce - 1, cs);
+			_GAXIS(ce - 1, cs);
+		}
 		for (uint32_t k = cs + 1; k + 1 < ce; k++) _GJOIN(k-1, k, k+1);
 		if (needs_close && (ce - cs) >= 2)
 		{
@@ -8984,12 +9036,52 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 		else if (expl) _GJOIN(ce-2, cs, cs+1);
 		else if (ce > cs + 1) { _GCAP(cs+1, cs); _GCAP(ce-2, ce-1); }
 	}
+	path->line_vert_count = wv;
+	if (vcen != NULL && pflag != NULL && wv > 0)
+	{
+		for (uint32_t ci = 0; ci < ccount; ci++)
+		{
+			uint32_t cs = cstarts[ci];
+			uint32_t ce = (ci + 1 < ccount) ? cstarts[ci + 1] : poly_count;
+			if (_GEXPLCLOSED(cs, ce))
+			{
+				uint8_t f = pflag[cs] | pflag[ce - 1];
+				pflag[cs] = f; pflag[ce - 1] = f;
+			}
+		}
+		path->soup = malloc((size_t) wv * 2 * sizeof(float));
+		path->soup_cen = malloc((size_t) wv * 2 * sizeof(float));
+		path->soup_sf = malloc(wv);
+		if (path->soup && path->soup_cen && path->soup_sf)
+		{
+			memcpy(path->soup, path->line_verts, (size_t) wv * 2 * sizeof(float));
+			for (uint32_t q = 0; q < wv; q++)
+			{
+				uint32_t k = vcen[q];
+				path->soup_cen[q * 2]     = poly[k * 2] * 20.0f;
+				path->soup_cen[q * 2 + 1] = poly[k * 2 + 1] * 20.0f;
+				path->soup_sf[q] = pflag[k];
+			}
+			path->soup_n = wv;
+			path->soup_gen = stroke_snap_next_gen(2);
+		}
+		else
+		{
+			free(path->soup); path->soup = NULL;
+			free(path->soup_cen); path->soup_cen = NULL;
+			free(path->soup_sf); path->soup_sf = NULL;
+		}
+	}
+	free(vcen);
+	free(pflag);
 	#undef _GCAP
 	#undef _GJOIN
 	#undef _GSEG
+	#undef _GCENS
+	#undef _GCENR
+	#undef _GAXIS
 	#undef _GEXPLCLOSED
 	#undef _GNEEDCLOSE
-	path->line_vert_count = wv;
 }
 
 // Flatten cmds[from, to) into contours (pixels). `seed` prepends a MoveTo at
@@ -9082,6 +9174,10 @@ static void gfx_snapshot_line(Avm2GraphicsExt* g, Avm2GfxPath* path)
 	path->ljoints = g->cljoints;
 	path->lcaps = g->clcaps;
 	path->lmiter = g->clmiter;
+	// AVM2 declares the width in WHOLE pixels, rounded (Flash oracle:
+	// lineStyle(1.2) draws as 1, 1.5 as 2; s28 n-stroke-snap drawapi_as3).
+	path->ldecl_twips = (float) (floor((double) g->clw_bnd + 0.5) * 20.0);
+	path->lflags = g->clflags;
 	if (!g->cur_line) return;
 	path->lsty = g->clsty;          // by value; the ramp travels with it
 	path->lsty.bmp_px = NULL;
@@ -9103,24 +9199,29 @@ static void gfx_snapshot_line(Avm2GraphicsExt* g, Avm2GfxPath* path)
 // (s25 w1-pixel-drawing §B, AVM1 landed in 0f35012bd): re-tessellate the soup
 // as its nonzero union (each triangle normalised CCW). Opaque strokes, and
 // bitmap strokes, are left exactly as built (their overlap is invisible).
-static void gfx_union_translucent_stroke(Avm2GfxPath* path)
+static int gfx_stroke_translucent(const Avm2GfxPath* path)
 {
-	if (path->line_verts == NULL || path->line_vert_count < 6) return;
-	int translucent = 0;
 	if (path->lsty.kind == 2)
 	{
 		for (int i = 0; i < 256; i++)
-			if (path->lsty.grad_ramp[i * 4 + 3] != 255) { translucent = 1; break; }
+			if (path->lsty.grad_ramp[i * 4 + 3] != 255) return 1;
+		return 0;
 	}
-	else if (path->lsty.kind == 0)
-		translucent = path->la < 0.999f;
-	if (!translucent) return;
+	if (path->lsty.kind == 0) return path->la < 0.999f;
+	return 0;
+}
+
+// Non-zero union of a triangle soup, replacing *verts_io. Also the renderer's
+// StrokeSnapSrc.post for a restaged translucent soup.
+static void gfx_union_tris(float** verts_io, unsigned* count_io)
+{
+	if (*verts_io == NULL || *count_io < 6) return;
 	TESStesselator* tess = tessNewTess(NULL);
 	if (tess == NULL) return;
-	uint32_t ntri_in = path->line_vert_count / 3;
+	uint32_t ntri_in = *count_io / 3;
 	for (uint32_t t = 0; t < ntri_in; t++)
 	{
-		const float* v = &path->line_verts[t * 6];
+		const float* v = &(*verts_io)[t * 6];
 		float area = (v[2] - v[0]) * (v[5] - v[1]) - (v[4] - v[0]) * (v[3] - v[1]);
 		if (fabsf(area) < 1e-4f) continue;
 		float tri[6];
@@ -9148,12 +9249,21 @@ static void gfx_union_translucent_stroke(Avm2GfxPath* path)
 					out[i * 6 + j * 2]     = (float) verts[idx * 2];
 					out[i * 6 + j * 2 + 1] = (float) verts[idx * 2 + 1];
 				}
-			free(path->line_verts);
-			path->line_verts = out;
-			path->line_vert_count = (uint32_t) ntris * 3;
+			free(*verts_io);
+			*verts_io = out;
+			*count_io = (unsigned) ntris * 3;
 		}
 	}
 	tessDeleteTess(tess);
+}
+
+static void gfx_union_translucent_stroke(Avm2GfxPath* path)
+{
+	if (path->line_verts == NULL || path->line_vert_count < 6) return;
+	if (!gfx_stroke_translucent(path)) return;
+	unsigned n = path->line_vert_count;
+	gfx_union_tris(&path->line_verts, &n);
+	path->line_vert_count = n;
 }
 
 // Close the CURRENT stroke run — Ruffle's Drawing::set_line_style. The fill is
@@ -9463,6 +9573,14 @@ static void gfx_dup_path_owned(Avm2GfxPath* p)
 	p->line_verts = (float*) gfx_dup_buf(p->line_verts,
 	                                     (size_t) p->line_vert_count * 2 * sizeof(float));
 	if (p->line_verts == NULL) p->line_vert_count = 0;
+	p->soup = (float*) gfx_dup_buf(p->soup, (size_t) p->soup_n * 2 * sizeof(float));
+	p->soup_cen = (float*) gfx_dup_buf(p->soup_cen, (size_t) p->soup_n * 2 * sizeof(float));
+	p->soup_sf = (uint8_t*) gfx_dup_buf(p->soup_sf, (size_t) p->soup_n);
+	if (p->soup == NULL || p->soup_cen == NULL || p->soup_sf == NULL)
+	{
+		free(p->soup); free(p->soup_cen); free(p->soup_sf);
+		p->soup = NULL; p->soup_cen = NULL; p->soup_sf = NULL; p->soup_n = 0;
+	}
 	p->bmp_px = (uint32_t*) gfx_dup_buf(p->bmp_px,
 	                                    (size_t) p->bmp_w * p->bmp_h * sizeof(uint32_t));
 	if (p->bmp_px == NULL) p->bmp_w = p->bmp_h = 0;
@@ -9741,6 +9859,23 @@ static Avm2Value gfx_end_fill(Avm2Activation* act)
 // `caps` / `joints` string -> our style codes. Ruffle
 // (globals/flash/display/graphics.rs caps_to_cap_style / joints_to_join_style)
 // treats null/undefined AND any unrecognised string as ROUND for both.
+// lineStyle args 3 (pixelHinting) and 4 (scaleMode) / GraphicsStroke's
+// pixelHinting + scaleMode -> STROKE_FLAG_* (stroke_snap.h).
+static uint8_t gfx_line_flags(Avm2Context* ctx, Avm2Value hint, Avm2Value mode)
+{
+	uint8_t f = 0;
+	if (hint.kind != AVM2_VALUE_UNDEFINED && avm2_coerce_to_boolean(hint))
+		f |= STROKE_FLAG_PIXEL_HINTING;
+	if (mode.kind != AVM2_VALUE_NULL && mode.kind != AVM2_VALUE_UNDEFINED)
+	{
+		const Avm2String* s_ = avm2_coerce_to_string(ctx, mode);
+		if (gfx_str_is(s_, "none")) f |= STROKE_FLAG_NO_HSCALE | STROKE_FLAG_NO_VSCALE;
+		else if (gfx_str_is(s_, "vertical")) f |= STROKE_FLAG_NO_HSCALE;
+		else if (gfx_str_is(s_, "horizontal")) f |= STROKE_FLAG_NO_VSCALE;
+	}
+	return f;
+}
+
 static uint8_t gfx_caps_code(Avm2Context* ctx, Avm2Value v)
 {
 	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED) return 0;
@@ -9811,6 +9946,8 @@ static Avm2Value gfx_line_style(Avm2Activation* act)
 	g->cla = (float) ((double) (uint8_t) (a * 255.0) / 255.0);
 	// lineStyle(thickness, color, alpha, pixelHinting, scaleMode, caps,
 	// joints, miterLimit) — args 5..7. Both style defaults are ROUND.
+	g->clflags = gfx_line_flags(ctx, act->argc > 3 ? act->args[3] : avm2_undefined(),
+	                            act->argc > 4 ? act->args[4] : avm2_undefined());
 	g->clcaps = act->argc > 5 ? gfx_caps_code(ctx, act->args[5]) : 0;
 	g->cljoints = act->argc > 6 ? gfx_joints_code(ctx, act->args[6]) : 0;
 	g->clmiter = 3.0f;
@@ -10951,6 +11088,7 @@ static void gfx_apply_stroke_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
 	g->cla = 1.0f;
 	// GraphicsStroke's own defaults differ from lineStyle's: caps = "none"
 	// (butt), joints = "round", miterLimit = 3 (see gfx_graphicsstroke_ctor).
+	g->clflags = gfx_line_flags(ctx, gfx_prop(o, "pixelHinting", 12), gfx_prop(o, "scaleMode", 9));
 	g->clcaps = gfx_caps_code(ctx, gfx_prop(o, "caps", 4));
 	g->cljoints = gfx_joints_code(ctx, gfx_prop(o, "joints", 6));
 	g->clmiter = 3.0f;
@@ -19387,12 +19525,32 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 			                          xid, cxid);
 		if (p->has_line && p->line_vert_count >= 3)
 		{
+			// s28 n-drawapi-stroke-snap: Flash's device-space stroke rule
+			// (stroke_snap.h); NULL keeps the stroke as built.
+			const float* lv = p->line_verts;
+			uint32_t ln = p->line_vert_count;
+			if (p->soup != NULL && p->soup_n > 0)
+			{
+				StrokeSnapSrc src;
+				memset(&src, 0, sizeof(src));
+				src.xy = p->soup;
+				src.cen = p->soup_cen;
+				src.sf = p->soup_sf;
+				src.n = p->soup_n;
+				src.decl_twips = p->ldecl_twips;
+				src.emitted_twips = p->lemit_twips;
+				src.flags = p->lflags;
+				src.gen = p->soup_gen;
+				src.post = gfx_stroke_translucent(p) ? gfx_union_tris : NULL;
+				uint32_t sn = 0;
+				const float* sv = renderer_stroke_snap(context, &src, xid, &sn);
+				if (sv != NULL && sn > 0) { lv = sv; ln = sn; }
+			}
 			// The stroke's own fill style (lineGradientStyle / lineBitmapStyle
 			// / a GraphicsStroke carrying an IGraphicsFill). kind 0 is the
 			// legacy solid path.
 			if (p->lsty.kind == 2)
-				renderer_draw_gradient_tris(context, p->line_verts,
-				                            p->line_vert_count,
+				renderer_draw_gradient_tris(context, lv, ln,
 				                            p->lsty.grad_type, p->lsty.grad_spread,
 				                            p->lsty.grad_interp, p->lsty.grad_focal,
 				                            p->lsty.grad_ramp, p->lsty.grad_fwd16,
@@ -19400,13 +19558,12 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 			else if (p->lsty.kind == 3 && p->lsty.bmp_px != NULL
 			         && renderer_fit_dynamic_bitmap(context, p->lsty.bmp_w,
 			                                        p->lsty.bmp_h))
-				renderer_draw_bitmap_tris(context, p->line_verts,
-				                          p->line_vert_count, p->lsty.bmp_px,
+				renderer_draw_bitmap_tris(context, lv, ln, p->lsty.bmp_px,
 				                          p->lsty.bmp_w, p->lsty.bmp_h,
 				                          p->lsty.bmp_matrix, p->lsty.bmp_repeat,
 				                          p->lsty.bmp_smooth, xid, cxid);
 			else
-				renderer_draw_tris(context, p->line_verts, p->line_vert_count,
+				renderer_draw_tris(context, lv, ln,
 				                   p->lr, p->lg, p->lb, p->la, xid, cxid);
 		}
 	}

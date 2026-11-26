@@ -1046,6 +1046,54 @@ re-triage the stroke snap.
 
 **Prune criterion:** upstream replaces these goldens with Flash references, or our render drifts off the Flash PNGs.
 
+**Update (s28 snap-pixel-audit, 2026-11-25):** the six goldens are now swapped for the Flash Player 32 captures through
+`ruffle-tests/flash_fixes/` (re-captured: draw() wrapper at quality low, Linux == Windows at 0 px,
+`SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/`). Master (`00b35fa5e`) still equals them
+exactly, so the six rows return to pass. This entry stays as the record of why the goldens differ.
+
+## s28 stroke snap at quality LOW: 31 image comparisons lose a Ruffle golden while moving toward Flash (s28 snap-pixel-audit)
+
+**Tests:** `avm2/symbol_class_conflict`, `from_shumway/acid/acid-chars`, `from_shumway/acid/acid-scale`, `from_shumway/acid/acid-text`, `regression/avm2_layer_group_alpha`, `regression/avm2_layer_group_erase`, `visual/blend_modes/add`, `visual/blend_modes/alpha_no_layer`, `visual/blend_modes/darken`, `visual/blend_modes/difference`, `visual/blend_modes/erase_no_layer`, `visual/blend_modes/hardlight`, `visual/blend_modes/invert`, `visual/blend_modes/layer_alpha`, `visual/blend_modes/layer_erase`, `visual/blend_modes/lighten`, `visual/blend_modes/multiply`, `visual/blend_modes/overlay`, `visual/blend_modes/screen`, `visual/blend_modes/subtract`, `visual/drawing_api/drawing_order`, `visual/filters/blur_size_grows`, `visual/filters/color_matrix`, `visual/filters/displacement_map`, `visual/filters/drop_shadow_angles`, `visual/opaque_background`, `visual/simple_shapes/gradients/focal_radial`, `visual/simple_shapes/gradients/gradients`, `visual/simple_shapes/layers`, `visual/simple_shapes/masks`, `visual/simple_shapes/masks_equal_clipdepth`
+
+<!-- image-axis: output only; ours closer to (or level with) the Flash 32 capture than the golden-matching render was; any move away from the Flash PNGs is NOT covered -->
+
+**Cause:** n-stroke-snap `09b2c9130` re-stages every timeline stroke in device space (¼-px width and centre, and
+axis-aligned snap of 1/2/3-px strokes). Interim #2 (`947443a23`, built at `10a5b515a`) shows 51 pass → fail image
+comparisons and 0 gains. Graded locally with `SWF_STROKE_SNAP=0` on and off: the stroke snap owns all 51 (off gives 0
+vs the golden on every row except `drop_shadow`, whose default-font text differs by host).
+
+**Goldens:** none of these rows has a Flash-made golden. They are all "not Flash" in the s27 golden-provenance sweep, or
+(for the two `regression/` twins) upstream Ruffle's `layer_alpha` / `layer_erase` goldens.
+
+**Flash:** re-captured with Flash Player 32 at each test's quality (draw() wrapper; `--screen` for the 14 blend_modes and
+the 2 layer_group rows). On the pixels the snap changed, ours now lands within 2 of Flash far more often than before.
+Examples:
+- `blend_modes/darken`: 593 vs 0 of 611 changed px
+- `opaque_background`: 1388 vs 1 of 1390
+- `focal_radial`: 3616 vs 0 of 3667
+- `acid-text`: 833 vs 6 of 866
+
+Whole-image outlier channels vs Flash, before → after: `add` 6344 → 5718, `darken` 8678 → 6966, `layer_alpha` 14103 →
+12322, `opaque_background` 6248 → 3474, `focal_radial` 10366 → 3, `gradients` 6959 → 5874.
+
+Neutral rows: `drawing_order` (1492 vs 1501 changed px within 2), `masks` ×2 (2/2), `displacement_map` (387/397) and
+`layers` (1 px). `drawing_order`'s remaining gap is a separate geometry one: Flash's 3-px rect stroke is 2 px narrower
+on each axis. Full table: `SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit-report.md`.
+
+**Not covered here:**
+- the default-font `visual/filters/*` rows (`bevel` ×4, `drop_shadow`, `glow` ×3): host fonts make them ungradable;
+- `avm1/mouse_events_visible_enabled`: input.json, no valid capture;
+- `visual/filters/blur_scales_with_screen`: stage size;
+- `from_shumway/acid/acid-gradient-2` and `from_shumway/doubleAndRegister`: these two move AWAY from Flash. They are a
+  defect (the report's D1), not a priced loss.
+
+**Decision:** match Flash (user ruling: Flash over Ruffle). These rows fail against the Ruffle goldens and are NOT
+ignored. No flash_fixes swap: ours is not equal to Flash on any of them, and the two layer_group captures exist only
+for Linux (the Windows harness has no screen mode).
+
+**Prune criterion:** a row returns to pass, gets a Flash golden, or its render moves away from the Flash PNG (then
+re-triage the stroke code).
+
 ## Unfiltered cacheAsBitmap: no pixel snap at quality HIGH (s28 w2-lowq-sample-point)
 
 **Capture:** Flash Player 32 LNX, `session28-fanout-reports/w1-local-oracles/w1-avm2-vector-flash/lowq_sample_point.high.png`
@@ -1141,6 +1189,20 @@ fails every gnash row below (`known_failure`, `output.ruffle.txt` = Ruffle's own
 | B19 SWF6 inherited setter | `a.m = v` calls an inherited addProperty setter hidden by flag 256 or 1024 (not 4096); writing an own property keeps flag 1024 (256/4096 cleared) | visible setters only; write clears all | `Global-v6` |
 
 **Decision:** match Flash (user ruling). Unpinned parts are listed in `w2b-gnash-holds-report.md` §LOCAL ORACLE REQUESTS.
+## Drawing-API strokes: Flash's device-space stroke rule (s28 n-drawapi-stroke-snap)
+
+**Tests:** `visual/drawing_api/cursor`, `visual/drawing_api/fills_and_lines` (image; quality LOW; Ruffle-made goldens)
+
+Flash rasterises Drawing-API strokes like timeline strokes (n-stroke-snap rule): width in device quarter pixels,
+exactly axis-aligned 1/2/3 px segments snapped to whole pixels, AVM1 thickness truncated to whole pixels, AVM2
+rounded. Ruffle's goldens tessellate the nominal width and AA-straddle pixel edges. With the rule, `cursor` moves
+from 399 to 200 px off the archived Flash PNG (`golden-provenance/visual__drawing_api__cursor__output.png`) but now
+differs from its golden by 200 px; `fills_and_lines` stays as far from the Flash screen capture as before
+(20166 → 20239 px of a mostly-different LOW frame) and differs from its golden by 394.
+
+**Decision:** keep the Flash rule (Flash over Ruffle). Both rows are LOW quality, where w2-lowq-sample-point owns
+the sample-point rule; re-grade them against Flash when that lands. Prune when either golden is replaced by a Flash
+reference or our render matches the golden again.
 
 ### s28 lowq-recapture: quality=LOW image goldens that are not FP32 at LOW (2026-11-25)
 

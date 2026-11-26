@@ -1,0 +1,27 @@
+{
+ "test": "regression/avm2_layer_group_erase",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": null,
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 59531,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 3,
+     "max_outliers": 0,
+     "outliers": 86054,
+     "outlier_pixels": 30635
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

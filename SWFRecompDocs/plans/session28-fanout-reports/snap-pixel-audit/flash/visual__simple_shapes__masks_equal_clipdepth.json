@@ -1,0 +1,27 @@
+{
+ "test": "visual/simple_shapes/masks_equal_clipdepth",
+ "mode": "draw",
+ "num_ticks": 1,
+ "quality": null,
+ "comparisons": {
+  "output": {
+   "trigger": 1,
+   "max_difference": 255,
+   "diff_pixels": 2118,
+   "pixels": 220000,
+   "checks": [
+    {
+     "tolerance": 0,
+     "max_outliers": 0,
+     "outliers": 4119,
+     "outlier_pixels": 2118
+    }
+   ],
+   "pass": false,
+   "exact": false
+  }
+ },
+ "stop": [
+  "done"
+ ]
+}

@@ -447,6 +447,8 @@ void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_
 void render_webgpu_draw_morph(WebGPURenderContext* context, size_t start_offset, size_t num_verts, const u32* start_verts, const float* end_xy, float t, u32 color_start, u32 color_count, const float* interp_colors, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
+struct StrokeSnapSrc;
+const float* render_webgpu_stroke_snap(WebGPURenderContext* context, const struct StrokeSnapSrc* src, u32 transform_id, u32* out_n);
 void render_webgpu_draw_gradient_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, u8 gradient_type, u8 spread_mode, u8 interpolation, float focal_ratio, const u8* gradient_ramp, const float* gradient_matrix, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_bitmap_quad(WebGPURenderContext* context, const uint32_t* argb_pixels, u32 bmp_width, u32 bmp_height, float x_twips, float y_twips, u32 transform_id, u32 cxform_id);
 // Raise the dynamic-source limit to fit (src_w x src_h); 0 when the device

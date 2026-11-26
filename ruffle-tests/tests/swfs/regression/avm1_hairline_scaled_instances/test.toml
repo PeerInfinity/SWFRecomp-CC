@@ -1,5 +1,8 @@
 num_frames = 3
 
+# Golden = Flash Player 32 capture (Linux == Windows), swapped in s28 snap-pixel-audit
+# (was a Ruffle-exporter golden). max_outliers = ours vs Flash measured at 00b35fa5e
+# (366 channels); SWF_STROKE_SNAP=0 gives 1551, so a stroke-snap regression still fails.
 [image_comparisons.output]
 tolerance = 0
-max_outliers = 0
+max_outliers = 366

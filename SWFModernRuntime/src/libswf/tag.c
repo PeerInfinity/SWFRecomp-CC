@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <stroke_snap.h>  // s28 n-drawapi-stroke-snap
 #include <utils.h>
 #include <heap.h>
 #include <stdint.h>
@@ -9239,13 +9240,33 @@ static void render_drawing_path(const DrawingRenderInfo* info)
 		}
 	}
 	if (info->line_count > 0) {
+		// s28 n-drawapi-stroke-snap: Flash's device-space stroke rule
+		// (stroke_snap.h); NULL keeps the stroke as built.
+		const float* lv = info->line_verts;
+		u32 ln = info->line_count;
+		if (info->line_soup != NULL) {
+			StrokeSnapSrc src;
+			memset(&src, 0, sizeof(src));
+			src.xy = info->line_soup;
+			src.cen = info->line_soup_cen;
+			src.sf = info->line_soup_sf;
+			src.n = info->line_soup_n;
+			src.decl_twips = info->line_decl_twips;
+			src.emitted_twips = info->line_emitted_twips;
+			src.flags = info->line_snap_flags;
+			src.gen = info->line_soup_gen;
+			src.post = info->line_translucent ? actionDrawingUnionTris : NULL;
+			u32 sn = 0;
+			const float* sv = renderer_stroke_snap(context, &src, info->transform_id, &sn);
+			if (sv != NULL && sn > 0) { lv = sv; ln = sn; }
+		}
 		if (info->has_line_gradient && info->line_gradient_ramp && info->line_gradient_matrix) {
-			renderer_draw_gradient_tris(context, info->line_verts, info->line_count,
+			renderer_draw_gradient_tris(context, lv, ln,
 				info->line_gradient_type, info->line_spread_mode, info->line_interpolation, info->line_focal_ratio,
 				info->line_gradient_ramp, info->line_gradient_matrix,
 				info->transform_id, info->cxform_id);
 		} else {
-			renderer_draw_tris(context, info->line_verts, info->line_count,
+			renderer_draw_tris(context, lv, ln,
 				info->line_r, info->line_g, info->line_b, info->line_a,
 				info->transform_id, info->cxform_id);
 		}

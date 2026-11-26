@@ -725,6 +725,16 @@ typedef struct {
 	u8 line_joints;            // 0 round, 1 miter, 2 bevel
 	u8 line_caps;              // 0 round, 1 none (butt), 2 square
 	float line_miter;          // miter limit; <1 degrades to bevel (lyon rule)
+	// s28 n-drawapi-stroke-snap: the stroke soup BEFORE the translucent
+	// union, with each vertex's centre (a stroke_poly vertex, twips) and that
+	// vertex's axis flags (stroke_snap.h), so the renderer can apply Flash's
+	// device-space stroke rule. gen changes on every rebuild (cache key).
+	float* stroke_soup;
+	float* stroke_soup_cen;
+	u8* stroke_soup_sf;
+	u32 stroke_soup_n;
+	unsigned long long stroke_soup_gen;
+	u8 line_flags;             // STROKE_FLAG_* (pixelHinting, noHScale, noVScale)
 } DrawPath;
 
 typedef struct {
@@ -754,6 +764,7 @@ typedef struct {
 	u8 line_joints;
 	u8 line_caps;
 	float line_miter;
+	u8 line_flags;             // STROKE_FLAG_* of the current line style
 	// Line gradient state (set by lineGradientStyle)
 	int has_line_gradient;
 	u8 line_gradient_type;
@@ -810,7 +821,23 @@ typedef struct {
 	// *_matrix pointers above point here when a gradient is present.
 	float gradient_matrix_fx[16];
 	float line_gradient_matrix_fx[16];
+	// s28 n-drawapi-stroke-snap: the stroke soup + what the renderer needs to
+	// apply Flash's device-space stroke rule (stroke_snap.h StrokeSnapSrc).
+	// line_soup NULL = draw line_verts as built.
+	const float* line_soup;
+	const float* line_soup_cen;
+	const u8* line_soup_sf;
+	u32 line_soup_n;
+	unsigned long long line_soup_gen;
+	float line_decl_twips;     // declared width, AVM1 rule (whole px, truncated)
+	float line_emitted_twips;  // full width the soup was built at
+	u32 line_snap_flags;
+	int line_translucent;      // the soup needs the union post-pass
 } DrawingRenderInfo;
+
+// Non-zero union of a stroke triangle soup (translucent drawing-API strokes);
+// the renderer's StrokeSnapSrc.post for AVM1 (s28 n-drawapi-stroke-snap).
+void actionDrawingUnionTris(float** verts, unsigned* count);
 
 typedef void (*DrawingRenderCallback)(const DrawingRenderInfo* info, void* user_data);
 int actionIterateDrawings(DrawingRenderCallback cb, void* user_data);
