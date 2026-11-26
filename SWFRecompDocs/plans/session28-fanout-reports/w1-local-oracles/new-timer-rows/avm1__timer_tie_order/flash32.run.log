@@ -1,0 +1,2 @@
+# flash trace: mode=direct frames=240 rate=24.0 stop=max_duration pin=settled 550x452
+BYTE-IDENTICAL to output.txt
