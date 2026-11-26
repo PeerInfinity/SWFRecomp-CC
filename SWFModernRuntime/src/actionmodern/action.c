@@ -40370,17 +40370,17 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 
 	extern int goto_from_action;
 
-	// When called from inside an enterFrame handler, skip the goto entirely.
-	// The frame loop will naturally advance on the next tick. The enterFrame
-	// callback (e.g., Dejagnu checker) retries every tick until its condition
-	// is met, so skipping one goto is safe. This prevents the enterFrame goto
-	// from overriding the natural frame advance via manual_next_frame.
-	{
-		extern int g_inside_enterframe_dispatch;
-		if (g_inside_enterframe_dispatch) {
-			return;
-		}
-	}
+	// A root GotoFrame issued inside an onEnterFrame handler moves the playhead
+	// INLINE, exactly like one from a frame script (Flash 32, s28
+	// regression/avm1_enterframe_root_goto_opcode: `ef cf=1 / after cf=3 /
+	// f3 cf=3`). There used to be an early return here under
+	// g_inside_enterframe_dispatch (fc0f8e4fd5, 2026-03, for the gnash Dejagnu
+	// rows). s28 w3-enterframe-root-goto measured every gnash row: the only goto
+	// that rule ever dropped in the corpus is the Dejagnu harness's goto to
+	// frame 0 while the root is stopped ON frame 0, which is a same-frame goto,
+	// and ng_executeGotoCatchUp's self-goto guard (swf_core.c / swf.c) already
+	// makes it a no-op. With the rule gone, all 244 gnash rows it fired on print
+	// byte-identical output in both modes.
 
 	next_frame = frame;
 	manual_next_frame = 1;
