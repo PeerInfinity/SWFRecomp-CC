@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-26 18:40 UTC
+**Date**: 2026-11-26 20:41 UTC
 
-**Git SHA**: `ed63ce7c43`
+**Git SHA**: `bfa47037b1`
 
-**Run Duration**: 6m 16s
+**Run Duration**: 6m 3s
 
 ## Summary
 
@@ -25,20 +25,20 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 16.4s |  |
-| 2 | `frame_label_count_oom` | 1 | 25.6s |  |
-| 3 | `frame_script_cleanup` | 30 | 28.6s |  |
-| 4 | `frame_script_cleanup2` | 32 | 33.0s |  |
-| 5 | `frame_script_cleanup3` | 30 | 25.8s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 26.3s |  |
-| 7 | `frame_script_cleanup_goto2` | 34 | 7.2s |  |
-| 8 | `frame_script_construct` | 25 | 22.1s |  |
-| 9 | `missing_frame_scripts` | 22 | 25.2s |  |
+| 1 | `clip_action_no_key_code` | 1 | 25.7s |  |
+| 2 | `frame_label_count_oom` | 1 | 19.9s |  |
+| 3 | `frame_script_cleanup` | 30 | 25.8s |  |
+| 4 | `frame_script_cleanup2` | 32 | 25.6s |  |
+| 5 | `frame_script_cleanup3` | 30 | 33.7s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 25.0s |  |
+| 7 | `frame_script_cleanup_goto2` | 34 | 10.6s |  |
+| 8 | `frame_script_construct` | 25 | 9.9s |  |
+| 9 | `missing_frame_scripts` | 22 | 24.2s |  |
 | 10 | `scene_count_oom` | 1 | 2.3s |  |
-| 11 | `swf_9_frame_script_button_order` | 15 | 26.9s |  |
-| 12 | `swf_9_frame_script_cleanup_goto` | 30 | 8.5s |  |
-| 13 | `swf_9_frame_script_cleanup_goto2` | 34 | 25.1s |  |
-| 14 | `swf_9_frame_script_dynamic_goto_2` | 33 | 7.7s |  |
+| 11 | `swf_9_frame_script_button_order` | 15 | 22.5s |  |
+| 12 | `swf_9_frame_script_cleanup_goto` | 30 | 7.7s |  |
+| 13 | `swf_9_frame_script_cleanup_goto2` | 34 | 29.1s |  |
+| 14 | `swf_9_frame_script_dynamic_goto_2` | 33 | 36.5s |  |
 
 ## Ruffle-Matched Tests
 
@@ -46,9 +46,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 34.1s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 27.8s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 33.3s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 28.9s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 24.4s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 10.2s |  |
 
 ## Near-Passing Tests
 
