@@ -1,7 +1,11 @@
 # s28 w2-lowq-sample-point: Flash quality=LOW sample-point model (report)
 
-Slot `w2-lowq-sample-point`, wave 2 (implementation). Branch `fanout/w2-lowq-sample-point`, rebased on
-origin/master `97f9742f4`, which includes n-stroke-snap and w2-glyph-quarter-snap.
+Slot `w2-lowq-sample-point`, wave 2 (implementation). Branch `fanout/w2-lowq-sample-point`.
+- All measurements are on origin/master `97f9742f4`, which includes n-stroke-snap and w2-glyph-quarter-snap.
+- The branch was then merged with `657dac763` (w2-avm1-leads-land, w2-filter-residuals-land), and the patch is
+  against `657dac763`. A 14-row re-check on the merged tree reproduced every number: all 6 filter / cacheAsBitmap
+  Flash-gate rows, `scroll_rect`, `blend_across_masks`, `edittext_underline`, `focus_highlight_render`, `avm1/color`,
+  both fixtures, and `graphics_gradients` 668.
 
 **New files:**
 - `session28-fanout-reports/w2-lowq-sample-point-report.md` (this file)

@@ -1,0 +1,181 @@
+RENDER CANARY  before=before  after=after   85 tests / 112 comparisons
+
+  IDENTICAL    67
+  DIFFERS      45
+  APPEARED      0   VANISHED 0   NO_RENDER 0
+
+  DIFFERS:
+    avm1/movieclip_line_gradient_style  output   [DIFFERS]
+        diff_channels 440/632400  mean 0.0014  max 209   bbox (6,6)-(504,304)
+        image status: pass -> fail    trace: pass -> pass
+    avm2/graphics_draw_path  output   [DIFFERS]
+        diff_channels 472/18000  mean 6.6867  max 255   bbox (0,0)-(50,90)
+        image status: fail -> fail    trace: ruffle_matched -> ruffle_matched
+    avm2/graphics_gradients  output   [DIFFERS]
+        diff_channels 394/880000  mean 0.0022  max 255   bbox (7,5)-(83,130)
+        image status: fail -> fail    trace: pass -> pass
+    avm2/graphics_simple_shapes  output   [DIFFERS]
+        diff_channels 2/880000  mean 0.0006  max 255   bbox (76,8)-(77,9)
+        image status: fail -> fail    trace: pass -> pass
+    avm2/stage3d_texture  output   [DIFFERS]
+        diff_channels 2309/880000  mean 0.5681  max 255   bbox (4,8)-(343,395)
+        image status: pass -> fail    trace: pass -> pass
+    fonts/embed_matching/fallback_preferences  output   [DIFFERS]
+        diff_channels 504/2200000  mean 0.0584  max 255   bbox (13,19)-(463,985)
+        image status: pass -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/BeginBitmapFill  output   [DIFFERS]
+        diff_channels 3/1920000  mean 0.0004  max 255   bbox (26,155)-(27,156)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame1   [DIFFERS]
+        diff_channels 391/1920000  mean 0.0519  max 255   bbox (0,0)-(101,101)
+        image status: pass -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame2   [DIFFERS]
+        diff_channels 1218/1920000  mean 0.1088  max 255   bbox (16,2)-(241,201)
+        image status: pass -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame3   [DIFFERS]
+        diff_channels 1218/1920000  mean 0.1088  max 255   bbox (16,2)-(381,301)
+        image status: pass -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame4   [DIFFERS]
+        diff_channels 1218/1920000  mean 0.1088  max 255   bbox (16,2)-(521,401)
+        image status: pass -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame5   [DIFFERS]
+        diff_channels 1218/1920000  mean 0.1088  max 255   bbox (16,2)-(661,501)
+        image status: pass -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame6   [DIFFERS]
+        diff_channels 418/1920000  mean 0.0555  max 255   bbox (16,2)-(800,600)
+        image status: pass -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/place_object_test  output   [DIFFERS]
+        diff_channels 1401/1920000  mean 0.1861  max 255   bbox (0,2)-(594,311)
+        image status: fail -> fail    trace: ruffle_matched -> ruffle_matched
+    from_gnash/misc-ming.all/shape_test  output   [DIFFERS]
+        diff_channels 4941/1920000  mean 0.6562  max 255   bbox (16,2)-(361,361)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-color-0  output   [DIFFERS]
+        diff_channels 6931/4194304  mean 0.0027  max 255   bbox (0,0)-(866,504)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-gradient-0  output   [DIFFERS]
+        diff_channels 2887/4194304  mean 0.0007  max 1   bbox (128,0)-(412,277)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-scale  output   [DIFFERS]
+        diff_channels 18/880000  mean 0.0031  max 255   bbox (5,84)-(398,206)
+        image status: pass -> fail    trace: pass -> pass
+    from_shumway/acid/acid-text  output   [DIFFERS]
+        diff_channels 2616/880000  mean 0.758  max 255   bbox (0,13)-(516,80)
+        image status: pass -> fail    trace: pass -> pass
+    from_shumway/acid/acid-text-6  output   [DIFFERS]
+        diff_channels 3/4194304  mean 0.0002  max 255   bbox (570,491)-(571,492)
+        image status: pass -> fail    trace: pass -> pass
+    from_shumway/acid/acid-text-escape  output   [DIFFERS]
+        diff_channels 8/880000  mean 0.0023  max 255   bbox (56,68)-(138,190)
+        image status: pass -> fail    trace: pass -> pass
+    from_shumway/acid/acid-textfield  output   [DIFFERS]
+        diff_channels 9/880000  mean 0.0014  max 186   bbox (242,209)-(310,249)
+        image status: fail -> fail    trace: ruffle_matched -> ruffle_matched
+    from_shumway/doubleAndRegister  output   [DIFFERS]
+        diff_channels 6/880000  mean 0.0016  max 255   bbox (106,14)-(388,24)
+        image status: pass -> fail    trace: pass -> pass
+    from_shumway/gradientTransform  output   [DIFFERS]
+        diff_channels 6/10100  mean 0.0006  max 1   bbox (1,22)-(100,23)
+        image status: fail -> fail    trace: pass -> pass
+    text/auto_size/width  output   [DIFFERS]
+        diff_channels 360/700000  mean 0.1311  max 255   bbox (73,40)-(441,301)
+        image status: pass -> fail    trace: pass -> pass
+    text/style_changes_in_html  output   [DIFFERS]
+        diff_channels 86/385000  mean 0.0173  max 103   bbox (46,14)-(505,163)
+        image status: pass -> fail    trace: pass -> pass
+    visual/blend_modes/add  output   [DIFFERS]
+        diff_channels 849/880000  mean 0.0508  max 255   bbox (86,74)-(334,355)
+        image status: pass -> fail    trace: pass -> pass
+    visual/blend_modes/layer_alpha  output   [DIFFERS]
+        diff_channels 2424/880000  mean 0.1881  max 255   bbox (86,50)-(375,355)
+        image status: pass -> fail    trace: pass -> pass
+    visual/blend_modes/layer_erase  output   [DIFFERS]
+        diff_channels 2359/880000  mean 0.2526  max 255   bbox (86,50)-(375,355)
+        image status: pass -> fail    trace: pass -> pass
+    visual/blend_modes/multiply  output   [DIFFERS]
+        diff_channels 1838/880000  mean 0.3312  max 255   bbox (86,64)-(334,355)
+        image status: pass -> fail    trace: pass -> pass
+    visual/cache_as_bitmap/nested_rotation  output   [DIFFERS]
+        diff_channels 3/880000  mean 0.0007  max 204   bbox (89,213)-(90,214)
+        image status: pass -> fail    trace: pass -> pass
+    visual/drawing_api/drawing_order  output   [DIFFERS]
+        diff_channels 5966/1000000  mean 1.5213  max 255   bbox (43,74)-(464,419)
+        image status: pass -> fail    trace: pass -> pass
+    visual/drawing_api/fills_and_lines  output   [DIFFERS]
+        diff_channels 4473/880000  mean 0.7403  max 255   bbox (100,10)-(500,353)
+        image status: pass -> fail    trace: pass -> pass
+    visual/filters/bevel  output   [DIFFERS]
+        diff_channels 5585/1430000  mean 0.0332  max 230   bbox (0,17)-(533,590)
+        image status: pass -> fail    trace: pass -> pass
+    visual/filters/bevel_inner  output   [DIFFERS]
+        diff_channels 3691/2880000  mean 0.0089  max 254   bbox (12,63)-(814,671)
+        image status: pass -> fail    trace: pass -> pass
+    visual/filters/color_matrix  output   [DIFFERS]
+        diff_channels 3/880000  mean 0.0009  max 255   bbox (360,276)-(361,277)
+        image status: pass -> fail    trace: pass -> pass
+    visual/filters/displacement_map  output   [DIFFERS]
+        diff_channels 1270/2000000  mean 0.0023  max 226   bbox (263,49)-(457,886)
+        image status: pass -> pass    trace: pass -> pass
+    visual/filters/drop_shadow  output   [DIFFERS]
+        diff_channels 190/880000  mean 0.0117  max 255   bbox (165,107)-(511,334)
+        image status: pass -> fail    trace: pass -> pass
+    visual/filters/drop_shadow_angles  output   [DIFFERS]
+        diff_channels 246/880000  mean 0.0047  max 255   bbox (139,97)-(543,341)
+        image status: pass -> fail    trace: pass -> pass
+    visual/filters/glow  output   [DIFFERS]
+        diff_channels 137/880000  mean 0.0103  max 255   bbox (165,105)-(507,334)
+        image status: pass -> fail    trace: pass -> pass
+    visual/fonts/device-font  output   [DIFFERS]
+        diff_channels 30/750000  mean 0.0102  max 255   bbox (82,48)-(319,70)
+        image status: pass -> fail    trace: pass -> pass
+    visual/simple_shapes/gradients/gradients  output   [DIFFERS]
+        diff_channels 3715/880000  mean 0.2891  max 255   bbox (63,44)-(490,390)
+        image status: pass -> fail    trace: pass -> pass
+    visual/simple_shapes/masks  output   [DIFFERS]
+        diff_channels 30/880000  mean 0.0076  max 255   bbox (92,14)-(510,345)
+        image status: pass -> fail    trace: pass -> pass
+    visual/simple_shapes/overlaps  output   [DIFFERS]
+        diff_channels 466/880000  mean 0.0725  max 255   bbox (141,76)-(335,269)
+        image status: pass -> fail    trace: pass -> pass
+    visual/simple_shapes/text_field_mask  output   [DIFFERS]
+        diff_channels 20/880000  mean 0.0058  max 255   bbox (52,129)-(546,156)
+        image status: pass -> fail    trace: pass -> pass
+
+  TRACE STATUS CHANGES: (none)
+  IMAGE STATUS CHANGES:
+    avm1/movieclip_line_gradient_style  output   pass -> fail        <-- REVIEW
+    avm2/stage3d_texture  output   pass -> fail        <-- REVIEW
+    fonts/embed_matching/fallback_preferences  output   pass -> fail        <-- REVIEW
+    from_gnash/misc-ming.all/morph_test1  frame1   pass -> fail        <-- REVIEW
+    from_gnash/misc-ming.all/morph_test1  frame2   pass -> fail        <-- REVIEW
+    from_gnash/misc-ming.all/morph_test1  frame3   pass -> fail        <-- REVIEW
+    from_gnash/misc-ming.all/morph_test1  frame4   pass -> fail        <-- REVIEW
+    from_gnash/misc-ming.all/morph_test1  frame5   pass -> fail        <-- REVIEW
+    from_gnash/misc-ming.all/morph_test1  frame6   pass -> fail        <-- REVIEW
+    from_shumway/acid/acid-scale  output   pass -> fail        <-- REVIEW
+    from_shumway/acid/acid-text  output   pass -> fail        <-- REVIEW
+    from_shumway/acid/acid-text-6  output   pass -> fail        <-- REVIEW
+    from_shumway/acid/acid-text-escape  output   pass -> fail        <-- REVIEW
+    from_shumway/doubleAndRegister  output   pass -> fail        <-- REVIEW
+    text/auto_size/width  output   pass -> fail        <-- REVIEW
+    text/style_changes_in_html  output   pass -> fail        <-- REVIEW
+    visual/blend_modes/add  output   pass -> fail        <-- REVIEW
+    visual/blend_modes/layer_alpha  output   pass -> fail        <-- REVIEW
+    visual/blend_modes/layer_erase  output   pass -> fail        <-- REVIEW
+    visual/blend_modes/multiply  output   pass -> fail        <-- REVIEW
+    visual/cache_as_bitmap/nested_rotation  output   pass -> fail        <-- REVIEW
+    visual/drawing_api/drawing_order  output   pass -> fail        <-- REVIEW
+    visual/drawing_api/fills_and_lines  output   pass -> fail        <-- REVIEW
+    visual/filters/bevel  output   pass -> fail        <-- REVIEW
+    visual/filters/bevel_inner  output   pass -> fail        <-- REVIEW
+    visual/filters/color_matrix  output   pass -> fail        <-- REVIEW
+    visual/filters/drop_shadow  output   pass -> fail        <-- REVIEW
+    visual/filters/drop_shadow_angles  output   pass -> fail        <-- REVIEW
+    visual/filters/glow  output   pass -> fail        <-- REVIEW
+    visual/fonts/device-font  output   pass -> fail        <-- REVIEW
+    visual/simple_shapes/gradients/gradients  output   pass -> fail        <-- REVIEW
+    visual/simple_shapes/masks  output   pass -> fail        <-- REVIEW
+    visual/simple_shapes/overlaps  output   pass -> fail        <-- REVIEW
+    visual/simple_shapes/text_field_mask  output   pass -> fail        <-- REVIEW
+
+  before/after PNGs + difference PNGs: /tmp/claude-0/-home-user-SWFRecomp-CC/b42fdbfa-9b85-591e-a2e5-7041298b332e/scratchpad/canary/_compare/before__after

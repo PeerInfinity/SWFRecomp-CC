@@ -1604,3 +1604,84 @@ mechanism in `image_triage.py` or the runner (S–M; design first).
     `session27-fanout-reports/*-local-oracles/`.
 - **A Flash-correct model can lose a Ruffle-golden row.** Price the loss in the brief before landing, disposition it
   (RvF + image-axis marker), and keep the model (`acid-color-0`, `bitmapdata_applyfilter_blur`).
+
+## 27. Session-28 state of the board (2026-11-26)
+
+**Baseline:** graphics images run `45547012629` at `7c3cfdcb7` (results `e1425f417`), 629 pass / 39 fail by status sum.
+
+**Images runs** (all graphics full, `images=true`): interim #1 `45687311987`, #2 `45694673542`, #3 `45707261082`,
+#4 `45718037295`, #5 `45750698566`, #6 `45867407140`; **FINAL `45878805896` at `bfa47037b` (results `014124ed5`)**.
+
+**Result: 545 pass / 140 fail** (+6 ignored, 3 skip; 694 comparisons). On the baseline intersection it is
+**528 / 668: 0 gains by name, 101 pass → fail, every one priced by name before or at its interim, all against Ruffle-made
+or exporter goldens** (Robert's ruling: match Flash, not Ruffle). 19 new comparisons, all passing.
+Bands: 11 better, 10 worse, all graded. Trace side: `polish-sweep-arc.md` §29.
+
+This is the first session where the pixel pass count fell on purpose. Three Flash models landed, and each lost
+Ruffle goldens it was priced against:
+
+| model (commit) | pass → fail | fail → pass | how it was graded |
+|---|---:|---:|---|
+| Flash thin-stroke snap `09b2c9130` (+ glyph ¼-px snap `b4b96919a`) | 51 at interim #2 | 8 at interim #5 (6 `simple_loop_test` flash_fixes + 2 own fixtures re-goldened to FP32) | `snap-pixel-audit-report.md`: all 51 owned by the stroke snap; none had a Flash golden; 49 Flash-ward / neutral, 2 away (D1, mostly recovered by lowq, below) |
+| filter residuals `bc585e9f2` | 2 (`edittext_scroll` .01/.02) | | device-font labels; priced, no flash_fix |
+| drawing-API snap `e81d27317` | 3 (`cursor`, `fills_and_lines`, `avm2/stage3d_texture`) | | `cursor` / `fills_and_lines` priced; `stage3d_texture` unpredicted, but the FP32 capture puts the border edges at x=5, y=394 = ours (RvF) |
+| Flash LOW model `ed63ce7c4` (+ 37 swaps) | 54 at interim #6 | 1 (`focal_radial`) | `lowq-corner-rule-report.md` §6 name for name (18 swapped goldens, 15 recapture, 21 rest); unlisted band moves graded vs fresh FP32 LOW captures in `w1-local-oracles/interim6-low/` |
+| n-join-disc `03527a3f8` | 0 | 0 | acid-stroke-0 7965 → 7173 (= its ledger); 2 FP32 fixtures |
+
+**Worsened bands at FINAL vs baseline, all graded:**
+- `acid-color-0` 1135 → 18835: ours→FP32 8683 vs golden→FP32 26477, far closer to Flash than the golden is (interim6-low).
+- `font_lookup_as3` 11520 → 13812: closer to Flash than the golden (interim6-low).
+- `acid-shapes` 88 → 243: priced in the n-drawapi-stroke-snap ledger. The golden is Flash, so this one moves 0.25% AWAY from Flash. It is the only Flash-golden row that worsened, and it is on the board.
+- The rest are ≤ 2% (`Video-EmbedSquareTest`, `BeginBitmapFill`, `acid-textfield`, `acid-text-4/5`, away3d, stage3d_fractal).
+
+**Better bands:** `graphics_gradients` 3685 → 304, `place_object_test` 38238 → 5073, `acid-stroke-0` 52702 → 7173,
+`acid-shapes-testing` 41339 → 10317, `graphics_draw_path` 704 → 192, `strokes/scale` 23391 → 12576,
+`graphics_draw_triangles` 1812 → 996, `shape_test` 15994 → 10300, `sprite_with_frames`, `graphics_simple_shapes`,
+`gradientTransform`.
+
+### Flash fixes at closeout (`ruffle-tests/flash_fixes/fixes.json`, 62 entries)
+
+`python3 ruffle-tests/apply_flash_fixes.py --check` (main tree): **ALREADY 5, APPLIED 57, 0 STALE, 0 UPSTREAMED**.
+Every entry is sha-pinned to the upstream file it replaces and names its FP32 evidence and its RvF section.
+
+| source (RvF section) | kind | n | rows |
+|---|---|---:|---|
+| s27 golden swaps | image | 5 | `visual/simple_shapes/strokes/scale`, `avm2/graphics_draw_path`, `avm2/bitmapdata_opaque`, `avm2/blend_scroll`, `visual/definefont4` |
+| s28 trace-provenance | trace | 4 | `avm1/goto_rewind_movieclip_replace`, `avm1/movieclip_hittest_shapeflag`, `avm1/watch_recursion_swf6`, `avm1/watch_recursion_double_swf6` |
+| s28 w2-loaded-shell-land | trace | 7 | `avm1/mcl_unloadclip`, `avm1/mcl_loadclip`, `avm1/mcl_target_png`, `avm1/mcl_target_jpg`, `avm1/mcl_target_gif87a`, `avm1/mcl_target_gif89a`, `avm1/mcl_mislabeled_target` |
+| s28 w2-occupied-depth | toml | 3 | `from_gnash/misc-ming.all/place_object_test`, `from_gnash/misc-ming.all/place_object_test2`, `from_gnash/misc-ming.all/path_format_test` |
+| s28 snap-pixel-audit | image | 6 | `from_gnash/misc-ming.all/loop/simple_loop_test` (frames 1,2,3,5,6,7) |
+| s28 lowq-recapture | image | 37 | `avm2/displayobject_mask`, `avm2/displayobject_scrollrect`, `avm2/graphics_bad_direct_commands`, `avm2/loader_loadbytes_events`, `avm2/mouse_pick_dobj_mask`, `avm2/mouse_pick_non_interactive_dobj_mask`, `from_gnash/misc-ming.all/morph_test1` (frames 1,2,3,4,5,6), `visual/blend_modes/add`, `visual/blend_modes/darken`, `visual/blend_modes/difference`, `visual/blend_modes/hardlight`, `visual/blend_modes/invert`, `visual/blend_modes/lighten`, `visual/blend_modes/multiply`, `visual/blend_modes/overlay`, `visual/blend_modes/screen`, `visual/blend_modes/subtract`, `visual/blend_modes/alpha_no_layer`, `visual/blend_modes/erase_no_layer`, `visual/blend_modes/layer_alpha`, `visual/blend_modes/layer_erase`, `visual/cache_as_bitmap/drawing_api`, `visual/cache_as_bitmap/nested_rotation`, `visual/drawing_api/gradient_focal_point`, `visual/filters/color_matrix`, `visual/fonts/glyph`, `visual/simple_shapes/gradients/focal_radial`, `visual/simple_shapes/layers`, `visual/simple_shapes/gradients/gradients`, `visual/simple_shapes/gradients/reflect`, `visual/simple_shapes/gradients/repeat`, `visual/opaque_background` |
+
+There are no STALE or UPSTREAMED entries. After the next upstream refresh (`download_tests.sh`), run `--check`. Re-derive
+any STALE entry against Flash before re-applying it, and delete any UPSTREAMED entry.
+
+### Left on the board (session 29)
+
+- **LOW model next slice** (`lowq-sample-point-model-status`):
+  - the .5-tie probe (`avm2_button_scroll_rect`);
+  - the LOW stroke y rule (class c `drawing_order` +934, `masks{,_equal_clipdepth}` +279);
+  - a Windows check of the swap candidates `invalidClipDepth`, `from_shumway/gradient`, `acid-gradient(-0)` and
+    `acid-filter` before they become flash_fixes.
+- **Strokes (N ladder head):** emit the closed seam as two caps in builders/lyon (the first cut opened holes; price on
+  the n-join-disc ledger); the LOW stroke raster; `acid-shapes` 0.25% away from its Flash golden
+  (thick curved strokes, quarter-grid AA).
+- **Text:** `rotated_glyphs` (1111 px vs Flash); 16-level glyph AA (NO-GO L as of w1-text-glyph-aa); the wordwrap
+  fixture's interim Ruffle golden; the 22 unpriced glyph-snap Ruffle-golden losses noted by w1-text-glyph-aa.
+- **AA mode:** Flash HIGH = 4×4 SSAA (w1-avm2-vector-flash); our HIGH is MSAA. It is a candidate cause of HIGH-quality edge
+  residuals, but unmeasured. Size it before any slot.
+- **Filters:** bevel HOLD probe captured; GPU display-filter growth NO-GO re-priced (w1-filter-residuals).
+- **Flash fixes:** `place_object_test` and `shape_test` goldens ARE Flash at LOW (the old-stub trap), so they are not
+  swap candidates. Our miss (5073 / 10300) is a real gap.
+- **Leads:** `movieclip_hittest_shapeflag` (trace flash_fix landed, still mismatch); `bitmapdata-clone` (bit-exact vs Flash,
+  0 headroom vs its Ruffle golden).
+
+### Process notes added in session 28
+
+- **Price every model's Ruffle-golden losses by name before landing; grade the interim against that list.** A loss
+  that is not on the list is a regression until an FP32 capture says otherwise. Interim #6 = lowq §6 exactly.
+- **Grade unlisted band moves with fresh FP32 captures, not with the golden.** Put the ours→FL / golden→FL table next to the
+  captures (`w1-local-oracles/interim6-low/README.md` is the template).
+- **A swap is a `fixes.json` entry, never a hand edit of a downloaded golden.** Run `--check` in the main tree: a worktree without
+  upstream downloads reads MISSING.
+- **The old-stub trap:** pinned AVM1 "low" captures from before 2026-11-25 are HIGH. Re-capture before trusting one as a LOW golden.

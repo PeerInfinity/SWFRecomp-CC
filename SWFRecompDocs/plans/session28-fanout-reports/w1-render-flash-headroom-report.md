@@ -11,6 +11,8 @@ and `shape_test`. So the absolute numbers below are CI-grade.
   in the tree.
 - `w1-render-flash-headroom-fixtures/make_fixtures.py` and `make_gt_offsets.py`: generators for the Flash oracle
   requests. Their built SWFs are under `…-fixtures/out/`.
+- `w1-render-flash-headroom-gate-ledger.txt` and `w1-render-flash-headroom-canary-compare.log`: the prototype's A/B
+  gate, with a per-row Flash-reference grading.
 
 ## Verdicts (lead)
 
@@ -19,7 +21,7 @@ and `shape_test`. So the absolute numbers below are CI-grade.
 | 1 | Harness renders at the golden's quality (HIGH) for `gradientTransform` / `acid-color` | **NO-GO (refuted)** | `gradientTransform` gets **worse**: 9 → 1767 outliers. `acid-color` frame1 is md5-identical low vs high and passes either way |
 | 2 | `gradientTransform` 9-px miss = "our low AA vs a HIGH golden" | **REFUTED.** Our LOW render *is* Flash-HIGH-like: 3 px over tol, all in the bevel's 45° corner pixels | none cheap. Completion mechanism: Flash's HIGH edge snap (oracle request #2) |
 | 3 | Brief's pricing "our miss vs Flash root ≈ 5984 / 1437 px" | **REFUTED (mis-read column).** Those are *golden*≠Flash. **Ours≠Flash root is 16 342 / 8 384 px** (tol 50, px count) | — |
-| 4 | Thin-stroke tie rule at LOW quality (Flash paints a hairline at integer x into pixel x; we paint x−1) | **GO as evidence for sibling `n-stroke-snap`** (it owns the general rule). Measured prototype: `shape_test` 8 384 → **5 895**, `place_object_test` 16 342 → 15 881 vs Flash | no pass flips. A Flash-ward move away from Ruffle-made goldens (gate below) |
+| 4 | Thin-stroke tie rule at LOW quality (Flash paints a hairline at integer x into pixel x; we paint x−1) | **Rule confirmed Flash-ward, but the global prototype is NO-GO.** Hand to sibling `n-stroke-snap` (it owns the stroke rule). Prototype: `shape_test` 8 384 → **5 895**, `place_object_test` 16 342 → 15 881 vs Flash; gate: 29 closer / 6 farther vs Flash, **36 pass→fail** vs (Ruffle) goldens | no flips. A stroke-only version is the wave-2 shape (§3) |
 | 5 | **Duplicate-depth PlaceObject (SWF ≤ 5/6?): Flash keeps BOTH objects; the newcomer goes BEHIND.** We and Ruffle refuse the newcomer with "Failed to place object" | **HOLD on a Flash oracle (#1); then GO (M).** Proven for SWF 5 by the Flash root capture's own xtrace window (`#passed: 7`) | pixels: `place_object_test` −~5.5k px, `shape_test` −1.8k px. Trace: `place_object_test` RM→pass (gnash, SWF 5). Candidates if the rule also holds at SWF 6: `place_object_test2`, `path_format_test` (both RM, and their goldens differ from Ruffle **only** by the warning lines) |
 | 6 | Unclosed fill paths (gnash `shape_test` shapes 6/8): Flash leaks the open fill across to the next shape's edge | **HOLD (needs the Flash fixture)** | `shape_test` −~3.1k px (bar 2 320 + sprite-9 interior 783) |
 
@@ -138,7 +140,45 @@ Gate set: every `quality = "low"` member of `render_canary_tests.txt` (80), plus
 (`BeginBitmapFill`, `morph_test1`, `place_object_test`, `shape_test`, misc-swfmill `background`, `missing_bitmap`),
 plus `gradientTransform`.
 
-GATE_RESULTS_PLACEHOLDER
+Gate size: 85 tests, 112 comparisons, A/B md5. Full ledger: `w1-render-flash-headroom-gate-ledger.txt`. Raw compare
+output: `…-canary-compare.log`.
+
+**Result: 45 comparisons DIFFER, and 36 of them go pass → fail against their (mostly Ruffle-made) goldens.** No
+comparison goes fail → pass. Traces are unchanged everywhere. As a global rule the prototype is a **NO-GO**.
+
+The same 45 comparisons graded against the best available **Flash** reference (a Flash-verdict golden, a flash_fixes
+golden, or the s27 archive capture; px ≠ Flash at tol 0): **29 closer to Flash, 6 farther, 5 equal**, and 5 have no
+Flash reference (filters/stage3d, untestable).
+
+| row | vs Flash before → after |
+|---|---|
+| `avm2/graphics_draw_path` (flash_fixes golden) | **387 → 126** |
+| `morph_test1` frame1 / frame6 | 201 → **1** / 320 → 124 |
+| `misc-ming shape_test` | 8 804 → 6 315 |
+| `acid-text` | 6 174 → 5 348 |
+| `visual/simple_shapes/overlaps` | 626 → 473 |
+| blend_modes ×4 | −160 … −515 each |
+| *farther:* `simple_shapes/gradients/gradients` | 80 294 → 80 575 |
+| *farther:* `drawing_api/fills_and_lines` | 59 875 → 60 126 |
+| *farther:* `drop_shadow_angles` | +72 |
+| *farther:* `masks` | +7 |
+| *farther:* `gradientTransform` | 17 → 19 |
+| *farther:* `graphics_simple_shapes` | 79 → 80 |
+
+Reading:
+- The tie direction is Flash-ward for **strokes**. The biggest wins are all stroke rows, matching `n-stroke-snap`'s
+  "solid on `floor(edge)`".
+- Biasing **every** primitive is too coarse. Gradient fills and filters drift because a +1/256 px shift also moves
+  gradient sampling and filter sources off exact texel ties.
+- The rule belongs on stroke geometry only, which is what n-stroke-snap is building.
+- Caveat: the archive refs for low-quality rows are s27 wrapper or root captures at test.toml quality, which
+  golden-provenance treats as Flash-at-that-quality. Several of the "closer" deltas are small next to the absolute
+  miss.
+
+**Disposition:** do not land the tie-bias. Hand the ledger to `n-stroke-snap` as a corpus price for "strokes on
+`floor(edge)` at MSAA 1". The stroke-only version should keep the wins above without the 36 pass→fail moves; most of
+those moves are fills, gradients and filters. Any Ruffle-golden row that a stroke-only rule still moves is a priced
+Flash-over-Ruffle loss (RvF).
 
 ## 4. Refutations
 
@@ -199,6 +239,6 @@ GATE_RESULTS_PLACEHOLDER
    the header RECT moved (xmin = ymin = −off twips; the edges land at (edge+off)/20 px, i.e. offset fractions
    .5/.75/.0/.15/.25). Are the rings hard at every offset (snap) or AA'd at .5/.25/.75? That pins the rounding mode.
    Note: off13 == the corpus SWF (RECT re-encoded at 16 bits).
-3. **FLASH: unclosed fill path** (image, direct pinned, low and high): the corpus `shape_test` already shows the leak.
-   For pinning, render `shape_test` with sprites 9/11/13 removed? Not built. I'm asking only whether the coordinator
-   wants this priced now. Otherwise defer to whoever takes §6.
+3. **(Deferred, no fixture built) FLASH: unclosed fill path.** The corpus `shape_test` capture already shows the
+   leak. Pinning its rule (does the open fill stop at the next edge of ANY object on the scanline?) needs a fixture
+   with one unclosed shape alone and one beside a second shape. Build it only if the coordinator wants §6 priced.

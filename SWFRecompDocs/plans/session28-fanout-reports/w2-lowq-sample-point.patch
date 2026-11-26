@@ -1,5 +1,5 @@
 diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
-index 8e0885f69..54fc40e92 100644
+index bfa79df3f..a742fb5f6 100644
 --- a/SWFModernRuntime/src/libswf/tag.c
 +++ b/SWFModernRuntime/src/libswf/tag.c
 @@ -3911,7 +3911,18 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
@@ -238,14 +238,13 @@ index d0f3fc012..76d085827 100644
  				pad_swap(ctx, ps);
  				ctx->filter_pad = P;
 diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
-index 480dabd95..0286252a9 100644
+index b3d7ddcc2..2e8f2c051 100644
 --- a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
 +++ b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
-@@ -960,3 +960,19 @@ non-unload action whose clip is `avm1_removed()` or `avm1_pending_removal()`, wh
- Flash also runs a clip's onClipEvent(enterFrame) in the same exec-list walk as the onEnterFrame methods (the fixture's
- `t EF, n EF, c clipEvent(enterFrame), s EF`).
- **Decision:** match Flash 32 (s28 w2-test12-land: action.c `ef_removal_keeps_enterframe` + tag.c clip-event interleave).
-+
+@@ -1045,3 +1045,18 @@ The trace row passes and is NOT ignored.
+ re-triage the stroke snap.
+ 
+ **Prune criterion:** upstream replaces these goldens with Flash references, or our render drifts off the Flash PNGs.
 +## Unfiltered cacheAsBitmap: no pixel snap at quality HIGH (s28 w2-lowq-sample-point)
 +
 +**Capture:** Flash Player 32 LNX, `session28-fanout-reports/w1-local-oracles/w1-avm2-vector-flash/lowq_sample_point.high.png`

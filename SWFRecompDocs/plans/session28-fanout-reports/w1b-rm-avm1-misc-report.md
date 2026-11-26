@@ -11,10 +11,19 @@ migration `07d4b9dbc..d2a801a98` on top of `c2f7d24b7`; `verify_output.py` alrea
 
 ## Verdicts (lead)
 
-**GO — prototype measured: 14 `ruffle_matched → pass` flips in scope (+1 gnash bonus), plus 2 zero-code flash_fixes.**
+**GO — prototype measured: 12 `ruffle_matched → pass` flips in scope (+1 gnash bonus), plus 2 zero-code flash_fixes = 14 in-scope rows.**
 Every flip is a row whose golden is Linux FP32 (trace-provenance table A), measured in `--mode=graphics`; AVM1 runtime
 rows also re-measured in no-graphics (§Measurements). Gates: 57 load/MCL/version rows, 44 BitmapData rows, 16
-addProperty/watch rows, 10 gnash rows, 70 `regression/` rows + 7 ASnative rows: **no pass→non-pass anywhere**.
+addProperty/watch rows, 10 gnash rows, 70 `regression/` rows + 7 ASnative rows: **no pass→non-pass and no rm→mismatch in the final patch** (one ASnative
+regression in the first cut was found and fixed; §Gates).
+
+Functions touched (sibling map): `action.c` `switchToFunctionVersion`, `actionGetMemberImpl` (FUNCTION "prototype"
+arm), `virtualAccessorBlocked`, `avm1LoadFormIntoMC` (+ new static `formFlashLenientUtf8`), `builtin_asnative`
+(+ new statics `asnativeFlashMajorExists`, `asnativeUnknownMinor`), `constructGeomRectDynamic`,
+`bitmapDataGenerateFilterRect`, `bitmapDataPaletteMap`, `perlin_turbulence`, `bitmapDataPerlinNoise`,
+`bitmapDataCopyPixels`, `actionCallMethod` (getBytesLoaded arm only; w2-hittest-shape-stale owns its hitTest arm);
+`swf.c` `tagMain` and `swf_core.c` `swfStart` (one `#ifdef SWF_BYTES_LOADED` block each); `verify_output.py`
+(`_swf_available_len`, both compile paths). The MCL drain and `actionFirePendingDirectLoadsImpl` were NOT touched.
 
 | bucket (owner mechanism) | size | rows flipped (measured) | owner |
 |---|---|---|---|
@@ -135,7 +144,8 @@ outliers.
 ### B7 — ASnative major table (1 row)
 `asnative_sweep` probes `ASnative(i, 9999)` for i < 65536. FP32 returns a function for 73 majors; we returned a value
 for 2. Prototype: a 73-entry major list; an unimplemented minor of a listed major returns one shared no-op native.
-Calling it returns `undefined` (real Flash natives do something; no corpus row calls a dead minor).
+Calling it returns `undefined` (real Flash natives do something; no corpus row calls a dead minor). It has no
+`prototype` (`no_lazy_prototype`), as gnash `ASnative.as:323` requires.
 
 ### B8 — flash_fixes candidates (2 rows, no code)
 `watch_recursion_swf6` (1 line) and `watch_recursion_double_swf6` (4 lines): FP32 prints `  o2.prop: ` with a
@@ -204,12 +214,25 @@ Graphics (CI mode), single tests, `-P 2`. Before = baseline `ruffle_matched` (al
   `lzma_length_too_long`, `virtual_property_recursion_swf6`, `form_loader_encoding_4`,
   `bitmapdata_custom_rectangle`, `bitmap_data_thorough/{paletteMap,perlinNoise,copyPixels}`, `asnative_sweep`: PASS.
   Bonus: gnash `TextField-v5` PASS.
-- No-graphics (AVM1 runtime + `swf_core.c`): see §Gates (re-measured at the end).
-- Gates (graphics): see §Gates.
+- No-graphics: all 13 headline rows pass (§Gates).
 
 ## Gates
 
-GATES_PLACEHOLDER
+All graphics unless noted; statuses compared against the baseline results JSON at `origin/master`.
+
+| gate | rows | result |
+|---|---|---|
+| avm1 load / MCL / `_level` / version / textfield_props / tab_ordering (`ls avm1 \| grep mcl_\|loadmovie\|swf[5-8]_to\|cross_call\|_level\|version\|replace_root\|load_movie\|textfield_props\|tab_ordering`) | 57 | only `mcl_replace_root_swf7_to_swf5/6`, `textfield_props_swf5` → pass; `root_onload_loaded_level` is upstream-new (no baseline row), passes |
+| BitmapData: every `avm1/bitmap*`, every `bitmap_data_thorough/*`, gnash `BitmapData-v8` | 44 | only the 4 B6 flips; `pixelDissolve` keeps its 20 index-diffs, gnash `BitmapData-v8` keeps its 8; 6 image comparisons pass at 0 outliers. `bitmap_data_copypixels` / `bitmapdata_copypixels_self` re-run after the final copyPixels edit: pass, image 0 outliers |
+| addProperty / watch family (`add_property`, `virtual_property_recursion_*`, `watch*`) | 16 | only `virtual_property_recursion_swf6` → pass; `watch_recursion_swf6/double_swf6` still byte-identical to the FP32 captures |
+| gnash `Object-v5..8`, `TextField-v5/v6`, `MovieClipLoader-v5..7`, `TextFieldHTML-v5` | 10 | `TextField-v5` rm → pass (bonus); the others unchanged (Object diff counts 3/8/8/8 = baseline) |
+| `regression/` fixtures (mcl, load, watch, bitmap, textfield, version, root, closure: 70 rows) | 70 | all 70 pass (= baseline); 2 text cxform fixtures sit at their 19-outlier image limit, as they do at baseline |
+| ASnative: `avm1/asnative`, `asnative_instrument`, `asnative_sweep`, gnash `ASnative-v5..8` | 7 | `asnative_sweep` → pass; `asnative` pass; `asnative_instrument` rm (131 lines, unchanged). The first cut **regressed** gnash `ASnative-v5..8` rm → mismatch: our shared stub grew a lazy `prototype`, while gnash `ASnative.as:323` (Flash golden) wants `typeof(g.prototype) == "undefined"`. Fixed with `no_lazy_prototype = 1`. Now each gnash row keeps rm and gains 1 Flash-ward line (`typeof(g) == "function"` PASSED): 34/39/39/39 diff lines vs 35/40/40/40 |
+| **no-graphics** (AVM1 runtime + `swf_core.c` arm): all 13 headline rows incl. gnash `TextField-v5` | 13 | all pass |
+
+Not run: avm2 / avmplus / the gnash sub-suites outside actionscript.all (not downloaded). The AVM1-only edits cannot reach AVM2 code. The
+`SWF_BYTES_LOADED` define fires only on truncated SWFs, and I could not scan the un-downloaded suites for those, so CI
+should confirm.
 
 ## New unclaimed leads
 

@@ -3770,3 +3770,108 @@ Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slot
 - `movieclip_hittest_shapeflag` lead: pinned Flash gives `false` on 3 lines where the golden says `true`. Check whether those are our ACCEPTED lines (then it's an RvF).
 
 **Pixels.** See `graphics-fanout-playbook.md` §26.
+
+## 29. Session 28 (2026-11-25 → 26) — dual-axis fan-out #20, CLOUD-FIRST, full size, FLASH OVER RUFFLE: trace 4781 → 4827 eff (4819 → 4864 rows; +75 by name, −1 upstream drift; 45 new rows, all pass), pixels 629 → 528 on the baseline intersection (0 gains, 101 priced Flash-over-Ruffle losses vs Ruffle-made goldens) + 19 new comparisons pass, 0 unexplained regressions in either mode
+
+Commits `7c3cfdcb7..bfa47037b` on master: 87 non-results commits. There are 31 cloud slots: 10 wave-1, 3 wave-1b (ruffle_matched provenance), 13 wave-2/2b and 4 wave-3, plus `w2-lowq-sample-point`'s partial landing. Env "SWFRecomp fan-out", Opus. All 31 delivered, none were lost. 10 local one-task sessions ran too:
+- `trace-provenance` → `flash-oracle-harness`;
+- the browser ladder `browser-root-goto` → `browser-attached-goto`;
+- the N ladder `n-stroke-snap` → `n-drawapi-stroke-snap` → `n-join-disc`;
+- `snap-pixel-audit`;
+- the lowq arc `lowq-recapture` → `lowq-corner-rule`.
+
+Every report, patch, probe and local Flash capture is under `session28-fanout-reports/`. The slot table and every grading run are in its `AGENT_LAUNCH_ORDER.md`. The 31 `fanout/*` branches were pruned at closeout after a blob check against master. Three branches had final reports or patches newer than the interim copies on master, and one had 2 logs missing from master. All of them were archived to master first.
+
+**What changed the method: Robert's Flash-over-Ruffle ruling (2026-11-24).** "The goal is still to match Flash, not to match Ruffle." Every confirmed Ruffle≠Flash difference gets an RvF entry. A golden that FP32 proves bad is swapped through the sha-pinned `ruffle-tests/flash_fixes/` package, which `download_tests.sh` re-applies after every upstream refresh. A Flash-correct pass is never traded for a Ruffle golden. This session is where the ruling bit:
+- On the trace axis, `trace-provenance` found that 212 of the 259 `ruffle_matched` rows have FLASH goldens. That makes them real gaps, not passes. Wave 1b turned 73 of them into passes.
+- On the pixel axis, three Flash models landed knowing they would lose Ruffle-made goldens: the stroke snap, the drawing-API snap and the LOW sample-point model. Each loss was priced by name before landing.
+
+**Baselines read fresh** (2026-11-25):
+- graphics `45547012629` at `7c3cfdcb7` (results `e1425f417`): trace 4781 eff / 4819 rows (4522 pass + 259 rm, 38 failing); pixels 629 pass / 39 fail by status sum;
+- no-graphics `2e286cf2f`: 4779 eff.
+
+**Grading runs** (detail: `session28-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+
+| run | code | trace | pixels | no-graphics |
+|---|---|---|---|---|
+| `45687311987` interim #1 | `13b40eabb` culling + trace flash_fixes | exact: +1 rm→pass flash fix, gnash `test4` rm→fail (drift), +1 new row | 0 flips; `draw_triangles` 1812 → 996 | — |
+| `45694673542` / `45694689945` interim #2 | `10a5b515a` n-stroke-snap, glyph snap, 3× w1b, test12, hittest, root-onload | **+51 rm→pass**, test12 → pass; **6 regressions** → JSON fixed (`d8b91ff94`), the rest → `w3-interim2-regressions` | **51 pass→fail** (stroke snap era) → local `snap-pixel-audit`: all Ruffle/exporter goldens, priced | same moves |
+| `45707261082` / `45707277497` interim #3 | `16033a154` leads, filter residuals, loaded shell, text edit, d2a, occupied depth | exact +13; **1 unexpected regression** `avm2/mouse_pick_avm1_root` → `w3-mouse-pick-avm1-root` | −2 priced (`edittext_scroll` .01/.02) | same; mode diffs only aac/computespectrum |
+| `45718037295` / `45718049426` interim #4 | `b030ed745` stroke width, gnash holds, w3 regressions | **exact, 0 regressions**: 4627 pass + 185 rm | 0 flips; acid-stroke-0 36466 → 10262 | 4625 pass |
+| `45750698566` interim #5 | `4a25debc9` mouse pick, browser-root-goto, drawapi snap, enterframe goto | exact; 4 NEW upstream timer rows fail (Flash goldens) → `w3-new-timer-rows` | +8 predicted; −3 Flash-ward (`cursor`, `fills_and_lines`, `stage3d_texture` RvF) | — |
+| `45867407140` interim #6 | `ed63ce7c4` timers, lowq model + 37 swaps | exact: 4 timer rows → pass; 4639 pass | **= lowq §6 ledger by name**: +1 / −54; unlisted bands graded vs FP32 (`w1-local-oracles/interim6-low/`) | — |
+| **`45878805896` / `45878818309` FINAL** at `bfa47037b` | + n-join-disc `03527a3f8`, browser-attached-goto `a9fb68b42` | **4827 eff / 4864**: 4642 pass + 185 rm, 37 failing. vs interim #6: exactly the 3 new fixtures pass, 0 regressions. Results `014124ed5` | **545 pass / 140 fail** (+6 ignored, 3 skip); vs interim #6: 0 flips, acid-stroke-0 7965 → 7173 (= ledger) | **4825 eff**: 4640 pass + 185 rm, 39 failing; mode diffs only `audio/aac` + `audio_computespectrum`. Results `336b83183` |
+
+**Final vs baseline, by name.**
+- Trace on the 4819-row intersection:
+  - +73 `ruffle_matched → pass`, real Flash gains that hid behind Ruffle-matched goldens;
+  - +2 fail → pass: `avm2/number_tostring` (d2a) and gnash `action_execution_order_test12`, the s27 gap closed by `w2-test12-land`;
+  - −1: gnash `action_execution_order_test4` rm → output_mismatch. This is upstream drift: upstream deleted its `output.ruffle.txt`, so the Flash golden now grades it. The §27.4 interleave is still NO-GO.
+- New rows (45), all passing in both modes: 38 `regression/` fixtures (Flash 32 goldens) and 7 upstream rows (`root_onload_loaded_level`, 4 timer rows, `enter_frame_non_display_dispatcher`, `pixelbender_ordered_dither`).
+- Pixels: 0 gains and 101 pass → fail. Every loss is against a Ruffle-made or exporter golden and was priced by name in its interim ledger (playbook §27). 19 new comparisons pass. The "−101" is the ruling at work, not a regression: the matching Flash-ward evidence is in the snap-pixel-audit, lowq-corner-rule §6 and interim6-low tables.
+
+### 29.1 Ledger
+
+| patch | trace | pixels | notes |
+|---|---:|---:|---|
+| `958313b73` w1-avm2-vector-flash | 0 | band | drawTriangles honours culling (1812 → 996) |
+| `9bb3276d7` trace-provenance | +1 (flash fix) | | 4 trace flash_fixes (`goto_rewind_movieclip_replace` rm → pass); 212/259 rm rows have Flash goldens |
+| `0d164c60b` flash-oracle-harness | | | clean PinStub. The old stub never applied quality=low, so every pinned AVM1 "low" capture before 2026-11-25 was HIGH. Re-captured |
+| `34177d8fe` w2-root-onload-proto | +2 new | | root onLoad through the prototype (Flash goldens, `--no-pin`) |
+| `09b2c9130` n-stroke-snap | 0 | −43 net priced | Flash thin-stroke snap: axis-aligned, u ≤ 4/8/12, ¼-px width/position, fills never. N console 1313 → 45 px. button3 3480 → 3 |
+| `b4b96919a` w2-glyph-quarter-snap | 0 | 0 corpus | glyph ¼-px snap (embedded + AA only); border pen 1 + tan/2; 2 goldens → Flash |
+| `bc3e02caf`, `ace9d2f88`, `558c5a8cf` w1b-rm-{avm1-misc,gnash,avm2} | **+48 rm→pass** | | the ruffle_matched gaps by mechanism: ASnative major table, BitmapData kernels, MCL/form edges, gnash builtins, AVM2 prototypes |
+| `f456cedfe` w2-test12-land | +1 fail→pass | | FP10 keeps a queued enterFrame of a clip removed later that tick. Flash refuted the SWF ≤ 7 gate |
+| `2c639b2a0` w2-hittest-shape-stale | +2 rm→pass | | a same-frame shape hitTest uses the stale last-render bounds |
+| `d8b91ff94` w2b-avm2-d2a | +9 | | avmplus number → string (ACCEPTED Cat 14 resolved); fixed interim #2's JSON/AS3Types |
+| `0f2caed84`, `e7afd5ad2` + `5d186720f`, `227392553`, `bc585e9f2`, `613c0f100` w2 avm1-leads, loaded-shell, text-edit, filter-residuals, occupied-depth | +3 rm→pass, +1 fail→pass, ~13 new | −2 priced | 4 deferred queues + onUnload scope; newest-load-first; next-tick goto scripts and loadClip; unloadMovie cancels a load; restrict/SNF defer; fractional shadow offset; glow amount quantisation; bevel fit; SWF5 keep-both occupied depth (the warning is KEPT: Flash prints it under ErrorReporting) |
+| `a7c72d830` w2b-stroke-width-merge | 0 | bands | Flash isotropic stroke width (timeline half): acid-stroke-0 36466 → 10262, strokes/scale 19362 → 12576 |
+| `239829d99` w2b-gnash-holds | +10 rm→pass | | Selection ×3, ops ×4, Object-v5, Number-v5, Global-v6 |
+| `f22b30382`, `912ecbdf7` w3-interim2-regressions, w3-mouse-pick-avm1-root | interim regressions fixed | | boxed_primitives, ASnative ×4, SWF5 getDepth; the C′ next-tick bucket is not promoted under an AVM2 root |
+| `e81d27317` n-drawapi-stroke-snap | +2 fixtures | +8 / −3 Flash-ward | drawing-API strokes take the Flash rule (AVM1 trunc / AVM2 round). acid-shapes-testing 41339 → 15079. Browser cost +0.11 ms/frame |
+| `dc6c75a64`, `a9fb68b42` browser-root-goto, browser-attached-goto | +2 fixtures | | root and attached gotos take the CI arms. `advance_attached_clip_frames` deleted; fixed CI late attached self-goto (both modes) and the browser double DoAction |
+| `4a25debc9` w3-enterframe-root-goto | +1 fixture | | a root GotoFrame opcode inside onEnterFrame moves the playhead (the `g_inside_enterframe_dispatch` early return is gone) |
+| `8be319e93` w3-new-timer-rows | +4 new upstream | | AVM1 type-1 closure scope in timer callbacks; overdue timers once each, in creation order, after busy code; AVM2 getTimer advances 1 ms per call past 20 per tick, an overdue pass after enterFrame, seq-keyed Timer entries |
+| `24c179dc6`, `ed63ce7c4` (+ `20ddedf5d` lowq-fixes) w2-lowq-sample-point, lowq-recapture, lowq-corner-rule | +2 fixtures | **+1 / −54 priced** | Flash LOW model: sample point, reflect/repeat = translation × 255/256, radial round(256t), opaqueBackground floor..ceil. vs FP32 LOW 3.30M → 1.81M channels; 0 Flash-golden losses; 37 golden swaps |
+| `03527a3f8` n-join-disc | +2 fixtures | bands | a closed seam is CAPPED, not joined; HIGH snapped-stroke cap/corner rule from 960 FP32 cells; signed noScale width. Kill switches `SWF_STROKE_JOIN_RULE`, `SWF_STROKE_NOSCALE_SIGNED` |
+
+### 29.2 Standing verdicts that fell
+
+- **"`ruffle_matched` ≈ pass"**: 212 of 259 have FLASH goldens (`trace-provenance`). They are real gaps, and 73 are closed.
+- **"gnash `place_object_test` / `shape_test` goldens are not Flash; deferred swap" (s27)**: VOID. The old PinStub never applied quality=low, so those "low" captures were HIGH. At LOW the goldens ARE Flash, and our miss is a real Flash gap.
+- **"The LOW corner paint rule is wrong"** (lowq-recapture's defect 1): the corner rule is right. The defect was reflect/repeat spread (`lowq-corner-rule`). Also, s27's lowq captures were already LOW, which overturns that session's premise.
+- **"A closed stroke seam is a join"** (`n-join-disc` brief): Flash CAPS it.
+- **"The drawing-API snap costs ~0.7 ms/frame"**: it measured +0.11 with an in-wasm timer. Frame-rate A/Bs are noise at this size.
+- **"test12 needs an SWF ≤ 7 gate"**: Flash v7 == v8. The rule is FP10's queued enterFrame on a removed clip.
+- **"shapeflag hitTest needs a shape-flag fix"** (w1-leads): refuted. The rule is the stale last-render bounds.
+- **"acid-shapes' 88 are translucent self-intersecting fills" (s25/s26 HOLD)**: refuted (0 interior mismatches; it is edge AA).
+- **"Date TZ rows are gaps"** (w1b-rm-avm2): refuted, they are harness timezone. **"`toString_valueOf-v5` is a regression"**: refuted, it went to B6.
+- **"The occupied-depth warning is a Ruffle artifact"**: Flash prints it under ErrorReporting. It is kept, with 3 gnash `test.toml` flash_fixes.
+- **"Our 4 own stroke fixtures have Flash goldens"** (snap-pixel-audit): none did. They had exporter or Ruffle goldens, and 2 were re-goldened to FP32.
+- **"The Tetris wasm break is attached-goto code"**: it was stale RecompiledScripts. `build_test.sh` now stamps them.
+
+### 29.3 Method notes (deltas vs s27)
+
+- **Flash fixes are a package, not a hand swap.** `ruffle-tests/flash_fixes/fixes.json` holds sha-pinned entries (62 at closeout: 48 image, 11 trace, 3 toml). `apply_flash_fixes.py --check` reports `ALREADY` / `APPLIED` / `STALE` / `UPSTREAMED`. A worktree without downloaded upstream tests reads MISSING: check in the main tree. The closeout check gave ALREADY 5, APPLIED 57, 0 STALE, 0 UPSTREAMED.
+- **Price losses by name before landing, then grade the interim against that list.** Interim #6 matched lowq §6 name for name. The worsened bands it did NOT list were graded against fresh FP32 LOW captures (`w1-local-oracles/interim6-low/`). All moved toward Flash except the 3 class-c rows lowq had already priced.
+- **The old-stub quality trap:** any pinned AVM1 capture made before 2026-11-25 with quality=low is HIGH. Re-capture before trusting it. Flash timers are wall-clock nondeterministic in tie/catch-up cases (`avm1_timer_clock_model`: cnt 10–12 over 3 runs), so grade those with a bound check, not one capture.
+- **Run ≤ 4 Linux Flash captures in parallel**; at 8 the pin never releases. `--log-warnings` is needed wherever Flash's ErrorReporting text is in the golden.
+- **Watching runs:** another session's `gh run watch` makes the hook block new watchers. Poll `gh run view --json status` in a background loop instead; never kill a peer's watcher.
+- **Interim cadence:** six interims for 31 slots plus 10 local sessions. Each landing batch was graded before the next one, so every regression has an owner. Interim #2 caught 6 trace regressions and interim #3 caught 1, all fixed by wave-3 slots before the final.
+- **Closeout blob check found real drift:** 3 of 31 branches carried final reports newer than the interim copies landed on master. Diff ALL report/patch/log blobs, not just the names, before pruning.
+
+### 29.4 Left on the board (session 29)
+
+**Trace**
+- **Timers:** `avm1_timer_clock_model`: Flash is nondeterministic, so refit it or turn it into a bound check. An AVM1 timer check after enterFrame needs an FP32 fixture. `gotoFrameFromInterval{,2}` are still rm against Flash goldens.
+- **Gotos and the browser ladder:**
+  - Self-goto port §5a, the timeline-sprite self-goto port (M; it breaks nested gotos on the new HEAD).
+  - A gotoAndStop(current) Flash fixture. The browser-only `stop` guard vs the CI same-frame branch.
+  - `actionNextFrame`'s `g_inside_enterframe_dispatch` arm may be stale, like the GotoFrame one `4a25debc9` removed.
+  - The DJ browser busy-loop after PLAY (pre-existing).
+- **ruffle_matched with Flash goldens:** the remaining w1b NO-GO buckets (`w1b-rm-*-report.md`). The AVM2 text-layout bucket. A Date TZ harness override (harness, not runtime). The 32-bit sort split (platform; declined).
+- **Held:** LocalConnection queue growth (w2-avm1-leads-land). gnash `test4` (the §27.4 interleave NO-GO, now graded vs Flash).
+- `movieclip_hittest_shapeflag`: stays mismatch after its flash_fix. Check the 3 Flash-`false` lines against our ACCEPTED lines.
+- **Unchanged NO-GOs:** the action_order family, `global_proto_decls(_delete)`, `global_instance_decls`, `native_objects_swf6`, `globals_monkeypatch`, `GradientFillTest`, `external_interface_monkeypatch`, shumway `esc`, and the avm2 ACCEPTED/RvF set.
+
+**Pixels.** See `graphics-fanout-playbook.md` §27 (lowq next slice, n-join-disc next slice, text AA, the swap candidates).
