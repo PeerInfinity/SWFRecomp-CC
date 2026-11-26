@@ -1,5 +1,8 @@
 # Test Suite Overview
 
+> **2026-11-26: these headline numbers are stale.** The current state, the remaining work and the NO-GO register
+> are in [`PROJECT_STATE.md`](../../../../SWFRecompDocs/plans/PROJECT_STATE.md) and [`NO_GO_REGISTER.md`](../../../../SWFRecompDocs/plans/NO_GO_REGISTER.md).
+
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
 > **2026-07-24 — full corpus imported; read the feature-priority map first.**

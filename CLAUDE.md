@@ -58,6 +58,7 @@ to make the pipeline resumable across sessions.
 We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 trace tests).
 
 **Key docs to read at session start:**
+- `SWFRecompDocs/plans/PROJECT_STATE.md` — current overall state, what is still worth doing, every non-corpus track; companion `SWFRecompDocs/plans/NO_GO_REGISTER.md` (work ruled not worthwhile, with reopen criteria)
 - `ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md` — architecture, how to run tests, infrastructure (all suites)
 - `ruffle-tests/tests/swfs/_investigation/OVERVIEW.md` — cross-suite summary (avm1, gnash, shumway)
 - Per-suite status: `ruffle-tests/tests/swfs/{suite}/_investigation/CURRENT_STATUS.md`

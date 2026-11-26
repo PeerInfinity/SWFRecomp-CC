@@ -1,5 +1,8 @@
 # Feature-Priority Map — coverage gaps across the full Ruffle corpus
 
+> **2026-11-26: this map is a July 2026 snapshot (3999/4421); the corpus is now 4827/4864.** The current state, the remaining work and the NO-GO register
+> are in [`PROJECT_STATE.md`](PROJECT_STATE.md) and [`NO_GO_REGISTER.md`](NO_GO_REGISTER.md).
+
 **Created**: 2026-07-24 · **Baseline**: `eabb3b366`, mode=graphics
 (no-graphics identical bar two pre-existing one-test divergences).
 **Purpose**: the corpus is a roadmap instrument. Rank the features we have
