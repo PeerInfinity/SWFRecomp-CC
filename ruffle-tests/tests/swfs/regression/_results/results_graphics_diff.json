@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T00:30:59.287656+00:00",
-    "old_git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
-    "new_timestamp": "2026-11-26T04:57:43.399100+00:00",
-    "new_git_sha": "4a25debc987ecbd0c8bc286bb498428558cc5a49",
+    "old_timestamp": "2026-11-26T04:57:43.399100+00:00",
+    "old_git_sha": "4a25debc987ecbd0c8bc286bb498428558cc5a49",
+    "new_timestamp": "2026-11-26T18:40:51.634852+00:00",
+    "new_git_sha": "ed63ce7c439940520a8fa7596ef7dd928337d36b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 282,
+    "old_pass": 287,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 282,
-    "old_total": 282,
+    "old_effective_pass": 287,
+    "old_total": 287,
     "old_pass_rate": 100.0,
-    "new_pass": 287,
+    "new_pass": 289,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 287,
-    "new_total": 287,
+    "new_effective_pass": 289,
+    "new_total": 289,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,37 +25,13 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 282,
-    "added": 5,
+    "unchanged": 287,
+    "added": 2,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_clipevent_root_goto_stopped",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "avm1_drawapi_stroke_snap",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm1_drawing_stroke_scale",
+      "test": "lowq_gradient_orient_probe",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -67,27 +43,15 @@
       }
     },
     {
-      "test": "avm1_enterframe_root_goto_opcode",
+      "test": "lowq_sample_point_probe",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "avm2_drawapi_stroke_snap",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
       }
     }
   ]
