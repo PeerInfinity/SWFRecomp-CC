@@ -47,8 +47,8 @@ Upstream: `b7ff32d93..66f9073de` (11 commits; 1 new row `avm2/xmldocument_tostri
 | w2-native-table-land | w1-native-table W2-a/c/d + per-version FP32 | 0 flips (W2-a), 6 rows Flash-ward; W2-c/d priced | session_018CoDi6z94o4EXoVajXQPSF |
 | w2-array-forin-proto | w1-native-table W2-b | proto_decls −~524 lines; array rows priced | session_018CoDi6z9pU14k8efCNVaqu |
 | w2-stroke-geometry-land | w1-stroke-geometry + FP32 probes | acid-shapes fail→pass; HIGH curve rows Flash-ward; timeline/AVM1 twins priced | session_018CoDi6oYbShZiTwxVTK8j3 |
-| w2-rm-avm2-land | w1-rm-avm2 + FP32 0–5 | +8 rm→pass; L1′ HELD; clipDepth toml; pixelBounds; +2 regression rows | (launching) |
-| w2-lowq-land | w1-lowq-residues + FP32 glyph probe | A + C: `gradients` fail→pass, 6+ rows Flash-ward, priced blend cost; glyph rule only if Flash-ward | (launching) |
+| w2-rm-avm2-land | w1-rm-avm2 + FP32 0–5 | +8 rm→pass; L1′ HELD; clipDepth toml; pixelBounds; +2 regression rows | session_018CoDi3ZD3QFF5z4H83uq7b |
+| w2-lowq-land | w1-lowq-residues + FP32 glyph probe | A + C: `gradients` fail→pass, 6+ rows Flash-ward, priced blend cost; glyph rule only if Flash-ward | session_018CoDi5vBAjwfeqdDXBD3t3 |
 | w2-native-instance | w1-native-table W2-e | ExternalInterface-v8 rm→pass; instance_decls Flash-ward | session_018CoDi3bJoV7MPov8DtZfAQ |
 
 ## Grading runs

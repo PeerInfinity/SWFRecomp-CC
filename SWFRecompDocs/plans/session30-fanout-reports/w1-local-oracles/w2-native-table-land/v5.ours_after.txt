@@ -1,0 +1,43 @@
+Array===_global.Array: false
+_global.Array.NUMERIC: 
+Array.NUMERIC: 16
+Array.CASEINSENSITIVE: 1
+String===_global.String: false
+typeof _global.String.fromCharCode: undefined
+typeof String.fromCharCode: function
+[].constructor===Array: true
+[].constructor===_global.Array: false
+Array.prototype===_global.Array.prototype: false
+new Array instanceof _global.Array: false
+Array.hasOwnProperty(NUMERIC): true
+String.hasOwnProperty(fromCharCode): true
+Key own toString:  str: [object Object] toString(): [object Object]
+Mouse own toString:  str: [object Object] toString(): [object Object]
+Stage own toString:  str: [object Object] toString(): [object Object]
+Selection own toString:  str: [object Object] toString(): [object Object]
+Math own toString:  str: [object Object] toString(): [object Object]
+Accessibility own toString:  str: [object Object] toString(): [object Object]
+Sound.prototype own toString:  str: [object Object]
+new Sound str: [object Object]
+typeof Accessibility.isActive: undefined
+typeof Accessibility.updateProperties: undefined
+_global own o:  o=null
+ASnative own __proto__: true own constructor: true
+ASSetNative own __proto__: true own constructor: true
+ASSetNativeAccessor own __proto__: true own constructor: true
+Key.constructor===Object: true
+typeof Sound.prototype.checkPolicyFile: undefined
+typeof Sound.prototype.areSoundsInaccessible: undefined
+typeof AssetCache: function RemoteLSOUsage: function AsSetupError: function
+({}).constructor===Object: true
+"".constructor===String: true
+typeof Key.constructor: function
+String.fromCharCode(72,105): Hi
+typeof ASnative.call: undefined ASnative.__proto__: undefined
+typeof AssetCache.getDiskUsage: undefined RemoteLSOUsage.getURLPageSupport: undefined
+Key keys after unhide: _listeners,removeListener,addListener,broadcastMessage,isAccessible,isToggled,isDown,getCode,getAscii,ALT,ENTER,SPACE,UP,DOWN,LEFT,RIGHT,PGUP,PGDN,HOME,END,TAB,CONTROL,SHIFT,ESCAPE,INSERT,DELETEKEY,BACKSPACE,CAPSLOCK,__proto__,constructor,
+Accessibility keys after unhide: updateProperties,sendEvent,isActive,__proto__,constructor,
+Math keys after unhide: pow,acos,asin,atan,ceil,floor,random,round,sqrt,log,exp,tan,atan2,cos,sin,max,min,abs,E,LN10,LN2,LOG10E,LOG2E,PI,SQRT1_2,SQRT2,__proto__,constructor,
+ASnative keys after unhide: 
+ASSetNative keys after unhide: __proto__,constructor,
+Done
