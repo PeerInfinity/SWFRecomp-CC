@@ -34926,6 +34926,23 @@ static void drawingUnionTranslucentStroke(DrawPath* path)
 // Called once at finalize with the nominal half-width and again at render time
 // whenever the MC's on-screen scale changes enough to alter Flash's minimum-1px
 // stroke width. Frees and reallocates path->line_verts.
+// s29 n-seam-caps: a closed contour's seam (explicitly closed, or auto-closed
+// by a fill) is two caps in Flash whenever snapping moves the two seam ends
+// apart, a join otherwise (n-seam-caps report §1). For round caps + round
+// joins two caps on the seam give both cases, so the builders emit the caps
+// and the renderer places them (stroke_seam_flags); other styles keep the
+// join (they would need both geometries). SWF_STROKE_SEAM_CAPS=0 off.
+static int drawing_stroke_seam_caps_on(void)
+{
+	static int on = -1;
+	if (on < 0)
+	{
+		const char* e = getenv("SWF_STROKE_SEAM_CAPS");
+		on = !(e != NULL && e[0] == '0');
+	}
+	return on;
+}
+
 static void drawingBuildStroke(DrawPath* path, float half_w)
 {
 	const u8 joints = path->line_joints;
@@ -34981,7 +34998,9 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 		// a fan, so the per-slot bound depends on the style AND the radius —
 		// see drawing_stroke_extra_verts.
 		u32 extra_per_vert = drawing_stroke_extra_verts(half_w, joints, caps);
-		u32 alloc_verts = total_segs * 6 + poly_count * extra_per_vert;
+		// (+1 slot per contour: an auto-closed seam emitted as two caps
+		// spends n+1 slots on its n vertices; s29 n-seam-caps.)
+		u32 alloc_verts = total_segs * 6 + (poly_count + contour_count) * extra_per_vert;
 		path->line_verts = (float*)malloc(alloc_verts * 2 * sizeof(float));
 		u32 wv = 0;  // verts written so far (each vert = 2 floats)
 		// s28 n-drawapi-stroke-snap: per emitted vertex, the polyline vertex
@@ -34989,6 +35008,10 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 		// polyline vertex the STROKE_SNAP_* flags of its segments.
 		u32* vcen = (u32*)malloc(alloc_verts * sizeof(u32));
 		u8* pflag = (u8*)calloc(poly_count ? poly_count : 1, 1);
+		// s29 n-seam-caps: per emitted vertex, STROKE_SNAP_OWN_* of the seam
+		// segment it belongs to (both seam caps share one centre index when
+		// the contour is auto-closed).
+		u8* vown = (u8*)calloc(alloc_verts ? alloc_verts : 1, 1);
 		#define _DR_AXIS_FLAG(_ka, _kb) do { \
 			float _dx = poly[(_kb)*2] - poly[(_ka)*2], _dy = poly[(_kb)*2+1] - poly[(_ka)*2+1]; \
 			u8 _f = (_dx == 0.0f && _dy != 0.0f) ? STROKE_SNAP_VERT \
@@ -35031,35 +35054,70 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 				poly[(_ke)*2], poly[(_ke)*2+1], half_w, caps); \
 			_DR_CEN_RANGE(_w0, (_ke)); \
 		} while (0)
+		const int seam_caps = joints == 0 && caps == 0 && drawing_stroke_seam_caps_on() && vown != NULL;
+		// Axis of segment a->b as STROKE_SNAP_OWN_* bits.
+		#define _DR_SEG_OWN(_ka, _kb) ( \
+			(poly[(_kb)*2] == poly[(_ka)*2] && poly[(_kb)*2+1] != poly[(_ka)*2+1]) ? STROKE_SNAP_OWN_V : \
+			(poly[(_kb)*2+1] == poly[(_ka)*2+1] && poly[(_kb)*2] != poly[(_ka)*2]) ? STROKE_SNAP_OWN_H : 0)
+		// Tag the vertices [w_from, wv) whose centre is _k with _own.
+		#define _DR_TAG_OWN(_wfrom, _k, _own) do { \
+			for (u32 _q = (_wfrom); _q < wv; _q++) if (vcen[_q] == (_k)) vown[_q] = (u8)((_own) | STROKE_SNAP_SEAM); \
+		} while (0)
 		for (u32 ci = 0; ci < contour_count; ci++) {
 			u32 cstart = contour_starts[ci];
 			u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
 			int needs_close = _DR_CONTOUR_NEEDS_CLOSE(cstart, cend);
 			int expl_closed = _DR_CONTOUR_EXPLICIT_CLOSED(cstart, cend);
+			const int seam = seam_caps && (needs_close || expl_closed) && vcen != NULL;
 			// Stroke quads for each consecutive segment.
 			for (u32 i = cstart; i + 1 < cend; i++) {
+				u32 _w0 = wv;
 				_DR_EMIT_STROKE_SEG(poly[i*2], poly[i*2+1],
 				                    poly[(i+1)*2], poly[(i+1)*2+1]);
 				_DR_CEN_SEG(i, i + 1);
 				_DR_AXIS_FLAG(i, i + 1);
+				if (seam && i == cstart) _DR_TAG_OWN(_w0, cstart, _DR_SEG_OWN(cstart, cstart + 1));
+				if (seam && expl_closed && i + 2 == cend) _DR_TAG_OWN(_w0, cend - 1, _DR_SEG_OWN(cend - 2, cend - 1));
 			}
 			if (needs_close) {
+				u32 _w0 = wv;
 				_DR_EMIT_STROKE_SEG(poly[(cend-1)*2], poly[(cend-1)*2+1],
 				                    poly[cstart*2], poly[cstart*2+1]);
 				_DR_CEN_SEG(cend - 1, cstart);
 				_DR_AXIS_FLAG(cend - 1, cstart);
+				if (seam) _DR_TAG_OWN(_w0, cstart, _DR_SEG_OWN(cend - 1, cstart));
 			}
 			// Joins at interior vertices (each shared by two segments).
 			for (u32 k = cstart + 1; k + 1 < cend; k++) {
 				_DR_EMIT_JOIN(k - 1, k, k + 1);
 			}
 			// Closure joins where the contour forms a loop.
-			if (needs_close && (cend - cstart) >= 2) {
+			if (needs_close && (cend - cstart) >= 2 && seam) {
+				// s29 n-seam-caps: the seam at cstart is two caps (first
+				// segment's start, closing segment's end), as in Flash.
+				u32 _w0 = wv;
+				_DR_EMIT_CAP(cstart + 1, cstart);
+				_DR_TAG_OWN(_w0, cstart, _DR_SEG_OWN(cstart, cstart + 1));
+				_w0 = wv;
+				_DR_EMIT_CAP(cend - 1, cstart);
+				_DR_TAG_OWN(_w0, cstart, _DR_SEG_OWN(cend - 1, cstart));
+				// Corner at cend-1: last segment meets the closing segment.
+				_DR_EMIT_JOIN(cend - 2, cend - 1, cstart);
+			} else if (needs_close && (cend - cstart) >= 2) {
 				// Seam at cstart: closing segment (cend-1 -> cstart) meets
 				// the first segment (cstart -> cstart+1).
 				_DR_EMIT_JOIN(cend - 1, cstart, cstart + 1);
 				// Corner at cend-1: last segment meets the closing segment.
 				_DR_EMIT_JOIN(cend - 2, cend - 1, cstart);
+			} else if (expl_closed && seam) {
+				// s29 n-seam-caps: Flash caps the seam (both segments end
+				// there) instead of joining it.
+				u32 _w0 = wv;
+				_DR_EMIT_CAP(cstart + 1, cstart);
+				_DR_TAG_OWN(_w0, cstart, _DR_SEG_OWN(cstart, cstart + 1));
+				_w0 = wv;
+				_DR_EMIT_CAP(cend - 2, cend - 1);
+				_DR_TAG_OWN(_w0, cend - 1, _DR_SEG_OWN(cend - 2, cend - 1));
 			} else if (expl_closed) {
 				// Seam where last point coincides with first: last segment
 				// (cend-2 -> cend-1≈cstart) meets first (cstart -> cstart+1).
@@ -35075,6 +35133,8 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 				_DR_EMIT_CAP(cend - 2, cend - 1);
 			}
 		}
+		#undef _DR_TAG_OWN
+		#undef _DR_SEG_OWN
 		#undef _DR_EMIT_CAP
 		#undef _DR_EMIT_JOIN
 		#undef _DR_EMIT_STROKE_SEG
@@ -35107,7 +35167,9 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 					u32 k = vcen[q];
 					path->stroke_soup_cen[q * 2]     = poly[k * 2] * 20.0f;
 					path->stroke_soup_cen[q * 2 + 1] = poly[k * 2 + 1] * 20.0f;
-					path->stroke_soup_sf[q] = pflag[k];
+					// Seam vertices: the corner flags (both segments' axes,
+					// for stroke_seam_flags' corner fallback) | SEAM | OWN_*.
+					path->stroke_soup_sf[q] = pflag[k] | (vown ? vown[q] : 0);
 				}
 				path->stroke_soup_n = wv;
 				path->stroke_soup_gen = stroke_snap_next_gen(1);
@@ -35119,6 +35181,7 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 		}
 		free(vcen);
 		free(pflag);
+		free(vown);
 		// s25 w1-pixel-drawing PROTOTYPE: a translucent stroke is one coverage
 		// region in Flash (the outline is filled once), but our per-segment
 		// quads + join wedges overlap at every corner and blend twice there.

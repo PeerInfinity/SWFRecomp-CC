@@ -11441,7 +11441,23 @@ namespace SWFRecomp
 
 						std::vector<Tri> tris;
 
-						drawLines(paths[i], line_style, tris);
+						// s29 n-seam-caps: a closed path's seam strokes as two
+						// caps (drawLinesLyon), tagged per tri so the runtime
+						// can snap each cap with its own segment. Only where
+						// the centre tables exist (not morphs / glyphs) and
+						// for opaque solid strokes: the two caps overlap, and
+						// a translucent stroke would double-blend there.
+						// SWF_STROKE_SEAM_CAPS=0 at recompile time: old join.
+						static const bool seam_caps_env = []
+						{
+							const char* e = getenv("SWF_STROKE_SEAM_CAPS");
+							return !(e != NULL && e[0] == '0');
+						}();
+						const bool want_seam_caps = seam_caps_env && !is_morph && !is_font
+						                            && line_style.fill_type == 0 && line_style.a == 255;
+						std::vector<u8> seam_owner;
+
+						drawLines(paths[i], line_style, tris, 1.0, want_seam_caps ? &seam_owner : nullptr);
 
 						tris_size += tris.size();
 
@@ -11454,8 +11470,10 @@ namespace SWFRecomp
 						if (!is_morph && !is_font && !tris.empty())
 						{
 							std::vector<Tri> centre_tris;
+							std::vector<u8> centre_owner;
 
-							drawLines(paths[i], line_style, centre_tris, 0.0);
+							drawLines(paths[i], line_style, centre_tris, 0.0,
+							          want_seam_caps ? &centre_owner : nullptr);
 
 							if (centre_tris.size() == tris.size())
 							{
@@ -11522,8 +11540,26 @@ namespace SWFRecomp
 									if (closed || !continued(pv.back())) pv_flags[pv.size() - 1] |= ef;
 								}
 
-								for (const Tri& ct : centre_tris)
+								// Seam-cap tris: the axis of the segment each
+								// belongs to (bit 4 vertical, bit 5 horizontal),
+								// plus bit 6 = seam cap (STROKE_SNAP_OWN_* /
+								// _SEAM; the runtime's stroke_seam_flags).
+								auto seg_own = [&](size_t a, size_t b) -> u32
 								{
+									const double x0 = strokeX(pv[a]), y0 = strokeY(pv[a]);
+									const double x1 = strokeX(pv[b]), y1 = strokeY(pv[b]);
+									if (x0 == x1 && y0 != y1) return 16;
+									if (y0 == y1 && x0 != x1) return 32;
+									return 0;
+								};
+								const u32 own_first = pv.size() >= 2 ? seg_own(0, 1) : 0;
+								const u32 own_last = pv.size() >= 2 ? seg_own(pv.size() - 2, pv.size() - 1) : 0;
+								const bool owners_ok = centre_owner.size() == centre_tris.size()
+								                       && seam_owner == centre_owner;
+								for (size_t ti = 0; ti < centre_tris.size(); ++ti)
+								{
+									const Tri& ct = centre_tris[ti];
+									const u8 owner = owners_ok ? centre_owner[ti] : 0;
 									for (int j = 0; j < 3; ++j)
 									{
 										float cx_f = (float) strokeX(ct.verts[j]);
@@ -11537,6 +11573,10 @@ namespace SWFRecomp
 											{
 												snap_f |= pv_flags[k];
 											}
+										}
+										if (owner != 0 && cxd == strokeX(pv[0]) && cyd == strokeY(pv[0]))
+										{
+											snap_f |= 64u | (owner == 1 ? own_first : own_last);
 										}
 										stroke_snap_data << snap_f << ",";
 
@@ -12485,7 +12525,7 @@ namespace SWFRecomp
 	}
 
 	bool SWF::drawLinesLyon(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
-	                        double offset_scale)
+	                        double offset_scale, std::vector<u8>* seam_owner)
 	{
 		u16 width = style.width;
 		const u8 join_style = style.line_join;
@@ -12508,10 +12548,17 @@ namespace SWFRecomp
 
 		const double hw = width/2.0;
 		const double ohw = hw*offset_scale;
-		const bool closed = n > 2 && path.verts.back().x == path.verts[0].x
-		                    && path.verts.back().y == path.verts[0].y
-		                    && path.verts.back().fx_frac == path.verts[0].fx_frac
-		                    && path.verts.back().fy_frac == path.verts[0].fy_frac;
+		const bool loop = n > 2 && path.verts.back().x == path.verts[0].x
+		                  && path.verts.back().y == path.verts[0].y
+		                  && path.verts.back().fx_frac == path.verts[0].fx_frac
+		                  && path.verts.back().fy_frac == path.verts[0].fy_frac;
+		// s29 n-seam-caps: Flash CAPS a closed contour's seam, it never joins
+		// it (n-join-disc §1.3). Measured with round caps + round joins, where
+		// the unsnapped geometry is the same either way; other styles keep the
+		// join. The seam then strokes as an open path's two ends.
+		const bool seam_caps = loop && seam_owner != nullptr && join_style == 0
+		                       && style.start_cap == 0 && style.end_cap == 0;
+		const bool closed = loop && !seam_caps;
 
 		// y-down positions
 		std::vector<double> px(n), py(n);
@@ -12672,6 +12719,7 @@ namespace SWFRecomp
 			return strokeVertex(x, -y, src.morph_index);
 		};
 
+		const size_t tris0 = tris.size();
 		// Edges (lyon add_edge_triangles): (p0_neg, p0_pos, p1_pos), (p0_neg, p1_pos, p1_neg)
 		for (size_t k = 0; k < ne; ++k)
 		{
@@ -12745,16 +12793,36 @@ namespace SWFRecomp
 			}
 		}
 
+		const size_t tris_caps = tris.size();
+		size_t tris_cap2 = tris_caps;
 		if (!closed)
 		{
 			drawLineCap(path.verts[0], path.verts[1], hw, style.start_cap, tris, offset_scale);
+			tris_cap2 = tris.size();
 			drawLineCap(path.verts.back(), path.verts[n - 2], hw, style.end_cap, tris, offset_scale);
+		}
+		if (seam_owner != nullptr)
+		{
+			seam_owner->resize(tris.size(), 0);
+			if (seam_caps)
+			{
+				for (size_t q = tris0; q < tris.size(); ++q)
+				{
+					const size_t r = q - tris0;
+					u8 o = 0;
+					if (q >= tris_cap2) o = 2;
+					else if (q >= tris_caps) o = 1;
+					else if (r < 2) o = 1;
+					else if (r >= 2*(ne - 1) && r < 2*ne) o = 2;
+					(*seam_owner)[q] = o;
+				}
+			}
 		}
 		return true;
 	}
 
 	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
-	                    double offset_scale)
+	                    double offset_scale, std::vector<u8>* seam_owner)
 	{
 		u16 width = style.width;
 
@@ -12763,12 +12831,24 @@ namespace SWFRecomp
 		// "fold" joins and degenerate edges.
 		{
 			std::vector<Tri> lyon_tris;
-			if (drawLinesLyon(path, style, lyon_tris, offset_scale))
+			std::vector<u8> lyon_owner;
+			if (drawLinesLyon(path, style, lyon_tris, offset_scale,
+			                  seam_owner != nullptr ? &lyon_owner : nullptr))
 			{
 				tris.insert(tris.end(), lyon_tris.begin(), lyon_tris.end());
+				if (seam_owner != nullptr)
+				{
+					seam_owner->insert(seam_owner->end(), lyon_owner.begin(), lyon_owner.end());
+				}
 				return;
 			}
 		}
+		// The fallback builder joins the seam: no seam-cap tris.
+		struct SeamOwnerPad
+		{
+			std::vector<u8>* o; const std::vector<Tri>& t;
+			~SeamOwnerPad() { if (o != nullptr) o->resize(t.size(), 0); }
+		} seam_owner_pad { seam_owner, tris };
 
 		// LINESTYLE2 cap/join words. Pre-v4 shapes leave these at 0, which is
 		// the round-everything geometry this builder has always drawn.

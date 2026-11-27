@@ -2088,6 +2088,19 @@ static float hairline_stage[16];
 static int stroke_snap_dyn_on = 1;
 // s28 n-join-disc corner/cap rule (stroke_snap_place); SWF_STROKE_JOIN_RULE=0 off.
 static int stroke_join_rule = 1;
+// s29 n-seam-caps: place a closed seam's two caps as caps (stroke_seam_flags);
+// SWF_STROKE_SEAM_CAPS=0 places them as the old snapped corner; =N caps only
+// W <= N. Default 2: W = 3 seam caps are Flash's geometry but our 4-sample
+// MSAA renders them farther from Flash's 16-sample raster than the corner
+// (n-seam-caps report §4, avm1_stroke_seam_caps 1824 -> 1836 at N = 3).
+static int stroke_seam_caps = 2;
+// s29 n-seam-caps: a pixelHinting END snaps along its axis too (Flash:
+// identical output for every sub-pixel offset within a half pixel,
+// regression/avm1_stroke_hinting_caps). SWF_STROKE_HINT_ENDS=0 off.
+static int stroke_hint_ends = 1;
+// s29 n-seam-caps: W = 3 snapped caps as Flash's octagon (stroke_snap_place);
+// SWF_STROKE_CAP_OCTAGON=0 keeps the disc.
+static int stroke_cap_octagon = 1;
 // s28 n-join-disc goal 2: a single no*Scale flag scales the width by the
 // SIGNED device component of v = M*(1,1) (NoVScale v.x, NoHScale v.y, y
 // down), clamped at 0 -> hairline. Flash 32, 34 cells
@@ -2120,6 +2133,12 @@ static void hairline_init(WebGPURenderContext* ctx)
 		stroke_join_rule = !(e3 != NULL && e3[0] == '0');
 		const char* e4 = getenv("SWF_STROKE_NOSCALE_SIGNED");
 		stroke_noscale_signed = !(e4 != NULL && e4[0] == '0');
+		const char* e5 = getenv("SWF_STROKE_SEAM_CAPS");
+		stroke_seam_caps = (e5 != NULL && e5[0] >= '0' && e5[0] <= '9') ? e5[0] - '0' : 2;
+		const char* e7 = getenv("SWF_STROKE_HINT_ENDS");
+		stroke_hint_ends = !(e7 != NULL && e7[0] == '0');
+		const char* e6 = getenv("SWF_STROKE_CAP_OCTAGON");
+		stroke_cap_octagon = !(e6 != NULL && e6[0] == '0');
 	}
 	// The CPU xform mirror also serves the drawing-API stroke snap
 	// (render_webgpu_stroke_snap), so it exists whether or not the movie has
@@ -3494,8 +3513,9 @@ static inline double stroke_snap_centre(double e, int W)
 //    there, so the two discs are NOT clipped (they paint up to half a pixel
 //    outside the bands; W = 1: nothing).
 // Implemented per vertex (stroke_snap_place): caps exactly; corners as the
-// join fan's arc points pushed onto that union, inside the corner square (the
-// seam's spill past the square is not placed; report §3). W = 1..3 only.
+// join fan's arc points pushed onto that union, inside the corner square. The
+// seam is emitted by the builders as two real caps (s29 n-seam-caps,
+// STROKE_SNAP_SEAM; stroke_seam_flags), so it takes the cap rule. W = 1..3.
 // Kill switch SWF_STROKE_JOIN_RULE=0 restores the n-stroke-snap placement
 // (every vertex of a corner snapped on both axes).
 
@@ -3513,17 +3533,54 @@ static inline double stroke_ray_disc(double px, double py, double ux, double uy,
 	return (t > 0.0) ? t : 0.0;
 }
 
+// s29 n-seam-caps: the effective STROKE_SNAP_* flags of one vertex of a
+// snapped run of width W. A seam-cap vertex (STROKE_SNAP_SEAM, emitted by the
+// builders for a closed contour's seam) is its own segment's open end where
+// the cap rule applies (HIGH, W = 1..3): only that segment's axis snaps and
+// the cap sits at the quantised end (Flash, n-join-disc §1.3). Elsewhere it
+// keeps the seam's corner flags, so it lands on the snapped corner as the old
+// join did (two round caps on one centre cover exactly a round join there).
+// Flash's rule (s29 Flash probe, report §1): the seam is two caps exactly
+// when snapping moves the first segment's start and the last one's end apart
+// ((x_q, Ys) vs (Xs, y_q) at an L seam); when they coincide it is a join. For
+// round caps + round join the cap placement gives both cases by itself. A
+// pixelHinting seam always joins in Flash (round corner around the snapped
+// vertex, no spill: avm1_drawapi_stroke_snap right half, W = 2 / 3 at every
+// offset), consistent with hinting snapping the ends along their axis too.
+static inline unsigned stroke_seam_flags(unsigned sf, int W, int hinted)
+{
+	if (!(sf & STROKE_SNAP_SEAM)) return sf;
+	int caps = stroke_join_rule && !hinted && W >= 1 && W <= 3 && W <= stroke_seam_caps;
+#if MSAA_SAMPLES == 1
+	caps = 0;
+#endif
+	if (!caps) return sf & (STROKE_SNAP_VERT | STROKE_SNAP_HORZ | STROKE_SNAP_CLOSE);
+	return ((sf & STROKE_SNAP_OWN_V) ? STROKE_SNAP_VERT : 0u)
+	     | ((sf & STROKE_SNAP_OWN_H) ? STROKE_SNAP_HORZ : 0u)
+	     | STROKE_SNAP_END;
+}
+
 // Place one stroke vertex of a snapped run (W >= 1) in device px. In: the
 // quantised device centre (*cdx, *cdy), the device offset re-expanded to the
 // run's width (*odx, *ody), the device-axis snap flags fx / fy and the
 // centre's STROKE_SNAP_END / STROKE_SNAP_CLOSE bits. Out: snapped centre and
 // offset (vertex = centre + offset).
 static inline void stroke_snap_place(double* cdx, double* cdy, double* odx, double* ody,
-                                     int W, int fx, int fy, unsigned sf)
+                                     int W, int fx, int fy, unsigned sf, int hinted)
 {
+	// pixelHinting, W >= 2: an open end snaps along its axis as well, so its
+	// cap sits on the fully snapped end (Flash W = 4..6 caps and corners are
+	// identical for every sub-pixel offset within a half pixel; W = 2 / 3
+	// hinted seams join around the snapped vertex). W = 1 unmeasured.
+#if MSAA_SAMPLES == 1
+	const int hend = 0;    // LOW is a different raster (report §1.4 of n-join-disc)
+	(void) hinted;
+#else
+	const int hend = hinted && stroke_hint_ends && W >= 2 && (sf & STROKE_SNAP_END) && (fx ^ fy);
+#endif
 	const double xq = *cdx, yq = *cdy;
-	const double Xs = fx ? stroke_snap_centre(xq, W) : xq;
-	const double Ys = fy ? stroke_snap_centre(yq, W) : yq;
+	const double Xs = (fx || hend) ? stroke_snap_centre(xq, W) : xq;
+	const double Ys = (fy || hend) ? stroke_snap_centre(yq, W) : yq;
 	*cdx = Xs; *cdy = Ys;
 	if (stroke_join_rule == 0) return;
 #if MSAA_SAMPLES == 1
@@ -3578,6 +3635,18 @@ static inline void stroke_snap_place(double* cdx, double* cdy, double* odx, doub
 	{
 		if (fy) *odx = 0.0;    // end of a horizontal segment
 		else    *ody = 0.0;    // end of a vertical one
+	}
+	// W = 3 cap: Flash's shape is a regular octagon of circumradius 1.5 with
+	// vertices on the axes and diagonals (n-join-disc §1.1: 37 vs 446 error
+	// units for the disc). Push each cap arc point onto it.
+	if (W == 3 && stroke_cap_octagon && (sf & STROKE_SNAP_END) && (fx ^ fy)
+	    && ol > 1e-9 && fabs(ol / h - 1.0) <= 0.02)
+	{
+		const double s8 = 0.78539816339744830962;
+		double a = atan2(*ody, *odx);
+		a -= s8 * floor(a / s8);
+		const double r = h * cos(0.39269908169872415481) / cos(a - 0.39269908169872415481);
+		*odx *= r / ol; *ody *= r / ol;
 	}
 }
 
@@ -3812,7 +3881,8 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 			u32* dst = &verts[(gv - offset) * 4];
 			union { float f; u32 u; } vx, vy, cx, cy;
 			vx.u = dst[0]; vy.u = dst[1]; cx.u = cen[0]; cy.u = cen[1];
-			const unsigned char sf = hairline_snap[ci];
+			const int hinted = (rf & 1u) != 0;
+			const unsigned sf = stroke_seam_flags(hairline_snap[ci], W, hinted);
 			const int fx = (axis == 1) ? (sf & 1) : (sf >> 1) & 1;  // device-x snappable
 			const int fy = (axis == 1) ? (sf >> 1) & 1 : (sf & 1);  // device-y snappable
 			// Device centre and offset. Flash strokes in DEVICE space: one
@@ -3839,7 +3909,7 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 			// (with the half width a multiple of 1/4, so do the edges).
 			cdx = floor(4.0 * cdx + 0.5) * 0.25;
 			cdy = floor(4.0 * cdy + 0.5) * 0.25;
-			if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf);
+			if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf, hinted);
 			const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
 			// Back to local.
 			vx.f = (float) (( By * ndx - Bx * ndy) / det);
@@ -3980,7 +4050,8 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 	{
 		const double vx = src->xy[v * 2], vy = src->xy[v * 2 + 1];
 		const double cx = src->cen[v * 2], cy = src->cen[v * 2 + 1];
-		const unsigned char sf = src->sf[v];
+		const int hinted = (src->flags & STROKE_FLAG_PIXEL_HINTING) != 0;
+		const unsigned sf = stroke_seam_flags(src->sf[v], W, hinted);
 		const int fx = (axis == 1) ? (sf & 1) : (sf >> 1) & 1;
 		const int fy = (axis == 1) ? (sf >> 1) & 1 : (sf & 1);
 		double cdx = Ax * cx + Bx * cy + Cx;
@@ -3999,7 +4070,7 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 		else { odx *= k_uni; ody *= k_uni; }
 		cdx = floor(4.0 * cdx + 0.5) * 0.25;
 		cdy = floor(4.0 * cdy + 0.5) * 0.25;
-		if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf);
+		if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf, hinted);
 		const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
 		out[v * 2]     = (float) (( By * ndx - Bx * ndy) / det);
 		out[v * 2 + 1] = (float) ((-Ay * ndx + Ax * ndy) / det);

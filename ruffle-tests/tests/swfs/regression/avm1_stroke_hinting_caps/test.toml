@@ -1,0 +1,8 @@
+# Golden = Flash Player 32 (LNX) HIGH oracle (s29 n-seam-caps): pixelHinting W = 4/5/6
+# open L corners + caps at 16 quarter-pixel offsets (AVM1 drawing API). Flash snaps a
+# hinted END along its axis too: every offset within a half pixel renders the same.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 2
+max_outliers = 7300

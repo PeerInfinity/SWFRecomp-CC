@@ -9056,6 +9056,21 @@ static uint32_t gfx_stroke_join(float* out, float ax, float ay, float vx,
 // (Flash closes fill+stroke of `moveTo;lineTo*;endFill`). The join/cap style
 // travels on the path (GraphicsStroke defaults to caps "none" while
 // lineStyle defaults to CapsStyle.ROUND, so it cannot be hard-coded).
+// s29 n-seam-caps: a closed contour's seam (explicit or fill-auto-closed) is
+// two caps, as Flash draws it when snapping separates the seam ends (action.c
+// drawing_stroke_seam_caps_on; round caps + round joins only).
+// SWF_STROKE_SEAM_CAPS=0 off.
+static int gfx_stroke_seam_caps_on(void)
+{
+	static int on = -1;
+	if (on < 0)
+	{
+		const char* e = getenv("SWF_STROKE_SEAM_CAPS");
+		on = !(e != NULL && e[0] == '0');
+	}
+	return on;
+}
+
 static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
                              uint32_t poly_count, const uint32_t* cstarts,
                              uint32_t ccount, int filled, float half_w)
@@ -9085,14 +9100,17 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 		if (_GNEEDCLOSE(cs, ce)) total_segs += 1;
 	}
 	if (total_segs == 0) return;
+	// +1 slot per contour: an auto-closed seam as two caps (s29 n-seam-caps).
 	uint32_t alloc_verts = total_segs * 6
-	                     + poly_count * gfx_stroke_extra_verts(half_w, joints, caps);
+	                     + (poly_count + ccount) * gfx_stroke_extra_verts(half_w, joints, caps);
 	path->line_verts = malloc(alloc_verts * 2 * sizeof(float));
 	uint32_t wv = 0;
 	// s28 n-drawapi-stroke-snap: centre polyline vertex per emitted vertex,
 	// STROKE_SNAP_* flags per polyline vertex (see action.c drawingBuildStroke).
 	uint32_t* vcen = malloc(alloc_verts * sizeof(uint32_t));
 	uint8_t* pflag = calloc(poly_count ? poly_count : 1, 1);
+	// s29 n-seam-caps: STROKE_SNAP_SEAM | OWN_* per emitted seam vertex.
+	uint8_t* vown = calloc(alloc_verts ? alloc_verts : 1, 1);
 	#define _GAXIS(_ka,_kb) do { \
 		float _dx = poly[(_kb)*2] - poly[(_ka)*2], _dy = poly[(_kb)*2+1] - poly[(_ka)*2+1]; \
 		uint8_t _f = (_dx == 0.0f && _dy != 0.0f) ? STROKE_SNAP_VERT \
@@ -9127,28 +9145,57 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 			half_w, caps); \
 		_GCENR(_w0, (_ke)); \
 	} while (0)
+	const int seam_caps = joints == 0 && caps == 0 && gfx_stroke_seam_caps_on()
+	                      && vown != NULL && vcen != NULL;
+	#define _GSEGOWN(_ka,_kb) ( \
+		(poly[(_kb)*2] == poly[(_ka)*2] && poly[(_kb)*2+1] != poly[(_ka)*2+1]) ? STROKE_SNAP_OWN_V : \
+		(poly[(_kb)*2+1] == poly[(_ka)*2+1] && poly[(_kb)*2] != poly[(_ka)*2]) ? STROKE_SNAP_OWN_H : 0)
+	#define _GTAG(_wfrom,_k,_own) do { \
+		for (uint32_t _q = (_wfrom); _q < wv; _q++) if (vcen[_q] == (_k)) vown[_q] = (uint8_t)((_own) | STROKE_SNAP_SEAM); \
+	} while (0)
 	for (uint32_t ci = 0; ci < ccount; ci++)
 	{
 		uint32_t cs = cstarts[ci];
 		uint32_t ce = (ci + 1 < ccount) ? cstarts[ci + 1] : poly_count;
 		int needs_close = _GNEEDCLOSE(cs, ce), expl = _GEXPLCLOSED(cs, ce);
+		const int seam = seam_caps && (needs_close || expl);
 		for (uint32_t i = cs; i + 1 < ce; i++)
 		{
+			uint32_t w0 = wv;
 			_GSEG(poly[i*2], poly[i*2+1], poly[(i+1)*2], poly[(i+1)*2+1]);
 			_GCENS(i, i + 1);
 			_GAXIS(i, i + 1);
+			if (seam && i == cs) _GTAG(w0, cs, _GSEGOWN(cs, cs + 1));
+			if (seam && expl && i + 2 == ce) _GTAG(w0, ce - 1, _GSEGOWN(ce - 2, ce - 1));
 		}
 		if (needs_close)
 		{
+			uint32_t w0 = wv;
 			_GSEG(poly[(ce-1)*2], poly[(ce-1)*2+1], poly[cs*2], poly[cs*2+1]);
 			_GCENS(ce - 1, cs);
 			_GAXIS(ce - 1, cs);
+			if (seam) _GTAG(w0, cs, _GSEGOWN(ce - 1, cs));
 		}
 		for (uint32_t k = cs + 1; k + 1 < ce; k++) _GJOIN(k-1, k, k+1);
-		if (needs_close && (ce - cs) >= 2)
+		if (needs_close && (ce - cs) >= 2 && seam)
+		{
+			uint32_t w0 = wv;
+			_GCAP(cs+1, cs); _GTAG(w0, cs, _GSEGOWN(cs, cs + 1));
+			w0 = wv;
+			_GCAP(ce-1, cs); _GTAG(w0, cs, _GSEGOWN(ce - 1, cs));
+			_GJOIN(ce-2, ce-1, cs);
+		}
+		else if (needs_close && (ce - cs) >= 2)
 		{
 			_GJOIN(ce-1, cs, cs+1);
 			_GJOIN(ce-2, ce-1, cs);
+		}
+		else if (expl && seam)
+		{
+			uint32_t w0 = wv;
+			_GCAP(cs+1, cs); _GTAG(w0, cs, _GSEGOWN(cs, cs + 1));
+			w0 = wv;
+			_GCAP(ce-2, ce-1); _GTAG(w0, ce - 1, _GSEGOWN(ce - 2, ce - 1));
 		}
 		else if (expl) _GJOIN(ce-2, cs, cs+1);
 		else if (ce > cs + 1) { _GCAP(cs+1, cs); _GCAP(ce-2, ce-1); }
@@ -9183,7 +9230,7 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 				uint32_t k = vcen[q];
 				path->soup_cen[q * 2]     = poly[k * 2] * 20.0f;
 				path->soup_cen[q * 2 + 1] = poly[k * 2 + 1] * 20.0f;
-				path->soup_sf[q] = pflag[k];
+				path->soup_sf[q] = pflag[k] | (vown ? vown[q] : 0);
 			}
 			path->soup_n = wv;
 			path->soup_gen = stroke_snap_next_gen(2);
@@ -9197,6 +9244,9 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 	}
 	free(vcen);
 	free(pflag);
+	free(vown);
+	#undef _GTAG
+	#undef _GSEGOWN
 	#undef _GCAP
 	#undef _GJOIN
 	#undef _GSEG

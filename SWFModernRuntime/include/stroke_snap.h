@@ -31,6 +31,18 @@
 // contour's seam instead of joining it; render_webgpu.c stroke_snap_place).
 #define STROKE_SNAP_END   4u   // an open end of the polyline (cap)
 #define STROKE_SNAP_CLOSE 8u   // the seam vertex of a closed contour
+// s29 n-seam-caps: the builders emit a closed contour's seam as TWO CAPS (one
+// per adjacent segment) instead of a join, as Flash draws it. Every vertex of
+// a seam cap, and of a seam-side segment-quad end, carries SEAM plus the axis
+// of the segment it belongs to (OWN_V / OWN_H; neither = a diagonal). The low
+// bits keep the seam's corner flags (both segments' axes | CLOSE), so the
+// runtime can place it either as that segment's cap (HIGH, W = 1..3:
+// stroke_seam_flags) or as the old snapped corner (LOW, W >= 4, kill switch
+// SWF_STROKE_SEAM_CAPS=0). For round caps + round joins the unsnapped geometry
+// is identical.
+#define STROKE_SNAP_OWN_V 16u
+#define STROKE_SNAP_OWN_H 32u
+#define STROKE_SNAP_SEAM  64u
 
 // Line flags (same bits as the recompiler's stroke_run_flags).
 #define STROKE_FLAG_PIXEL_HINTING 1u
