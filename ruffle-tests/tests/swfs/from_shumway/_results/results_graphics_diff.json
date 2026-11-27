@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T16:16:08.667502+00:00",
-    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "new_timestamp": "2026-11-27T18:08:28.330383+00:00",
-    "new_git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
+    "old_timestamp": "2026-11-27T18:08:28.330383+00:00",
+    "old_git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
+    "new_timestamp": "2026-11-27T21:14:49.049105+00:00",
+    "new_git_sha": "a18a0e03349f07a0a41e1c7bb971b8eafe349891",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 228,
     "old_total": 229,
     "old_pass_rate": 93.9,
-    "new_pass": 215,
-    "new_ruffle_matched": 13,
+    "new_pass": 218,
+    "new_ruffle_matched": 10,
     "new_effective_pass": 228,
     "new_total": 229,
-    "new_pass_rate": 93.9,
+    "new_pass_rate": 95.2,
     "old_mismatched_lines": 76,
-    "new_mismatched_lines": 76,
+    "new_mismatched_lines": 70,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 6,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 229,
+    "status_changed": 3,
+    "unchanged": 226,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "MaskTest-3",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "avm2/flash/geom/transform/pixelBounds",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "timeline/nav/clipDepth",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 8,
+        "matching_lines": 4
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    }
+  ]
 }
