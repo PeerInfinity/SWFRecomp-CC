@@ -3903,7 +3903,8 @@ one-task sessions ran too: the N ladder `n-seam-caps`, and the browser ladder `b
 
 Both FINAL runs lost one shard each to an apt "Install system dependencies" failure; `gh run rerun --failed` recovered
 them (partial results were published first and then replaced). Pages: dry run `45938119068` green, REAL deploy
-`46032563406` (see §30.3).
+`46033409898` (Deploy step ran; the first attempt `46032563406` uploaded its artifact but deploy-pages found 0 artifacts,
+the s28 failure again, so a FRESH dispatch was the retry).
 
 **Final vs baseline, by name** (both modes identical):
 - Trace: **+29 rm → pass**, **+5 fail → pass** (`globals_swf5`, `native_objects_swf6`, `dependent_strings`,
