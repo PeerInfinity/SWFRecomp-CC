@@ -1,0 +1,35 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 30 (dual-axis #22), slot `w1-rm-avm2`, wave 1 (DIAGNOSIS, measured prototypes welcome). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w1-rm-avm2` (and ONLY that branch; never master, never force-push). Your report on that branch is your only deliverable.
+
+FIRST: read `SWFRecompDocs/plans/session30-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules and Delivery sections exactly. Your branch is `fanout/w1-rm-avm2`; your report is `SWFRecompDocs/plans/session30-fanout-reports/w1-rm-avm2-report.md` (plus an optional `w1-rm-avm2-prototype.patch`). Also read `CLAUDE.md`.
+
+---- YOUR TASK ----
+
+**ruffle_matched pool, AVM2 side (M; re-price against FP32, then prototype the smallest separable rules).**
+
+Yours: every AVM2-VM rm row (avm2, from_avmplus, from_shumway AVM2, mixed_avm, timeline/visual AVM2) in
+`session30-fanout-reports/s30-baseline-trace-rm.txt`, and the AVM2 mismatch rows NOT dispositioned NO-GO in register
+§1a. Prior pricing of record: s28 `session28-fanout-reports/w1b-rm-avm2-report.md` (buckets K–S) and s29
+`session29-fanout-reports/w1-rm-avm2-report.md` (+19 flips; its tail table is the newest per-row price). The s30
+board candidates (PROJECT_STATE §2 item 1): **AVM2 frame/event lifecycle** (`loader_events_2`,
+`avm2_loads_avm1_events`, `simplebutton_childevents_*`, `swf_9_*goto*`, `LoaderTest`), **typed nulls** (L),
+**`avm1movie`** (L), the **FTE line model** (`textblock_*`), hand-assembled ABC (`freestanding_superclass`,
+`weird_superinterface_properties`), the device-font metrics family on the AVM2 side (`flash_text_TextField*`), and the
+`array_sort_swf10_32bit/_64bit` flash_fix question (register §1a: an FP32 64-bit swap of `_32bit` gives +1/0; the SWFs
+are byte-identical; decide if it is a valid flash_fixes entry per its README and say exactly what to capture).
+
+Task:
+1. Re-run the pool on origin/master (graphics, ≤ -P 2). Classify by OWNER mechanism. Note every price that changed.
+2. FP32 truth: TP has captures for most rows (`session28-fanout-reports/trace-provenance/`); for AVM2 `for…in` order
+   rows remember FP32 is hash-scattered and NONDETERMINISTIC between runs (never fit to one capture; register §1a
+   `bom`/`loader_load`). Platform-split rows with Windows goldens stay soft NO-GO unless LNX FP32 shows we are wrong
+   (`avm2/html_text_img_parsing` belongs to w1-drift-smalls).
+3. Frame/event lifecycle: find the smallest separable rule (one row family), prototype it, and price the rest.
+   Typed nulls / avm1movie / FTE: re-price only unless you find an S inside.
+4. **Measured prototype** with an exact rm→pass ledger; gate on the pool + the AVM2 `regression/` rows near the change
+   + `categories=full`-class rows you touch (from_avmplus if you touch the recompiler). Recompiler changes: rebuild,
+   `--recompile`.
+Deliver `w1-rm-avm2-prototype.patch` + updated per-bucket prices with completion mechanisms + FLASH requests.
+Siblings: w1-drift-smalls (`avm2/xmldocument_tostring`, `html_text_img_parsing`), w1-exec-order (AVM1 frame loops only).
+Name every function you touch.

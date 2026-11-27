@@ -38,6 +38,11 @@ from the s29 FINAL run `45938113471`. Counts are channels with |Δ| > tolerance.
 
 ## 4. `regression/avm2_layer_group_alpha` / `_erase` (LOW) — resolves the s29 UNSURE item
 
+> **CORRECTED at s30 launch (s30 coordinator):** these rows use ALPHA/ERASE, non-LAYER blends, so the `draw()` captures
+> below are INVALID (draw vs `--screen` = 82 531 channels). Against FP32 `--screen` LOW (`layer_group_screen/`, LNX ×2
+> deterministic): golden 13 763 / 11 979, **ours 4 268 / 2 143**. There is no ~80 k compositing gap. Both fixtures are
+> re-goldened to the screen captures. The numbers below are kept as the record of the draw()-based read.
+
 - Fresh LNX captures are byte-identical to the s29 ones (`w1-local-oracles/w2-lowq-tsnap/`), and **WIN == LNX**.
 - t2 channels: alpha ours→FP32 81 986 vs exporter-golden→FP32 89 617; erase 79 910 vs 88 046. TSNAP's ~8 k move was
   **Flash-ward**. Both rows stay far from Flash (~80 k at t2): a separate gap (layer-group compositing at LOW).
@@ -50,3 +55,30 @@ from the s29 FINAL run `45938113471`. Counts are channels with |Δ| > tolerance.
 `SWFRecomp/build/SWFRecomp` binary predated `73d80aea1`'s `abc_emit.cpp` debug-line change. `verify_output.py` does not
 rebuild the recompiler. After `cmake --build SWFRecomp/build -j4` it passes locally. **After any recompiler landing,
 rebuild the local recompiler before local grading.**
+
+## 6. Native-object table captures (s30 coordinator, at launch) — `native-table/`
+
+Fresh FP32 runs, direct + pinned, LNX and WIN, of every row the native-object table owns. Files
+`<suite>__<test>.{lnx,win}.txt` (+ `.log` with the run line).
+
+| row | golden | LNX vs golden | WIN vs LNX |
+|---|---|---|---|
+| `avm1/global_proto_decls` | `output.txt` 4562 | **0 diff** (golden = FP32 LNX) | 770 diff lines (WIN 3796: host-dependent members) |
+| `avm1/global_proto_decls_delete` | 4158 (`Warning:` lines → `--log-warnings`) | 2 lines: `System.capabilities.manufacturer` enumeration position moves (run-to-run / host order) | 332 |
+| `avm1/global_instance_decls` | 758 | 3 lines: TZ in a `Date` instance string (+0200 golden vs our host −0700) + trailing blank | 0 |
+| gnash `argstest-v6` | `output.fp32.txt` 2192 | 2 lines: same `capabilities.manufacturer` move | 2 |
+| gnash `argstest-v7` | `output.fp32.txt` 2061 | 2 lines: same | 40 |
+| gnash `argstest-v8` | `output.fp32.txt` 2434 | LNX run **stops at 111 lines** at `FileReferenceList.browse()` (host dialog; untestable on LNX, as TP said) | WIN reaches 2344 |
+| gnash `ExternalInterface-v8` | 118 | 0 diff | 0 |
+
+So the goldens ARE the Linux FP32 table, byte-for-byte apart from the `capabilities.manufacturer` position and a TZ
+string. **The test output itself is the table** (`global_proto_decls/test.as` walks `_global` recursively and prints,
+per member: own, DONT_ENUM, READ_ONLY, type, in enumeration order). A generator can read `output.txt` directly.
+
+## 7. TextField `tabIndex` (s30 coordinator, at launch) — `tf_tabindex_null/`
+
+MTASC fixture `Test.as` (v6 + v8 SWFs), FP32 LNX `v6.lnx.txt` / `v8.lnx.txt`. FP32 on a `createTextField` field:
+`null`, `undefined` and **any negative number** unset it (reads back `undefined`; v6 prints empty); `"7"` → 7, `"abc"`
+→ 0, `true` → 1, `3.7` → 3, `-2147483648` → 2147483648; **`delete t.tabIndex` is a no-op** (still 4); `tabIndex` is
+**enumerable** on a text field. Ours (`2d40d3799`, local): lines 1–7 match (the null rule already holds for text
+fields); we differ on `-1` (ours 4294967295), `delete` (ours unsets) and enumeration (ours not enumerable). S rider.

@@ -1,0 +1,41 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 30 (dual-axis #22), slot `w1-native-table`, wave 1 (DIAGNOSIS, measured prototypes welcome). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w1-native-table` (and ONLY that branch; never master, never force-push). Your report on that branch is your only deliverable.
+
+FIRST: read `SWFRecompDocs/plans/session30-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules and Delivery sections exactly. Your branch is `fanout/w1-native-table`; your report is `SWFRecompDocs/plans/session30-fanout-reports/w1-native-table-report.md` (plus an optional `w1-native-table-prototype.patch`). Also read `CLAUDE.md`.
+
+---- YOUR TASK ----
+
+**The AVM1 native-object table generated from the FP32 golden (L; DIAGNOSIS + measured prototype; implementation is wave 2).**
+
+Owns: `avm1/global_proto_decls`, `avm1/global_proto_decls_delete`, `avm1/global_instance_decls` (mismatch, KF,
+root-ignored), gnash `actionscript.all/argstest-v6/7/8` (mismatch, KF; graded subtest `output.fp32.txt`), and the rest
+of gnash `ExternalInterface-v8` (rm; s29 refuted its "S" half: the remainder is native enumeration: hidden prototype
+members, native order, `attributes` null, no `idMap`). Register §1a rows; s29 `w1-disposition-audit-report.md` (the
+goldens ARE Flash; the old "Flash uses DONT_ENUM" ignore premise is refuted).
+
+**FP32 data already taken (s30 launch), use it, do not ask again:** `session30-fanout-reports/pre-launch-oracles/
+native-table/` (README §6): fresh LNX + WIN captures of all 7 rows. LNX == golden except (a) the enumeration position of
+`System.capabilities.manufacturer` (2 lines; check whether it moves between OUR runs/hosts too, and whether Flash's is
+run-to-run), (b) a `Date` instance TZ string in `global_instance_decls`, (c) `argstest-v8` stops at
+`FileReferenceList.browse()` on LNX (host dialog; WIN reaches 2344 of 2434 lines). WIN ≠ LNX on the decls rows
+(host-dependent members): the target is LNX. The tests' output IS the table: `global_proto_decls/test.as` walks `_global`
+recursively and prints, per member, `own`, `DONT_ENUM`, `READ_ONLY`, `type=[…]`, in enumeration order.
+
+Task:
+1. Diff our output vs the golden for all 7 rows; classify every differing line by mechanism (missing member, extra
+   member, wrong flag, wrong type, wrong ORDER, SWF-version gating, a value that differs). Give a histogram per row.
+2. Design the table: a generated C table (from the FP32 golden, via a script checked into the repo) of per-class
+   members, flags and enumeration order, consumed where we build natives (`setupNativeFuncOwnProps` and the per-class
+   setup in `action.c` / `avm1_*.c`; find them all). Decide how SWF-version differences are represented (v5..v8 gnash
+   argstest prints differ). Decide what happens to members we do NOT implement (Flash lists them; do we create inert
+   stubs? price the risk for every corpus row that probes `typeof X.y`).
+3. **Measured prototype:** generate the table for at least `_global` + 3 classes and show the diff-line delta on the 7
+   rows, AND run every AVM1 row that enumerates natives or tests `typeof`/`hasOwnProperty` on builtins (gnash
+   actionscript.all `*-v5..v8`, `avm1/*native*`, `avm1/*proto*`, `regression/avm1_*native*`; argue the sweep, ≤ ~60 rows)
+   before/after: every move by name. A pass → anything is a priced loss to report, not to hide.
+4. Price wave 2: rows that flip, rows that move Flash-ward, the exact remaining residue per row (e.g. the
+   `capabilities.manufacturer` position, the TZ line), and the size (S/M/L).
+Deliver `w1-native-table-prototype.patch` + the generator script. **You are the only slot that may edit
+`setupNativeFuncOwnProps` or the native member tables.** Siblings: w1-rm-avm1-gnash (other AVM1 builtins),
+w1-drift-smalls (tabIndex, hitTest). Name every function you touch.

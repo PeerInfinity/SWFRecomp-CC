@@ -1,0 +1,13 @@
+init undefined undefined
+num 5 number
+null undefined undefined
+str 7 number
+undef undefined undefined
+nanstr 0 number
+min 2147483648
+neg undefined
+frac 3
+bool 1 number
+del 4
+enum tabIndex
+done
