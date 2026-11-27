@@ -1,0 +1,31 @@
+--- a/SWFModernRuntime/src/actionmodern/math.c
++++ b/SWFModernRuntime/src/actionmodern/math.c
+@@ -8,6 +8,9 @@
+ #include <stdint.h>
+ #include <string.h>
+ #include <time.h>
++#if defined(DJ_SEED_FROM_JS) && defined(__EMSCRIPTEN__)
++#include <emscripten.h>
++#endif
+ 
+ #include <actionmodern/action_internal.h>
+ #include <actionmodern/actionmath.h>
+@@ -268,7 +271,17 @@
+ static int32_t GenerateRandomNumber(TRandomFast *pRandomFast) {
+ 	// Initialize if needed (first call or uninitialized)
+ 	if (pRandomFast->uValue == 0) {
+-#ifdef MOCK_DATE_TIME
++#if defined(DJ_SEED_FROM_JS) && defined(__EMSCRIPTEN__)
++		{
++			double mdt = EM_ASM_DOUBLE({
++				var m = new URLSearchParams(location.search).get("mdt");
++				var v = m ? Number(m) : Date.now();
++				console.log("[DJSEED] mdt=" + v);
++				return v;
++			});
++			RandomFastInit(pRandomFast, (uint32_t)((int64_t)mdt * 1000LL));
++		}
++#elif defined(MOCK_DATE_TIME)
+ 		// Deterministic seed matching Ruffle's test/deterministic mode:
+ 		// Ruffle's avm_rng seeds from get_current_date_time().timestamp_micros()
+ 		// as u32. MOCK_DATE_TIME is in milliseconds, so multiply by 1000.

@@ -1226,6 +1226,32 @@ void ng_gotoFrameCurrentSprite(u16 frame)
 	// Clamp to last frame
 	if (frame >= ch->sprite_frame_count)
 		frame = (u16)(ch->sprite_frame_count - 1);
+	// A goto to the frame the clip already shows -- or to the frame its pending
+	// self-goto already targets, whose script is the one running now -- is a
+	// no-op beyond stop (a trailing Play opcode resumes), in every build (Flash
+	// Player 32; Ruffle's AVM1 no_op_goto; ng_gotoFrameByMC's same-frame rule,
+	// s29 c91637b7a). The record + queue below re-queued this very frame's
+	// script into the running drain, so a 1-frame clip whose frame script is
+	// `gotoAndPlay(1)` looped forever (s29 browser-dj-freeze: Doodle Jump's
+	// `coin`/`Inverse` items hung the page through ng_gotoFrameByMC before
+	// c91637b7a; the timeline-placed form still hung here).
+	// sprite_current_frame is the NEXT frame ((shown+1)%fc), so un-wrap it.
+	// sprite_needs_init: only 1 means frame 0 never ran; 2/3 (eager init, the
+	// timeline-placed clip's state while its queued frame-0 script runs) already
+	// placed frame 0's tags.
+	// Fixture: regression/avm1_selfgoto_current_frame_opcode.
+	if (!catch_up_mode && obj->sprite_needs_init != 1)
+	{
+		size_t fc = ch->sprite_frame_count;
+		size_t shown = obj->sprite_manual_next_frame
+			? obj->sprite_next_frame
+			: (obj->sprite_current_frame + fc - 1) % fc;
+		if (shown == frame)
+		{
+			obj->sprite_is_playing = 0;
+			return;
+		}
+	}
 	// An attachMovie'd clip's OWN frame script navigating itself (GotoFrame /
 	// GoToLabel opcode): apply it NOW, through the same path as the method
 	// form (`this.gotoAndPlay(n)` -> ng_gotoFrameByMC). Flash moves the playhead

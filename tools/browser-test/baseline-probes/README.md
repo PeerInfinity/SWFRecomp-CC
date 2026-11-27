@@ -60,3 +60,19 @@ After any change to `SWFModernRuntime/src/libswf/tag.c`,
 (`SWFRecomp/src/swf.cpp`), run all five probes and visually inspect
 the screenshots. If the wasm probe suite (`tools/wasm_probe_runner.py`)
 also passes, that's a strong signal the change is safe.
+
+## Doodle Jump seeded freeze / capture probes (s29 browser-dj-freeze)
+
+- `dj_seed_from_url.patch` — LOCAL-ONLY runtime hook (do not commit to
+  math.c): under `-DDJ_SEED_FROM_JS` the AVM1 RNG seeds from the page URL
+  `?mdt=<ms>` (same meaning as `MOCK_DATE_TIME`; falls back to `Date.now()`)
+  and logs `[DJSEED] mdt=…`, so ONE build covers every seed. Apply, build with
+  `EMCC_CFLAGS="-DDJ_SEED_FROM_JS --profiling-funcs" build_test.sh
+  flasharchive/Doodle_Jump wasm --graphics`, revert, then serve a docs root
+  holding demo.html + `examples/flasharchive/Doodle_Jump/`.
+- `dj_freeze.py <mdt|none> [watch_s] [port]` — Run, click PLAY, poll a rAF
+  counter + `Module._dbgRootFrame()`; on a 3 s evaluate timeout it
+  `Debugger.pause`s 3× over CDP and prints the wasm stacks.
+- `dj_shots.py <mdt> <secs> <outdir> [port]` — random steering + frame
+  captures via the in-wasm `window.dbgCaptureBoard()` readback (Playwright
+  canvas screenshots hang under WSL2 software WebGPU).
