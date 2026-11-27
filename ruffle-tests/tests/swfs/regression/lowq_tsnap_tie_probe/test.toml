@@ -1,0 +1,16 @@
+num_ticks = 1
+
+# s29 w2-lowq-tsnap. Golden = Flash Player 32 quality LOW (LNX capture;
+# WIN == LNX and --screen == draw(), 0 px; w1-local-oracles/w1-lowq-next).
+# The SWF sets _quality = "LOW" itself. Rows 0-3 (placement / tie / nesting:
+# the per-level translation snap) are exact; the max_outliers budget is the
+# unmodelled rows 4-5 (45-degree LOW stroke width, the 3-px rect band, the
+# acid-stroke-0 matrices, Drawing-API lineStyle(5) and the drawRect .5 tie):
+# 3152 channels at s29 w2-lowq-tsnap (master 5102; row 3 alone was 234 px
+# under a WORLD-translation snap).
+[image_comparisons.output]
+tolerance = 0
+max_outliers = 3152
+
+[player_options]
+with_renderer = { optional = false, quality = "low" }

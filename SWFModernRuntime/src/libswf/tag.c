@@ -3939,6 +3939,188 @@ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
 }
 
 // ---------------------------------------------------------------------------
+// s29 w2-lowq-tsnap: Flash LOW translation snap (TSNAP), PER DISPLAY-LIST
+// LEVEL. Flash Player 32 at quality=LOW (lowq_tsnap_tie_probe, LNX == WIN ==
+// --screen): every placed object's device translation is rounded half-DOWN,
+// ceil(T - 0.5), at its own level, and the children compose under the
+// SNAPPED parent. Rows 0-2 (root rects / triangle at x + .25/.35/.45/.5/.55/
+// .65/.75) and all eight nested (parent, child) fraction pairs of row 3 fit
+// this exactly; snapping only the composed WORLD translation misses three
+// nested cells and moved the blend_modes / layers FP32 goldens away (s29
+// w1-lowq-next). Ties go to EVEN on the twip grid (lowq_tsnap_round).
+//
+// Out of scope (unchanged): bitmap-cached / filtered entries (cab_snap_delta
+// owns their snap: no double snap), text characters (the LOW text-field and
+// glyph placement is unmodelled; sprite_with_frames moved away under a text
+// snap), AVM1 Drawing-API holders and dynamic-slot root leaves.
+// Kill switch: SWF_LOWQ_TSNAP=0. Compiled in at MSAA_SAMPLES == 1 only.
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+static int lowq_tsnap_on(void)
+{
+	static int on = -1;
+	if (on < 0)
+	{
+		const char* e = getenv("SWF_LOWQ_TSNAP");
+		on = !(e != NULL && e[0] == '0');
+	}
+	return on;
+}
+
+// Round a device-px translation to whole px, ties to EVEN, on the twip grid
+// (the twip quantise removes float noise, so an exact x.5 is a real tie).
+// Every .5 placement in the probe sits at an even integer + .5 (so it cannot
+// tell half-even from half-down); the half-even arm is what fits the .5-on-
+// ODD cases: visual/drawing_api/drawing_order's outer sprite at (253.5,
+// 246.5) -> (254, 246), all four LOW bands, and avm2/symbol_class_conflict's
+// sprite at 411.5 -> 412. SWF_LOWQ_TSNAP=d selects half-down (A/B only).
+double lowq_tsnap_round(double t)
+{
+	static int half_down = -1;
+	if (half_down < 0)
+	{
+		const char* e = getenv("SWF_LOWQ_TSNAP");
+		half_down = (e != NULL && e[0] == 'd');
+	}
+	double q = nearbyint(t * 20.0) / 20.0;
+	return half_down ? ceil(q - 0.5) : nearbyint(q);
+}
+
+static int lowq_tsnap_delta(const DisplayObject* obj, const float world[16],
+                            float* dx, float* dy)
+{
+	*dx = 0.0f; *dy = 0.0f;
+	if (!lowq_tsnap_on() || obj == NULL || obj->char_id == 0) return 0;
+	if (cab_snaps(obj)) return 0;
+	if (dictionary[obj->char_id].type == CHAR_TYPE_TEXT) return 0;
+	double vs = (context != NULL && context->stage_scale > 0.0f)
+	          ? (double) context->stage_scale : 1.0;
+	double tx = (double) world[12] / 20.0 * vs;
+	double ty = (double) world[13] / 20.0 * vs;
+	if (!isfinite(tx) || !isfinite(ty) || fabs(tx) > 1e8 || fabs(ty) > 1e8) return 0;
+	*dx = (float) ((lowq_tsnap_round(tx) - tx) * 20.0 / vs);
+	*dy = (float) ((lowq_tsnap_round(ty) - ty) * 20.0 / vs);
+	return (*dx != 0.0f) || (*dy != 0.0f);
+}
+
+// Per-level state. Inside a bitmap-cached / filtered subtree nothing snaps
+// (cab_snap_delta owns that subtree's snap: no double snap; visual/filters/*
+// and visual/cache_as_bitmap/scroll_rect moved away from Flash when the
+// cached subtree's children were snapped), and a text entry composes under
+// the UNSNAPPED parent (g_tsnap_acc = the ancestors' accumulated shift).
+// compose_children saves / restores the state per level; a root caller
+// seeds the outermost level through g_tsnap_seed_* (consumed at depth 0).
+static int g_tsnap_depth;
+static int g_tsnap_off, g_tsnap_seed_off;
+static float g_tsnap_acc[2], g_tsnap_seed_acc[2];
+
+static void lowq_tsnap_level(const DisplayObject* obj, float world[16])
+{
+	if (!lowq_tsnap_on() || obj == NULL || obj->char_id == 0) return;
+	if (dictionary[obj->char_id].type == CHAR_TYPE_TEXT)
+	{
+		world[12] -= g_tsnap_acc[0];
+		world[13] -= g_tsnap_acc[1];
+		return;
+	}
+	if (g_tsnap_off > 0) return;
+	if (cab_snaps(obj)) { g_tsnap_off++; return; }
+	float dx, dy;
+	if (!lowq_tsnap_delta(obj, world, &dx, &dy)) return;
+	world[12] += dx;
+	world[13] += dy;
+	g_tsnap_acc[0] += dx;
+	g_tsnap_acc[1] += dy;
+}
+
+// Seed the outermost compose_children level for a root container (or an
+// attached clip) whose matrix the caller has just snapped by (dx, dy).
+static void lowq_tsnap_seed(int off, float dx, float dy)
+{
+	g_tsnap_seed_off = off;
+	g_tsnap_seed_acc[0] = dx;
+	g_tsnap_seed_acc[1] = dy;
+}
+
+// Attached clip: snap its composed matrix in place and seed its subtree.
+static void lowq_tsnap_attached(const DisplayObject* obj, float world[16])
+{
+	float dx = 0.0f, dy = 0.0f;
+	if (obj != NULL && obj->char_id != 0 && cab_snaps(obj))
+	{
+		lowq_tsnap_seed(1, 0.0f, 0.0f);
+		return;
+	}
+	if (lowq_tsnap_delta(obj, world, &dx, &dy))
+	{
+		world[12] += dx;
+		world[13] += dy;
+	}
+	lowq_tsnap_seed(0, dx, dy);
+}
+
+// Root sprite / button: same contract as cab_snap_world (the container's own
+// slot moves too, for its opaqueBackground / focus rect); seeds the subtree.
+static const float* lowq_tsnap_world(DisplayObject* obj, const float* in,
+                                     float out[16])
+{
+	float dx, dy;
+	if (obj != NULL && obj->char_id != 0 && cab_snaps(obj))
+	{
+		lowq_tsnap_seed(1, 0.0f, 0.0f);
+		return in;
+	}
+	lowq_tsnap_seed(0, 0.0f, 0.0f);
+	if (!lowq_tsnap_delta(obj, in, &dx, &dy)) return in;
+	lowq_tsnap_seed(0, dx, dy);
+	memcpy(out, in, 16 * sizeof(float));
+	out[12] += dx;
+	out[13] += dy;
+	if (g_next_dynamic_xform_slot < g_xform_slot_capacity)
+	{
+		u32 slot = g_next_dynamic_xform_slot++;
+		xform_overrides_push(obj, obj->transform_id);
+		obj->transform_id = slot;
+		renderer_write_transform(context, slot, out);
+	}
+	return out;
+}
+
+// Root leaf (shape / morph / edittext-free): same contract as
+// cab_snap_root_leaf.
+static void lowq_tsnap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
+{
+	if (obj == NULL || obj->char_id == 0) return;
+	CharacterType t = dictionary[obj->char_id].type;
+	if (t != CHAR_TYPE_SHAPE && t != CHAR_TYPE_MORPH_SHAPE) return;
+	u32 baked = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
+	if (obj->transform_id >= baked) return;   // already a dynamic slot
+	const float* src = (const float*)app_context->transform_data + obj->transform_id * 16;
+	float dx, dy;
+	if (!lowq_tsnap_delta(obj, src, &dx, &dy)) return;
+	if (g_next_dynamic_xform_slot >= g_xform_slot_capacity) return;
+	float snapped[16];
+	memcpy(snapped, src, sizeof(snapped));
+	snapped[12] += dx;
+	snapped[13] += dy;
+	u32 slot = g_next_dynamic_xform_slot++;
+	xform_overrides_push(obj, obj->transform_id);
+	obj->transform_id = slot;
+	renderer_write_transform(context, slot, snapped);
+}
+#define LOWQ_TSNAP_IN_PLACE(o, w) lowq_tsnap_level((o), (w))
+#define LOWQ_TSNAP_ATTACHED(o, w) lowq_tsnap_attached((o), (w))
+#define LOWQ_TSNAP_SEED_CLEAR() lowq_tsnap_seed(0, 0.0f, 0.0f)
+#define LOWQ_TSNAP_WORLD(o, in, buf) lowq_tsnap_world((o), (in), (buf))
+#define LOWQ_TSNAP_ROOT_LEAF(a, o) lowq_tsnap_root_leaf((a), (o))
+#else
+#define LOWQ_TSNAP_IN_PLACE(o, w) ((void) 0)
+#define LOWQ_TSNAP_ATTACHED(o, w) ((void) 0)
+#define LOWQ_TSNAP_SEED_CLEAR() ((void) 0)
+#define LOWQ_TSNAP_WORLD(o, in, buf) (in)
+#define LOWQ_TSNAP_ROOT_LEAF(a, o) ((void) 0)
+#endif
+
+// ---------------------------------------------------------------------------
 // s27 w2-layer-alpha-group: blendMode = LAYER as a TRANSPARENCY GROUP.
 // Flash Player 32 (oracle capture flash-oracle-captures/n3_layer_alpha): a
 // LAYER clip at alpha 50% holding two overlapping OPAQUE rects shows only the
@@ -4102,6 +4284,19 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 {
 	const float* transforms = (const float*)app_context->transform_data;
 	if (parent_cx != NULL && cx_is_identity(parent_cx)) parent_cx = NULL;
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	// s29 w2-lowq-tsnap: per-level snap state (see lowq_tsnap_level).
+	if (g_tsnap_depth == 0)
+	{
+		g_tsnap_off = g_tsnap_seed_off;
+		g_tsnap_acc[0] = g_tsnap_seed_acc[0];
+		g_tsnap_acc[1] = g_tsnap_seed_acc[1];
+		lowq_tsnap_seed(0, 0.0f, 0.0f);
+	}
+	g_tsnap_depth++;
+	const int tsnap_entry_off = g_tsnap_off;
+	const float tsnap_entry_acc[2] = { g_tsnap_acc[0], g_tsnap_acc[1] };
+#endif
 
 	// Depth 0 is a real SWF depth (UI16; Ruffle's display list keys on it like
 	// any other) and tagPlaceObject2 stores it at dl[0], so the walk starts at
@@ -4112,6 +4307,11 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 	for (size_t i = 0; i <= dl_max_depth; ++i)
 	{
 		DisplayObject* obj = &dl[i];
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+		g_tsnap_off = tsnap_entry_off;
+		g_tsnap_acc[0] = tsnap_entry_acc[0];
+		g_tsnap_acc[1] = tsnap_entry_acc[1];
+#endif
 		if (obj->char_id == 0) continue;
 		// s28 w2-occupied-depth: SWF-5 keep-both entries compose as siblings
 		// of this entry, under the same parent (1-element list walk).
@@ -4206,6 +4406,9 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				composed[13] = nearbyintf(ry) + parent_composed[13];
 			}
 		}
+		// s29 w2-lowq-tsnap: quality=LOW per-level translation snap (before
+		// the scrollRect translate: the crop and the content both ride it).
+		LOWQ_TSNAP_IN_PLACE(obj, composed);
 
 		// MovieClip.scrollRect, the TRANSLATE half (Ruffle
 		// display_object.rs:1189 `transform_stack.push(translate(-x_min,
@@ -4500,6 +4703,12 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				break;
 		}
 	}
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	g_tsnap_off = tsnap_entry_off;
+	g_tsnap_acc[0] = tsnap_entry_acc[0];
+	g_tsnap_acc[1] = tsnap_entry_acc[1];
+	g_tsnap_depth--;
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -10208,6 +10417,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	{
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
+		LOWQ_TSNAP_SEED_CLEAR();   // s29 w2-lowq-tsnap
 		if (obj->ng_under != NULL) ng_compose_root_under(app_context, obj);   // s28 SWF-5 keep-both
 		Character* ch = &dictionary[obj->char_id];
 		// cacheAsBitmap PixelSnapping::Always for a ROOT LEAF entry. Sprites
@@ -10219,6 +10429,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		if (cab_snaps(obj) && ch->type != CHAR_TYPE_SPRITE
 		    && ch->type != CHAR_TYPE_BUTTON && ch->type != CHAR_TYPE_TEXT)
 			cab_snap_root_leaf(app_context, obj);
+		else if (!cab_snaps(obj))
+			LOWQ_TSNAP_ROOT_LEAF(app_context, obj);   // s29 w2-lowq-tsnap
 		if (ch->type == CHAR_TYPE_SPRITE)
 		{
 			if (obj->sprite_display_list != NULL)
@@ -10240,6 +10452,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				// matrix has to be the one compose_children sees as the parent.
 				float cab_sprite_buf[16];
 				sprite_xform = cab_snap_world(obj, sprite_xform, cab_sprite_buf);
+				float tsnap_sprite_buf[16]; (void) tsnap_sprite_buf;
+				sprite_xform = LOWQ_TSNAP_WORLD(obj, sprite_xform, tsnap_sprite_buf);   // s29 w2-lowq-tsnap (no-op when cab snapped)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
@@ -10282,6 +10496,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				}
 				float cab_btn_buf[16];
 				btn_xform = cab_snap_world(obj, btn_xform, cab_btn_buf);
+				float tsnap_btn_buf[16]; (void) tsnap_btn_buf;
+				btn_xform = LOWQ_TSNAP_WORLD(obj, btn_xform, tsnap_btn_buf);   // s29 w2-lowq-tsnap (no-op when cab snapped)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
@@ -10773,6 +10989,7 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
 	float mc_xform[16];
 	hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
+	LOWQ_TSNAP_ATTACHED(d, mc_xform);   // s29 w2-lowq-tsnap
 	float att_cx[20];
 	u32 att_cx_slot = 0;
 	int att_has_cx = attached_mc_world_cxform(mc, att_cx, &att_cx_slot);
@@ -11332,6 +11549,7 @@ void tagShowFrame(SWFAppContext* app_context)
 	{
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
+		LOWQ_TSNAP_SEED_CLEAR();   // s29 w2-lowq-tsnap
 		if (obj->ng_under != NULL) ng_compose_root_under(app_context, obj);   // s28 SWF-5 keep-both
 
 		Character* ch = &dictionary[obj->char_id];
@@ -11344,6 +11562,8 @@ void tagShowFrame(SWFAppContext* app_context)
 		if (cab_snaps(obj) && ch->type != CHAR_TYPE_SPRITE
 		    && ch->type != CHAR_TYPE_BUTTON && ch->type != CHAR_TYPE_TEXT)
 			cab_snap_root_leaf(app_context, obj);
+		else if (!cab_snaps(obj))
+			LOWQ_TSNAP_ROOT_LEAF(app_context, obj);   // s29 w2-lowq-tsnap
 		if (ch->type == CHAR_TYPE_SPRITE)
 		{
 			if (obj->sprite_display_list != NULL)
@@ -11369,6 +11589,8 @@ void tagShowFrame(SWFAppContext* app_context)
 				// matrix has to be the one compose_children sees as the parent.
 				float cab_sprite_buf[16];
 				sprite_xform = cab_snap_world(obj, sprite_xform, cab_sprite_buf);
+				float tsnap_sprite_buf[16]; (void) tsnap_sprite_buf;
+				sprite_xform = LOWQ_TSNAP_WORLD(obj, sprite_xform, tsnap_sprite_buf);   // s29 w2-lowq-tsnap (no-op when cab snapped)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
@@ -11434,6 +11656,8 @@ void tagShowFrame(SWFAppContext* app_context)
 				}
 				float cab_btn_buf[16];
 				btn_xform = cab_snap_world(obj, btn_xform, cab_btn_buf);
+				float tsnap_btn_buf[16]; (void) tsnap_btn_buf;
+				btn_xform = LOWQ_TSNAP_WORLD(obj, btn_xform, tsnap_btn_buf);   // s29 w2-lowq-tsnap (no-op when cab snapped)
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;

@@ -856,3 +856,10 @@ regression/avm1_edittext_rotated_paragraph   # 200 glyphs rotated 30deg, run-bud
 # tier=2
 visual/cache_as_bitmap/avm1_color                   # cached clip at a sub-px position, HIGH  1 cmp
 from_shumway/acid/acid-shapes                       # thick curved drawing-API strokes, HIGH   1 cmp
+# s29 w2-lowq-tsnap: Flash LOW per-level translation snap (tag.c compose_children /
+# lowq_tsnap_*, avm2_display.c avm2_lowq_tsnap). quality=low rows; FP32 golden (probe) and
+# FP32 flash_fixes golden (blend_modes/add: root sprite at x.5 + fractional deep children).
+# tier=1
+regression/lowq_tsnap_tie_probe                     # placement / tie / nesting rows, LOW  1 cmp
+# tier=2
+visual/blend_modes/add                              # per-level vs world snap, LOW       1 cmp

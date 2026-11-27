@@ -21790,6 +21790,58 @@ static float avm2_render_layer_group(Avm2Context* ctx, Avm2Object* obj,
 	return 1.0f;
 }
 
+// s29 w2-lowq-tsnap: the AVM2 twin of tag.c lowq_tsnap_delta (Flash LOW
+// per-level translation snap to whole device px, ties to even
+// (lowq_tsnap_round); the children compose under the snapped world).
+// - No snap inside a filtered or bitmap-cached subtree, nor on the cached /
+//   filtered node itself (avm2_render_filtered / the cache own that snap: no
+//   double snap). visual/filters/* x11 and the Flash-golden
+//   visual/cache_as_bitmap/scroll_rect moved away when the cached subtree's
+//   children were snapped.
+// - Text nodes take NO snap, own or inherited: they compose under the
+//   UNSNAPPED parent (avm2/sprite_with_frames, Flash golden: the "Frame N"
+//   labels sit where the unsnapped walk puts them).
+// State is per walk level (saved / restored by avm2_render_node).
+// Kill switch SWF_LOWQ_TSNAP=0.
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+static int g_avm2_tsnap_off;          // > 0 inside a cached / filtered subtree
+static double g_avm2_tsnap_acc[2];    // ancestors' snap shift (twips)
+#endif
+static void avm2_lowq_tsnap(Avm2Object* obj, const Avm2DisplayObjectExt* ext,
+                            Mat* world)
+{
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	static int on = -1;
+	if (on < 0)
+	{
+		const char* e = getenv("SWF_LOWQ_TSNAP");
+		on = !(e != NULL && e[0] == '0');
+	}
+	if (!on || ext->is_stage) return;
+	if (ext->edittext != NULL || ext->statictext != NULL)
+	{
+		world->tx -= g_avm2_tsnap_acc[0];
+		world->ty -= g_avm2_tsnap_acc[1];
+		return;
+	}
+	if (g_avm2_tsnap_off > 0 || g_avm2_filter_active) return;
+	if (avm2_is_bitmap_cached(obj, ext)) { g_avm2_tsnap_off++; return; }
+	double vs = (context != NULL && context->stage_scale > 0.0f)
+	          ? (double) context->stage_scale : 1.0;
+	double tx = world->tx / 20.0 * vs, ty = world->ty / 20.0 * vs;
+	if (!isfinite(tx) || !isfinite(ty) || fabs(tx) > 1e8 || fabs(ty) > 1e8) return;
+	extern double lowq_tsnap_round(double t);   // tag.c (ties to even)
+	double dx = (lowq_tsnap_round(tx) - tx) * 20.0 / vs;
+	double dy = (lowq_tsnap_round(ty) - ty) * 20.0 / vs;
+	world->tx += dx;
+	world->ty += dy;
+	g_avm2_tsnap_acc[0] += dx;
+	g_avm2_tsnap_acc[1] += dy;
+#else
+	(void) obj; (void) ext; (void) world;
+#endif
+}
+
 static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
                              const Mat* parent_world, double parent_alpha,
                              const Avm2Cx* parent_cx)
@@ -21952,6 +22004,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 
 	Mat local = ext_matrix(ext);
 	Mat world = mat_mul(parent_world, &local);
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	// s29 w2-lowq-tsnap: per-level snap state, restored at the end of this node.
+	int tsnap_saved_off = g_avm2_tsnap_off;
+	double tsnap_saved_acc[2] = { g_avm2_tsnap_acc[0], g_avm2_tsnap_acc[1] };
+#endif
+	avm2_lowq_tsnap(obj, ext, &world);   // s29 w2-lowq-tsnap
 	// s27: a LAYER group's own alpha is applied at its composite instead.
 	int lga_own = (obj == g_avm2_lga_strip);
 	if (lga_own) g_avm2_lga_strip = NULL;
@@ -22137,6 +22195,11 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	if (pushed_mask)
 		renderer_restore_clip(context, saved_clip_ref);
 	g_avm2_render_tz = saved_render_tz;
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	g_avm2_tsnap_off = tsnap_saved_off;
+	g_avm2_tsnap_acc[0] = tsnap_saved_acc[0];
+	g_avm2_tsnap_acc[1] = tsnap_saved_acc[1];
+#endif
 }
 
 // Focus highlight, drawn on TOP of the whole stage (Ruffle
