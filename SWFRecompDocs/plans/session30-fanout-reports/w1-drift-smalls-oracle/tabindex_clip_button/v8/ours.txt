@@ -1,0 +1,28 @@
+c neg1
+-1
+c neg2
+-2
+c min
+-2147483648
+c del
+true
+undefined
+m neg1
+-1
+m neg2
+-2
+m min
+-2147483648
+m del
+true
+undefined
+b neg1
+-1
+b neg2
+-2
+b min
+-2147483648
+b del
+true
+undefined
+done
