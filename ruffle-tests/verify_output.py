@@ -1603,7 +1603,8 @@ def _child_key(test_dir, child_swf):
         return child_swf.name
 
 
-def recompile_child_swf(swf_path, output_dir, symbol_prefix="", char_id_base=0):
+def recompile_child_swf(swf_path, output_dir, symbol_prefix="", char_id_base=0,
+                        curve_tol=None):
     """Recompile a child SWF into output_dir. Returns True on success.
 
     symbol_prefix/char_id_base (loader-arc tranche 6) are handed to the
@@ -1635,10 +1636,16 @@ def recompile_child_swf(swf_path, output_dir, symbol_prefix="", char_id_base=0):
         child_cfg = tmp / "config.toml"
         child_cfg.write_text(cfg)
         try:
+            # A loaded child renders at its parent's quality: same timeline
+            # curve tolerance as the parent (get_curve_tol_twips).
+            child_env = dict(os.environ)
+            if curve_tol is not None:
+                child_env["SWFRECOMP_CURVE_TOL_TWIPS"] = curve_tol
             proc = subprocess.Popen(
                 ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
                  str(RECOMP_BIN), str(child_cfg)],
                 cwd=str(tmp),
+                env=child_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
@@ -2531,6 +2538,23 @@ def generate_data_registry(data_files, build_dir):
     out_path.write_text("\n".join(lines))
 
 
+def get_curve_tol_twips(test_dir):
+    """Timeline-shape curve flattening tolerance (twips) for SWFRecomp
+    (SWFRECOMP_CURVE_TOL_TWIPS, swf.cpp shapeCurveTolTwips). s30
+    w2b-stroke-timeline: 0.2 tw (= 0.01 px at 1:1, the HIGH drawing-API
+    tolerance) unless the test's main build is quality = "low"
+    (get_msaa_samples == 1), which keeps the pre-s30 2 tw its MSAA-1 raster
+    rules were tuned on. A [subtests] variant at another MSAA reuses the main
+    build's recompiled shapes (the corpus has one such test,
+    avm2/bitmapdata_drawwithquality, LOW main, drawing-API only).
+    An explicit SWFRECOMP_CURVE_TOL_TWIPS in the environment wins (A/B legs).
+    """
+    env = os.environ.get("SWFRECOMP_CURVE_TOL_TWIPS", "")
+    if env:
+        return env
+    return "2" if get_msaa_samples(test_dir) == 1 else "0.2"
+
+
 def recompile_swf(test_dir, force=False):
     """Run SWFRecomp on test.swf if not already done (or if forced).
 
@@ -2542,10 +2566,12 @@ def recompile_swf(test_dir, force=False):
     # or the SWF, so the mtime check below cannot see them; a cached tree from
     # a different mode must be regenerated.
     mode_stamp = scripts_dir / ".recomp_mode"
-    want_mode = "try_helper=%s tu_split=%s skip_avm1_payload=%s\n" % (
+    curve_tol = get_curve_tol_twips(test_dir)
+    want_mode = "try_helper=%s tu_split=%s skip_avm1_payload=%s curve_tol=%s\n" % (
         "1" if os.environ.get("SWF_TRY_HELPER", "") not in ("", "0") else "0",
         os.environ.get("SWF_TU_SPLIT", "") or "0",
-        "1" if os.environ.get("SWF_SKIP_AVM1_PAYLOAD", "") not in ("", "0") else "0")
+        "1" if os.environ.get("SWF_SKIP_AVM1_PAYLOAD", "") not in ("", "0") else "0",
+        curve_tol)
     if not force and scripts_dir.exists():
         # Stale-cache check: if the SWFRecomp binary is newer than the cached
         # output (or test.swf is newer), the cached code may use an older
@@ -2602,10 +2628,13 @@ def recompile_swf(test_dir, force=False):
             pass
 
     try:
+        recomp_env = dict(os.environ)
+        recomp_env["SWFRECOMP_CURVE_TOL_TWIPS"] = curve_tol
         proc = subprocess.Popen(
             ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
              str(RECOMP_BIN), str(RECOMP_CONFIG)],
             cwd=str(test_dir),
+            env=recomp_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -2999,7 +3028,8 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         child_char_base = child_movie_id * CHILD_CHAR_ID_STRIDE
         if recompile_child_swf(child_swf, child_recomp_dir,
                                symbol_prefix=child_sym_prefix,
-                               char_id_base=child_char_base):
+                               char_id_base=child_char_base,
+                               curve_tol=get_curve_tol_twips(test_dir)):
             # Detect prelude SWFs by filename convention (prelude_*.swf)
             child_is_prelude = child_swf.name.startswith("prelude_")
             # An AVM2 child: its prefixed ABC/timeline tables compile into the
@@ -3618,7 +3648,8 @@ def compile_wasm(test_dir, num_frames, build_dir):
         # prefix: compile_wasm does not link an AVM2 child's tables (compile_native
         # does that, gated on an AVM2 parent), so there is nothing to deconflict.
         if recompile_child_swf(child_swf, child_recomp_dir,
-                               char_id_base=child_movie_id * CHILD_CHAR_ID_STRIDE):
+                               char_id_base=child_movie_id * CHILD_CHAR_ID_STRIDE,
+                               curve_tol=get_curve_tol_twips(test_dir)):
             child_is_prelude = child_swf.name.startswith("prelude_")
             prefix = generate_child_movie_file(
                 child_name, child_recomp_dir, build_dir,

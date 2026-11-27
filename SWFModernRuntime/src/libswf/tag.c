@@ -8645,11 +8645,10 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 // its advance rounded UP to a whole device px (regression/lowq_glyph_probe_df2,
 // FP32 LOW: 12 px "aceosgb@&S 2369" steps 8,7,8,8,7,8,8,12,10,8,4,8,8,8 =
 // ceil(7.35, 6.60, 7.38, ...)). DefineFont3 (em 20480) keeps the fractional
-// advance (lowq_glyph_probe_df3: 'W' 59.5 px). HOLD, default OFF
-// (SWF_TF_LOW_ADV_CEIL=1 enables): FP32's from_gnash morph_test1 xtrace field
-// (same DF2 font, 12 px, but WordWrap + selectable + variable-bound) keeps the
-// fractional advance, so the field property that switches the rule is unknown
-// (w2-lowq-land report, LOCAL ORACLE REQUEST 1).
+// advance (lowq_glyph_probe_df3: 'W' 59.5 px). s30 w2b-lowq-text: gated on
+// the SWF version (>= 7), see textfield_glyph_render_cb_impl: FP32's
+// from_gnash morph_test1 (SWF 6) keeps the fractional advance although its
+// xtrace field and font are byte-identical to BeginBitmapFill's (SWF 8, ceils).
 static float g_tf_low_adv_ceil_q = 0.0f;
 static inline float tf_glyph_advance_twips(s32 adv, float scale, int device_font)
 {
@@ -9010,6 +9009,9 @@ static float tf_tab_stop(float line_x, s16 ascent, s16 descent, int em, u16 fh, 
 //    rotated field (a device-space snap measured slightly AWAY from Flash on
 //    regression/avm1_edittext_rotated_glyphs).
 // -DTF_GLYPH_NO_QSNAP compiles it out for A/B.
+// s30 w2b-lowq-text: the em square of the glyph run being snapped (the
+// caller's run_em), read by the LOW field-local pen arm.
+static int g_tf_low_pen_run_em = 1024;
 static void tf_glyph_quarter_snap(float* xy, const TextFieldGlyphInfo* info,
 	const u32 (*sd)[4], size_t g_offset, size_t g_size, float scale,
 	float x_pos, float y_pos)
@@ -9064,11 +9066,26 @@ static void tf_glyph_quarter_snap(float* xy, const TextFieldGlyphInfo* info,
 		const char* e = getenv("SWF_TF_LOW_PEN_LOCAL");
 		pen_local_on = !(e != NULL && e[0] == '0');
 	}
+	// s30 w2b-lowq-text: the y half is DefineFont/DefineFont2 (em 1024) only.
+	// FP32 LOW text/style_changes_in_html (DefineFont3 + alignment zones, HTML,
+	// field y 68.5, local baseline 29.16) draws its baseline at 98 = the
+	// world rounding (97.66), where the local rule put it at 68 + 29 = 97;
+	// x matches FP32 under either rule there. The DF2 rows of
+	// lowq_glyph_probe_df2 at field y 108.5 / 140.5 keep the local y (132 /
+	// 175, world 133 / 176). Which property splits them (font kind vs HTML)
+	// REQ 2 answer: DF3 rows (plain/HTML/no zones) keep the LOCAL y; =0 em-only.
+	// DEFAULT local y for every font: FP32 REFUTED the em gate (coordinator).
+	static int pen_local_y_all = -1;
+	if (pen_local_y_all < 0) {
+		const char* e = getenv("SWF_TF_LOW_PEN_LOCAL_Y");
+		pen_local_y_all = !(e != NULL && e[0] == '0');
+	}
 	if (pen_local_on && !info->has_matrix) {
 		const float ox = info->x * 20.0f, oy = info->y * 20.0f;
 		const float sox = rintf(ox / q) * q, soy = rintf(oy / q) * q;
 		dx = sox + rintf((x_pos - ox) / q) * q - x_pos;
-		dy = soy + rintf((y_pos - oy) / q) * q - y_pos;
+		if (pen_local_y_all || g_tf_low_pen_run_em == 1024)
+			dy = soy + rintf((y_pos - oy) / q) * q - y_pos;
 	}
 	for (size_t v = 0; v < g_size; v++) {
 		xy[2 * v]     += dx;
@@ -9112,10 +9129,23 @@ static void textfield_glyph_render_cb_impl(const TextFieldGlyphInfo* info, void*
 	if (em_square == 0) return;
 #if !defined(TF_GLYPH_NO_LOW_PEN) && defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
 	{   // s30 w2-lowq-land: LOW DefineFont/DefineFont2 whole-px advance (see g_tf_low_adv_ceil_q)
+		// s30 w2b-lowq-text: the switch is the SWF VERSION. FP32 ceils in
+		// every SWF 7/8 case seen (lowq_glyph_probe_df2 + the 8-row
+		// lowq_adv_flags_probe, SWF 8; BeginBitmapFill, SWF 8; the
+		// EmbeddedFontTest textWidth sums, SWF 7) and keeps the fractional
+		// advance in morph_test1 (SWF 6), whose xtrace DefineEditText + font
+		// are byte-identical to BeginBitmapFill's. Default: on for
+		// g_swf_version >= 7 (SWF_TF_LOW_ADV_CEIL_MINVER overrides; the 7-vs-8
+		// edge is unproven, w2b-lowq-text LOCAL ORACLE REQUEST 1).
+		// SWF_TF_LOW_ADV_CEIL=0 kills it, =1 forces it at every version.
 		static int adv_ceil_on = -1;
 		if (adv_ceil_on < 0) {
 			const char* e = getenv("SWF_TF_LOW_ADV_CEIL");
-			adv_ceil_on = (e != NULL && e[0] == '1');   // HOLD: default OFF
+			const char* mv = getenv("SWF_TF_LOW_ADV_CEIL_MINVER");
+			extern int g_swf_version;
+			if (e != NULL && e[0] == '0') adv_ceil_on = 0;
+			else if (e != NULL && e[0] == '1') adv_ceil_on = 1;
+			else adv_ceil_on = g_swf_version >= ((mv != NULL && mv[0]) ? atoi(mv) : 7);
 		}
 		if (adv_ceil_on && em_square == 1024 && !info->device_font && !info->csm_advanced) {
 			const float dsc = (context != NULL && context->stage_scale > 0.0f) ? context->stage_scale : 1.0f;
@@ -9790,6 +9820,7 @@ static void textfield_glyph_render_cb_impl(const TextFieldGlyphInfo* info, void*
 				xy_buf[2 * v]     = vx.f * scale + x_pos;
 				xy_buf[2 * v + 1] = vy.f * scale + y_pos;
 			}
+			g_tf_low_pen_run_em = run_em;
 			tf_glyph_quarter_snap(xy_buf, info, _sd, g_offset, g_size, scale, x_pos, y_pos);
 			} else {
 				// s27 w2-avm1-text-layout: stage = M2 * T(lbox origin) *

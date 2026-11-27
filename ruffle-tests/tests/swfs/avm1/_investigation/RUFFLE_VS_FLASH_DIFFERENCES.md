@@ -1636,3 +1636,21 @@ unaffected (a = 0 is a no-op there).
 bit written by the child's own draws; the ALPHA / ERASE composite tests the stencil instead of `discard`ing
 src.a == 0), so a painted 0 erases and an unpainted texel keeps the group. Prune criterion: Ruffle's alpha blend
 stops discarding painted alpha-0 texels.
+
+## s30 LOW DefineFont2 advances round UP to a whole px, SWF 7+ only (w2-lowq-land → w2b-lowq-text, 2026-11-27)
+
+**Tests:** `from_gnash/misc-ming.all/BeginBitmapFill` (golden = Flash, s27 provenance), `regression/lowq_glyph_probe_df2`
+(FP32 LOW); counter-case `from_gnash/misc-ming.all/morph_test1` frames 2–6 (flash_fixes FP32 LOW).
+
+At quality LOW, FP32 advances each glyph of an embedded DefineFont2 (em 1024) EditText by ceil(advance px)
+(df2 probe at 12 px: steps 8,7,8,8,7,8,8,12,… = ceil(7.35, 6.60, 7.38, …); all 8 EditText-flag variants of
+`w2-lowq-land-fixtures/lowq_adv_flags_probe` too). `morph_test1` (SWF 6) keeps the fractional advance although its
+xtrace DefineEditText and DefineFont2 are byte-identical to `BeginBitmapFill`'s (SWF 8, ceils), so the switch is the
+SWF version; `EmbeddedFontTest` (SWF 7) `textWidth` = the per-glyph ceil sum (w1-rm-avm1-gnash FP32 request 2) puts
+the edge at 7. Ruffle never ceils (font_like.rs whole-twip truncation), so its LOW goldens of SWF 7+ DF2 text drift
+left along each line.
+
+**Decision:** match Flash. `tag.c` `textfield_glyph_render_cb_impl`: on for `g_swf_version >= 7`, LOW, embedded
+em-1024 fonts (`SWF_TF_LOW_ADV_CEIL=0` kills it, `SWF_TF_LOW_ADV_CEIL_MINVER` moves the edge). The 7-vs-8 edge and
+the SmallText-only question are open (w2b-lowq-text LOCAL ORACLE REQUEST 1, `w2b-lowq-text-fixtures/
+swfver_ceil_probe/`). Prune criterion: Ruffle lays out SWF 7+ DefineFont2 text with whole-px advances at LOW.

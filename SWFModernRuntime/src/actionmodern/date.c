@@ -174,29 +174,60 @@ static double date_make_date(double day, double time_v) {
 	return day * DATE_MS_PER_DAY + time_v;
 }
 
+// s30 w2b-native-residues: per-instant DST (the avm2_date.c model, s29). Total UTC offset the C
+// library reports for instant `t` (ms); NAN when it cannot be converted.
+static double date_c_offset_ms_at(double t) {
+	double secs = floor(t / 1000.0);
+	if (!(secs > -8.64e12 && secs < 8.64e12)) return NAN;
+	time_t tt = (time_t) secs;
+	struct tm local_tm;
+	if (localtime_r(&tt, &local_tm) == NULL) return NAN;
+	double as_utc = date_make_date(date_make_day(local_tm.tm_year + 1900.0, local_tm.tm_mon, local_tm.tm_mday),
+	                               date_make_time(local_tm.tm_hour, local_tm.tm_min, local_tm.tm_sec, 0.0));
+	return as_utc - secs * 1000.0;
+}
+
 static void date_ensure_tza(void) {
 	if (g_date_tza_init) return;
 	g_date_tza_init = 1;
-	// Compute local timezone offset from system
-	time_t now = time(NULL);
-	struct tm gmt_tm, local_tm;
-	gmtime_r(&now, &gmt_tm);
-	localtime_r(&now, &local_tm);
-	// Difference in seconds
-	time_t gmt_epoch = timegm(&gmt_tm);
-	time_t local_epoch = timegm(&local_tm);
-	double offset_sec = difftime(local_epoch, gmt_epoch);
-	g_date_local_tza_ms = offset_sec * 1000.0;
+	// LocalTZA = the STANDARD-time offset: the smaller of the "now" year's January and July
+	// offsets (equal in a zone without DST, e.g. the runner's NPT-5:45 pin). "Now" is the mock
+	// clock when the test pins one, so the result never depends on the wall-clock date.
+#ifdef MOCK_DATE_TIME
+	double base = (double) MOCK_DATE_TIME;
+#else
+	double base = (double) time(NULL) * 1000.0;
+#endif
+	double jan = date_c_offset_ms_at(base - 33.0 * DATE_MS_PER_DAY);
+	double jul = date_c_offset_ms_at(base + 148.0 * DATE_MS_PER_DAY);
+	if (isnan(jan)) jan = 0.0;
+	if (isnan(jul)) jul = jan;
+	g_date_local_tza_ms = jan < jul ? jan : jul;
+}
+
+// DaylightSavingTA(t): the host's DST adjustment at UTC instant t (0 in a zone without DST).
+static double date_dst_ta(double t) {
+	date_ensure_tza();
+	if (!isfinite(t)) return 0.0;
+	double off = date_c_offset_ms_at(t);
+	if (isnan(off)) return 0.0;
+	return off - g_date_local_tza_ms;
+}
+
+// Full offset (standard + DST) at UTC instant t, in ms.
+static double date_offset_ms_at_utc(double t) {
+	date_ensure_tza();
+	return g_date_local_tza_ms + date_dst_ta(t);
 }
 
 static double date_utc_to_local(double t) {
 	date_ensure_tza();
-	return t + g_date_local_tza_ms;
+	return t + g_date_local_tza_ms + date_dst_ta(t);
 }
 
 static double date_local_to_utc(double t) {
 	date_ensure_tza();
-	return t - g_date_local_tza_ms;
+	return t - g_date_local_tza_ms - date_dst_ta(t - g_date_local_tza_ms);
 }
 
 // --- Date internal timestamp access ---
@@ -263,8 +294,7 @@ static ActionVar builtin_date_toString(SWFAppContext* app_context, ActionVar* ar
 	int min = (int)date_min_from_time_safe(lt);
 	int sec = (int)date_sec_from_time_safe(lt);
 
-	date_ensure_tza();
-	int offset_min = (int)(g_date_local_tza_ms / DATE_MS_PER_MINUTE);
+	int offset_min = (int)(date_offset_ms_at_utc(t) / DATE_MS_PER_MINUTE);
 	int offset_h = offset_min / 60;
 	int offset_m = offset_min % 60;
 	if (offset_m < 0) offset_m = -offset_m;
@@ -379,8 +409,7 @@ static ActionVar builtin_date_getTimezoneOffset(SWFAppContext* app_context, Acti
 	if (!date_has_backing(this_obj)) { ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED; return _u; }
 	double t = date_get_time((ASObject*)this_obj);
 	if (isnan(t) || !isfinite(t)) return mathReturnDouble(NAN);
-	date_ensure_tza();
-	return mathReturnDouble(-(g_date_local_tza_ms / DATE_MS_PER_MINUTE));
+	return mathReturnDouble(-(date_offset_ms_at_utc(t) / DATE_MS_PER_MINUTE));
 }
 
 // --- 17 setter methods ---

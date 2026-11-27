@@ -1,0 +1,12 @@
+# gate_c1 (before the y-scope edit): M = SWF_TF_LOW_ADV_CEIL=0, X = version-gated ceil, T = ceil at every SWF version (w2 HOLD leg).
+from_gnash/misc-ming.all/BeginBitmapFill output M=F894 X=F393 T=F393 MOVED:XT
+regression/lowq_glyph_probe_df2 output M=P52527 X=P12891 T=P12891 MOVED:XT
+from_gnash/misc-ming.all/morph_test1 frame1 M=P0 X=P0 T=F93 MOVED:T
+from_gnash/misc-ming.all/morph_test1 frame2 M=F198 X=F198 T=F918 MOVED:T
+from_gnash/misc-ming.all/morph_test1 frame3 M=F198 X=F198 T=F918 MOVED:T
+from_gnash/misc-ming.all/morph_test1 frame4 M=F198 X=F198 T=F918 MOVED:T
+from_gnash/misc-ming.all/morph_test1 frame5 M=F198 X=F198 T=F918 MOVED:T
+from_gnash/misc-ming.all/morph_test1 frame6 M=F198 X=F198 T=F918 MOVED:T
+from_gnash/misc-ming.all/place_object_test output M=F2604 X=F2604 T=F14358 MOVED:T
+from_gnash/misc-ming.all/shape_test output M=F9709 X=F9709 T=F12325 MOVED:T
+regression/lowq_glyph_probe_df3 output M=P9024 X=P9024 T=P9024 same

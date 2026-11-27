@@ -489,6 +489,29 @@ namespace SWFRecomp
 
 	static const float LEVIEN_TOL_TWIPS = 2.0f;   // = lyon 0.1 px at 1:1
 
+	// Plain-shape (DefineShape 1-4) curve tolerance in twips. Flash flattens
+	// timeline curves far finer than lyon's 0.1 px at HIGH quality (s30
+	// w2-stroke-geometry-land: the AVM1/AVM2 drawing-API twins landed at
+	// 0.01 px; s30 w2b-stroke-timeline: this arm, 0.2 tw = 0.01 px at 1:1).
+	// The recompiler does not know a test's stage quality, so the caller
+	// passes it: SWFRECOMP_CURVE_TOL_TWIPS (verify_output.py sets 0.2 for a
+	// non-LOW test and 2 for quality = "low", whose MSAA-1 raster and LOW
+	// stroke rules were tuned on 2 tw). Unset or invalid = 2 tw, i.e. the
+	// pre-s30 output byte for byte (browser / deploy builds). Embedded glyph
+	// shapes (DefineFont*) always keep 2 tw: no Flash evidence, and their
+	// generated code moves in ~225 text/trace rows for a 2-PNG pixel gain.
+	static float shapeCurveTolTwips(bool is_font)
+	{
+		static float tol = -1.0f;
+		if (tol < 0.0f)
+		{
+			const char* e = getenv("SWFRECOMP_CURVE_TOL_TWIPS");
+			double v = (e != NULL) ? atof(e) : 0.0;
+			tol = (v > 0.0 && v <= 64.0) ? (float) v : LEVIEN_TOL_TWIPS;
+		}
+		return is_font ? LEVIEN_TOL_TWIPS : tol;
+	}
+
 	struct LevienParams
 	{
 		u32 count;               // 0 => a single straight chord
@@ -9969,7 +9992,7 @@ namespace SWFRecomp
 							levien_params = levienInit((float) current.x, (float) current.y,
 							                           (float) control.x, (float) control.y,
 							                           (float) anchor.x, (float) anchor.y,
-							                           LEVIEN_TOL_TWIPS);
+							                           shapeCurveTolTwips(is_font));
 							levien_active = true;
 							num_passes = (levien_params.count < 1) ? 1 : levien_params.count;
 						}

@@ -1,0 +1,12 @@
+xml for-in: namespaceURI,localName,prefix,previousSibling,parentNode,nodeValue,nodeType,nodeName,nextSibling,lastChild,firstChild,childNodes,attributes,getPrefixForNamespace,getNamespaceForPrefix,toString,hasChildNodes,appendChild,insertBefore,removeNode,cloneNode,xmlDecl,status,loaded,ignoreWhite,docTypeDecl,contentType,addRequestHeader,getBytesTotal,getBytesLoaded,onData,onLoad,sendAndLoad,send,load,parseXML,createTextNode,createElement,
+xml hOP nodeType: false
+xml hOP contentType: false
+alias firstChild: a
+delete firstChild: false
+after delete: a
+nodeType write: 1
+alias glow blurX: 6
+glow hOP blurX: false
+ct write typeof: number
+delete new Object __proto__: false
+sound for-in after unhide: [checkPolicyFile,]

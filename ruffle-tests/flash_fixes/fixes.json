@@ -1076,5 +1076,27 @@
     "reason": "Flash LOW, Linux == Windows. golden (Ruffle) 1 795 ch (t0) from Flash; ours s30 before 1 091, after w2-lowq-land 747. Stays fail (limit 0), now graded against Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-lowq-land FP32 LOW grading",
     "added": "2026-11-27"
+  },
+  {
+    "test": "visual/simple_shapes/heavy_tesselation",
+    "file": "output.expected.png",
+    "upstream_sha256": "a5b9b76fd3d2f391182fb2b17876a7057cfa7705bded5fc86473ecfcc04ad544",
+    "fix": "visual/simple_shapes/heavy_tesselation/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/visual_simple_shapes_heavy_tesselation.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, --screen run; draw() png); Windows FP32 .win.low.png within 42 channels",
+    "reason": "Flash LOW, host-stable (WIN vs LNX 42 ch). Golden (Ruffle) 69 352 ch from Flash; ours at interim #2 (a18a0e033) 44 486. Its interim #2 move (+20% vs the Ruffle golden, w2-lowq-land tie rule) was unpriced; graded against Flash from now on. Stays fail.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-lowq-land FP32 LOW grading",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "avm1/global_instance_decls",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "avm1/global_instance_decls/test.toml",
+    "kind": "toml",
+    "evidence": "Golden = FP32 LNX table (session30-fanout-reports/pre-launch-oracles/README.md §6: 0 diff apart from the TZ line); it prints 'Sat Apr 4 00:00:00 GMT+0200 2020'. w2b-native-residues measured the line == golden under this mock_timezone",
+    "reason": "The golden's host TZ was +0200 in April 2020 (CEST; any +2 zone prints the same single line). Our default NPT pin prints +0545. Row stays output_mismatch (161 other lines).",
+    "rvf": "",
+    "added": "2026-11-27"
   }
 ]

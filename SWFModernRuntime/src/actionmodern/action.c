@@ -1060,6 +1060,10 @@ static int g_array_constructor_static_init = 0;
 static ASFunction g_object_constructor_static;
 static ASFunction g_object_registerClass_func;
 static int g_object_constructor_static_init = 0;
+// s30 w2b-native-residues (L2): once ensureGlobalInit has built `_global.Object` (g_ctors[0]),
+// ensureObjectConstructor returns it, so `Object === _global.Object` and every `constructor` /
+// `__constructor__` slot set afterwards names the one Object (the Array / String merge pattern).
+static ASFunction* g_object_ctor_ref = NULL;
 static ASFunction* ensureObjectConstructor(SWFAppContext* app_context);
 static void registerGeomMethod(ASFunction* func, const char* name, Function2Ptr impl, SWFAppContext* app_context, ASObject* proto);
 
@@ -1070,6 +1074,12 @@ static ASFunction* g_prev_executing_func = NULL;
 static ASFunction g_object_toString_func;
 static ASFunction g_object_valueOf_func;
 static ASFunction g_object_hasOwnProperty_func;
+// s30 w2b-native-residues: FP32 `ASnative` is a function with NO __proto__ and no constructor
+// (w1-local-oracles/w2-native-table-land v5-v8: `typeof ASnative.call` undefined,
+// `ASnative.__proto__` undefined). Set by ensureGlobalInit; nothing is inherited through it.
+static ASFunction* g_avm1_noproto_fn = NULL;
+static inline int avm1FuncHasNoProto(const ASFunction* f) { return f != NULL && f == g_avm1_noproto_fn; }
+static int avm1ObjProtoMethodHiddenV5(const char* name, u32 len);
 
 // Flash treats only canonical decimal strings ("0", or [1-9][0-9]*) as array
 // indices; "05", " 5", "+5", "-0" are ordinary named properties
@@ -5095,6 +5105,7 @@ static void addStubMethodToProto(SWFAppContext* app_context, ASObject* proto, co
 }
 
 static int isNativeTextFieldProperty(const char* name, u32 len); // forward decl
+static int avm1XmlOwnSlotIsNative(ASObject* obj, const char* n, u32 len); // s30 w2-native-instance
 
 // Built-in hasOwnProperty checks if a property exists directly on the object
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr, const char* method_name, u32 method_name_len, ActionVar* args, u32 num_args);
@@ -5159,6 +5170,11 @@ static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, Actio
 			{
 				return ret; // false
 			}
+			// s30 w2-native-instance: XML node fields are prototype getters in FP32.
+			if (avm1XmlOwnSlotIsNative(obj, prop_name, prop_name_len))
+			{
+				return ret; // false
+			}
 			// Use hasPropertyRaw to check existence ignoring flash_flags visibility
 			// (hasOwnProperty returns true even for hidden properties)
 			if (hasPropertyRaw(obj, prop_name, prop_name_len))
@@ -5198,7 +5214,7 @@ static ActionVar builtin_object_isPropertyEnumerable(SWFAppContext* app_context,
 			prop_name_len = (u32) len;
 		}
 
-		if (prop_name != NULL)
+		if (prop_name != NULL && !avm1XmlOwnSlotIsNative(obj, prop_name, prop_name_len))
 		{
 			// Check own properties only (not prototype chain)
 			for (u32 i = 0; i < obj->num_used; i++)
@@ -6314,6 +6330,9 @@ static int ei_toXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, i
 static int ei_arrayToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size);
 static int ei_argumentsToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size);
 static int ei_objectToXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size);
+// s30 w2-native-instance: own-slot hiding for for..in walkers (defined with the XML code).
+static int avm1EnumHideMask(ASObject* obj);
+static int avm1EnumHidesOwnSlot(int mask, const char* n, u32 len);
 
 static int ei_toXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, int buf_size)
 {
@@ -6344,6 +6363,12 @@ static int ei_toXML_buf(SWFAppContext* app_context, ActionVar* val, char* buf, i
 		return ei_arrayToXML_buf(app_context, val, buf, buf_size);
 	if (val->type == ACTION_STACK_VALUE_OBJECT) {
 		ASObject* obj = (ASObject*) val->data.numeric_value;
+		// s30 w2-native-instance: the player's AS `_toXML` tests `value == null`
+		// first; a prototype-less object (XML `attributes`) has no valueOf, so
+		// it compares equal to null (FP32: `_objectToXML(new XML())` emits
+		// `<property id="attributes"><null/></property>`, ExternalInterface.as:265).
+		if (obj && findPropertyStructWithPrototype(obj, "valueOf", 7) == NULL)
+			return snprintf(buf, buf_size, "<null/>");
 		if (obj) {
 			// Check for .length property — if present, treat as array
 			ASProperty* len_prop = findPropertyStructWithPrototype(obj, "length", 6);
@@ -6493,6 +6518,57 @@ static int ei_objectToXML_buf(SWFAppContext* app_context, ActionVar* val, char* 
 					pos += snprintf(buf + pos, buf_size - pos, "</property>");
 				}
 			}
+		}
+	} else if (val && val->type == ACTION_STACK_VALUE_OBJECT && val->data.numeric_value != 0) {
+		// s30 w2-native-instance: FP32's _objectToXML is a `for (p in obj)`
+		// walk, so it lists INHERITED enumerable members too, in for..in order
+		// (gnash ExternalInterface.as:265: `new XML()` lists the XMLNode.prototype
+		// getters, the XMLNode methods, then XML.prototype). Values are read
+		// through GetMember so accessors (XML.status / .loaded) run with
+		// this = obj. Names are snapshotted in actionEnumerate2's push order;
+		// for..in (and the XML) is the reverse of that.
+		ASObject* obj = (ASObject*) val->data.numeric_value;
+		enum { EI_MAX_NAMES = 512 };
+		const char* names[EI_MAX_NAMES];
+		u32 lens[EI_MAX_NAMES];
+		int n = 0;
+		ASObject* cur = obj;
+		int depth = 0, inherited = 0;
+		while (cur != NULL && depth < 100 && n < EI_MAX_NAMES) {
+			depth++;
+			int hide_mask = avm1EnumHideMask(cur);
+			for (u32 i = 0; i < cur->num_used && n < EI_MAX_NAMES; i++) {
+				const char* pn = cur->properties[i].name;
+				u32 pl = cur->properties[i].name_length;
+				if (pn == NULL || (uintptr_t)pn < 4096) continue;
+				if (!(cur->properties[i].flags & PROPERTY_FLAG_ENUMERABLE)) continue;
+				if (pl == 9 && strncmp(pn, "__proto__", 9) == 0) continue;
+				if (avm1EnumHidesOwnSlot(hide_mask, pn, pl)) continue;
+				if (inherited && pl == 11 && memcmp(pn, "constructor", 11) == 0) continue;
+				int dup = 0;
+				for (int d = 0; d < n && !dup; d++)
+					dup = (lens[d] == pl && memcmp(names[d], pn, pl) == 0);
+				if (dup) continue;
+				names[n] = pn; lens[n] = pl; n++;
+			}
+			ActionVar* pv = getProperty(cur, "__proto__", 9);
+			cur = (pv != NULL && pv->type == ACTION_STACK_VALUE_OBJECT) ? (ASObject*) pv->data.numeric_value : NULL;
+			inherited = 1;
+		}
+		for (int k = n - 1; k >= 0 && pos < buf_size - 200; k--) {
+			pos += snprintf(buf + pos, buf_size - pos, "<property id=\"");
+			if (pos + (int)lens[k] < buf_size - 50) {
+				memcpy(buf + pos, names[k], lens[k]);
+				pos += lens[k];
+			}
+			pos += snprintf(buf + pos, buf_size - pos, "\">");
+			pushVar(app_context, val);
+			PUSH_STR((char*)names[k], lens[k]);
+			actionGetMember(app_context);
+			ActionVar mv;
+			popVar(app_context, &mv);
+			pos += ei_toXML_buf(app_context, &mv, buf + pos, buf_size - pos);
+			pos += snprintf(buf + pos, buf_size - pos, "</property>");
 		}
 	} else if (val && (val->type == ACTION_STACK_VALUE_OBJECT || val->type == ACTION_STACK_VALUE_MOVIECLIP)) {
 		ASObject* obj = (ASObject*) val->data.numeric_value;
@@ -12973,15 +13049,20 @@ static ActionVar colorTransformConstructor(SWFAppContext* app_context, ActionVar
 		aOff  = varToDoubleSWF(app_context, &args[7], g_swf_version);
 	}
 
+	// s30 w2-native-instance: slot order = reverse FP32 for..in order
+	// (avm1/global_instance_decls: alphaMultiplier, red/green/blueMultiplier,
+	// alphaOffset, red/green/blueOffset). The slots are the storage behind
+	// FP32's prototype accessors (avm1XmlOwnSlotIsNative hides them from
+	// hasOwnProperty / delete; actionSetMember coerces writes to Number).
 	ActionVar v;
+	v = makeF64(aMult); setProperty(app_context, obj, "alphaMultiplier", 15, &v);
 	v = makeF64(rMult); setProperty(app_context, obj, "redMultiplier",   13, &v);
 	v = makeF64(gMult); setProperty(app_context, obj, "greenMultiplier", 15, &v);
 	v = makeF64(bMult); setProperty(app_context, obj, "blueMultiplier",  14, &v);
-	v = makeF64(aMult); setProperty(app_context, obj, "alphaMultiplier", 15, &v);
+	v = makeF64(aOff);  setProperty(app_context, obj, "alphaOffset",     11, &v);
 	v = makeF64(rOff);  setProperty(app_context, obj, "redOffset",        9, &v);
 	v = makeF64(gOff);  setProperty(app_context, obj, "greenOffset",     11, &v);
 	v = makeF64(bOff);  setProperty(app_context, obj, "blueOffset",      10, &v);
-	v = makeF64(aOff);  setProperty(app_context, obj, "alphaOffset",     11, &v);
 	return undef;
 }
 
@@ -17063,6 +17144,7 @@ static void applyGlobalFunctionProtoLink(SWFAppContext* app_context, ASFunction*
 // __constructor__ on freshly allocated objects).
 static ASFunction* ensureObjectConstructor(SWFAppContext* app_context)
 {
+	if (g_object_ctor_ref != NULL) return g_object_ctor_ref;
 	if (!g_object_constructor_static_init)
 	{
 		memset(&g_object_constructor_static, 0, sizeof(ASFunction));
@@ -20525,6 +20607,110 @@ static int isXMLNodeInstance(ASObject* obj) {
 	return 0;
 }
 
+// s30 w2-native-instance: FP32 XML/XMLNode node fields (nodeType, nodeName,
+// childNodes, ...) are native GETTERS on XMLNode.prototype; a node instance has
+// no own slot for them (gnash ExternalInterface.as:265 `_objectToXML(new XML())`
+// lists them through the prototype; avm1/global_instance_decls lists no own
+// member on an XML instance even after ASSetPropFlags(inst, null, 0, 1)). Our
+// nodes keep their data in own slots, so every own-slot observer (for..in,
+// hasOwnProperty, isPropertyEnumerable, delete) treats these names on a node
+// object as absent. Reads/writes are unchanged.
+static int xml_is_native_slot_name(const char* n, u32 len) {
+	switch (len) {
+	case 5:  return memcmp(n, "idMap", 5) == 0;
+	case 6:  return memcmp(n, "prefix", 6) == 0;
+	case 8:  return memcmp(n, "nodeType", 8) == 0 || memcmp(n, "nodeName", 8) == 0;
+	case 9:  return memcmp(n, "nodeValue", 9) == 0 || memcmp(n, "lastChild", 9) == 0 ||
+	                memcmp(n, "localName", 9) == 0;
+	case 10: return memcmp(n, "parentNode", 10) == 0 || memcmp(n, "firstChild", 10) == 0 ||
+	                memcmp(n, "childNodes", 10) == 0 || memcmp(n, "attributes", 10) == 0;
+	case 11: return memcmp(n, "nextSibling", 11) == 0;
+	case 12: return memcmp(n, "namespaceURI", 12) == 0 || memcmp(n, "__xml_status", 12) == 0 ||
+	                memcmp(n, "__xml_loaded", 12) == 0;
+	case 14: return memcmp(n, "__realChildren", 14) == 0;
+	case 15: return memcmp(n, "previousSibling", 15) == 0;
+	default: return 0;
+	}
+}
+
+// 1 when obj is an XML/XMLNode node object (not one of the two prototypes).
+static int xml_obj_has_native_slots(ASObject* obj) {
+	if (obj == NULL || !g_xml_constructor_init) return 0;
+	if (obj == g_xml_constructor.prototype_obj || obj == g_xmlnode_constructor.prototype_obj)
+		return 0;
+	if (obj->native_type == NATIVE_XML || obj->native_type == NATIVE_XMLNODE) return 1;
+	return isXMLNodeInstance(obj);
+}
+
+// s30 w2-native-instance (L4): FP32 instances of native-backed classes never
+// list __proto__ / __constructor__ in for..in, even after
+// ASSetPropFlags(inst, null, 0, 1) (avm1/global_instance_decls: PrintJob,
+// MovieClipLoader, LocalConnection, FileReference, ColorTransform, the 9
+// concrete filters, BitmapData, TextFormat, TextField, Button, LoadVars, XML,
+// XMLNode(type, value), Sound, String, Date, Boolean, Number). AS-implemented
+// classes (Matrix, Point, Rectangle, BitmapFilter, ...) and plain objects list
+// them. TextSnapshot constructed without a clip is a plain object in FP32.
+static int avm1_native_type_hides_proto_slots(u8 nt) {
+	switch (nt) {
+	case NATIVE_STRING: case NATIVE_NUMBER: case NATIVE_BOOLEAN: case NATIVE_DATE:
+	case NATIVE_SOUND: case NATIVE_XML: case NATIVE_XMLNODE: case NATIVE_TEXTFIELD:
+	case NATIVE_TEXTFORMAT: case NATIVE_BITMAPDATA: case NATIVE_LOADVARS:
+	case NATIVE_LOCALCONNECTION: case NATIVE_MOVIECLIPLOADER: case NATIVE_PRINTJOB:
+	case NATIVE_BUTTON: case NATIVE_COLORTRANSFORM: case NATIVE_FILTER: case NATIVE_FILEREF:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+// Per-object enumeration mask for avm1EnumHidesOwnSlot (computed once per walk level).
+#define AVM1_HIDE_XML_SLOTS   1
+#define AVM1_HIDE_PROTO_SLOTS 2
+#define AVM1_HIDE_SOUND_SLOTS 4
+static int avm1EnumHideMask(ASObject* obj) {
+	if (obj == NULL) return 0;
+	int m = 0;
+	if (xml_obj_has_native_slots(obj)) m |= AVM1_HIDE_XML_SLOTS;
+	if (avm1_native_type_hides_proto_slots(obj->native_type)) m |= AVM1_HIDE_PROTO_SLOTS;
+	if (obj->native_type == NATIVE_SOUND) m |= AVM1_HIDE_SOUND_SLOTS;
+	return m;
+}
+static int avm1EnumHidesOwnSlot(int mask, const char* n, u32 len) {
+	if (mask == 0) return 0;
+	if ((mask & AVM1_HIDE_XML_SLOTS) && xml_is_native_slot_name(n, len)) return 1;
+	// s30 w2b-native-residues: a Sound instance's `checkPolicyFile` (boolean, gnash Sound.as:112)
+	// is native storage in FP32: for..in never lists it, even after an ASSetPropFlags unhide
+	// (w1-local-oracles/w2-native-instance fp32.lnx.txt line 12).
+	if ((mask & AVM1_HIDE_SOUND_SLOTS) && len == 15 && memcmp(n, "checkPolicyFile", 15) == 0) return 1;
+	// Native-backed instances: __proto__, __constructor__ and our own
+	// `__name__` bookkeeping slots (Sound __sound_use_global__, LoadVars
+	// __loaded__, ...) have no FP32 counterpart in for..in.
+	if ((mask & AVM1_HIDE_PROTO_SLOTS) && len >= 5 &&
+	    n[0] == '_' && n[1] == '_' && n[len - 1] == '_' && n[len - 2] == '_')
+		return 1;
+	return 0;
+}
+// Own-slot observers other than for..in (hasOwnProperty, isPropertyEnumerable,
+// delete): only the XML native slots are absent there.
+static int avm1XmlOwnSlotIsNative(ASObject* obj, const char* n, u32 len) {
+	if (obj == NULL) return 0;
+	// Filter instances (L5): FP32 filter members are accessors on the
+	// filter's prototype; our instance keeps the values in own slots that
+	// shadow those accessors. hasOwnProperty / isPropertyEnumerable / delete
+	// treat a shadowing slot as absent (avm1/global_instance_decls lists no
+	// own member on a `new GlowFilter()`).
+	if (obj->native_type == NATIVE_FILTER || obj->native_type == NATIVE_COLORTRANSFORM) {
+		ActionVar* pv = getProperty(obj, "__proto__", 9);
+		if (pv != NULL && pv->type == ACTION_STACK_VALUE_OBJECT && pv->data.numeric_value != 0 &&
+		    !(len == 9 && memcmp(n, "__proto__", 9) == 0) &&
+		    !(len == 15 && memcmp(n, "__constructor__", 15) == 0) &&
+		    findPropertyStructWithPrototype((ASObject*) pv->data.numeric_value, n, len) != NULL)
+			return 1;
+		return 0;
+	}
+	return xml_is_native_slot_name(n, len) && xml_obj_has_native_slots(obj);
+}
+
 // Allocate a persistent string copy
 static char* xml_strdup(SWFAppContext* app_context, const char* s, u32 len) {
 	(void)app_context;
@@ -20731,6 +20917,11 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
                                   const char* nodeValue, u32 valueLen) {
 	initXMLPrototype(app_context);
 	ASObject* node = allocObject(app_context, 20);
+	// s30 w2-native-instance: every runtime-built node (parse, createElement,
+	// createTextNode, cloneNode) is a native XMLNode in FP32: its __proto__ /
+	// __constructor__ never enumerate (avm1/global_instance_decls,
+	// `new XML(src).firstChild`). `new XMLNode()` with < 2 args resets this.
+	node->native_type = NATIVE_XMLNODE;
 
 	// Set __proto__ to XMLNode.prototype
 	if (g_xmlnode_constructor.prototype_obj != NULL) {
@@ -22378,11 +22569,10 @@ static void xml_install_construct_proto_props(SWFAppContext* app_context) {
 	ASObject* xml_proto = g_xml_constructor.prototype_obj;
 	if (xml_proto == NULL) return;
 
+	// s30 w2-native-instance: FP32 order (reverse for..in) contentType,
+	// docTypeDecl, ignoreWhite, loaded, status, xmlDecl; all enumerable
+	// (avm1/global_instance_decls, gnash ExternalInterface.as:265).
 	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
-	if (findPropertyRaw(xml_proto, "docTypeDecl", 11) == NULL)
-		setPropertyWithFlags(app_context, xml_proto, "docTypeDecl", 11, &undef, PROPERTY_FLAGS_DONTENUM);
-	if (findPropertyRaw(xml_proto, "xmlDecl", 7) == NULL)
-		setPropertyWithFlags(app_context, xml_proto, "xmlDecl", 7, &undef, PROPERTY_FLAGS_DONTENUM);
 	if (findPropertyRaw(xml_proto, "contentType", 11) == NULL) {
 		ActionVar ct = {0};
 		ct.type = ACTION_STACK_VALUE_STRING;
@@ -22391,11 +22581,13 @@ static void xml_install_construct_proto_props(SWFAppContext* app_context) {
 			"application/x-www-form-urlencoded", 33, &ct_u16_len);
 		ct.str_size = ct_u16_len;
 		ct.data.numeric_value = (u64) ct_u16;
-		setPropertyWithFlags(app_context, xml_proto, "contentType", 11, &ct, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, xml_proto, "contentType", 11, &ct, PROPERTY_FLAGS_DEFAULT);
 	}
+	if (findPropertyRaw(xml_proto, "docTypeDecl", 11) == NULL)
+		setPropertyWithFlags(app_context, xml_proto, "docTypeDecl", 11, &undef, PROPERTY_FLAGS_DEFAULT);
 	if (findPropertyRaw(xml_proto, "ignoreWhite", 11) == NULL) {
 		ActionVar iw = {0}; iw.type = ACTION_STACK_VALUE_BOOLEAN;
-		setPropertyWithFlags(app_context, xml_proto, "ignoreWhite", 11, &iw, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, xml_proto, "ignoreWhite", 11, &iw, PROPERTY_FLAGS_DEFAULT);
 	}
 
 	// status / loaded virtual accessors
@@ -22412,12 +22604,14 @@ static void xml_install_construct_proto_props(SWFAppContext* app_context) {
 	g_xml_fn_loaded_set.function_type = 2;
 	g_xml_fn_loaded_set.advanced_func = (Function2Ptr) xml_loaded_setter;
 
-	if (findPropertyRaw(xml_proto, "status", 6) == NULL)
-		setAddPropertyWithFlags(app_context, xml_proto, "status", 6,
-			&g_xml_fn_status_get, &g_xml_fn_status_set, PROPERTY_FLAGS_DONTENUM);
 	if (findPropertyRaw(xml_proto, "loaded", 6) == NULL)
 		setAddPropertyWithFlags(app_context, xml_proto, "loaded", 6,
-			&g_xml_fn_loaded_get, &g_xml_fn_loaded_set, PROPERTY_FLAGS_DONTENUM);
+			&g_xml_fn_loaded_get, &g_xml_fn_loaded_set, PROPERTY_FLAGS_DEFAULT);
+	if (findPropertyRaw(xml_proto, "status", 6) == NULL)
+		setAddPropertyWithFlags(app_context, xml_proto, "status", 6,
+			&g_xml_fn_status_get, &g_xml_fn_status_set, PROPERTY_FLAGS_DEFAULT);
+	if (findPropertyRaw(xml_proto, "xmlDecl", 7) == NULL)
+		setPropertyWithFlags(app_context, xml_proto, "xmlDecl", 7, &undef, PROPERTY_FLAGS_DEFAULT);
 }
 
 static void initXMLPrototype(SWFAppContext* app_context) {
@@ -22475,46 +22669,61 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	} while(0)
 	#define INSTALL_METHOD(name, nlen, fn_ptr) INSTALL_METHOD_ON(xmlnode_proto, name, nlen, fn_ptr)
 
-	INSTALL_METHOD("appendChild", 11, &g_xml_fn_appendChild);
+	// s30 w2-native-instance: FP32 XMLNode.prototype members are ENUMERABLE
+	// (gnash ExternalInterface.as:265 lists them through `for..in` of a new
+	// XML; avm1/global_proto_decls + global_instance_decls). Insertion order
+	// is the REVERSE of FP32's for..in order (our for..in yields the newest
+	// slot first): cloneNode .. getPrefixForNamespace, then the node getters
+	// attributes .. namespaceURI, so for..in lists namespaceURI first.
+	INSTALL_METHOD("cloneNode", 9, &g_xml_fn_cloneNode);
 	INSTALL_METHOD("removeNode", 10, &g_xml_fn_removeNode);
 	INSTALL_METHOD("insertBefore", 12, &g_xml_fn_insertBefore);
+	INSTALL_METHOD("appendChild", 11, &g_xml_fn_appendChild);
 	INSTALL_METHOD("hasChildNodes", 13, &g_xml_fn_hasChildNodes);
-	INSTALL_METHOD("cloneNode", 9, &g_xml_fn_cloneNode);
 	INSTALL_METHOD("toString", 8, &g_xml_fn_toString);
 	INSTALL_METHOD("getNamespaceForPrefix", 21, &g_xml_fn_getNamespaceForPrefix);
 	INSTALL_METHOD("getPrefixForNamespace", 21, &g_xml_fn_getPrefixForNamespace);
 
 	// Virtual node properties on XMLNode.prototype — Flash exposes these as
-	// own (DontEnum) accessor properties on the prototype itself. Our XMLNode
+	// own (enumerable) accessor properties on the prototype itself. Our XMLNode
 	// instances carry their own data copies (set in xml_create_node), which
-	// shadow these placeholders, so reads are unaffected; the placeholders
-	// only exist to satisfy XMLNode.prototype.hasOwnProperty(). Phase 1 of
-	// XML_XMLNODE_PLAN.
+	// shadow these placeholders, so reads are unaffected; the instance copies
+	// are invisible to for..in / hasOwnProperty / delete
+	// (avm1XmlOwnSlotIsNative). Phase 1 of XML_XMLNODE_PLAN.
+	// Getter-only members are READ_ONLY (avm1/global_proto_decls); nodeName /
+	// nodeValue keep a writable placeholder (their FP32 setters work on nodes,
+	// and an inherited read-only slot would block a node's first write).
 	#define INSTALL_VPROP(name, nlen) do { \
 		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED; \
-		setPropertyWithFlags(app_context, xmlnode_proto, name, nlen, &uv, PROPERTY_FLAGS_DONTENUM); \
+		setPropertyWithFlags(app_context, xmlnode_proto, name, nlen, &uv, \
+			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE); \
 	} while(0)
-	INSTALL_VPROP("nodeName", 8);
+	#define INSTALL_VPROP_RW(name, nlen) do { \
+		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED; \
+		setPropertyWithFlags(app_context, xmlnode_proto, name, nlen, &uv, PROPERTY_FLAGS_DEFAULT); \
+	} while(0)
+	INSTALL_VPROP("attributes", 10);
+	INSTALL_VPROP("childNodes", 10);
+	INSTALL_VPROP("firstChild", 10);
+	INSTALL_VPROP("lastChild", 9);
+	INSTALL_VPROP("nextSibling", 11);
+	INSTALL_VPROP_RW("nodeName", 8);
+	INSTALL_VPROP("nodeType", 8);
 	// nodeValue placeholder is NULL-typed (not undefined): element and
 	// document nodes carry no own nodeValue and inherit this — Flash reports
 	// `typeof(elem.nodeValue) == 'null'` (XML.as:344, 364). Text nodes shadow
 	// it with an own string data prop.
 	{
 		ActionVar nullv = {0}; nullv.type = ACTION_STACK_VALUE_NULL;
-		setPropertyWithFlags(app_context, xmlnode_proto, "nodeValue", 9, &nullv, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, xmlnode_proto, "nodeValue", 9, &nullv, PROPERTY_FLAGS_DEFAULT);
 	}
-	INSTALL_VPROP("nodeType", 8);
-	INSTALL_VPROP("attributes", 10);
-	INSTALL_VPROP("childNodes", 10);
-	INSTALL_VPROP("firstChild", 10);
-	INSTALL_VPROP("lastChild", 9);
 	INSTALL_VPROP("parentNode", 10);
-	INSTALL_VPROP("nextSibling", 11);
 	INSTALL_VPROP("previousSibling", 15);
-	INSTALL_VPROP("namespaceURI", 12);
 	INSTALL_VPROP("prefix", 6);
 	INSTALL_VPROP("localName", 9);
+	INSTALL_VPROP("namespaceURI", 12);
 	#undef INSTALL_VPROP
+	#undef INSTALL_VPROP_RW
 
 	if (function_count < MAX_FUNCTIONS)
 		function_registry[function_count++] = &g_xmlnode_constructor;
@@ -22539,17 +22748,19 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	// getBytesLoaded/getBytesTotal also live here — Flash exposes them on
 	// XML.prototype only, and XML.as line 98-99 asserts they are absent from
 	// XMLNode.prototype.
-	INSTALL_METHOD_ON(xml_proto, "parseXML", 8, &g_xml_fn_parseXML);
+	// s30 w2-native-instance: insertion order = reverse FP32 for..in order
+	// (see XMLNode.prototype above); all enumerable in FP32.
 	INSTALL_METHOD_ON(xml_proto, "createElement", 13, &g_xml_fn_createElement);
 	INSTALL_METHOD_ON(xml_proto, "createTextNode", 14, &g_xml_fn_createTextNode);
+	INSTALL_METHOD_ON(xml_proto, "parseXML", 8, &g_xml_fn_parseXML);
 	INSTALL_METHOD_ON(xml_proto, "load", 4, &g_xml_fn_load);
-	INSTALL_METHOD_ON(xml_proto, "onData", 6, &g_xml_fn_onData);
-	INSTALL_METHOD_ON(xml_proto, "onLoad", 6, &g_xml_fn_onLoad);
 	INSTALL_METHOD_ON(xml_proto, "send", 4, &g_xml_fn_send);
 	INSTALL_METHOD_ON(xml_proto, "sendAndLoad", 11, &g_xml_fn_sendAndLoad);
-	INSTALL_METHOD_ON(xml_proto, "addRequestHeader", 16, &g_xml_fn_addRequestHeader);
+	INSTALL_METHOD_ON(xml_proto, "onLoad", 6, &g_xml_fn_onLoad);
+	INSTALL_METHOD_ON(xml_proto, "onData", 6, &g_xml_fn_onData);
 	INSTALL_METHOD_ON(xml_proto, "getBytesLoaded", 14, &g_xml_fn_getBytesLoaded);
 	INSTALL_METHOD_ON(xml_proto, "getBytesTotal", 13, &g_xml_fn_getBytesTotal);
+	INSTALL_METHOD_ON(xml_proto, "addRequestHeader", 16, &g_xml_fn_addRequestHeader);
 
 	// Note: docTypeDecl / xmlDecl / contentType / ignoreWhite / status / loaded
 	// are NOT installed here — Flash's XML constructor installs them on
@@ -22588,8 +22799,9 @@ static ASObject* xml_create_document(SWFAppContext* app_context) {
 	ASObject* idmap = allocObject(app_context, 4);
 	xml_set_obj(app_context, doc, "idMap", 5, idmap);
 
-	xml_set_str(app_context, doc, "contentType", 11,
-		"application/x-www-form-urlencoded", 33);
+	// s30 w2-native-instance: no own contentType — FP32 reads it from
+	// XML.prototype (xml_install_construct_proto_props); an own copy made it
+	// enumerate as an own member (gnash ExternalInterface.as:265).
 
 	// status is a virtual accessor on XML.prototype (see
 	// xml_install_construct_proto_props) — no own data prop here, otherwise it
@@ -39603,6 +39815,7 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 	while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
 	{
 		chain_depth++;
+		int _hide_mask = (mc == NULL) ? avm1EnumHideMask(current_obj) : 0;
 
 		for (u32 i = 0; i < current_obj->num_used; i++)
 		{
@@ -39611,6 +39824,8 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 			u8 prop_flags = current_obj->properties[i].flags;
 
 			if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
+				continue;
+			if (avm1EnumHidesOwnSlot(_hide_mask, prop_name, prop_name_len))
 				continue;
 			if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
 				continue;
@@ -45637,6 +45852,22 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 		}
 	}
 
+	// s30 w2b-native-residues: FP32 Sound.prototype owns `areSoundsInaccessible` and
+	// `checkPolicyFile`, DONT_ENUM + DONT_DELETE + READ_ONLY (w1-native-table v6/v7/v8 dumps and
+	// the SWF15 golden). checkPolicyFile reads undefined at every version (gnash Sound.as:74);
+	// areSoundsInaccessible is undefined at SWF6-8 and a function in the SWF15 golden (SWF9-14
+	// unmeasured: the function from 9). avm1NativeTableApply sets the order and the other flags.
+	{
+		const u8 ro_flags = PROPERTY_FLAG_CONFIGURABLE; // not WRITABLE, not ENUMERABLE
+		if (g_swf_version >= 9) {
+			addStubMethodToProto(app_context, ctor->prototype_obj, "areSoundsInaccessible", 21, ro_flags);
+		} else {
+			ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "areSoundsInaccessible", 21, &uv, ro_flags);
+		}
+		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "checkPolicyFile", 15, &uv, ro_flags);
+	}
 }
 
 // LocalConnection.prototype:
@@ -50344,6 +50575,10 @@ static void avm1NativeStubsInstall(SWFAppContext* app_context)
 				setPropertyWithFlags(app_context, singletons[i], "constructor", 11, &ov, PROPERTY_FLAGS_DONTENUM);
 		}
 	}
+	// s30 w2b-native-residues: FP32 SWF5 already has `RemoteLSOUsage.getURLPageSupport` as a
+	// function (w2-native-table-land/v5.lnx.txt) while AssetCache.getDiskUsage is SWF6+.
+	if (g_remoteLSOUsage_ctor.own_props == NULL) setupNativeFuncOwnProps(app_context, &g_remoteLSOUsage_ctor);
+	avm1StubFn(app_context, g_remoteLSOUsage_ctor.own_props, &g_avm1stub_getURLPageSupport, "getURLPageSupport", 1);
 	if (g_swf_version < 6 || global_object == NULL) return;
 	// _global.o: Flash's init-time temporary, left as null (DONT_ENUM). GetVariable("o")
 	// already answers null; this makes the slot itself visible (hasOwnProperty / for..in).
@@ -50892,6 +51127,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			g_asnative_func.own_props = allocObject(app_context, 2);
 			retainObject(g_asnative_func.own_props);
 		}
+		g_avm1_noproto_fn = &g_asnative_func;
 	}
 
 	// Registration order: first registered → last in for-in
@@ -51596,6 +51832,15 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		releaseObject(app_context, old);
 		g_ctors[0].own_props = new_props;
 	}
+	// s30 w2b-native-residues (L2): merge the two Object constructors. If the lazy static one
+	// was built earlier it pointed Object.prototype.constructor at itself; repoint it.
+	g_object_ctor_ref = &g_ctors[0];
+	if (g_object_prototype != NULL) {
+		ASProperty* _opc = findPropertyRaw(g_object_prototype, "constructor", 11);
+		if (_opc != NULL && _opc->getter == NULL && _opc->value.type == ACTION_STACK_VALUE_FUNCTION &&
+		    (ASFunction*)(uintptr_t) _opc->value.data.numeric_value == &g_object_constructor_static)
+			_opc->value.data.numeric_value = (u64) &g_ctors[0];
+	}
 	avm1NativeStubsInstall(app_context);
 	// FP32-golden native-object reconcile (s30 W2-a): attributes, for..in order and
 	// `.prototype` presence of every native member. Must stay the last step.
@@ -51725,7 +51970,10 @@ static void avm1NativeTableApply(SWFAppContext* app_context)
 				}
 			}
 		}
-		// 2. order: unlisted props first (keep relative order), then listed in reverse FP32 order
+		// 2. order: listed in reverse FP32 order, then unlisted props (keep relative order) LAST, so
+		// they enumerate FIRST (for..in pops newest first). s30 coordinator: FP32 gnash
+		// ButtonEventsTest lists a button's tabIndex (absent from the SWF15 table) BEFORE blendMode;
+		// the unlisted-first order made it enumerate after useHandCursor (rm -> mismatch at interim #2).
 		if (o->num_used > 1) {
 			u32 nu = o->num_used;
 			ASProperty* np = (ASProperty*) malloc(sizeof(ASProperty) * nu);
@@ -51739,8 +51987,8 @@ static void avm1NativeTableApply(SWFAppContext* app_context)
 				slot[mi] = s;
 			}
 			u32 w = 0;
-			for (u32 i = 0; i < nu; i++) if (!listed[i]) np[w++] = o->properties[i];
 			for (int mi = ob->count - 1; mi >= 0; mi--) if (slot[mi] >= 0) np[w++] = o->properties[slot[mi]];
+			for (u32 i = 0; i < nu; i++) if (!listed[i]) np[w++] = o->properties[i];
 			memcpy(o->properties, np, sizeof(ASProperty) * nu);
 			objectRehashIndex(o);
 			free(np); free(listed); free(slot);
@@ -56564,6 +56812,10 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 		return 0;
 	}
 
+	// s30 w2b-native-residues: a proto-less native (ASnative) is an instance of nothing.
+	if (obj_is_function && avm1FuncHasNoProto(obj_func_ref) &&
+	    (current_proto_var == NULL || current_proto_var->type == ACTION_STACK_VALUE_UNDEFINED))
+		return 0;
 	// For FUNCTION objects, if own_props doesn't have __proto__, use virtual Function.prototype
 	if (obj_is_function && (current_proto_var == NULL || current_proto_var->type == ACTION_STACK_VALUE_UNDEFINED)) {
 		int fv = (obj_func_ref->swf_version > 0) ? obj_func_ref->swf_version : g_swf_version;
@@ -56781,7 +57033,7 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 		// for instanceof checks (Flash Player behavior).
 		if (f != NULL) {
 			int fv = (f->swf_version > 0) ? f->swf_version : g_swf_version;
-			if (fv >= 6)
+			if (fv >= 6 && !avm1FuncHasNoProto(f)) // s30 w2b: ASnative has no __proto__
 				virtual_proto = getFunctionProto(fv);
 		}
 	} else if (obj_var->type == ACTION_STACK_VALUE_ARRAY) {
@@ -57117,6 +57369,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
 			{
 				chain_depth++;
+				int _hide_mask = avm1EnumHideMask(current_obj);
 
 				for (u32 i = 0; i < current_obj->num_used; i++)
 				{
@@ -57128,6 +57381,8 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					if (prop_name == NULL || (uintptr_t)prop_name < 4096)
 						continue;
 					if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
+						continue;
+					if (avm1EnumHidesOwnSlot(_hide_mask, prop_name, prop_name_len))
 						continue;
 					// Skip "constructor" from inherited prototypes — Flash's for-in
 					// doesn't propagate constructor through the __proto__ chain
@@ -59591,6 +59846,21 @@ void actionSetMember(SWFAppContext* app_context)
 				    (prop_name_len == 9 && memcmp(prop_name, "rectangle", 9) == 0))
 					return;
 			}
+			// s30 w2-native-instance: ColorTransform members are numeric
+			// accessors in FP32 (a string write reads back as a Number:
+			// avm1/global_instance_decls marks all 8 READ_ONLY).
+			if (obj->native_type == NATIVE_COLORTRANSFORM && prop_name_len >= 9 &&
+			    value_var.type != ACTION_STACK_VALUE_F64 && value_var.type != ACTION_STACK_VALUE_F32 &&
+			    ((prop_name_len == 13 && memcmp(prop_name, "redMultiplier", 13) == 0) ||
+			     (prop_name_len == 15 && memcmp(prop_name, "greenMultiplier", 15) == 0) ||
+			     (prop_name_len == 14 && memcmp(prop_name, "blueMultiplier", 14) == 0) ||
+			     (prop_name_len == 15 && memcmp(prop_name, "alphaMultiplier", 15) == 0) ||
+			     (prop_name_len == 9  && memcmp(prop_name, "redOffset", 9) == 0) ||
+			     (prop_name_len == 11 && memcmp(prop_name, "greenOffset", 11) == 0) ||
+			     (prop_name_len == 10 && memcmp(prop_name, "blueOffset", 10) == 0) ||
+			     (prop_name_len == 11 && memcmp(prop_name, "alphaOffset", 11) == 0))) {
+				value_var = makeF64(varToDoubleSWF(app_context, &value_var, g_swf_version));
+			}
 			// Filter property setters: validate and clamp values
 			if (obj->native_type == NATIVE_FILTER && prop_name_len >= 4) {
 				double dv = varToDoubleSimple(&value_var);
@@ -60022,6 +60292,18 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				// distance, bias, divisor: no validation, pass through
 				(void)handled;
+			}
+			// s30 w2-native-instance: nodeType / prefix / localName /
+			// namespaceURI are getter-only on XMLNode.prototype in FP32; a
+			// script write to a node is a no-op (avm1/global_instance_decls
+			// marks them READ_ONLY on XML and XMLNode instances).
+			if (((prop_name_len == 8  && memcmp(prop_name, "nodeType", 8) == 0) ||
+			     (prop_name_len == 6  && memcmp(prop_name, "prefix", 6) == 0) ||
+			     (prop_name_len == 9  && memcmp(prop_name, "localName", 9) == 0) ||
+			     (prop_name_len == 12 && memcmp(prop_name, "namespaceURI", 12) == 0)) &&
+			    xml_obj_has_native_slots(obj) && getProperty(obj, "nodeType", 8) != NULL)
+			{
+				return;
 			}
 			// XML node property write coercion: xmlDecl / docTypeDecl /
 			// contentType / nodeValue coerce the assigned value to a string,
@@ -63118,6 +63400,24 @@ void actionDelete(SWFAppContext* app_context)
 		return;
 	}
 
+	// s30 w2-native-instance: `new X()` stores __proto__ DONT_DELETE in FP32
+	// (avm1/global_instance_decls: every constructed instance that lists
+	// __proto__ marks it DONT_DELETE). An own __constructor__ is the mark of
+	// a `new`-built object; object literals / Object.prototype are untouched.
+	if (prop_name != NULL && prop_name_len == 9 && memcmp(prop_name, "__proto__", 9) == 0 &&
+	    hasPropertyRaw(obj, "__constructor__", 15))
+	{
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+		return;
+	}
+	// s30 w2-native-instance: an XML node field is a prototype getter in FP32;
+	// `delete node.firstChild` removes nothing (and must not drop our storage).
+	if (prop_name != NULL && avm1XmlOwnSlotIsNative(obj, prop_name, prop_name_len))
+	{
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+		return;
+	}
+
 	// Delete the property
 	bool success = deleteProperty(app_context, obj, prop_name, prop_name_len);
 
@@ -64461,6 +64761,12 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 					pushVar(app_context, pv);
 					found = 1;
 				}
+			}
+			// s30 w2b-native-residues: a proto-less native (ASnative) inherits nothing.
+			if (!found && avm1FuncHasNoProto(func))
+			{
+				pushUndefined(app_context);
+				found = 1;
 			}
 			// B6: in SWF5 the creation-time __proto__ (flagged 0x80, or the
 			// virtual one of a function without an own __proto__) is hidden,
@@ -66872,9 +67178,7 @@ void actionNewObject(SWFAppContext* app_context)
 		}
 		ASObject* node = xml_create_node(app_context, nodeType, nodeName, nodeNameLen, nodeValue, nodeValueLen);
 		// XMLNode is native only with 2+ args (nodeType AND value)
-		if (num_args >= 2) {
-			node->native_type = NATIVE_XMLNODE;
-		}
+		node->native_type = (num_args >= 2) ? NATIVE_XMLNODE : NATIVE_NONE;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) node);
 		return;
 	}
@@ -67163,6 +67467,22 @@ void actionNewObject(SWFAppContext* app_context)
 			pushBitmapDataConstruct(app_context, args, num_args);
 			return;
 		}
+		// s30 w2-native-instance: an alias of the XML constructor
+		// (`var C = eval("_global.XML"); new C(src)`, avm1/global_instance_decls)
+		// builds a real XML document, same as the named `new XML(src)` arm.
+		if (ctor_func != NULL && g_xml_constructor_init && ctor_func == &g_xml_constructor)
+		{
+			ASObject* xml_doc = xml_create_document(app_context);
+			xml_doc->native_type = NATIVE_XML;
+			if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				char _xml_alias_buf[4096];
+				u16_to_utf8(varGetU16Ptr(&args[0]), args[0].str_size, _xml_alias_buf, sizeof(_xml_alias_buf));
+				xml_parse_into(app_context, xml_doc, _xml_alias_buf, (u32)strlen(_xml_alias_buf));
+			}
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) xml_doc);
+			return;
+		}
 
 		if (ctor_func != NULL)
 		{
@@ -67173,16 +67493,46 @@ void actionNewObject(SWFAppContext* app_context)
 
 			// Set native_type for native-backed stub constructors
 			if (ctor_name != NULL) {
-				if (strcmp(ctor_name, "Sound") == 0) {
+				// s30 w2-native-instance: an ALIAS of a native constructor
+				// (`var C = eval("_global.flash.filters.GlowFilter"); new C()`,
+				// avm1/global_instance_decls) dispatches on the function's
+				// own name, as actionNewMethod does for `new flash.filters.X()`.
+				const char* _nat_name = ctor_name;
+				int _nat_alias = 0;
+				if (ctor_func->name[0] != '\0' && strcmp(ctor_func->name, ctor_name) != 0 &&
+				    ctor_func->simple_func == NULL && ctor_func->advanced_func == NULL) {
+					_nat_name = ctor_func->name;
+					_nat_alias = 1;
+				}
+				if (strcmp(_nat_name, "Sound") == 0) {
 					obj->native_type = NATIVE_SOUND;
 					initSoundTarget(app_context, obj, args, num_args);
 					// Transform is stored on the target (MC or global), not on the Sound object
 				}
-				else if (strcmp(ctor_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
-				else if (strcmp(ctor_name, "LocalConnection") == 0) obj->native_type = NATIVE_LOCALCONNECTION;
-				else if (strcmp(ctor_name, "MovieClipLoader") == 0) obj->native_type = NATIVE_MOVIECLIPLOADER;
-				else if (strcmp(ctor_name, "PrintJob") == 0) obj->native_type = NATIVE_PRINTJOB;
-				else if (strcmp(ctor_name, "Button") == 0) obj->native_type = NATIVE_BUTTON;
+				else if (strcmp(_nat_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
+				else if (strcmp(_nat_name, "LocalConnection") == 0) obj->native_type = NATIVE_LOCALCONNECTION;
+				else if (strcmp(_nat_name, "MovieClipLoader") == 0) obj->native_type = NATIVE_MOVIECLIPLOADER;
+				else if (strcmp(_nat_name, "PrintJob") == 0) obj->native_type = NATIVE_PRINTJOB;
+				else if (strcmp(_nat_name, "Button") == 0) obj->native_type = NATIVE_BUTTON;
+				else if (_nat_alias && (
+					strcmp(_nat_name, "BevelFilter") == 0 ||
+					strcmp(_nat_name, "BlurFilter") == 0 ||
+					strcmp(_nat_name, "ColorMatrixFilter") == 0 ||
+					strcmp(_nat_name, "ConvolutionFilter") == 0 ||
+					strcmp(_nat_name, "DisplacementMapFilter") == 0 ||
+					strcmp(_nat_name, "DropShadowFilter") == 0 ||
+					strcmp(_nat_name, "GlowFilter") == 0 ||
+					strcmp(_nat_name, "GradientBevelFilter") == 0 ||
+					strcmp(_nat_name, "GradientGlowFilter") == 0)) {
+					ActionVar _nsc_result = {0};
+					invokeNativeSuperConstructor(app_context, ctor_func, obj, args, num_args, &_nsc_result);
+				}
+				else if (_nat_alias && strcmp(_nat_name, "FileReference") == 0) {
+					obj->native_type = NATIVE_FILEREF;
+					filerefDefineOwnListeners(app_context, obj);
+				}
+				else if (_nat_alias && strcmp(_nat_name, "FileReferenceList") == 0)
+					filerefDefineOwnListeners(app_context, obj);
 			}
 
 			// Set __proto__ to constructor's prototype (for prototype chain inheritance)
@@ -68096,8 +68446,11 @@ void actionNewMethod(SWFAppContext* app_context)
 		initBitmapDataPrototype(app_context);
 		if (num_args >= 2)
 		{
-			double w = varToDouble(&args[0]);
-			double h = varToDouble(&args[1]);
+			// s30 w2b-native-residues: ToNumber, not a raw F32/F64 read. varToDouble on a STRING
+			// arg (`new BitmapData("100", "100")`, avm1/global_instance_decls) reinterpreted the
+			// string pointer's bits, so the result flipped with ASLR between runs.
+			double w = tsArgToDouble_ctx(app_context, &args[0]);
+			double h = tsArgToDouble_ctx(app_context, &args[1]);
 			bool valid = false;
 			if (g_swf_version >= 10)
 				valid = (w >= 1 && w <= 8191 && h >= 1 && h <= 8191 && w * h <= 16777215);
@@ -70527,7 +70880,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		xml_set_obj(app_context, obj, "attributes", 10, attrs);
 		ASObject* idmap = allocObject(app_context, 4);
 		xml_set_obj(app_context, obj, "idMap", 5, idmap);
-		xml_set_str(app_context, obj, "contentType", 11, "application/x-www-form-urlencoded", 33);
+		// s30 w2-native-instance: contentType inherits from XML.prototype.
 		// status is a virtual accessor on XML.prototype; the instance carries a
 		// hidden __xml_status slot defaulted to 0 (no own "status" data prop).
 		xml_store_status(app_context, obj, 0.0);
@@ -74259,6 +74612,13 @@ static int callArrayMethod(SWFAppContext* app_context,
 	// and any name in the props sidecar. Object.prototype.hasOwnProperty
 	// mis-casts an ASArray to ASObject, so handle it here (XML.as:354
 	// `childNodes.hasOwnProperty('length')`).
+	if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0 &&
+	    avm1ObjProtoMethodHiddenV5(method_name, method_name_len) &&
+	    (arr->props == NULL || getProperty(arr->props, method_name, method_name_len) == NULL))
+	{
+		pushUndefined(app_context);
+		return 1;
+	}
 	if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
 	{
 		int found = 0;
@@ -76953,6 +77313,24 @@ static int mcArmCaseMiss(const char* name, u32 len)
 // the tagged stubs, MovieClip.prototype still holds that stub (no script
 // override), the clip has no own override, and the tag hides it at the
 // running version (so an ASSetPropFlags unhide re-exposes it).
+// s30 w2b-native-residues: SWF5 hides the SWF6+ Object.prototype members (flash_flags 0x0080 on
+// g_object_prototype, initObjectPrototype). Receivers whose CallMethod arm hard-codes them
+// (function, array, clip) ask this first: FP32 SWF5 prints empty for `Array.hasOwnProperty(..)`
+// (w1-local-oracles/w2-native-table-land/v5.lnx.txt). Reads the live slot, so an
+// ASSetPropFlags unhide of Object.prototype re-exposes them.
+static int avm1ObjProtoMethodHiddenV5(const char* name, u32 len)
+{
+	if (g_swf_version >= 6 || g_object_prototype == NULL) return 0;
+	static const char* const k_v6[] = { "hasOwnProperty", "isPropertyEnumerable", "isPrototypeOf",
+	                                    "watch", "unwatch", "addProperty", NULL };
+	for (int i = 0; k_v6[i] != NULL; i++) {
+		if (strlen(k_v6[i]) != len || strncasecmp(k_v6[i], name, len) != 0) continue;
+		ASProperty* p = findPropertyRaw(g_object_prototype, k_v6[i], len);
+		return p != NULL && isPropertyHiddenAtVersion(p->flash_flags);
+	}
+	return 0;
+}
+
 static int mcArmVersionHidden(SWFAppContext* app_context, MovieClip* mc, const char* name, u32 len)
 {
 	static const char* const k_gated[] = {
@@ -78855,6 +79233,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 		}
 
+		// s30 w2b-native-residues: a proto-less native (ASnative) has no Function.prototype /
+		// Object.prototype methods; a method that is not own is undefined (FP32).
+		if (avm1FuncHasNoProto(func) && method_name_len > 0 &&
+		    (func->own_props == NULL || getProperty(func->own_props, method_name, method_name_len) == NULL))
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+
 		if (method_name_len == 4 && strncasecmp(method_name, "call", 4) == 0)
 		{
 			// Function.call(thisArg, arg1, arg2, ...)
@@ -79534,6 +79922,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
+		if (avm1ObjProtoMethodHiddenV5(method_name, method_name_len) &&
+		    (func == NULL || func->own_props == NULL ||
+		     getProperty(func->own_props, method_name, method_name_len) == NULL))
+		{
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 		if (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0)
 		{
 			// Functions have virtual own properties: constructor, prototype, __proto__
@@ -79899,6 +80295,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (mcArmCaseMiss(method_name, method_name_len)) goto _mc_user_dispatch; // s27 w2 lead 2
 		if (mc != NULL && !MC_IS_TEXTFIELD(mc) && !mc->is_button_mc &&
 		    mcArmVersionHidden(app_context, mc, method_name, method_name_len)) {
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
+		if (mc != NULL && avm1ObjProtoMethodHiddenV5(method_name, method_name_len) &&
+		    (mc->dynamic_props == NULL ||
+		     getProperty((ASObject*) mc->dynamic_props, method_name, method_name_len) == NULL)) {
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;

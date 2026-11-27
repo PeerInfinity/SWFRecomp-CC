@@ -1,0 +1,24 @@
+function: hasOwnProperty=undefined isPropertyEnumerable=undefined isPrototypeOf=undefined addProperty=undefined watch=undefined unwatch=undefined
+function hOP(x) call: false isPE(x) call: 
+object: hasOwnProperty=undefined isPropertyEnumerable=undefined isPrototypeOf=undefined addProperty=undefined watch=undefined unwatch=undefined
+object hOP(x) call:  isPE(x) call: 
+array: hasOwnProperty=undefined isPropertyEnumerable=undefined isPrototypeOf=undefined addProperty=undefined watch=undefined unwatch=undefined
+array hOP(x) call: false isPE(x) call: 
+clip: hasOwnProperty=undefined isPropertyEnumerable=undefined isPrototypeOf=undefined addProperty=undefined watch=undefined unwatch=undefined
+clip hOP(x) call: false isPE(x) call: false
+string: hasOwnProperty=undefined isPropertyEnumerable=undefined isPrototypeOf=undefined addProperty=undefined watch=undefined unwatch=undefined
+string hOP(x) call:  isPE(x) call: 
+ASnative typeof:function __proto__=undefined constructor=function prototype=undefined call=undefined apply=undefined toString=undefined valueOf=undefined hasOwnProperty=undefined addProperty=undefined
+ASnative hOP call: false toString call: [type Function] instanceof Function: false instanceof Object: false
+ASnative(2,0) typeof: function
+Object===_global.Object: false
+Key.constructor===_global.Object: false
+({}).constructor===_global.Object: false
+Object.prototype===_global.Object.prototype: false
+new Object instanceof _global.Object: false
+Math.constructor===Object: true ===_global.Object: false
+typeof Object.registerClass: function Object.__proto__===Function.prototype: true typeof Object.constructor: function
+Object keys: registerClass,
+after Object.prototype=5: object ({}).constructor===Object: true
+typeof _global.hasOwnProperty: undefined typeof _global.__proto__: undefined _global.hOP(Object): 
+Done

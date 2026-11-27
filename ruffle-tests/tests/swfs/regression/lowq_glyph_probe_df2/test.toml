@@ -8,12 +8,12 @@ num_ticks = 1
 # create_test_swf.py. max_outliers = our measured channels at s30 w2-lowq-land
 # (it guards the LOW glyph rule; it is NOT a Flash-exact pass).
 # s30 w2-lowq-land: 56139 at master; 52527 with the field-local pen rule.
-# The rest is mostly layout: FP32 advances this field's DefineFont2 glyphs by
-# ceil(advance px) (SWF_TF_LOW_ADV_CEIL=1: 12891, HOLD) and the 48 px row's
-# baseline sits 1 px lower in Flash.
+# s30 w2b-lowq-text: 12891 with the DefineFont2 ceil(advance px) rule, now on
+# for SWF >= 7 (this SWF is version 8). The rest: glyph raster (chords) and
+# the 48 px row's baseline, which sits 1 px lower in Flash.
 [image_comparisons.output]
 tolerance = 2
-max_outliers = 52527
+max_outliers = 12891
 
 [player_options]
 with_renderer = { optional = false, quality = "low" }

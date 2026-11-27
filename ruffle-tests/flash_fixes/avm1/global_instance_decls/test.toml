@@ -1,0 +1,5 @@
+num_ticks = 1
+known_failure = true
+# s30 coordinator: the FP32 golden was captured on a GMT+0200-in-April host (CEST);
+# needs the per-instant DST model in date.c (w2b-native-residues).
+mock_timezone = "CET-1CEST,M3.5.0,M10.5.0/3"
