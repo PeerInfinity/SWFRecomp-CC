@@ -1396,3 +1396,35 @@ and `gradientTransform.high.png` (README in the same directory).
 **Decision:** both `output.expected.png` goldens are replaced by the FP32 LOW capture via `ruffle-tests/flash_fixes/`
 (platform-stable, README rule 1). Both rows still fail; the residuals above are the honest Flash gap. Prune criterion:
 upstream ships a Flash LOW golden (the entry then prints `UPSTREAMED`).
+## AVM2 rm pool landed: Date capture host, debug `[file:line]`, freestanding `super`, interface aliases, `scrollV` (s29 w2-rm-avm2-land, 2026-11-26)
+
+Diagnosis: `SWFRecompDocs/plans/session29-fanout-reports/w1-rm-avm2-report.md`. Landing report:
+`SWFRecompDocs/plans/session29-fanout-reports/w2-rm-avm2-land-report.md`.
+
+1. **Date capture host (15 avmplus `ecma3/Date` rows).** The goldens are FP32 output on a US-Pacific Windows host
+   (current US DST rule applied to every year, e.g. `Fri Apr 3 17:00:00 GMT-0700 1970`), captured 2025-07-23 ~22:00 PDT.
+   Ruffle's runner pins a fixed +5:45 with no DST for every test (`DeterministicLocaleBackend`). Coordinator FP32
+   (`w1-local-oracles/w1-rm-avm2/e15_9_5_35_1.pst8pdt.fp32.txt`): Linux FP32 under host
+   `TZ=PST8PDT,M3.2.0,M11.1.0` is byte-identical to the `e15_9_5_35_1` golden. **Decision:** emulate the capture host
+   per test with the project-only `test.toml` keys `mock_timezone` (+ `mock_date_time` = the instant the golden prints),
+   delivered as flash_fixes `kind: "toml"` entries; AVM2 `Date` applies DST per timestamp (`avm2_date.c`).
+2. **FP debug-player `[file:line]` stack suffixes** (`avm2/try_catch_typed`, `event_handler_exception`,
+   `coerce_property`, and `swz`'s securityError report). FP32 (`w1-local-oracles/w1-rm-avm2/try_catch_typed.fp32.txt`)
+   prints `\tat Test()[Z:\tests\tests\swfs\avm2\try_catch_typed\Test.as:33]` and
+   `\tat test_fla::MainTimeline/frame1()[test_fla.MainTimeline::frame1:1]`; Ruffle prints no suffix. The DebugFile
+   string `root;pkg;file` is joined per avmplus `StackTrace::dumpFilename` (`\` if the string holds any backslash, else
+   `/`; a `;` after a separator is dropped). **Decision:** match Flash; `try_catch_typed` gets a flash_fixes
+   `output.txt` swap to the FP32 capture (pass → stays pass).
+3. **`super` in a freestanding function** (`avm2/freestanding_superclass`): FP resolves against Object and prints the
+   function; Ruffle raises VerifyError #1035. Match Flash.
+4. **Interface aliases survive a shadowing slot** (`avm2/weird_superinterface_properties`): `c.f` is undefined but
+   `(c as I).I::f` is still the base method in FP (Ruffle's own FIXME in `vtable.rs` `copy_interface_properties`). Match Flash.
+5. **`scrollV` survives a TextField `height =`** (clamped to maxScrollV) (`avm2/edittext_getcharboundaries_culling`):
+   the golden's scroll-4 block starts at line 3 for every height; Ruffle's `relayout` resets it. Match Flash.
+6. **Slot-id VerifyError #1107** (`avm2/slot_holes_fail`, `avm2/slot_id_exceeds_trait_count`): upstream goldens are
+   EMPTY by Ruffle convention (uncaught errors not compared). FP32 (`session28-fanout-reports/trace-provenance/avm2__slot_*.r1.txt`)
+   rejects the ABC (avmplus `Traits::buildBindings`: raw slot id > the trait block's `nameCount`) and logs
+   `VerifyError: Error #1107…` (+ `ReferenceError: Error #1065: Variable SlotTest is not defined.`). flash_fixes
+   `output.txt` swaps to the captures; we do not implement the check yet (lead O3), so both stay failing vs Flash.
+
+Prune criterion: Ruffle adopts the FP behaviour (per item), or upstream re-captures the goldens.

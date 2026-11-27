@@ -118,6 +118,13 @@ void avm2_stack_check(Avm2Context* ctx);
 // Debug call stack (avm2_class.c pushes/pops around every invocation).
 void avm2_callstack_push(Avm2Context* ctx, const Avm2MethodRef* m, Avm2Class* bound_class);
 void avm2_callstack_pop(Avm2Context* ctx);
+// DebugFile / DebugLine (debug SWFs): record the current method's source
+// position in its call frame; "[file:line]" then follows the frame's name in
+// stack traces, as in the FP debug player. Ignored unless the top frame IS the
+// emitted method `method_index` of act->file (a body run without its own
+// frame must never relabel its caller).
+void avm2_debug_file(Avm2Activation* act, uint32_t method_index, uint32_t str_idx);
+void avm2_debug_line(Avm2Activation* act, uint32_t method_index, uint32_t line);
 // FP's playerglobal is AS3 code that raises through Error.throwError, so an
 // "Error$/throwError()" frame sits atop the trace; its C++-implemented core
 // does NOT. Call this immediately before avm2_throw_error at the sites whose

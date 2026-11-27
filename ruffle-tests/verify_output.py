@@ -2633,6 +2633,52 @@ def get_mock_date_time(test_dir):
     return None
 
 
+def get_mock_timezone(test_dir):
+    """Parse mock_timezone from test.toml if present (a POSIX TZ string).
+
+    A project-only key, like mock_date_time / mock_platform: Ruffle's runner has
+    no per-test zone (DeterministicLocaleBackend is a FIXED +5:45 offset, no DST,
+    for every test), and every other test keeps the NPT-5:45 pin run_binary sets.
+    It exists for Flash goldens captured on a host in another zone: the avmplus
+    ecma3/Date rows were captured by Windows FP32 in US Pacific time, which
+    applies the CURRENT US DST rule to every year -- exactly what the POSIX rule
+    spelling "PST8PDT,M3.2.0,M11.1.0" gives glibc (never "America/Los_Angeles":
+    that zone file carries the historical rules, which Windows FP32 does not
+    use). Upstream test.toml files receive the key through flash_fixes entries.
+
+    Fail-safe: glibc silently treats a malformed TZ (no offset, unknown
+    name) as UTC, which would grade the row against the wrong zone with no
+    signal. So a present key must be a well-formed POSIX TZ string (std name
+    + offset, optional dst name/offset and ,start[/time],end[/time] rule).
+    Anything else -- an unparseable line, a tzdb name, a typo -- raises
+    ValueError, which the run loop books as runtime_error
+    ("invalid mock_timezone") instead of running under a fallback zone.
+    """
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return None
+    text = toml_path.read_text()
+    if not re.search(r'^\s*mock_timezone\s*=', text, re.MULTILINE):
+        return None
+    m = re.search(r'^\s*mock_timezone\s*=\s*"([^"]*)"\s*(?:#.*)?$', text,
+                  re.MULTILINE)
+    if not m:
+        raise ValueError("mock_timezone must be a double-quoted string")
+    tz = m.group(1)
+    if not _POSIX_TZ_RE.match(tz):
+        raise ValueError(f"mock_timezone {tz!r} is not a POSIX TZ rule string")
+    return tz
+
+
+# POSIX TZ (IEEE 1003.1 §8.3), the forms glibc parses without a zone file.
+_TZ_NAME = r'(?:[A-Za-z]{3,}|<[A-Za-z0-9+-]{3,}>)'
+_TZ_OFF = r'[+-]?\d{1,2}(?::\d{2}(?::\d{2})?)?'
+_TZ_DATE = r'(?:J\d{1,3}|\d{1,3}|M\d{1,2}\.[1-5]\.[0-6])'
+_TZ_RULE = rf'{_TZ_DATE}(?:/[+-]?\d{{1,3}}(?::\d{{2}}(?::\d{{2}})?)?)?'
+_POSIX_TZ_RE = re.compile(
+    rf'^{_TZ_NAME}{_TZ_OFF}(?:{_TZ_NAME}(?:{_TZ_OFF})?(?:,{_TZ_RULE},{_TZ_RULE})?)?$')
+
+
 def get_mock_platform(test_dir):
     """Parse mock_platform from test.toml if present.
 
@@ -4874,6 +4920,25 @@ def main():
 
             # Set up capture triggers for image comparison tests
             run_env = {}
+            # mock_timezone: per-test host TZ (POSIX TZ string). Overrides the
+            # NPT pin below AND any TZ the CI job exports (run_binary applies
+            # extra_env after its setdefault). test_env.json can still win.
+            try:
+                mock_tz = get_mock_timezone(test_dir)
+            except ValueError as _tz_err:
+                stats["runtime_error"] += 1
+                fail_list.append(name)
+                fail_details[name] = f"invalid mock_timezone ({_tz_err})"
+                entry.update(status="runtime_error",
+                             detail=f"invalid mock_timezone: {_tz_err}",
+                             duration=round(time.monotonic() - test_start, 2))
+                test_results.append(entry)
+                if args.verbose:
+                    print(f"RUNTIME_ERROR (invalid mock_timezone: {_tz_err})")
+                save_incremental()
+                continue
+            if mock_tz:
+                run_env["TZ"] = mock_tz
             # Archipelago native __swfBridge: if the test ships a config, point the
             # runtime's native EI handler at it (installs the handler + connects
             # the rando_ap backend). Mirrors the browser's window.__swfBridge gate.

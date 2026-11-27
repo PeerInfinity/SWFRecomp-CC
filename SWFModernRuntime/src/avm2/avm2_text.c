@@ -860,6 +860,7 @@ static Avm2EditTextExt* edittext_of(Avm2Context* ctx, Avm2Object* obj)
 }
 
 static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et);
+static int32_t et_maxscroll(Avm2Context* ctx, Avm2EditTextExt* et);
 typedef struct Avm2StyleSheetExt Avm2StyleSheetExt;
 static Avm2StyleSheetExt* stylesheet_ext_of(Avm2Object* obj);
 static const struct Avm2TextFormatFields* stylesheet_style_for(
@@ -8751,7 +8752,14 @@ void avm2_text_set_height_px(Avm2Context* ctx, Avm2Object* obj, double value)
 	Avm2EditTextExt* et = ext->edittext;
 	et_apply_lazy_bounds(et);
 	et->bounds_h = isnan(value) ? 0 : twips_from_px(value);
+	// FP keeps scrollV across a height change (clamped to the new
+	// maxScrollV); Ruffle's relayout resets it to 1
+	// (avm2/edittext_getcharboundaries_culling scroll 2..4 blocks).
+	int32_t keep_scroll = et->scroll;
 	et_relayout(ctx, et);
+	int32_t max_scroll = et_maxscroll(ctx, et);
+	et->scroll = keep_scroll < max_scroll ? keep_scroll : max_scroll;
+	if (et->scroll < 1) et->scroll = 1;
 }
 
 // bounds_x/y_offset (Ruffle EditText::bounds_x_offset): scale * bounds

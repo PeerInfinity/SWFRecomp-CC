@@ -3508,6 +3508,15 @@ static Avm2Class* super_class_of(Avm2Activation* act)
 		{
 			return ctx->builtins.object_class;
 		}
+		// A FREESTANDING function (NewFunction, no declaring class) resolves
+		// super against Object in FP: avm2/freestanding_superclass prints
+		// AS3::hasOwnProperty's function for super.hasOwnProperty whether the
+		// closure runs as func(), new func() or func.call(obj). Ruffle (and we,
+		// before) raise VerifyError #1035 instead.
+		if (act->callee != NULL && act->file != NULL)
+		{
+			return ctx->builtins.object_class;
+		}
 	}
 	else if (frame_is_class_side(act))
 	{

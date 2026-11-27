@@ -1922,10 +1922,19 @@ namespace abc
 			// --- returns are handled by the caller (try-frame pop) ---
 
 			// Comment-only ops (the // <op> line above suffices).
+			// Debug-SWF source position: recorded in the method's call frame
+			// so stack traces print FP's "[file:line]" suffix
+			// (avm2/event_handler_exception). Release SWFs carry neither op.
+			case IrOpcode::DebugFile:
+				out << "\tavm2_debug_file(act, " << bc.method_index << ", "
+				    << op.arg1 << ");" << endl;
+				return true;
+			case IrOpcode::DebugLine:
+				out << "\tavm2_debug_line(act, " << bc.method_index << ", "
+				    << op.arg1 << ");" << endl;
+				return true;
 			case IrOpcode::CoerceA:
 			case IrOpcode::Debug:
-			case IrOpcode::DebugFile:
-			case IrOpcode::DebugLine:
 			case IrOpcode::Bkpt:
 			case IrOpcode::BkptLine:
 			case IrOpcode::Timestamp:

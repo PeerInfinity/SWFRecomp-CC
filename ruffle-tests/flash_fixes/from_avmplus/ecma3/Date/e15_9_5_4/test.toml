@@ -1,0 +1,7 @@
+num_ticks = 1
+known_failure = true
+# SWFRecomp flash_fixes (s29): emulate the FP32 capture host. The golden is
+# Windows FP32 in US Pacific time (current US DST rule for every year).
+mock_timezone = "PST8PDT,M3.2.0,M11.1.0"
+# Capture-time wall clock: the golden prints rows derived from new Date() at capture.
+mock_date_time = 1753333006000

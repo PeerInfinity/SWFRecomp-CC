@@ -823,8 +823,12 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 			// Protected/interface members are aliased under other
 			// namespaces (ancestor protected ns, interface ns); an
 			// override must update every alias that shared the old
-			// implementation.
-			for (uint32_t j = 0; j < vt->count; j++)
+			// implementation. Only a real OVERRIDE (same kind) re-points them:
+			// a slot that shadows an inherited method is not an override, and
+			// FP keeps the interface alias on the base method
+			// (avm2/weird_superinterface_properties: C's slot `f` hides B.f,
+			// yet `(c as I).I::f` is still B's method).
+			for (uint32_t j = 0; e.kind == old.kind && j < vt->count; j++)
 			{
 				Avm2PropEntry* o = &vt->entries[j];
 				if (o == existing) continue;

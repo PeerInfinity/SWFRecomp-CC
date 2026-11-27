@@ -101,7 +101,64 @@ void avm2_callstack_push(Avm2Context* ctx, const Avm2MethodRef* m, Avm2Class* bo
 	}
 	ctx->call_frames[ctx->call_depth].method = *m;
 	ctx->call_frames[ctx->call_depth].bound_class = bound_class;
+	ctx->call_frames[ctx->call_depth].debug_file = NULL;
+	ctx->call_frames[ctx->call_depth].debug_line = 0;
 	ctx->call_depth++;
+}
+
+static Avm2CallFrame* debug_frame_of(Avm2Activation* act, uint32_t method_index)
+{
+	Avm2Context* ctx = act->ctx;
+	if (ctx == NULL || ctx->call_depth == 0 || act->file == NULL) return NULL;
+	Avm2CallFrame* f = &ctx->call_frames[ctx->call_depth - 1];
+	if (f->method.file != act->file || f->method.method_index != method_index) return NULL;
+	return f;
+}
+
+void avm2_debug_file(Avm2Activation* act, uint32_t method_index, uint32_t str_idx)
+{
+	Avm2CallFrame* f = debug_frame_of(act, method_index);
+	if (f != NULL) f->debug_file = &act->file->data->strings[str_idx];
+}
+
+void avm2_debug_line(Avm2Activation* act, uint32_t method_index, uint32_t line)
+{
+	Avm2CallFrame* f = debug_frame_of(act, method_index);
+	if (f != NULL) f->debug_line = line;
+}
+
+// FP debug-player frame suffix "[file:line]". The Flash-IDE DebugFile string
+// is "<dir>;;<file>" (FP prints "<dir>\<file>"); frame scripts carry a bare
+// "test_fla.MainTimeline::frame1" (printed as-is).
+static uint32_t debug_suffix(const Avm2CallFrame* f, char* out, uint32_t cap)
+{
+	if (f->debug_file == NULL || cap < 4) return 0;
+	const char* s = f->debug_file->utf8;
+	uint32_t len = f->debug_file->len, n = 0;
+	// avmplus StackTrace::dumpFilename: the DebugFile string is
+	// "root;package/path;file" in the COMPILING host's path format. Each ';'
+	// becomes '\' if the string holds any backslash, else '/', and a ';'
+	// right after a separator (incl. a replaced one) is dropped -- so
+	// "Z:\dir;;Test.as" -> "Z:\dir\Test.as", "/Users/x;;Test.as" ->
+	// "/Users/x/Test.as" (avm2/swz's FP32 capture).
+	char sep = memchr(s, '\\', len) ? '\\' : '/';
+	int prev_slash = 0;
+	out[n++] = '[';
+	for (uint32_t i = 0; i < len && n + 16 < cap; i++)
+	{
+		char ch = s[i];
+		if (ch == ';')
+		{
+			if (prev_slash) continue;
+			ch = sep;
+			prev_slash = 1;
+		}
+		else
+			prev_slash = (ch == '/' || ch == '\\');
+		out[n++] = ch;
+	}
+	n += (uint32_t) snprintf(out + n, cap - n, ":%u]", f->debug_line);
+	return n;
 }
 
 void avm2_callstack_pop(Avm2Context* ctx)
@@ -313,7 +370,7 @@ static int class_is_error_family(Avm2Context* ctx, Avm2Class* cls)
 // skipping the error-constructor frames on top.
 static const Avm2String* callstack_snapshot(Avm2Context* ctx)
 {
-	char buf[4096];
+	char buf[16384];
 	uint32_t n = 0;
 	int64_t top = (int64_t) ctx->call_depth - 1;
 	while (top >= 0)
@@ -331,13 +388,15 @@ static const Avm2String* callstack_snapshot(Avm2Context* ctx)
 	// from the first frame below the Error-family constructors skipped above.
 	int64_t bottom = top - 63;
 	if (bottom < 0) bottom = 0;
-	for (int64_t i = top; i >= bottom && n + 200 < sizeof(buf); i--)
+	for (int64_t i = top; i >= bottom && n + 400 < sizeof(buf); i--)
 	{
 		char name[176];
+		char where[192];
 		avm2_callstack_frame_name(ctx, &ctx->call_frames[i], name, sizeof(name));
+		where[debug_suffix(&ctx->call_frames[i], where, sizeof(where))] = '\0';
 		n += (uint32_t) (name[0] == '\0'
 			? snprintf(buf + n, sizeof(buf) - n, "\n")
-			: snprintf(buf + n, sizeof(buf) - n, "\n\tat %s", name));
+			: snprintf(buf + n, sizeof(buf) - n, "\n\tat %s%s", name, where));
 	}
 	return avm2_string_new(ctx, buf, n);
 }

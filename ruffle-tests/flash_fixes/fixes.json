@@ -757,5 +757,203 @@
     "reason": "The upstream golden is Flash at quality HIGH (0 px vs FP32 HIGH at tol 3) but the row runs at quality LOW. FP32 LOW differs from it by 3 px / 9 ch over tol 3 (max 15); Linux == Windows. Grade the LOW row against Flash LOW.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-pixel-gaps-land golden swaps (text_field_mask, gradientTransform)",
     "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_22_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_22_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = Windows FP32 output (s28 trace-provenance.md row; GMT-0800/-0700 lines, current-rule DST for 1970/1998/1999)",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_28_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_28_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = Windows FP32 output (s28 trace-provenance.md row; GMT-0800/-0700 lines, current-rule DST for 1970/1998/1999)",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_29_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_29_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = Windows FP32 output (s28 trace-provenance.md row; GMT-0800/-0700 lines, current-rule DST for 1970/1998/1999)",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_35_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_35_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = Windows FP32 output (s28 trace-provenance.md row; GMT-0800/-0700 lines, current-rule DST for 1970/1998/1999)",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_10_10",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_10_10/test.toml",
+    "kind": "toml",
+    "evidence": "golden = Windows FP32 output (s28 trace-provenance.md row; GMT-0800/-0700 lines, current-rule DST for 1970/1998/1999)",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_10_11",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_10_11/test.toml",
+    "kind": "toml",
+    "evidence": "golden = Windows FP32 output (s28 trace-provenance.md row; GMT-0800/-0700 lines, current-rule DST for 1970/1998/1999)",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_10",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_10/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_11",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_11/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_12",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_12/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_13",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_13/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_15_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_15_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_17_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_17_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_10_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_10_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_12_1",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_12_1/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_avmplus/ecma3/Date/e15_9_5_4",
+    "file": "test.toml",
+    "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
+    "fix": "from_avmplus/ecma3/Date/e15_9_5_4/test.toml",
+    "kind": "toml",
+    "evidence": "golden = FP32 output captured in July/Aug 2025 on a US-Pacific host (wall-clock instant printed in output.txt; s28 trace-provenance lists it as 'untestable: today-dependent')",
+    "reason": "Host mismatch: the golden was captured by Windows FP32 on a US-Pacific host (current US DST rule applied to every year); our harness pins NPT-5:45. mock_timezone makes the run emulate the capture host. mock_date_time pins new Date() to the capture instant printed in the golden (rows/strings derived from 'now').",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w1-rm-avm2 Date capture host",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "avm2/try_catch_typed",
+    "file": "output.txt",
+    "upstream_sha256": "ad5e505a91c21ae4fb00a29a18a00063873e3df0fb86db01dcd03a16788fbcb2",
+    "fix": "avm2/try_catch_typed/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-rm-avm2/try_catch_typed.fp32.txt (s29 coordinator, LNX debug projector, direct pinned)",
+    "reason": "The SWF carries DebugFile/DebugLine ops and the FP32 debug player (the only player with getStackTrace) prints the [file:line] suffixes: '\\tat Test()[Z:\\\\tests\\\\tests\\\\swfs\\\\avm2\\\\try_catch_typed\\\\Test.as:33]' and '\\tat test_fla::MainTimeline/frame1()[test_fla.MainTimeline::frame1:1]'. The upstream golden (Ruffle, no suffixes) is not FP32 output. Ours (with s29 debug line info, bucket P) == FP32.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-rm-avm2-land FP debug-player [file:line] suffixes",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "avm2/slot_holes_fail",
+    "file": "output.txt",
+    "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fix": "avm2/slot_holes_fail/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__slot_holes_fail.r1.txt (s28 trace-provenance)",
+    "reason": "The upstream golden is EMPTY by Ruffle convention (its test.toml: uncaught errors are not compared). FP32 rejects the ABC at load (avmplus Traits::buildBindings: slot_id > the trait block's nameCount) and logs VerifyError #1107. Ours does not implement the check yet (O3): stays failing vs Flash.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-rm-avm2-land slot-id VerifyError #1107",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "avm2/slot_id_exceeds_trait_count",
+    "file": "output.txt",
+    "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fix": "avm2/slot_id_exceeds_trait_count/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__slot_id_exceeds_trait_count.r1.txt (s28 trace-provenance)",
+    "reason": "The upstream golden is EMPTY by Ruffle convention (its test.toml: uncaught errors are not compared). FP32 rejects the ABC at load (avmplus Traits::buildBindings: slot_id > the trait block's nameCount) and logs VerifyError #1107 + ReferenceError #1065 (document class SlotTest never defined). Ours does not implement the check yet (O3): stays failing vs Flash.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-rm-avm2-land slot-id VerifyError #1107",
+    "added": "2026-11-26"
   }
 ]

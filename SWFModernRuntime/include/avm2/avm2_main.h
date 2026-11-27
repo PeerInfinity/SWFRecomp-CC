@@ -24,6 +24,11 @@ typedef struct Avm2CallFrame
 {
 	Avm2MethodRef method;
 	Avm2Class* bound_class;
+	// Debug-SWF position (DebugFile / DebugLine ops, written by the emitted
+	// body via avm2_debug_file / avm2_debug_line). NULL / 0 = none: release
+	// SWFs carry no debug ops, and the stack trace then prints no suffix.
+	const Avm2String* debug_file;
+	uint32_t debug_line;
 } Avm2CallFrame;
 
 struct Avm2Context

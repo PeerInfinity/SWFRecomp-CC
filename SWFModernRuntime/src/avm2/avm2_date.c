@@ -21,14 +21,17 @@
 //     setMonth 2) but the rule still holds — see FLASH_BUGS_REPLICATED.md
 //     §"[AVM2] Function.length on builtins deviates from ECMA-262".
 //
-//  3. Local time is a FIXED offset read once from the C library, with no DST
-//     term. The test harness pins TZ=NPT-5:45 (Nepal, no DST) for
-//     determinism, and the avmplus Date tests themselves assume a single
-//     whole-run offset (they compute one TZ_DIFF from
-//     `new Date(2000,1,1).getTimezoneOffset()` and adjust every hard-coded
-//     PST result array by it). A per-timestamp DST lookup would disagree with
-//     the tests in any zone that has DST, and agrees with this in any zone
-//     that doesn't.
+//  3. Local time is ECMA-262 LocalTZA + DaylightSavingTA(t), both read from
+//     the C library per timestamp (ensure_tza / dst_ta). The harness pins
+//     TZ=NPT-5:45 (Nepal, no DST), where this is a single fixed offset, so
+//     almost every test sees one whole-run offset. The avmplus ecma3/Date
+//     rows whose Flash goldens were captured in US Pacific time run with
+//     test.toml `mock_timezone = "PST8PDT,M3.2.0,M11.1.0"` (flash_fixes):
+//     Windows FP32 applies the CURRENT US DST rule to every year, which is
+//     what that POSIX rule spelling gives glibc. (The old fixed-offset model
+//     read the offset at the real wall clock, so a DST zone made results
+//     depend on the season of the run, and it never applied DST to a
+//     setMinutes/setHours result.)
 //
 // getYear/setYear are deliberately absent: AS3 dropped them, and
 // ecma3/Expressions/e11_2_1_1 asserts `typeof Date.prototype.getYear ==
@@ -213,34 +216,63 @@ static double time_clip(double t)
 // Local time zone (fixed offset — see the header comment)
 // ---------------------------------------------------------------------------
 
-static double g_local_tza_ms = 0.0;
+static double g_local_tza_ms = 0.0;   // LocalTZA: the STANDARD-time offset
 static int g_tza_init = 0;
+
+// Total UTC offset (standard + DST) the C library reports for instant `t`
+// (ms since the epoch). Returns NAN when the instant cannot be converted.
+static double c_offset_ms_at(double t)
+{
+	double secs = floor(t / 1000.0);
+	if (!(secs > -8.64e12 && secs < 8.64e12)) return NAN;
+	time_t tt = (time_t) secs;
+	struct tm local_tm;
+	if (localtime_r(&tt, &local_tm) == NULL) return NAN;
+	// Re-read the broken-down LOCAL fields as if they were UTC (this file's
+	// own §15.9.1 algebra, not timegm(): that is not declared under the
+	// runtime's -std flags, and an implicit-int timegm truncates every
+	// pre-1901 / post-2038 instant). The difference is the offset at `tt`.
+	double as_utc = make_date(make_day(local_tm.tm_year + 1900.0, local_tm.tm_mon,
+	                                   local_tm.tm_mday),
+	                          make_time(local_tm.tm_hour, local_tm.tm_min,
+	                                    local_tm.tm_sec, 0.0));
+	return as_utc - secs * 1000.0;
+}
 
 static void ensure_tza(void)
 {
 	if (g_tza_init) return;
 	g_tza_init = 1;
-	time_t now = time(NULL);
-	struct tm gmt_tm, local_tm;
-	if (gmtime_r(&now, &gmt_tm) == NULL || localtime_r(&now, &local_tm) == NULL)
-	{
-		return;
-	}
-	// timegm() reads the broken-down fields as if they were UTC, so the
-	// difference of the two is exactly the zone offset.
-	g_local_tza_ms = difftime(timegm(&local_tm), timegm(&gmt_tm)) * 1000.0;
+	// LocalTZA (ECMA-262 §15.9.1.8) is the standard-time offset. Sample the
+	// mock year's January and July: the smaller offset is standard time in
+	// either hemisphere (equal in a zone without DST, e.g. the NPT pin).
+	double jan = c_offset_ms_at(MOCK_DATE_TIME - 33.0 * MS_PER_DAY);
+	double jul = c_offset_ms_at(MOCK_DATE_TIME + 148.0 * MS_PER_DAY);
+	if (isnan(jan)) jan = 0.0;
+	if (isnan(jul)) jul = jan;
+	g_local_tza_ms = jan < jul ? jan : jul;
+}
+
+// DaylightSavingTA(t) (§15.9.1.9): the host's DST adjustment at UTC instant t.
+static double dst_ta(double t)
+{
+	ensure_tza();
+	if (isnan(t)) return 0.0;
+	double off = c_offset_ms_at(t);
+	if (isnan(off)) return 0.0;
+	return off - g_local_tza_ms;
 }
 
 static double local_time(double t)
 {
 	ensure_tza();
-	return t + g_local_tza_ms;
+	return t + g_local_tza_ms + dst_ta(t);
 }
 
 static double utc_time(double t)
 {
 	ensure_tza();
-	return t - g_local_tza_ms;
+	return t - g_local_tza_ms - dst_ta(t - g_local_tza_ms);
 }
 
 // ---------------------------------------------------------------------------
@@ -524,10 +556,10 @@ static const char* const MONTH_NAMES[12] = { "Jan", "Feb", "Mar", "Apr",
                                              "Sep", "Oct", "Nov", "Dec" };
 
 // Flash's zone suffix: "GMT+0545" / "GMT-0800".
-static void format_zone(char* buf, size_t n)
+static void format_zone(char* buf, size_t n, double utc_ms)
 {
 	ensure_tza();
-	double off_min = g_local_tza_ms / MS_PER_MINUTE;
+	double off_min = (g_local_tza_ms + dst_ta(utc_ms)) / MS_PER_MINUTE;
 	char sign = off_min < 0.0 ? '-' : '+';
 	int abs_min = (int) fabs(off_min);
 	snprintf(buf, n, "GMT%c%02d%02d", sign, abs_min / 60, abs_min % 60);
@@ -577,7 +609,7 @@ static Avm2Value format_date(Avm2Activation* act, DateFormat fmt)
 	int mi = (int) min_from_time(t);
 	int ss = (int) sec_from_time(t);
 	char zone[16];
-	format_zone(zone, sizeof(zone));
+	format_zone(zone, sizeof(zone), m);
 
 	char buf[128];
 	switch (fmt)
