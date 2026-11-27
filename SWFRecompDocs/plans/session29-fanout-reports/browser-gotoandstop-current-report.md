@@ -1,7 +1,7 @@
 # s29 browser-gotoandstop-current: a goto to the frame a clip already shows
 
 One-task local slice, browser ladder. It follows `browser-attached-goto`; that slice's report §4 and §5 were this slice's brief.
-Base `d6c7e74cd` (docs only since `bfa47037b`, the CI baseline). Code + fixtures land in one commit (SHA in the coordinator message and `git log`).
+Base `d6c7e74cd` (docs only since `bfa47037b`, the CI baseline). **Code + fixtures landed in `c91637b7a`.** That commit's message says "docs(s29): launch order update" because the coordinator committed from the shared tree while this slice's hunks were staged. Its runtime and fixture content is exactly this slice's change set. Re-verified on that tree (after `faeaaba4b`): both fixtures pass in both native modes, and `avm1_nested_child_swapdepths_remove` fails as designed.
 
 ## 1. Verdict
 
