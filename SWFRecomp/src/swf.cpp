@@ -5748,6 +5748,18 @@ namespace SWFRecomp
 					cur_pos += export_name.length() + 1;  // +1 for null terminator
 					// Emit registration call in tagInit
 					tag_init << endl << "\ttagRegisterExport(app_context, \"" << export_name << "\", " << charId(export_char_id) << ");";
+					// FP32 (s28 export_timing probe): an export in a frame the
+					// playhead has not reached yet is not attachable. Register it
+					// up front (imports and font lookups still see it) but gate
+					// attachMovie until this frame runs. The release goes into the
+					// frame prologue in stream order with DoInitAction/ImportAssets
+					// (an init action of the same frame may attach it:
+					// gnash misc-ming.all/register_class/registerClassTest2).
+					if (next_frame_i > 1)
+					{
+						tag_init << endl << "\ttagExportDeferToFrame(app_context, \"" << export_name << "\");";
+						current_frame_init_actions << "\t" << "tagExportFrameReached(app_context, \"" << export_name << "\");" << endl;
+					}
 					// Embedded-font name registry: an export name wins over
 					// every font name, and an export of a non-font hides the
 					// name. An export of a not-yet-defined id is ignored.

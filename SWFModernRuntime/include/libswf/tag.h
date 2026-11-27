@@ -230,6 +230,9 @@ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u1
 void tagVideoFrame(SWFAppContext* app_context, u16 char_id, u16 frame_num,
     const unsigned char* payload, size_t payload_size);
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
+void tagExportDeferToFrame(SWFAppContext* app_context, const char* name);
+void tagExportFrameReached(SWFAppContext* app_context, const char* name);
+size_t ng_lookupExportForMovieReached(const char* name, u8 movie_id);
 void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const char* export_name);
 
 // Run a DoInitAction script, guarded by once-per-character-id.

@@ -6698,6 +6698,20 @@ static ActionVar actionEI_toAS(SWFAppContext* app_context, ActionVar* args, u32 
 		VAL(double, &result.data.numeric_value) = d;
 		return result;
 	}
+	if (name_len == 5 && strncmp(name, "class", 5) == 0) {
+		// Flash's _toAS: `case "class": return eval(String(firstChild))`
+		// (gnash ExternalInterface.as:336-344: "foo" -> undefined,
+		// "Date" -> the Date constructor; FP32 golden).
+		char cbuf[256];
+		int clen = ei_get_firstChild_str(app_context, &args[0], cbuf, sizeof(cbuf) - 1);
+		cbuf[clen] = '\0';
+		if (clen <= 0) return result;
+		PUSH_STR(cbuf, (u32)clen);
+		actionGetVariable(app_context);
+		peekVar(app_context, &result);
+		POP();
+		return result;
+	}
 	return result;
 }
 
@@ -8622,6 +8636,32 @@ static void registerStringProtoValueOfSelf(ASObject* proto)
 // that observable answer through machinery that already exists (actionEquals2 ->
 // false; string concat -> toString -> "[object Object]") without inventing a
 // string here.
+// s29 MovieClip super context (w2-rm-avm1-gnash-land). FP32
+// (regression/avm1_mc_super_native_probe): `this.__proto__.__constructor__ =
+// Boolean/Number; super(v);` in a plain function called on a MovieClip gives
+// the CLIP a hidden primitive that Boolean.prototype.toString/valueOf (resp.
+// Number.prototype.toString/valueOf) read back when installed as the clip's
+// own methods; the wrong-type native, String.prototype.toString included,
+// answers undefined on a clip. The primitive lives under a script-unreachable
+// DontEnum key on the clip's dynamic_props.
+#define MC_NATIVE_PRIM_KEY "\x01mc_native_prim"
+#define MC_NATIVE_PRIM_KEY_LEN 15
+// Receiver of a NATIVE called as a MovieClip own method (the MC user-method
+// arm of actionCallMethod passes this_obj = NULL); set only around that call.
+static MovieClip* g_mc_native_recv = NULL;
+static ASFunction* g_mc_native_func = NULL;
+// Distinct identities for Number.prototype.valueOf/toString and
+// Boolean.prototype.valueOf (same C bodies as the shared wrapper natives, so
+// every `advanced_func ==` check still matches); Flash's are distinct natives.
+static ASFunction g_num_proto_valueOf_func;
+static ASFunction g_num_proto_toString_func;
+static ASFunction g_bool_proto_valueOf_func;
+static ActionVar* mcNativePrim(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return NULL;
+	return getProperty((ASObject*) mc->dynamic_props, MC_NATIVE_PRIM_KEY, MC_NATIVE_PRIM_KEY_LEN);
+}
+
 static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	ActionVar ret;
@@ -8629,6 +8669,15 @@ static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* 
 	ret.str_size = 0;
 	ret.data.numeric_value = 0;
 
+	if (this_obj == NULL && g_mc_native_recv != NULL)
+	{
+		ActionVar* mp = mcNativePrim(g_mc_native_recv);
+		if (mp != NULL &&
+		    ((g_mc_native_func == &g_bool_proto_valueOf_func && mp->type == ACTION_STACK_VALUE_BOOLEAN) ||
+		     (g_mc_native_func == &g_num_proto_valueOf_func && mp->type == ACTION_STACK_VALUE_F64)))
+			ret = *mp;
+		return ret;
+	}
 	if (this_obj != NULL)
 	{
 		ASObject* obj = (ASObject*) this_obj;
@@ -8670,6 +8719,14 @@ static ActionVar builtin_string_proto_valueOf(SWFAppContext* app_context, Action
 {
 	ActionVar thisv = {0};
 	thisv.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL && g_mc_native_recv != NULL) {
+		// FP32: String.prototype.valueOf as a clip's own method -> the path.
+		thisv.type = ACTION_STACK_VALUE_MOVIECLIP;
+		thisv.data.numeric_value = (u64)(uintptr_t) g_mc_native_recv;
+		char mbuf[1024];
+		u32 mn = (u32) varToStringBuf(app_context, &thisv, mbuf, sizeof(mbuf));
+		return makeStringActionVar(app_context, mbuf, mn);
+	}
 	if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_FUNCTION &&
 	    this_obj == g_call_this_fn_bag)
 		return makeStringActionVar(app_context, "[type Function]", 15);
@@ -8731,6 +8788,25 @@ static ActionVar builtin_prim_wrapper_toString(SWFAppContext* app_context, Actio
 	ret.str_size = 0;
 	ret.data.numeric_value = 0;
 
+	if (this_obj == NULL && g_mc_native_recv != NULL)
+	{
+		ActionVar* mp = mcNativePrim(g_mc_native_recv);
+		if (g_mc_native_func == &g_num_proto_toString_func && mp != NULL && mp->type == ACTION_STACK_VALUE_F64)
+		{
+			// Format through a throwaway Number wrapper (radix arm included).
+			ASObject* tmp = allocObject(app_context, 2);
+			tmp->native_type = NATIVE_NUMBER;
+			setProperty(app_context, tmp, "valueOf_value", 13, mp);
+			MovieClip* saved_recv = g_mc_native_recv;
+			g_mc_native_recv = NULL;
+			ActionVar r = builtin_prim_wrapper_toString(app_context, args, arg_count, registers, tmp);
+			g_mc_native_recv = saved_recv;
+			releaseObject(app_context, tmp);
+			return r;
+		}
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
+		return ret;
+	}
 	if (this_obj != NULL)
 	{
 		ASObject* obj = (ASObject*) this_obj;
@@ -8836,6 +8912,15 @@ static int g_wrapper_funcs_init = 0;
 static ASFunction g_bool_proto_toString_func;
 static ActionVar builtin_bool_proto_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
+	if (this_obj == NULL && g_mc_native_recv != NULL)
+	{
+		ActionVar* mp = mcNativePrim(g_mc_native_recv);
+		if (mp != NULL && mp->type == ACTION_STACK_VALUE_BOOLEAN)
+		{
+			const char* bs = mp->data.numeric_value ? "true" : "false";
+			return makeStringActionVar(app_context, bs, (u32) strlen(bs));
+		}
+	}
 	if (this_obj == NULL || getProperty((ASObject*) this_obj, "valueOf_value", 13) == NULL)
 	{
 		ActionVar u = {0};
@@ -8866,6 +8951,33 @@ static void installBoolProtoToString(SWFAppContext* app_context, ASObject* proto
 	v.type = ACTION_STACK_VALUE_FUNCTION;
 	v.data.numeric_value = (u64) &g_bool_proto_toString_func;
 	setPropertyWithFlags(app_context, proto, "toString", 8, &v, PROPERTY_FLAG_WRITABLE);
+}
+
+// Give a Number/Boolean prototype its own valueOf/toString identity (see
+// g_num_proto_valueOf_func). Only a slot still holding the shared wrapper
+// native is swapped.
+static void distinctPrimProtoSlot(ASObject* proto, const char* name, u32 len,
+                                  ASFunction* shared, ASFunction* clone)
+{
+	if (proto == NULL) return;
+	ASProperty* p = findPropertyRaw(proto, name, len);
+	if (p == NULL || p->getter != NULL || p->value.type != ACTION_STACK_VALUE_FUNCTION
+	    || p->value.data.numeric_value != (u64)(uintptr_t) shared) return;
+	if (clone->advanced_func == NULL)
+	{
+		*clone = *shared;
+		if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = clone;
+	}
+	p->value.data.numeric_value = (u64)(uintptr_t) clone;
+}
+static void installPrimProtoDistinct(ASObject* proto, int is_number)
+{
+	if (is_number) {
+		distinctPrimProtoSlot(proto, "valueOf", 7, &g_wrapper_valueOf_func, &g_num_proto_valueOf_func);
+		distinctPrimProtoSlot(proto, "toString", 8, &g_prim_wrapper_toString_func, &g_num_proto_toString_func);
+	} else {
+		distinctPrimProtoSlot(proto, "valueOf", 7, &g_wrapper_valueOf_func, &g_bool_proto_valueOf_func);
+	}
 }
 
 // Get or create the global Object.prototype
@@ -10676,6 +10788,16 @@ static ActionVar transformMatrixGetter(SWFAppContext* app_context, ActionVar* ar
 	if (!flashGeomClassAvailable("Matrix", 6)) return r;
 	double a, b, c, d, tx, ty;
 	getLocalMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
+	// FP32 (regression/avm1_rotation_matrix_fixed): a matrix Flash rebuilt
+	// from _rotation/_xscale/_yscale holds 16.16 fixed-point a/b/c/d
+	// (cos 30 deg -> 0.86602783203125, 90 deg multiples exact). Read-back
+	// only; the renderer keeps its float matrix.
+	if ((mc->as_set_flags & (4|8|16)) && !mc_exact_matrix_live(mc)) {
+		a = round(a * 65536.0) / 65536.0;
+		b = round(b * 65536.0) / 65536.0;
+		c = round(c * 65536.0) / 65536.0;
+		d = round(d * 65536.0) / 65536.0;
+	}
 	ASObject* mat = makeMatrixObject(app_context, a, b, c, d, tx, ty);
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) mat;
@@ -17514,6 +17636,33 @@ static ActionVar builtin_mc_meth(SWFAppContext* app_context, ActionVar* args,
 	return result;
 }
 
+// Flash's MovieClip.prototype.loadVariables / getURL / loadMovie are AS
+// wrappers that ALWAYS call `this.meth(method)` to turn the method argument
+// into 0/1/2 (gnash MovieClip.as:2251-2305, FP32 golden: a user `_root.meth`
+// runs once per call, even with no arguments). Our natives parse the method
+// themselves, which equals the builtin meth, so only a REPLACED meth needs
+// to run. Returns 1 and sets *out_method when a user meth ran.
+static int mcInvokeUserMeth(SWFAppContext* app_context, ActionVar* recv,
+                            ActionVar* method_arg, u8* out_method)
+{
+	if (recv == NULL || g_execution_halted) return 0;
+	pushVar(app_context, recv);
+	PUSH_STR("meth", 4);
+	actionGetMember(app_context);
+	ActionVar fv;
+	popVar(app_context, &fv);
+	if (fv.type != ACTION_STACK_VALUE_FUNCTION || fv.data.numeric_value == 0) return 0;
+	ASFunction* f = (ASFunction*) fv.data.numeric_value;
+	if (f->function_type == 2 && f->advanced_func == (Function2Ptr) builtin_mc_meth) return 0;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ActionVar arg = method_arg ? *method_arg : undef;
+	ActionVar r = invokeFunctionValue(app_context, f, recv, &arg, 1, NULL);
+	double d = varToDouble(&r);
+	*out_method = (d == 1.0) ? 1 : (d == 2.0) ? 2 : 0;
+	return 1;
+}
+
 // MovieClip.prototype.getSWFVersion as a real builtin so it works when aliased
 // onto a plain Object (e.g. `o.getSWFVersion = MovieClip.prototype.getSWFVersion`).
 // MOVIECLIP/TextField receivers are handled by the dedicated case in
@@ -17554,6 +17703,16 @@ static ActionVar builtin_mc_getURL(SWFAppContext* app_context, ActionVar* args,
 	(void)registers; (void)this_obj;
 	ActionVar result = {0};
 	result.type = ACTION_STACK_VALUE_UNDEFINED;
+	u8 user_meth_method = 0;
+	int user_meth_ran = 0;
+	{
+		ActionVar recv = as_this(this_obj);
+		if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_MOVIECLIP)
+			recv.type = ACTION_STACK_VALUE_MOVIECLIP;
+		if (recv.type != ACTION_STACK_VALUE_UNDEFINED)
+			user_meth_ran = mcInvokeUserMeth(app_context, &recv, num_args > 2 ? &args[2] : NULL, &user_meth_method);
+	}
+	(void)user_meth_ran; (void)user_meth_method;
 #if SWF_LOG_FETCH_ENABLED
 	if (num_args == 0) return result;
 	char url_utf8[512], window_utf8[512], method_utf8[32];
@@ -36720,8 +36879,11 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 		markTransformedByScript(mc);
 		return;
 	}
-	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
-	double prev_sy = (double)mc->yscale / 100.0;
+	// Flash resets a negative scale to positive on a _width/_height write
+	// (gnash MovieClip.as:1517-1529, FP32: _yscale -50 -> 50 after
+	// `_width = 10`); Ruffle keeps the sign.
+	double prev_sx = fabs((double)mc->xscale) / 100.0;  // unit scale
+	double prev_sy = fabs((double)mc->yscale) / 100.0;
 	double rot_rad = (double)mc->rotation * 3.14159265358979323846 / 180.0;
 	double c = fabs(cos(rot_rad));
 	double s = fabs(sin(rot_rad));
@@ -36770,8 +36932,11 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 		markTransformedByScript(mc);
 		return;
 	}
-	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
-	double prev_sy = (double)mc->yscale / 100.0;
+	// Flash resets a negative scale to positive on a _width/_height write
+	// (gnash MovieClip.as:1517-1529, FP32: _yscale -50 -> 50 after
+	// `_width = 10`); Ruffle keeps the sign.
+	double prev_sx = fabs((double)mc->xscale) / 100.0;  // unit scale
+	double prev_sy = fabs((double)mc->yscale) / 100.0;
 	double rot_rad = (double)mc->rotation * 3.14159265358979323846 / 180.0;
 	double c = fabs(cos(rot_rad));
 	double s = fabs(sin(rot_rad));
@@ -41399,8 +41564,16 @@ static int avm1LoadFormIntoMC(SWFAppContext* app_context, MovieClip* mc, const c
 
 	// Heap, not a 4097-byte stack buffer: decoding expands (up to 3x) and
 	// parseURLEncodedVars mutates its argument.
+	// SWF6+ Flash drops a leading UTF-8 BOM (gnash MovieClip.as:2209, FP32:
+	// `_root.var1 == 'val1'` from a BOM-prefixed vars.txt; Ruffle keeps it
+	// in the first name). SWF5 decodes it as cp1252 bytes (:2212).
+	const unsigned char* fbytes = (const unsigned char*) data->content;
+	if (cs == LEGACY_CS_UTF8 && len >= 3 && fbytes[0] == 0xEF && fbytes[1] == 0xBB && fbytes[2] == 0xBF) {
+		fbytes += 3;
+		len -= 3;
+	}
 	char* buf = (cs == LEGACY_CS_UTF8)
-		? formFlashLenientUtf8((const unsigned char*) data->content, len)
+		? formFlashLenientUtf8(fbytes, len)
 		: legacy_charset_to_utf8((const unsigned char*) data->content, len, cs, NULL);
 	if (buf != NULL) {
 		parseURLEncodedVars(app_context, buf, mc);
@@ -42713,6 +42886,7 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
     return result;
 }
 
+void actionCancelPendingLoadsFor(MovieClip* mc);
 static ActionVar builtin_mcl_unloadClip(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
@@ -42764,6 +42938,10 @@ static ActionVar builtin_mcl_unloadClip(SWFAppContext* app_context, ActionVar* a
         actionUnregisterLevelAdvance(target_mc);
         actionClearChildMovieShell(app_context, target_mc);  // s26 w2 phase 5
     }
+    // A still-queued load of the same target is cancelled, as mc.unloadMovie
+    // already does (FP32 avm1/load_cancel_via_unloadclip: onLoadStart only,
+    // the child never runs and onLoadInit never fires).
+    actionCancelPendingLoadsFor(target_mc);
 
     VAL(u64, &result.data.numeric_value) = 1;
     return result;
@@ -50756,6 +50934,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		}
 		setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
 		installBoolProtoToString(app_context, g_ctors[4].prototype_obj);
+		installPrimProtoDistinct(g_ctors[4].prototype_obj, 0);
+		installPrimProtoDistinct(g_ctors[3].prototype_obj, 1);
 
 		// Array.prototype (g_ctors[1]) — unify with g_array_constructor_static
 		// Both constructors must share the same prototype_obj = g_array_prototype
@@ -51378,6 +51558,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 			_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 			setPropertyWithFlags(app_context, sec_extra_ctors[i]->prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
 			if (i == 2) installBoolProtoToString(app_context, sec_extra_ctors[i]->prototype_obj);  // Boolean
+			if (i == 1 || i == 2) installPrimProtoDistinct(sec_extra_ctors[i]->prototype_obj, i == 1);
 			// Set prototype property on own_props
 			if (sec_extra_ctors[i]->own_props != NULL) {
 				ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
@@ -60532,7 +60713,10 @@ void actionSetMember(SWFAppContext* app_context)
 					double _t = isfinite(d) ? fmod(trunc(d), 256.0) : 0.0;
 					if (_t < 0) _t += 256.0;
 					int idx = (int)_t;
-					if (idx >= 0 && idx <= 14) {
+					// FP32 (gnash MovieClip.as:2375-2380, Linux + Windows): 0 is
+					// ignored (keeps "multiply"), 1..14 select, 15 is stored and
+					// reads back as "" (an unnamed mode); 16+ is ignored.
+					if (idx >= 1 && idx <= 15) {
 						mc->blend_mode = (u8)idx;
 					}
 					// Out of range after byte truncation: keep previous value
@@ -60542,7 +60726,7 @@ void actionSetMember(SWFAppContext* app_context)
 				// renderer reads (tagPlaceObject3 writes the same field). Without this
 				// a script-set mc.blendMode is a pixel no-op.
 				if (mc->display_obj != NULL)
-					((DisplayObject*) mc->display_obj)->blend_mode = mc->blend_mode;
+					((DisplayObject*) mc->display_obj)->blend_mode = (mc->blend_mode == 15) ? 1 : mc->blend_mode;
 				return;
 			}
 			// opaqueBackground setter (Ruffle avm1/globals/movie_clip.rs
@@ -64823,7 +65007,7 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 				"alpha", "erase", "overlay", "hardlight"
 			};
 			int bm = mc->blend_mode;
-			const char* name = (bm >= 0 && bm <= 14) ? blend_mode_names[bm] : "normal";
+			const char* name = (bm >= 0 && bm <= 14) ? blend_mode_names[bm] : (bm == 15) ? "" : "normal";
 			PUSH_STR((char*)name, strlen(name));
 			return;
 		}
@@ -70313,6 +70497,82 @@ static const char* const k_swf6_string_methods[] = {
 	"substr", "substring", "toLowerCase", "toString", "toUpperCase", "valueOf", NULL
 };
 
+// s29 MovieClip super context (see actionCallFunction's `super` arm).
+// Returns the clip when `this` is a MovieClip that no active super context
+// belongs to (registerClass constructors push one with the clip as
+// companion / its dynamic_props as receiver), else NULL.
+static MovieClip* mcSuperOnDemandClip(SWFAppContext* app_context)
+{
+	PUSH_STR("this", 4);
+	actionGetVariable(app_context);
+	ActionVar tv;
+	popVar(app_context, &tv);
+	if (tv.type != ACTION_STACK_VALUE_MOVIECLIP || tv.data.numeric_value == 0) return NULL;
+	MovieClip* mc = (MovieClip*)(uintptr_t) tv.data.numeric_value;
+	if (hasSuperContext() && (getSuperMC() == (void*) mc ||
+	    (mc->dynamic_props != NULL && getSuperThis() == mc->dynamic_props)))
+		return NULL;
+	return mc;
+}
+
+static void mcSuperOnDemandCall(SWFAppContext* app_context, MovieClip* mc, ActionVar* args, u32 num_args)
+{
+	ActionVar tv = {0};
+	tv.type = ACTION_STACK_VALUE_MOVIECLIP;
+	tv.data.numeric_value = (u64)(uintptr_t) mc;
+	pushVar(app_context, &tv);
+	PUSH_STR("__proto__", 9);
+	actionGetMember(app_context);
+	ActionVar pv;
+	popVar(app_context, &pv);
+	ASObject* base_proto = NULL;
+	if (pv.type == ACTION_STACK_VALUE_OBJECT) base_proto = (ASObject*)(uintptr_t) pv.data.numeric_value;
+	else if (pv.type == ACTION_STACK_VALUE_ARRAY && pv.data.numeric_value != 0)
+		base_proto = ((ASArray*)(uintptr_t) pv.data.numeric_value)->props;
+	if (base_proto == NULL) return;
+	ASProperty* cp = findPropertyStructWithPrototype(base_proto, "__constructor__", 15);
+	if (cp == NULL) return;
+	ActionVar cv = (cp->getter != NULL) ? invokeVirtualGetter(app_context, cp, (void*) base_proto) : cp->value;
+	if (cv.type != ACTION_STACK_VALUE_FUNCTION || cv.data.numeric_value == 0) return;
+	ASFunction* ctor = (ASFunction*)(uintptr_t) cv.data.numeric_value;
+	if (ctor->simple_func == NULL && ctor->advanced_func == NULL)
+	{
+		// Native constructors. FP32: Boolean / Number store a hidden
+		// primitive on the clip; String (and the rest) leave nothing
+		// observable through the probe, so they stay no-ops.
+		ActionVar prim = {0};
+		if (strcmp(ctor->name, "Boolean") == 0) {
+			prim.type = ACTION_STACK_VALUE_BOOLEAN;
+			if (num_args > 0) {
+				pushVar(app_context, &args[0]);
+				actionNot(app_context);
+				actionNot(app_context);
+				popVar(app_context, &prim);
+			}
+		} else if (strcmp(ctor->name, "Number") == 0) {
+			double d = (num_args > 0) ? varToDouble(&args[0]) : 0.0;
+			prim = makeF64(d);
+		} else {
+			return;
+		}
+		if (mc->dynamic_props == NULL) mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
+		setPropertyWithFlags(app_context, (ASObject*) mc->dynamic_props, MC_NATIVE_PRIM_KEY, MC_NATIVE_PRIM_KEY_LEN,
+		                     &prim, PROPERTY_FLAGS_DONTENUM);
+		return;
+	}
+	// Script constructor: run it with the clip as `this`; a nested super()
+	// inside it resolves one level further up (base_proto.__proto__).
+	if (g_call_depth >= g_max_call_depth - 1) { g_execution_halted = 1; return; }
+	pushSuperContextWithMC((void*) base_proto, 1, (void*) mc);
+	InvokeOpts o = {0};
+	o.flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS | INV_VERSION_SWITCH |
+	          ((ctor->function_type == 1) ? INV_THIS_STACK : (INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR));
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, ctor, &tv, args, num_args, &o);
+	g_call_depth--;
+	popSuperContext();
+}
+
 void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
@@ -70365,7 +70625,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// undefined variable (no-op), matching Flash behavior.
 	if (func_name_len == 5 && strncmp(func_name, "super", 5) == 0 && g_swf_version >= 6)
 	{
-		if (hasSuperContext())
+		// s29 MovieClip super context: a plain function called on a clip
+		// (no registerClass constructor context for that clip) runs
+		// `super(...)` as this.__proto__.__constructor__ with the clip as
+		// `this` (FP32 regression/avm1_mc_super_native_probe: U(7) sets
+		// u=7, Boolean/Number give the clip a hidden primitive).
+		MovieClip* _sm_mc = mcSuperOnDemandClip(app_context);
+		if (_sm_mc != NULL)
+		{
+			mcSuperOnDemandCall(app_context, _sm_mc, args, num_args);
+		}
+		else if (hasSuperContext())
 		{
 			void* this_obj = getSuperThis();
 			u8 depth = getSuperDepth();
@@ -71806,7 +72076,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 			int depth_val = (int)varToDouble(&args[2]);
 			// Per-movie export isolation: look up in the calling MC's movie's exports
-			size_t char_id = ng_lookupExportForMovie(_am_buf1, mc->movie_id);
+			size_t char_id = ng_lookupExportForMovieReached(_am_buf1, mc->movie_id);
 			if (char_id != (size_t)-1) {
 				MovieClip* attached = ng_attachMovie(app_context, char_id, _am_buf2, depth_val, mc);
 				if (attached != NULL) {
@@ -75885,7 +76155,10 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 		ASArray* arr = allocArray(app_context, 4);
 		u32 count = 0;
 
-		if (delim_len == 0)
+		// SWF5: a multi-character delimiter does not split at all (FP32,
+		// gnash String.as:390-393 / 441-442: "aa".split("aa") == ["aa"]);
+		// it behaves like the empty delimiter below (limit 0 still → []).
+		if (delim_len == 0 || (swf_ver < 6 && delim_len > 1))
 		{
 			if (swf_ver < 6)
 			{
@@ -79828,7 +80101,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// (browser attached-timeline follow-up) after a DJ smoke test.
 
 				// Lookup exported symbol (per-movie isolation)
-				size_t char_id = ng_lookupExportForMovie(linkage_id, mc->movie_id);
+				size_t char_id = ng_lookupExportForMovieReached(linkage_id, mc->movie_id);
 				if (char_id != (size_t)-1 && new_name[0] != '\0') {
 					// Attach the movie
 					MovieClip* attached = ng_attachMovie(app_context, char_id, new_name, depth_val, mc);
@@ -83093,6 +83366,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 9 && strncasecmp(method_name, "loadMovie", 9) == 0)
 		{
 			// mc.loadMovie(url) — load a pre-compiled child SWF into this clip
+			if (mc != NULL) {
+				ActionVar _lm_recv = {0};
+				_lm_recv.type = ACTION_STACK_VALUE_MOVIECLIP;
+				_lm_recv.data.numeric_value = (u64)(uintptr_t) mc;
+				u8 _lm_um = 0;
+				mcInvokeUserMeth(app_context, &_lm_recv, num_args >= 2 ? &args[1] : NULL, &_lm_um);
+			}
 			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_STRING) {
 				char _lm_url[512];
 				const uint16_t* _lm_u16 = varGetU16Ptr(&args[0]);
@@ -83154,6 +83434,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// their `vars.txt` + onData tail. The GetURL2 TAG form
 			// (load_variables_flag) was already implemented; this is the
 			// method form, and both now share avm1LoadFormIntoMC.
+			u8 _lvm_user_method = 0;
+			int _lvm_user_meth = 0;
+			if (mc != NULL) {
+				ActionVar _lvm_recv = {0};
+				_lvm_recv.type = ACTION_STACK_VALUE_MOVIECLIP;
+				_lvm_recv.data.numeric_value = (u64)(uintptr_t) mc;
+				_lvm_user_meth = mcInvokeUserMeth(app_context, &_lvm_recv,
+					num_args >= 2 ? &args[1] : NULL, &_lvm_user_method);
+			}
 			if (mc != NULL && num_args >= 1) {
 				char _lvm_url[512];
 				varToStringBuf(app_context, &args[0], _lvm_url, sizeof(_lvm_url));
@@ -83167,6 +83456,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (strcasecmp(_lvm_m, "GET") == 0) _lvm_method = 1;
 					else if (strcasecmp(_lvm_m, "POST") == 0) _lvm_method = 2;
 				}
+				if (_lvm_user_meth) _lvm_method = _lvm_user_method;
 				if (_lvm_url[0] != '\0') {
 					avm1_log_form_fetch(app_context, mc, _lvm_url, _lvm_method);
 					if (avm1LoadFormIntoMC(app_context, mc, _lvm_url))
@@ -83601,8 +83891,21 @@ _mc_user_dispatch: ;
 							_mc_o.this_ptr = mc->dynamic_props;
 							g_call_this_type = ACTION_STACK_VALUE_MOVIECLIP;
 						}
+						// s29: the Boolean/Number/String prototype natives read
+						// the clip receiver (see g_mc_native_recv).
+						MovieClip* _mc_saved_nrecv = g_mc_native_recv;
+						ASFunction* _mc_saved_nfunc = g_mc_native_func;
+						if (func == &g_wrapper_valueOf_func || func == &g_prim_wrapper_toString_func ||
+						    func == &g_num_proto_valueOf_func || func == &g_num_proto_toString_func ||
+						    func == &g_bool_proto_valueOf_func || func == &g_bool_proto_toString_func ||
+						    func == &g_string_valueOf_func) {
+							g_mc_native_recv = mc;
+							g_mc_native_func = func;
+						}
 						ActionVar result = invokeFunctionValue(app_context, func, &this_var,
 						                                       args, num_args, &_mc_o);
+						g_mc_native_recv = _mc_saved_nrecv;
+						g_mc_native_func = _mc_saved_nfunc;
 						g_call_this_type = _mc_saved_call_this_type;
 
 						leaveClosureFrame(app_context, &cf);

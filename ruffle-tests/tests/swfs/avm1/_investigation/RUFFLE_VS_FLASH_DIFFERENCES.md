@@ -1477,3 +1477,30 @@ frames for children that are placed on this frame") runs `A, B, c1, c2`.
 inline target replay and the PlaceObject2 skip arms in `tag.c` run each
 target-frame child's deferred init at its own tag position
 (`ng_goto_inline_place_hook`). s29 w2-timers-goto-land.
+
+## s29 MovieClip method rules: super() on a clip `this`, `meth` hook, `_width` sign, form BOM, blendMode 0/15, 16.16 rotation matrix (s29 w2-rm-avm1-gnash-land, 2026-11-27)
+
+**Tests:** `from_gnash/actionscript.all/MovieClip-v5..v8`, `from_gnash/misc-ming.all/matrix_test` (FP32 goldens, all
+`ruffle_matched` before: Ruffle's `output.ruffle.txt` carries the same wrong lines); `regression/avm1_mc_super_native_probe`
+and `regression/avm1_rotation_matrix_fixed` (FP32 captures,
+`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-rm-avm1-gnash/`).
+
+FP32 differs from Ruffle on six MovieClip rules (evidence: `w1-rm-avm1-gnash-report.md`, `w2-rm-avm1-gnash-land-report.md`):
+1. `super(v)` from a plain function called on a clip calls `this.__proto__.__constructor__` with the clip as `this`
+   (`U(7)` sets `u = 7`); with `Boolean`/`Number` the clip answers `Boolean.prototype.toString/valueOf` (resp. Number's)
+   with the value; the wrong-type native and `String.prototype.toString` answer `undefined`; `String.prototype.valueOf`
+   gives the clip path.
+2. `MovieClip.prototype.loadVariables/getURL/loadMovie` call a user-replaced `this.meth(method)` once per call.
+3. A `_width`/`_height` write resets BOTH negative scales to positive (`_xscale -50, _yscale -50, _height = 10` →
+   `50, 50`); Ruffle keeps the signs.
+4. The SWF6+ form loader drops a leading UTF-8 BOM (Ruffle keeps it in the first variable name).
+5. `blendMode = 0` is ignored (keeps the previous mode); `= 15` is stored and reads back `""`.
+6. A matrix rebuilt from `_rotation`/`_xscale`/`_yscale` reads back 16.16 fixed point (`cos 30° = 0.86602783203125`,
+   90° multiples exact); Ruffle prints double trig (`0.866025403784439`, `8.74e-8`-class residues in `matrix_test`).
+
+Example (`MovieClip-v6` `output.fp23.txt` vs our old output): `PASSED: mcm == 1 [./MovieClip.as:2257]` vs
+`FAILED: expected: 1 obtained: 0` (×12), `PASSED: draw._yscale == 50 [./MovieClip.as:1520]` vs `obtained: -50`,
+`PASSED: mc.toString() == "false" [./MovieClip.as:2596]` vs `obtained: ` (undefined).
+
+**Decision:** match Flash (landed, `action.c`; rule 6 is read-back only, the renderer keeps its float matrix). Prune
+criterion: Ruffle adopts the rule, or a Flash capture contradicts it.

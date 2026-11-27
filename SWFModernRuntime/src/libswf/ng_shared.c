@@ -1335,6 +1335,7 @@ static struct ng_export_ent {
 	size_t char_id;
 	u8 swf_version;
 	u8 movie_id;
+	u8 frame_pending;   // export's frame not reached yet (attachMovie-invisible)
 } *ng_exported_symbols;
 static size_t ng_exported_symbols_cap = 0;
 static size_t ng_exported_symbol_count = 0;
@@ -1374,6 +1375,7 @@ static void ng_register_export_entry(const char* name, size_t char_id,
 		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
 		ng_exported_symbols[ng_exported_symbol_count].swf_version = swf_version;
 		ng_exported_symbols[ng_exported_symbol_count].movie_id = movie_id;
+		ng_exported_symbols[ng_exported_symbol_count].frame_pending = 0;
 		ng_exported_symbol_count++;
 	}
 }
@@ -1395,6 +1397,44 @@ size_t ng_lookupExportForMovie(const char* name, u8 movie_id)
 			&& strcasecmp(ng_exported_symbols[i].name, name) == 0)
 			result = ng_exported_symbols[i].char_id;
 	return result;
+}
+
+// attachMovie's lookup: like ng_lookupExportForMovie, but an export whose
+// ExportAssets frame the playhead has not reached is not found (FP32: a
+// frame-2 export attached on frame 1 gives undefined, s28 export_timing).
+size_t ng_lookupExportForMovieReached(const char* name, u8 movie_id)
+{
+	size_t result = (size_t)-1;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (ng_exported_symbols[i].movie_id == movie_id
+			&& strcasecmp(ng_exported_symbols[i].name, name) == 0)
+			result = ng_exported_symbols[i].frame_pending ? (size_t)-1 : ng_exported_symbols[i].char_id;
+	return result;
+}
+
+static void ng_export_set_pending(const char* name, u8 pending)
+{
+	int hit = 0;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (ng_exported_symbols[i].movie_id == g_current_movie_id
+			&& strcasecmp(ng_exported_symbols[i].name, name) == 0)
+		{ ng_exported_symbols[i].frame_pending = pending; hit = 1; }
+	if (!hit && !pending)
+		for (size_t i = 0; i < ng_exported_symbol_count; i++)
+			if (strcasecmp(ng_exported_symbols[i].name, name) == 0)
+				ng_exported_symbols[i].frame_pending = 0;
+}
+
+void tagExportDeferToFrame(SWFAppContext* app_context, const char* name)
+{
+	(void)app_context;
+	ng_export_set_pending(name, 1);
+}
+
+void tagExportFrameReached(SWFAppContext* app_context, const char* name)
+{
+	(void)app_context;
+	ng_export_set_pending(name, 0);
 }
 
 int ng_lookupExportVersion(const char* name)
