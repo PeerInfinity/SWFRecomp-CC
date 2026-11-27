@@ -1,0 +1,366 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action_queue.h b/SWFModernRuntime/include/actionmodern/action_queue.h
+index 84be8c23..c402a044 100644
+--- a/SWFModernRuntime/include/actionmodern/action_queue.h
++++ b/SWFModernRuntime/include/actionmodern/action_queue.h
+@@ -109,6 +109,10 @@ size_t actionAQGetOrderKey(void);
+ int actionAQOrderMergedEnabled(void);   // SWF_EXEC_ORDER_MERGED (default 1)
+ void actionAQOrderMark(ActionQueueOrderMark* m);
+ void actionAQOrderSortSince(const ActionQueueOrderMark* m);
++// s30 w1-exec-order: per-clip enterFrame before its own queued script.
++int actionAQExecEFEnabled(void);        // SWF_EXEC_ORDER_EF (default 1; needs MERGED)
++int actionAQExecHasPending(void);
++void actionAQRunExecNewer(SWFAppContext* app_context, size_t bound);
+ 
+ // Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by
+ // actionCall to isolate a called frame's drain from the outer drain's
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index a84cbf25..0ea966eb 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -44153,6 +44153,60 @@ extern void tagClipEFFireRemaining(SWFAppContext* app_context);
+ static int g_ef_clip_interleave = 0;
+ static int g_ef_dispatch_nest = 0;
+ 
++// s30 w1-exec-order: per-clip enterFrame before the clip's own queued script
++// (action_queue.c actionAQRunExecNewer). g_ef_mbound[i] = the newest
++// place_seq of an onEnterFrame method still to fire when the outermost method
++// pass is at cache slot i (slots <= i, live or snapshot), so a queued action
++// never runs ahead of a NEWER clip's pending enterFrame. Built only on ticks
++// with exec-block entries pending.
++static size_t* g_ef_mbound = NULL;
++static int g_ef_mbound_cap = 0;
++static int g_ef_mbound_n = 0;    // 0 = no bounds this pass (no interleave)
++static int g_ef_visit_i = -1;
++
++size_t actionEFPendingMethodBound(void)
++{
++	if (g_ef_mbound_n <= 0 || g_ef_visit_i < 0) return 0;
++	int i = g_ef_visit_i < g_ef_mbound_n ? g_ef_visit_i : g_ef_mbound_n - 1;
++	return g_ef_mbound[i];
++}
++
++static size_t ef_mbound_below(int i)
++{
++	if (g_ef_mbound_n <= 0 || i <= 0) return 0;
++	return g_ef_mbound[(i - 1) < g_ef_mbound_n ? (i - 1) : g_ef_mbound_n - 1];
++}
++
++static void ef_build_method_bounds(int top)
++{
++	g_ef_mbound_n = 0;
++	if (top <= 0 || !actionAQExecHasPending()) return;
++	if (top > g_ef_mbound_cap) {
++		int nc = g_ef_mbound_cap ? g_ef_mbound_cap : 64;
++		while (nc < top) nc *= 2;
++		size_t* nb = (size_t*) realloc(g_ef_mbound, (size_t)nc * sizeof(size_t));
++		if (nb == NULL) return;
++		g_ef_mbound = nb; g_ef_mbound_cap = nc;
++	}
++	for (int i = 0; i < top; i++) g_ef_mbound[i] = 0;
++	for (int k = 0; k < g_ef_snap_n; k++)
++		if (g_ef_snap[k].idx < top && g_ef_snap[k].place_seq > g_ef_mbound[g_ef_snap[k].idx])
++			g_ef_mbound[g_ef_snap[k].idx] = g_ef_snap[k].place_seq;
++	for (int i = 0; i < top && i < child_mc_count; i++) {
++		MovieClip* mc = child_mc_cache[i];
++		if (mc == NULL || mc->display_obj == NULL || mc->dynamic_props == NULL
++		    || mc->is_button_mc || actionIsLoadedLevelRootMC(mc)) continue;
++		size_t ps = ((DisplayObject*)mc->display_obj)->place_seq;
++		if (ps <= g_ef_mbound[i]) continue;
++		ActionVar* ef = getPropertyWithPrototype((ASObject*)mc->dynamic_props, "onEnterFrame", 12);
++		if (ef == NULL || ef->type != ACTION_STACK_VALUE_FUNCTION) continue;
++		g_ef_mbound[i] = ps;
++	}
++	for (int i = 1; i < top; i++)
++		if (g_ef_mbound[i - 1] > g_ef_mbound[i]) g_ef_mbound[i] = g_ef_mbound[i - 1];
++	g_ef_mbound_n = top;
++}
++
+ // Fire the snapshot entries for cache slot `idx` whose clip the advance removed.
+ static void ef_fire_removed_snapshot_slot(SWFAppContext* app_context, int idx)
+ {
+@@ -44167,6 +44221,10 @@ static void ef_fire_removed_snapshot_slot(SWFAppContext* app_context, int idx)
+ 		if (mc->ef_fired_tick == g_tick_count) continue;
+ 		mc->ef_fired_tick = g_tick_count;
+ 		if (g_ef_clip_interleave) tagClipEFFireNewerOrEqual(app_context, e->place_seq);
++		if (g_ef_clip_interleave && g_ef_mbound_n > 0) {  // s30 w1-exec-order
++			size_t mb = actionEFPendingMethodBound();
++			actionAQRunExecNewer(app_context, e->place_seq > mb ? e->place_seq : mb);
++		}
+ 		ef_invoke_handler(app_context, mc, e->func);
+ 	}
+ }
+@@ -44190,8 +44248,10 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
+ 	// order (children before parents).
+ 	int _ef_saved_interleave = g_ef_clip_interleave;
+ 	g_ef_clip_interleave = (++g_ef_dispatch_nest == 1);
++	if (g_ef_clip_interleave) { ef_build_method_bounds(_ef_top); g_ef_visit_i = -1; }
+ 	for (int i = _ef_top - 1; i >= 0; i--)
+ 	{
++		if (g_ef_clip_interleave) g_ef_visit_i = i;
+ 		if (g_ef_snap_n > 0) ef_fire_removed_snapshot_slot(app_context, i);
+ 		if (i >= child_mc_count) continue;
+ 		MovieClip* mc = child_mc_cache[i];
+@@ -44243,6 +44303,17 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
+ 			if (ef_mc_or_ancestor_removed(mc) || mc->dynamic_props == NULL) continue;
+ 		}
+ 
++		// s30 w1-exec-order: newer clips' queued actions first, then this
++		// clip's enterFrame, then (later) its own frame script.
++		if (g_ef_clip_interleave && g_ef_mbound_n > 0 && mc->display_obj != NULL
++		    && !actionIsLoadedLevelRootMC(mc)) {
++			size_t ps = ((DisplayObject*)mc->display_obj)->place_seq;
++			size_t mb = ef_mbound_below(i);
++			actionAQRunExecNewer(app_context, ps > mb ? ps : mb);
++			if (i >= child_mc_count || child_mc_cache[i] != mc) continue;
++			if (ef_mc_or_ancestor_removed(mc) || mc->dynamic_props == NULL) continue;
++		}
++
+ 		ASObject* props = (ASObject*) mc->dynamic_props;
+ 		ActionVar* ef_prop = getPropertyWithPrototype(props, "onEnterFrame", 12);
+ 		if (ef_prop == NULL || ef_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
+@@ -44314,7 +44385,9 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
+ 		g_current_context = ef_saved_base;
+ 		actionSetCurrentContext(saved_ctx);
+ 	}
++	if (g_ef_clip_interleave) g_ef_visit_i = -1;
+ 	if (g_ef_clip_interleave) tagClipEFFireRemaining(app_context);
++	if (g_ef_clip_interleave) g_ef_mbound_n = 0;
+ 	g_ef_dispatch_nest--;
+ 	g_ef_clip_interleave = _ef_saved_interleave;
+ 
+diff --git a/SWFModernRuntime/src/actionmodern/action_queue.c b/SWFModernRuntime/src/actionmodern/action_queue.c
+index c788b6c0..df37e4eb 100644
+--- a/SWFModernRuntime/src/actionmodern/action_queue.c
++++ b/SWFModernRuntime/src/actionmodern/action_queue.c
+@@ -20,6 +20,7 @@ typedef struct {
+ 	int queued_in_catchup;  // captured catch_up_mode at queue time
+ 	ActionQueueKind kind;
+ 	size_t order_key;       // s29 browser-attach-order: advancing clip's place_seq (0 = none)
++	size_t exec_key;        // s30 w1-exec-order: order_key kept after the block sort (0 = none)
+ } ActionQueueEntry;
+ 
+ // Read from libswf — global goto-catchup flag set during ng_executeGotoCatchUp.
+@@ -111,6 +112,7 @@ void actionQueueCallbackEx(SWFAppContext* app_context,
+ 	e->queued_in_catchup = catch_up_mode ? 1 : 0;
+ 	e->kind = kind;
+ 	e->order_key = g_aq_order_key;
++	e->exec_key = 0;
+ }
+ 
+ void actionQueueCallback(SWFAppContext* app_context,
+@@ -433,7 +435,7 @@ void actionAQOrderSortSince(const ActionQueueOrderMark* m)
+ 	// index no longer names the block's first entry. Leave the order alone.
+ 	if (g_aq_pops != m->pops || g_aq_count < m->count) return;
+ 	size_t n = g_aq_count - m->count;
+-	if (n < 2) return;
++	if (n == 0) return;
+ 	ActionQueueEntry* b = &g_aq[m->count];
+ 	// An entry queued with no advancing clip (key 0) rides with the entry before it.
+ 	for (size_t i = 1; i < n; i++)
+@@ -445,7 +447,87 @@ void actionAQOrderSortSince(const ActionQueueOrderMark* m)
+ 		while (j > 0 && b[j - 1].order_key < t.order_key) { b[j] = b[j - 1]; j--; }
+ 		b[j] = t;
+ 	}
+-	for (size_t i = 0; i < n; i++) b[i].order_key = 0;
++	for (size_t i = 0; i < n; i++) { b[i].exec_key = b[i].order_key; b[i].order_key = 0; }
++}
++
++// ---------------------------------------------------------------------------
++// s30 w1-exec-order: per-clip enterFrame immediately before that clip's own
++// queued frame script (n-exec-order-report.md section 2b, reqs 1 and 3).
++// Flash (gnash misc-ming action_order/action_execution_order_test11, Flash-
++// verified) and Ruffle (avm1/runtime.rs run_frame -> movie_clip.rs
++// run_frame_avm1) walk ONE exec list, newest instantiation first: each clip's
++// enterFrame (clip event + onEnterFrame), THEN what its advance queued (its
++// frame script, a newly placed child's onClipEvent(load)). Ours advances every
++// clip first (the s29-sorted exec block, entries tagged exec_key = advancing
++// clip's place_seq) and fires every enterFrame later, at the pre-DoAction
++// flush. The enterFrame dispatchers call actionAQRunExecNewer(bound) right
++// before each enterFrame with place_seq p, bound = max(p, every enterFrame
++// still pending this pass): it runs the queue-front ONLOAD/SCRIPT entries the
++// drain would pop next anyway, while their exec_key > bound. The queue order
++// itself never changes; only the enterFrames move later, between the block
++// entries. Kill switch SWF_EXEC_ORDER_EF=0 (browser -DSWF_EXEC_ORDER_EF_OFF);
++// also off with SWF_EXEC_ORDER_MERGED=0 (no exec block).
++// ---------------------------------------------------------------------------
++int actionAQExecEFEnabled(void)
++{
++	static int s = -1;
++#ifdef SWF_EXEC_ORDER_EF_OFF
++	s = 0;
++#endif
++	if (s < 0) {
++		const char* e = getenv("SWF_EXEC_ORDER_EF");
++		s = !(e && e[0] == '0') && actionAQOrderMergedEnabled();
++	}
++	return s;
++}
++
++int actionAQExecHasPending(void)
++{
++	if (!actionAQExecEFEnabled()) return 0;
++	for (size_t i = 0; i < g_aq_count; i++)
++		if (g_aq[i].exec_key != 0
++		    && (g_aq[i].kind == AQ_KIND_ONLOAD || g_aq[i].kind == AQ_KIND_SCRIPT)) return 1;
++	return 0;
++}
++
++void actionAQRunExecNewer(SWFAppContext* app_context, size_t bound)
++{
++	static int s_active = 0;
++	if (s_active || g_drain_suppress_depth > 0 || !actionAQExecEFEnabled()) return;
++	s_active = 1;
++	// Queued actions run outside the enterFrame dispatch window (the goto
++	// deferral rules key on it), as they do in the drain.
++	extern int g_inside_enterframe_dispatch;
++	int saved_inside = g_inside_enterframe_dispatch;
++	g_inside_enterframe_dispatch = 0;
++	for (;;) {
++		// Mirror actionDrainAllInPriorityOrder: construction kinds first.
++		int ctor = 0;
++		for (size_t i = 0; i < g_aq_count; i++) {
++			ActionQueueKind k = g_aq[i].kind;
++			if (k == AQ_KIND_CLIP_INIT || k == AQ_KIND_CLIP_CONSTRUCT
++			    || k == AQ_KIND_REGISTER_CTOR) { ctor = 1; break; }
++		}
++		if (g_unify_sprite_drain_flag)
++			actionFlushPendingSpriteScriptsToScriptQueue(app_context);
++		// The entry the drain pops next (aq_drain_one_onload_or_script).
++		int best = -1, best_pri = -1;
++		for (size_t i = 0; i < g_aq_count; i++) {
++			const ActionQueueEntry* e = &g_aq[i];
++			if (e->kind != AQ_KIND_ONLOAD && e->kind != AQ_KIND_SCRIPT) continue;
++			if ((int)e->priority > best_pri) { best_pri = (int)e->priority; best = (int)i; }
++		}
++		if (best < 0 || g_aq[best].exec_key <= bound) break;
++		if (ctor) {
++			actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
++			actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
++			actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
++			continue;
++		}
++		aq_drain_one_onload_or_script(app_context);
++	}
++	g_inside_enterframe_dispatch = saved_inside;
++	s_active = 0;
+ }
+ 
+ // Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index a510389c..8c815952 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -7540,6 +7540,16 @@ void tagClipEFFireNewerOrEqual(SWFAppContext* app_context, size_t place_seq)
+ {
+ 	while (g_clip_ef_pend_active && g_clip_ef_pend_pos < g_clip_ef_pend_n
+ 	       && g_clip_ef_pend[g_clip_ef_pend_pos].place_seq >= place_seq) {
++		// s30 w1-exec-order: the queued actions of clips newer than this one
++		// (and than every enterFrame still pending) run first (action_queue.c
++		// actionAQRunExecNewer). They may rebase g_clip_ef_pend (rebase frame).
++		{
++			extern size_t actionEFPendingMethodBound(void);
++			size_t ps = g_clip_ef_pend[g_clip_ef_pend_pos].place_seq;
++			size_t mb = actionEFPendingMethodBound();
++			actionAQRunExecNewer(app_context, ps > mb ? ps : mb);
++			if (!g_clip_ef_pend_active || g_clip_ef_pend_pos >= g_clip_ef_pend_n) break;
++		}
+ 		size_t e = g_clip_ef_pend_pos++;
+ 		// Clip events always ran outside the method pass's
+ 		// g_inside_enterframe_dispatch window (it changes root-goto handling).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/create_test_swf.py
+new file mode 100644
+index 00000000..656f795d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/create_test_swf.py
+@@ -0,0 +1,24 @@
++#!/usr/bin/env python3
++"""avm1_exec_order_sibling_interleave: AVM1 per-clip exec order, the `sibling`
++shape of ../avm1_exec_order_attached_selfremove/create_test_swf.py (timeline
++sprite `tl`, attachMovie'd `a` at root f1, attachMovie'd `b` at root f2; every
++clip has an onEnterFrame and frame scripts; `a`/`b` self-remove on frame 3).
++
++Pins: each clip's onEnterFrame runs immediately before ITS OWN queued frame
++script, clips newest-first, _root last (n-exec-order-report.md section 2b
++reqs 1-2; Ruffle avm1/runtime.rs run_frame + movie_clip.rs run_frame_avm1).
++Red before s30 w1-exec-order (ours ran every child enterFrame before any child
++frame script), green after. Kill switch: SWF_EXEC_ORDER_EF=0 restores red.
++
++Expected output: Ruffle exporter (local build) --frames 8 trace, from the
++s26 parked fixture (SWFRecompDocs/plans/n-exec-order-sibling-fixture/).
++A Flash Player 32 capture is requested in the s30 w1-exec-order report.
++
++Usage: create_test_swf.py <out.swf>   (byte-identical to the shipped test.swf)
++"""
++import os, subprocess, sys
++
++here = os.path.dirname(os.path.abspath(__file__))
++gen = os.path.join(here, "..", "avm1_exec_order_attached_selfremove", "create_test_swf.py")
++out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "test.swf")
++sys.exit(subprocess.call([sys.executable, gen, out, "sibling"]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/output.txt b/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/output.txt
+new file mode 100644
+index 00000000..30f573d8
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/output.txt
+@@ -0,0 +1,38 @@
++tl f1
++root f1
++a f1
++a ef
++a f2
++tl ef
++tl f2
++root ef a=movieclip b=undefined
++root f2
++b f1
++b ef
++b f2
++a ef
++a f3 remove
++tl ef
++tl f3
++root ef a=undefined b=movieclip
++root f3
++b ef
++b f3 remove
++tl ef
++tl f4
++root ef a=undefined b=undefined
++root f4
++tl ef
++tl f1
++root ef a=undefined b=undefined
++root f5
++tl ef
++tl f2
++root ef a=undefined b=undefined
++root f6
++tl ef
++tl f3
++root ef a=undefined b=undefined
++tl ef
++tl f4
++root ef a=undefined b=undefined
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/test.swf b/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c19471eed62dc9f2854c5f53a4289eb8c1cf7ad
+GIT binary patch
+literal 927
+zcmb_b-%7$z9RBP$r&&f<5=4$Jyw6z|foQngRR(q8Wz0BZ19h^7_y|71Zo23RdZXUO
+zzOxCAG70e<7~}W*&hLDGw%*{m_#prfwGOl|;GzKQ6kOedC0FT_uY%hUaRG=t{|)D{
+z4!lg9u|z-C0K>h4T}Nj-rjcUWV!(-;XC0|orV+|<Fq4F5P-XB=t`z|?Oi>TP%$MDf
+zKgCnEN(#WT6!V$q-WTPqbIgB8Z>AWaSjo}KsXND_aH)}EG(ub4=4eQXih>|gUe@C?
+z=!X;m2MJhbKy+O7Y5p<mQRKXOiFWEv;#f6_beKv72qyQFNQS*o<@C;&fZ89vs|=+}
+zl8@O@dAdE?)2z*W?hrHbM7DGdr-khGsS?XhzOZ2n_K)TeeT$5ld0Q+fZtY+rb+D`?
+k4|j2pqjz?Yd@5qi#f17XvX$nq%5_pX$(*`DUFR|28<Eb-C;$Ke
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/test.toml b/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/test.toml
+new file mode 100644
+index 00000000..fc915e37
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_exec_order_sibling_interleave/test.toml
+@@ -0,0 +1 @@
++num_frames = 8

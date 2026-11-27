@@ -7540,6 +7540,16 @@ void tagClipEFFireNewerOrEqual(SWFAppContext* app_context, size_t place_seq)
 {
 	while (g_clip_ef_pend_active && g_clip_ef_pend_pos < g_clip_ef_pend_n
 	       && g_clip_ef_pend[g_clip_ef_pend_pos].place_seq >= place_seq) {
+		// s30 w1-exec-order: the queued actions of clips newer than this one
+		// (and than every enterFrame still pending) run first (action_queue.c
+		// actionAQRunExecNewer). They may rebase g_clip_ef_pend (rebase frame).
+		{
+			extern size_t actionEFPendingMethodBound(void);
+			size_t ps = g_clip_ef_pend[g_clip_ef_pend_pos].place_seq;
+			size_t mb = actionEFPendingMethodBound();
+			actionAQRunExecNewer(app_context, ps > mb ? ps : mb);
+			if (!g_clip_ef_pend_active || g_clip_ef_pend_pos >= g_clip_ef_pend_n) break;
+		}
 		size_t e = g_clip_ef_pend_pos++;
 		// Clip events always ran outside the method pass's
 		// g_inside_enterframe_dispatch window (it changes root-goto handling).

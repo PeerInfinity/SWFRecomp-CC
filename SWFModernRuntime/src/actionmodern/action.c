@@ -44153,6 +44153,60 @@ extern void tagClipEFFireRemaining(SWFAppContext* app_context);
 static int g_ef_clip_interleave = 0;
 static int g_ef_dispatch_nest = 0;
 
+// s30 w1-exec-order: per-clip enterFrame before the clip's own queued script
+// (action_queue.c actionAQRunExecNewer). g_ef_mbound[i] = the newest
+// place_seq of an onEnterFrame method still to fire when the outermost method
+// pass is at cache slot i (slots <= i, live or snapshot), so a queued action
+// never runs ahead of a NEWER clip's pending enterFrame. Built only on ticks
+// with exec-block entries pending.
+static size_t* g_ef_mbound = NULL;
+static int g_ef_mbound_cap = 0;
+static int g_ef_mbound_n = 0;    // 0 = no bounds this pass (no interleave)
+static int g_ef_visit_i = -1;
+
+size_t actionEFPendingMethodBound(void)
+{
+	if (g_ef_mbound_n <= 0 || g_ef_visit_i < 0) return 0;
+	int i = g_ef_visit_i < g_ef_mbound_n ? g_ef_visit_i : g_ef_mbound_n - 1;
+	return g_ef_mbound[i];
+}
+
+static size_t ef_mbound_below(int i)
+{
+	if (g_ef_mbound_n <= 0 || i <= 0) return 0;
+	return g_ef_mbound[(i - 1) < g_ef_mbound_n ? (i - 1) : g_ef_mbound_n - 1];
+}
+
+static void ef_build_method_bounds(int top)
+{
+	g_ef_mbound_n = 0;
+	if (top <= 0 || !actionAQExecHasPending()) return;
+	if (top > g_ef_mbound_cap) {
+		int nc = g_ef_mbound_cap ? g_ef_mbound_cap : 64;
+		while (nc < top) nc *= 2;
+		size_t* nb = (size_t*) realloc(g_ef_mbound, (size_t)nc * sizeof(size_t));
+		if (nb == NULL) return;
+		g_ef_mbound = nb; g_ef_mbound_cap = nc;
+	}
+	for (int i = 0; i < top; i++) g_ef_mbound[i] = 0;
+	for (int k = 0; k < g_ef_snap_n; k++)
+		if (g_ef_snap[k].idx < top && g_ef_snap[k].place_seq > g_ef_mbound[g_ef_snap[k].idx])
+			g_ef_mbound[g_ef_snap[k].idx] = g_ef_snap[k].place_seq;
+	for (int i = 0; i < top && i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->display_obj == NULL || mc->dynamic_props == NULL
+		    || mc->is_button_mc || actionIsLoadedLevelRootMC(mc)) continue;
+		size_t ps = ((DisplayObject*)mc->display_obj)->place_seq;
+		if (ps <= g_ef_mbound[i]) continue;
+		ActionVar* ef = getPropertyWithPrototype((ASObject*)mc->dynamic_props, "onEnterFrame", 12);
+		if (ef == NULL || ef->type != ACTION_STACK_VALUE_FUNCTION) continue;
+		g_ef_mbound[i] = ps;
+	}
+	for (int i = 1; i < top; i++)
+		if (g_ef_mbound[i - 1] > g_ef_mbound[i]) g_ef_mbound[i] = g_ef_mbound[i - 1];
+	g_ef_mbound_n = top;
+}
+
 // Fire the snapshot entries for cache slot `idx` whose clip the advance removed.
 static void ef_fire_removed_snapshot_slot(SWFAppContext* app_context, int idx)
 {
@@ -44167,6 +44221,10 @@ static void ef_fire_removed_snapshot_slot(SWFAppContext* app_context, int idx)
 		if (mc->ef_fired_tick == g_tick_count) continue;
 		mc->ef_fired_tick = g_tick_count;
 		if (g_ef_clip_interleave) tagClipEFFireNewerOrEqual(app_context, e->place_seq);
+		if (g_ef_clip_interleave && g_ef_mbound_n > 0) {  // s30 w1-exec-order
+			size_t mb = actionEFPendingMethodBound();
+			actionAQRunExecNewer(app_context, e->place_seq > mb ? e->place_seq : mb);
+		}
 		ef_invoke_handler(app_context, mc, e->func);
 	}
 }
@@ -44190,8 +44248,10 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 	// order (children before parents).
 	int _ef_saved_interleave = g_ef_clip_interleave;
 	g_ef_clip_interleave = (++g_ef_dispatch_nest == 1);
+	if (g_ef_clip_interleave) { ef_build_method_bounds(_ef_top); g_ef_visit_i = -1; }
 	for (int i = _ef_top - 1; i >= 0; i--)
 	{
+		if (g_ef_clip_interleave) g_ef_visit_i = i;
 		if (g_ef_snap_n > 0) ef_fire_removed_snapshot_slot(app_context, i);
 		if (i >= child_mc_count) continue;
 		MovieClip* mc = child_mc_cache[i];
@@ -44240,6 +44300,17 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		// event fires before its method.
 		if (g_ef_clip_interleave && (mc->display_obj == NULL || actionIsLoadedLevelRootMC(mc))) {
 			tagClipEFFireRemaining(app_context);
+			if (ef_mc_or_ancestor_removed(mc) || mc->dynamic_props == NULL) continue;
+		}
+
+		// s30 w1-exec-order: newer clips' queued actions first, then this
+		// clip's enterFrame, then (later) its own frame script.
+		if (g_ef_clip_interleave && g_ef_mbound_n > 0 && mc->display_obj != NULL
+		    && !actionIsLoadedLevelRootMC(mc)) {
+			size_t ps = ((DisplayObject*)mc->display_obj)->place_seq;
+			size_t mb = ef_mbound_below(i);
+			actionAQRunExecNewer(app_context, ps > mb ? ps : mb);
+			if (i >= child_mc_count || child_mc_cache[i] != mc) continue;
 			if (ef_mc_or_ancestor_removed(mc) || mc->dynamic_props == NULL) continue;
 		}
 
@@ -44314,7 +44385,9 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		g_current_context = ef_saved_base;
 		actionSetCurrentContext(saved_ctx);
 	}
+	if (g_ef_clip_interleave) g_ef_visit_i = -1;
 	if (g_ef_clip_interleave) tagClipEFFireRemaining(app_context);
+	if (g_ef_clip_interleave) g_ef_mbound_n = 0;
 	g_ef_dispatch_nest--;
 	g_ef_clip_interleave = _ef_saved_interleave;
 

@@ -20,6 +20,7 @@ typedef struct {
 	int queued_in_catchup;  // captured catch_up_mode at queue time
 	ActionQueueKind kind;
 	size_t order_key;       // s29 browser-attach-order: advancing clip's place_seq (0 = none)
+	size_t exec_key;        // s30 w1-exec-order: order_key kept after the block sort (0 = none)
 } ActionQueueEntry;
 
 // Read from libswf — global goto-catchup flag set during ng_executeGotoCatchUp.
@@ -111,6 +112,7 @@ void actionQueueCallbackEx(SWFAppContext* app_context,
 	e->queued_in_catchup = catch_up_mode ? 1 : 0;
 	e->kind = kind;
 	e->order_key = g_aq_order_key;
+	e->exec_key = 0;
 }
 
 void actionQueueCallback(SWFAppContext* app_context,
@@ -433,7 +435,7 @@ void actionAQOrderSortSince(const ActionQueueOrderMark* m)
 	// index no longer names the block's first entry. Leave the order alone.
 	if (g_aq_pops != m->pops || g_aq_count < m->count) return;
 	size_t n = g_aq_count - m->count;
-	if (n < 2) return;
+	if (n == 0) return;
 	ActionQueueEntry* b = &g_aq[m->count];
 	// An entry queued with no advancing clip (key 0) rides with the entry before it.
 	for (size_t i = 1; i < n; i++)
@@ -445,7 +447,87 @@ void actionAQOrderSortSince(const ActionQueueOrderMark* m)
 		while (j > 0 && b[j - 1].order_key < t.order_key) { b[j] = b[j - 1]; j--; }
 		b[j] = t;
 	}
-	for (size_t i = 0; i < n; i++) b[i].order_key = 0;
+	for (size_t i = 0; i < n; i++) { b[i].exec_key = b[i].order_key; b[i].order_key = 0; }
+}
+
+// ---------------------------------------------------------------------------
+// s30 w1-exec-order: per-clip enterFrame immediately before that clip's own
+// queued frame script (n-exec-order-report.md section 2b, reqs 1 and 3).
+// Flash (gnash misc-ming action_order/action_execution_order_test11, Flash-
+// verified) and Ruffle (avm1/runtime.rs run_frame -> movie_clip.rs
+// run_frame_avm1) walk ONE exec list, newest instantiation first: each clip's
+// enterFrame (clip event + onEnterFrame), THEN what its advance queued (its
+// frame script, a newly placed child's onClipEvent(load)). Ours advances every
+// clip first (the s29-sorted exec block, entries tagged exec_key = advancing
+// clip's place_seq) and fires every enterFrame later, at the pre-DoAction
+// flush. The enterFrame dispatchers call actionAQRunExecNewer(bound) right
+// before each enterFrame with place_seq p, bound = max(p, every enterFrame
+// still pending this pass): it runs the queue-front ONLOAD/SCRIPT entries the
+// drain would pop next anyway, while their exec_key > bound. The queue order
+// itself never changes; only the enterFrames move later, between the block
+// entries. Kill switch SWF_EXEC_ORDER_EF=0 (browser -DSWF_EXEC_ORDER_EF_OFF);
+// also off with SWF_EXEC_ORDER_MERGED=0 (no exec block).
+// ---------------------------------------------------------------------------
+int actionAQExecEFEnabled(void)
+{
+	static int s = -1;
+#ifdef SWF_EXEC_ORDER_EF_OFF
+	s = 0;
+#endif
+	if (s < 0) {
+		const char* e = getenv("SWF_EXEC_ORDER_EF");
+		s = !(e && e[0] == '0') && actionAQOrderMergedEnabled();
+	}
+	return s;
+}
+
+int actionAQExecHasPending(void)
+{
+	if (!actionAQExecEFEnabled()) return 0;
+	for (size_t i = 0; i < g_aq_count; i++)
+		if (g_aq[i].exec_key != 0
+		    && (g_aq[i].kind == AQ_KIND_ONLOAD || g_aq[i].kind == AQ_KIND_SCRIPT)) return 1;
+	return 0;
+}
+
+void actionAQRunExecNewer(SWFAppContext* app_context, size_t bound)
+{
+	static int s_active = 0;
+	if (s_active || g_drain_suppress_depth > 0 || !actionAQExecEFEnabled()) return;
+	s_active = 1;
+	// Queued actions run outside the enterFrame dispatch window (the goto
+	// deferral rules key on it), as they do in the drain.
+	extern int g_inside_enterframe_dispatch;
+	int saved_inside = g_inside_enterframe_dispatch;
+	g_inside_enterframe_dispatch = 0;
+	for (;;) {
+		// Mirror actionDrainAllInPriorityOrder: construction kinds first.
+		int ctor = 0;
+		for (size_t i = 0; i < g_aq_count; i++) {
+			ActionQueueKind k = g_aq[i].kind;
+			if (k == AQ_KIND_CLIP_INIT || k == AQ_KIND_CLIP_CONSTRUCT
+			    || k == AQ_KIND_REGISTER_CTOR) { ctor = 1; break; }
+		}
+		if (g_unify_sprite_drain_flag)
+			actionFlushPendingSpriteScriptsToScriptQueue(app_context);
+		// The entry the drain pops next (aq_drain_one_onload_or_script).
+		int best = -1, best_pri = -1;
+		for (size_t i = 0; i < g_aq_count; i++) {
+			const ActionQueueEntry* e = &g_aq[i];
+			if (e->kind != AQ_KIND_ONLOAD && e->kind != AQ_KIND_SCRIPT) continue;
+			if ((int)e->priority > best_pri) { best_pri = (int)e->priority; best = (int)i; }
+		}
+		if (best < 0 || g_aq[best].exec_key <= bound) break;
+		if (ctor) {
+			actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+			actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+			actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+			continue;
+		}
+		aq_drain_one_onload_or_script(app_context);
+	}
+	g_inside_enterframe_dispatch = saved_inside;
+	s_active = 0;
 }
 
 // Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by

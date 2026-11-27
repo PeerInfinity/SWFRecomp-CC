@@ -109,6 +109,10 @@ size_t actionAQGetOrderKey(void);
 int actionAQOrderMergedEnabled(void);   // SWF_EXEC_ORDER_MERGED (default 1)
 void actionAQOrderMark(ActionQueueOrderMark* m);
 void actionAQOrderSortSince(const ActionQueueOrderMark* m);
+// s30 w1-exec-order: per-clip enterFrame before its own queued script.
+int actionAQExecEFEnabled(void);        // SWF_EXEC_ORDER_EF (default 1; needs MERGED)
+int actionAQExecHasPending(void);
+void actionAQRunExecNewer(SWFAppContext* app_context, size_t bound);
 
 // Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by
 // actionCall to isolate a called frame's drain from the outer drain's
