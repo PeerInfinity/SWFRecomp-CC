@@ -33,7 +33,7 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
 | w2-palettemap-land | w1-drift + FP32 | `avm2/bitmapdata_palettemap_opaque` new→pass; new `regression/avm2_bitmapdata_palettemap_index` | session_018CoDi4Bkz9NG5UkK7xk674 — DELIVERED, LANDED `ab49742e5` |
-| w2-text-coverage-land | w1-text-pixels + FP32 W1/W2 | rotated_glyphs/borders + edittext_border_transform .04/.06 bands toward goldens; new fixtures; 0 status moves | session_018CoDi3xgg2pUfZeojNd8Fe — launched |
+| w2-text-coverage-land | w1-text-pixels + FP32 W1/W2 | rotated_glyphs/borders + edittext_border_transform .04/.06 bands toward goldens; new fixtures; 0 status moves | session_018CoDi3xgg2pUfZeojNd8Fe — DELIVERED, LANDED `9c9be05ef` (batched cov runs; colour = floor((dst(16−n)+cn)/16) exact; W2: same rule fits shapes, triangle 563→170 px >2); F1 golden `574824001` |
 | w2-disposition-land | w1-disposition-audit + FP32 | native_objects_swf6, globals_swf5, loader_applicationDomain, dependent_strings mm→pass; swz mm (1/3); +2 regression rows; 3 flash_fixes | session_018CoDi5vBfv1NbGkZQQDNaU — launched |
 | w2-pixel-gaps-land | w1-pixel-flash-gaps + FP32 | bands toward Flash (place_object_test, shape_test, morph_test1, acid-shapes 243→88, avm1_color); 2 swaps (text_field_mask, gradientTransform) | session_018CoDi4gzPRPdoE9veAKVJK — launched |
 | w2-timers-goto-land | w1-timers-goto + FP32 | gnash gotoFrameFromInterval{,2} rm→pass; ~6 new regression rows | session_018CoDi7QhSDj7YUWLFHhnVN — launched |
@@ -45,3 +45,4 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
 | `45907020469` interim #1 | `4989a9dfb` 2 flash_fixes + fresh upstream download | **= ledger**: 4866 rows (4643 pass + 185 rm, 38 failing); only moves = 2 new rows (`avm1/bitmapdata_palettemap_values` pass, `avm2/bitmapdata_palettemap_opaque` mm, fixed later in `ab49742e5`). flash-fixes: APPLIED 64, 0 STALE / 0 UPSTREAMED. Results `e081322b5` | **= ledger**: `invalidClipDepth` fail→pass; `acid-filter` 432→104; 0 regressions (548 pass / 139 fail) | — |
+| `45914277386` interim #2 | `574824001` palettemap + text coverage | expected: `avm2/bitmapdata_palettemap_opaque` mm→pass; new pass: `regression/avm2_bitmapdata_palettemap_index`, `avm1_edittext_rotated_color`, `avm1_edittext_rotated_paragraph` (trace) | expected: rotated_glyphs/borders, edittext_border_transform .04/.06 bands toward goldens; new `rotated_color` pass; `rotated_paragraph` provisional budget (measure) | — |
