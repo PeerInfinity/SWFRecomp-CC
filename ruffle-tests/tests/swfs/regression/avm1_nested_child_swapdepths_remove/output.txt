@@ -1,0 +1,8 @@
+h d depth=-16380
+h d depth after swap=100
+h d after remove=undefined
+h a after remove (no swap)=movieclip
+t d depth=-16380
+t d depth after swap=100
+t d after remove=undefined
+t a after remove (no swap)=movieclip

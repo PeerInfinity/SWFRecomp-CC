@@ -1,0 +1,22 @@
+root f1 run
+drv tick 1
+  pre cf=2 r.x=10 r.y=0
+root f2 run cf=2 r.x=10 r.y=0
+root f2 after self gotoAndStop(2) cf=2 r.x=44 r.y=0
+drv tick 2
+  pre cf=2 r.x=44 r.y=0
+drv tick 3
+  pre cf=2 r.x=44 r.y=0
+  after gotoAndStop(2) cf=2 r.x=44 r.y=0
+drv tick 4
+  pre cf=2 r.x=44 r.y=0
+drv tick 5
+  pre cf=2 r.x=44 r.y=0
+  after gotoAndPlay(2) cf=2 r.x=44 r.y=66
+drv tick 6
+  pre cf=3 r.x=44 r.y=66
+root f3 run cf=3 r.x=44 r.y=66
+drv tick 7
+  pre cf=3 r.x=44 r.y=66
+drv tick 8
+  pre cf=3 r.x=44 r.y=66

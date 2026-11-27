@@ -1487,12 +1487,9 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			}
 			catch_up_mode = _gfbmc_saved_cm;
 		}
-		else
+		else if (obj->sprite_needs_init)
 		{
-			// Same frame: execute this frame's tags. Handles the case where
-			// sprite_current_frame was bumped after init but the target frame's
-			// tags were never actually executed (sprite was stopped before
-			// advance_sprite_frames could run them).
+			// Same frame on a clip whose frame 0 has not run yet: execute it.
 			// Increment place_gen so placement tags don't conflict with
 			// entries placed during the previous frame's execution.
 			extern size_t g_place_gen;
@@ -1500,6 +1497,13 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			if (frame < fc && ch->sprite_frame_funcs[frame] != NULL)
 				exec_sprite_frame(app_context, obj, ch->sprite_frame_funcs[frame]);
 		}
+		// else: a goto to the frame the clip already shows is a no-op beyond the
+		// stop/play below, in every build (Flash Player 32; Ruffle's AVM1
+		// no_op_goto). Re-running the frame's tags re-placed timeline children
+		// over script edits (Doodle Jump's breakable piece snapped back to _y=0 on
+		// every block.gotoAndStop(4)), and re-running its DoAction re-hit the
+		// frame's stop() so gotoAndPlay(current) never played on.
+		// Fixture: regression/avm1_goto_current_frame_clip (s29).
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 		// Finalize deferred removes from the synchronous replay. In browser-WASM,

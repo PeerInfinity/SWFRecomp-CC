@@ -1,0 +1,23 @@
+t S f1 run
+r1 h cf=1 a.x=0 b.y=10 c=movieclip d=undefined d.y=undefined e.x=undefined
+r1 t cf=1 a.x=0 b.y=10 c=movieclip d=undefined d.y=undefined e.x=undefined
+r1 n cf=1 a.x=0 b.y=10 c=movieclip d=undefined d.y=undefined e.x=undefined
+h S f1 run
+n S f1 run
+r2 h cf=2 a.x=50 b.y=10 c=undefined d=movieclip d.y=0 e.x=7
+r2 t cf=2 a.x=50 b.y=10 c=undefined d=movieclip d.y=0 e.x=7
+r2 n cf=1 a.x=0 b.y=10 c=movieclip d=undefined d.y=undefined e.x=undefined
+h S f2 run
+t S f2 run
+r3 pre h cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r3 pre t cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r3 post h cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r3 post t cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r4 pre h cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r4 pre t cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r4 post h cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r4 post t cf=2 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r5 h cf=3 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r5 t cf=3 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r6 h cf=3 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33
+r6 t cf=3 a.x=99 b.y=77 c=undefined d=movieclip d.y=55 e.x=33

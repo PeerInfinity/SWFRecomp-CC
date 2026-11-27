@@ -79046,7 +79046,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// processTimers' ng_runPendingRootGoto run it right after the
 					// calling script, as Flash does. Fixture:
 					// regression/avm1_timer_root_goto_stopped_gs.
-					if (force_root || mc == &root_movieclip) {
+					if ((force_root || mc == &root_movieclip) &&
+					    root_movieclip.currentframe == (int)frame0 + 1 &&
+					    !ng_isInsideSpriteInit()) {
+						// Root goto to the frame it already shows: a no-op beyond
+						// stop/play (Flash Player 32; fixture
+						// regression/avm1_goto_current_frame_root). The catch-up
+						// below re-ran the frame's DoAction.
+						extern int is_playing;
+						is_playing = is_play ? 1 : 0;
+					}
+					else if (force_root || mc == &root_movieclip) {
 						// Root goto via method call: always inline catch-up
 						// so RemoveObject2 fires synchronously and avm1_removed is set.
 						extern size_t next_frame;
@@ -79069,22 +79079,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 						if (is_play) is_playing = 1;
 					}
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-					// Browser only: gotoAndStop(N) on a clip already showing N
-					// rebuilds nothing, but still STOPS it (Flash: a goto to the
-					// current frame is a no-op beyond the stop). Without it, Doodle
-					// Jump's breakable re-calls block.gotoAndStop(4) on every
-					// re-collision and each call re-placed the break piece (charId 37)
-					// at _y=0, restarting its fall and pinning the platform's
-					// collision bounds at the hero. N's tileMC (attach, then
-					// gotoAndStop(1) on frame 1) needs the stop. CI's
-					// ng_gotoFrameByMC same-frame branch re-runs the frame's tags
-					// instead (open question, s28 browser-attached-goto report §4).
-					else if (!is_play && mc->display_obj != NULL &&
-					         mc->currentframe == (int)frame0 + 1) {
-						((DisplayObject*)mc->display_obj)->sprite_is_playing = 0;
-					}
-#endif
+					// A non-root goto to the frame the clip already shows only
+					// stops/plays it (every build since s29: ng_gotoFrameByMC's
+					// same-frame branch). The browser-only "gotoAndStop(current) =
+					// stop" guard that stood here is gone.
 					// Every build since s28 browser-attached-goto. The browser used
 					// to defer an attachMovie'd clip's goto to a tagShowFrame pass
 					// (advance_attached_clip_frames, deleted) whenever
