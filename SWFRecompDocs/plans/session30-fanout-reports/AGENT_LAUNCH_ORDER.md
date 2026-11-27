@@ -31,18 +31,23 @@ Upstream: `b7ff32d93..66f9073de` (11 commits; 1 new row `avm2/xmldocument_tostri
 
 | # | slug | task | session id |
 |---|---|---|---|
-| 1 | w1-drift-smalls | `briefs/w1-drift-smalls.md` | session_018CoDi3UKNCYNXQnaGSMtpt (launched 2026-11-27) |
-| 2 | w1-native-table | `briefs/w1-native-table.md` | session_018CoDi4Sch2FCj267pG7rvV (launched 2026-11-27) |
+| 1 | w1-drift-smalls | `briefs/w1-drift-smalls.md` | session_018CoDi3UKNCYNXQnaGSMtpt — DELIVERED: xmldocument_tostring 12→23/32 (rest = XMLNode fields as traits, M); flash_fixes 94 ALREADY, 0 STALE/UPSTREAMED; TextField tabIndex = u32 −1 sentinel + delete no-op (+2 fixtures pass; 'negative unsets' + 'null already OK' refuted); html_text_img_parsing CAN pass (we print the Windows side) but needs FP32 load count (98 vs 95); hittest_shapeflag 71 (layer boundary in path_data) + 296 (min stroke width ignores scale; 'integer-twip morph' refuted) fixed. Coordinator FP32: clips/buttons same tabIndex rule; per-case img load counts → w2-drift-smalls-land |
+| 2 | w1-native-table | `briefs/w1-native-table.md` | session_018CoDi4Sch2FCj267pG7rvV — DELIVERED: generated table prototype GO, 0 flips, all 6 rows Flash-ward (proto_decls 2593→878, _delete 2215→781); 76-row guard 0 moves; residue = ARRAY for..in proto walk (524 lines), instance layout, lazy/second-identity natives; real bug f.constructor===f fixed; 'golden flags are clean' refuted (DONT_ENUM unobservable for Object.prototype names). Coordinator FP32: SWF6/7/8 dumps; manufacturer 3/3 fresh runs agree (golden differs; not run-to-run) → w2-native-table-land, w2-array-forin-proto, w2-native-instance |
 | 3 | w1-exec-order | `briefs/w1-exec-order.md` (IMPLEMENTATION) | session_018CoDi3wxmmmZzx6LvZSqQy (launched 2026-11-27) |
 | 4 | w1-rm-avm1-gnash | `briefs/w1-rm-avm1-gnash.md` | session_018CoDi5SY1nuHbr85qkJ3v6 (launched 2026-11-27) |
 | 5 | w1-rm-avm2 | `briefs/w1-rm-avm2.md` | session_018CoDi826BFpNusgFJQzZLD (launched 2026-11-27) |
 | 6 | w1-lowq-residues | `briefs/w1-lowq-residues.md` | session_018CoDi5KLv9Hms3cZuawbmS (launched 2026-11-27) |
-| 7 | w1-stroke-geometry | `briefs/w1-stroke-geometry.md` | session_018CoDi3XoxSKf3YqHyc4Zjr (launched 2026-11-27) |
+| 7 | w1-stroke-geometry | `briefs/w1-stroke-geometry.md` | session_018CoDi3XoxSKf3YqHyc4Zjr — DELIVERED: **acid-shapes fail→PASS** from AVM2 drawing-API curve flattening at 0.01 px (HIGH only; owner `gfx_flatten_cmds`, not the stroker/lyon/swf.cpp); AA NOT needed (AA NO-GO stands, −6/−4 for 0 flips); acid-stroke-0 HOLD (LOW diagonal raster 59%); AVM2 seam twin 0 px; union weld REFUTED (slivers are downstream of an exact union). Coordinator FP32: curve scale probes + translucent round strokes (WIN==LNX) → w2-stroke-geometry-land |
 
 ## Wave 2 (cloud)
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
+| w2-drift-smalls-land | w1-drift-smalls + FP32 req 1/2 | +4 regression rows; xmldocument_tostring mm (23/32+); html_text_img_parsing rm→pass or HOLD; hittest_shapeflag 6→4 lines | session_018CoDi4C9JHcd8ig5dPBV6B |
+| w2-native-table-land | w1-native-table W2-a/c/d + per-version FP32 | 0 flips (W2-a), 6 rows Flash-ward; W2-c/d priced | session_018CoDi6z94o4EXoVajXQPSF |
+| w2-array-forin-proto | w1-native-table W2-b | proto_decls −~524 lines; array rows priced | session_018CoDi6z9pU14k8efCNVaqu |
+| w2-stroke-geometry-land | w1-stroke-geometry + FP32 probes | acid-shapes fail→pass; HIGH curve rows Flash-ward; timeline/AVM1 twins priced | (launching) |
+| w2-native-instance | w1-native-table W2-e | ExternalInterface-v8 rm→pass; instance_decls Flash-ward | session_018CoDi3bJoV7MPov8DtZfAQ |
 
 ## Grading runs
 
