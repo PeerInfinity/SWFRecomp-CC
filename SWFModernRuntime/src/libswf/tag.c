@@ -1329,19 +1329,11 @@ static void ng_sprite_park_no_end_tag(DisplayObject* obj)
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
-static void advance_sprite_frames_impl(SWFAppContext* app_context);
 void advance_sprite_frames(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) return;
 #endif
-	const size_t saved_key = actionAQGetOrderKey();
-	advance_sprite_frames_impl(app_context);
-	actionAQSetOrderKey(saved_key);
-}
-
-static void advance_sprite_frames_impl(SWFAppContext* app_context)
-{
 
 	// Iterate in reverse-instantiation order (largest place_seq first), mirroring
 	// Ruffle's clip_exec_list LIFO traversal in core/src/avm1/runtime.rs (push at
@@ -1400,10 +1392,6 @@ static void advance_sprite_frames_impl(SWFAppContext* app_context)
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
 		if (obj->attach_registration) continue; // timeline owned by the attached-clip pump
-		// s29 browser-attach-order: entries this clip's advance queues keep its
-		// exec-list slot (actionAQOrderSortSince). A nested recursion stamps its
-		// own children and restores this on return (key saved at entry).
-		if (obj->place_seq != 0) actionAQSetOrderKey(obj->place_seq);
 		Character* ch = &dictionary[obj->char_id];
 
 		// Recurse into button display lists to advance their sprite children
@@ -2014,19 +2002,11 @@ void ng_construct_pending_registerclass_sprites(SWFAppContext* app_context)
 // Deferred recursion pass: for each root-level sprite, swap into its display
 // list and call advance_sprite_frames (which will now recurse normally since
 // g_advance_defer_nested is 0).
-static void advance_nested_sprite_frames_impl(SWFAppContext* app_context);
 void advance_nested_sprite_frames(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) return;
 #endif
-	const size_t saved_key = actionAQGetOrderKey();
-	advance_nested_sprite_frames_impl(app_context);
-	actionAQSetOrderKey(saved_key);
-}
-
-static void advance_nested_sprite_frames_impl(SWFAppContext* app_context)
-{
 
 	// Reverse-instantiation order (place_seq DESC) — same Ruffle clip_exec_list
 	// LIFO semantics as advance_sprite_frames. The cap is tested against the
@@ -2074,7 +2054,6 @@ static void advance_nested_sprite_frames_impl(SWFAppContext* app_context)
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
 		if (obj->attach_registration) continue; // timeline owned by the attached-clip pump
-		if (obj->place_seq != 0) actionAQSetOrderKey(obj->place_seq);  // s29 browser-attach-order
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 		if (obj->sprite_display_list == NULL) continue;
