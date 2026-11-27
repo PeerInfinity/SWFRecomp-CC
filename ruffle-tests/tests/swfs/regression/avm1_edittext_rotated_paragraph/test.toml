@@ -1,7 +1,8 @@
 # s29 w2-text-coverage-land: 200-glyph rotated paragraph, the coverage-run
-# budget stress (see create_test_swf.py). No golden yet: the comparison is
-# skip until the FLASH capture (report LOCAL ORACLE REQUEST F1) is archived;
-# it still renders, so it is a render-canary member (md5 identity).
+# budget stress (see create_test_swf.py). Golden: FP32 LNX HIGH capture (s29
+# coordinator, F1; draw() == --screen), session29-fanout-reports/w1-local-oracles/
+# w2-text-coverage-land/. max_outliers is PROVISIONAL (0) until the next images CI
+# run measures our residual; then set to ~2x the measured count.
 num_ticks = 1
 
 [image_comparisons.output]
