@@ -7124,6 +7124,8 @@ typedef struct Avm2PendingUrlLoad
 	uint32_t len;
 	uint8_t found;
 	uint8_t is_stream;   // the target is a URLStream, not a URLLoader
+	uint8_t sig_error;   // URLRequest.digest set: FP32 refuses it (#2046)
+	const Avm2String* stack_tail;  // load()'s call stack, for the #2044 report
 } Avm2PendingUrlLoad;
 
 #define AVM2_MAX_PENDING_URL_LOADS 32
@@ -7182,6 +7184,34 @@ static void ul_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl)
 	Avm2UrlLoaderExt* ext = url_loader_ext_of(self);
 	if (ext == NULL) return;
 
+	if (pl->sig_error)
+	{
+		// FP32 (avm2/swz, avm2/loader_applicationDomain; Linux == Windows):
+		// a URLLoader fetch whose URLRequest carries a `digest` is a signed-RSL
+		// load, and the player refuses the file with securityError #2046 --
+		// no open/progress/complete. With no listener the debug player prints
+		// #2044 plus the stack the load was started from.
+		extern Avm2Object* avm2_security_error_event_new(Avm2Context*,
+			const Avm2String*, const Avm2String*, int32_t);
+		extern int avm2_dispatcher_has_listener(Avm2Context*, Avm2Object*,
+			const Avm2String*);
+		const Avm2String* type = avm2_string_from_literal(ctx, "securityError");
+		const char* text =
+			"Error #2046: The loaded file did not have a valid signature.";
+		if (!avm2_dispatcher_has_listener(ctx, self, type))
+		{
+			printf("Error #2044: Unhandled securityError:. text=%s", text);
+			if (pl->stack_tail != NULL)
+				printf("%.*s", (int) pl->stack_tail->len, pl->stack_tail->utf8);
+			putchar('\n');
+			fflush(stdout);
+		}
+		Avm2Object* sev = avm2_security_error_event_new(ctx, type,
+			avm2_string_from_literal(ctx, text), 2046);
+		if (sev != NULL) avm2_dispatch_event(ctx, self, sev);
+		return;
+	}
+
 	if (!pl->found)
 	{
 		ul_set_data(ctx, ext, NULL, 0);
@@ -7232,6 +7262,28 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request,
 	memset(&pl, 0, sizeof(pl));
 	pl.loader = self;
 	pl.is_stream = (uint8_t) (is_stream != 0);
+	if (!is_stream)
+	{
+		int dfound = 0;
+		Avm2Value dg = avm2_get_public_property(ctx, request, "digest", 6, &dfound);
+		if (dfound && dg.kind == AVM2_VALUE_STRING && dg.u.str != NULL)
+		{
+			extern const Avm2String* avm2_error_callstack_tail(Avm2Context*);
+			pl.sig_error = 1;
+			pl.stack_tail = avm2_error_callstack_tail(ctx);
+			// FP's report starts at the script frame: drop our own native
+			// "\n\tat flash.net::URLLoader/..." frame on top.
+			const Avm2String* t = pl.stack_tail;
+			static const char k_ul[] = "\n\tat flash.net::URLLoader";
+			if (t != NULL && t->len > sizeof(k_ul) - 1
+			    && memcmp(t->utf8, k_ul, sizeof(k_ul) - 1) == 0)
+			{
+				const char* nl = memchr(t->utf8 + 1, '\n', t->len - 1);
+				uint32_t off = nl != NULL ? (uint32_t) (nl - t->utf8) : t->len;
+				pl.stack_tail = avm2_string_new(ctx, t->utf8 + off, t->len - off);
+			}
+		}
+	}
 	Avm2PendingLoad probe;
 	memset(&probe, 0, sizeof(probe));
 	// Unlike Loader.load, a URL that resolves to nothing is an ERROR here
@@ -15213,7 +15265,10 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
 	// into listener closures the stream itself owns, a cycle nothing else
 	// reaches).
 	for (uint32_t i = 0; i < g_pending_url_load_count; i++)
+	{
 		avm2_gc_mark_object(g_pending_url_loads[i].loader);
+		avm2_gc_mark_string(g_pending_url_loads[i].stack_tail);
+	}
 	avm2_gc_mark_object(g_mouse_hovered);
 	for (int i = 0; i < 3; i++) avm2_gc_mark_object(g_mouse_pressed[i]);
 	avm2_gc_mark_object(g_drag_object);

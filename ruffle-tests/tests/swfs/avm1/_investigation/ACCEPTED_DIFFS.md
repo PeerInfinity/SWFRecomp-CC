@@ -79,38 +79,6 @@ are internally inconsistent: given the UTC offset and the local fields, the UTCH
 value shown is wrong. Our UTCHours=23 is mathematically correct. This appears to be a
 Ruffle test-generation bug affecting only the extreme negative boundary.
 
-### `native_objects_swf6` — `new TextField()` typeof check (1 diff line, line 56)
-
-> Note (2026-05-29): a *separate*, graphics-mode-only segfault flake in this test
-> was root-caused and fixed (ASArray-as-ASObject type confusion in `super()` over an
-> array receiver + `Date.prototype.getDate.call([])`). See SESSION_NOTES.md. The
-> remaining single-line diff below is unchanged and still accepted.
-
-**Diff:**
-```
-- new TextField(): non-object: non-object: undefined
-+ new TextField(): native
-```
-
-The test `getNativeStatus(new TextField())` is expected to return `"non-object: undefined"`,
-implying that `new TextField()` returns `undefined` in SWF6. But two other tests assert the
-opposite:
-
-- `avm1/textfield_props_swf6` (PASS, no `known_failure`) — expects `var o = new TextField();`
-  to produce a real object that traces as `[object Object]` with `typeof o == "object"` and
-  enumerates 35 properties.
-- `from_gnash/actionscript.all/toString_valueOf-v6` — does `text1 = new TextField(); check(typeof(text1) == "object");`.
-
-Both Flash and Ruffle return a real object for `new TextField()` in SWF6 (per the other
-tests' expected output). The `native_objects_swf6` line 56 expectation is internally
-inconsistent with the rest of the AVM1 test corpus. Forcing `new TextField()` to undefined
-in SWF6 fixes line 56 but breaks `textfield_props_swf6` (210/210 → 77/210) and
-`toString_valueOf-v6` (ruffle_matched 150/155 → output_mismatch 141/155). The test is
-already marked `known_failure = true` and listed in `ruffle-tests/ignored_tests.txt`, so the
-1-line diff is harmless to the filtered pass rate. **Decision:** keep current behavior
-(`new TextField()` returns an object in all SWF versions where the class exists), accept the
-1-line diff in `native_objects_swf6`.
-
 ### `avm2/verify_method_info_duplicate` — trailing `#1065` contradicts a PASSING sibling (1 diff line of 2)
 
 <!-- image-axis: none -->
@@ -403,6 +371,16 @@ the 293-line test causes this 4-line known-failure test to fail.
 
 **Decision:** Accept; Ruffle known failure, contradicts `tab_ordering_properties` expectations.
 
+> **s29 HOLD (2026-11-26, `w2-disposition-land`).** The "irreconcilable" premise is wrong in a new
+> way: FP32 reproduces THIS golden byte-exact (pinned and `--no-pin`; `session29-fanout-reports/
+> w1-local-oracles/w1-disposition-audit/tab_edge_corpus.*.flash.txt`), yet the MTASC SWF6/7/8
+> fixtures `L3b_tabindex{,_v7,_v8}` (`var r:Object = _root; r.tabIndex = "s"`, first set) all
+> COERCE to `-2147483648` in FP32. So neither the w1 "first string set is sticky raw" rule nor our
+> current "NaN keeps the previous value" rule (we print `undefined, undefined, 5, 5`) is Flash's.
+> The discriminator is open: 13 single-variable fixtures (`session29-fanout-reports/
+> w2-disposition-land-oracle/tabindex/`) await an FP32 run. Stays ignored until a rule predicts
+> both the corpus row and the L3b captures.
+
 ### `bitmap_data_thorough/pixelDissolve` — Flash's dissolve permutation is not Ruffle's Feistel (Ruffle panics)
 
 > **Axis note (2026-08-01, session 9 pixel triage).** This entry is **trace-axis
@@ -455,8 +433,8 @@ missing/invalid args match.
 
 Tests where shape-accurate `hitTest(x, y, true)` results differ due to inherent
 differences in font glyph outlines, morph boundary precision, and Drawing API
-stroke tessellation accuracy. 332/338 lines pass; the remaining **6** (lines 71,
-171–177 and 296; was 9 — corrected s26 `w1-trace-tail-audit` §5, first flagged s24
+stroke tessellation accuracy. 332/338 lines pass; the remaining **6** (71 'layers' shape
+geometry, 171–177 Noto glyph boundaries, 296 morph boundary; was 9 — corrected s26 `w1-trace-tail-audit` §5, first flagged s24
 `w1-avm1-tail` lead 3) are at exact geometric boundaries where our implementation
 disagrees with Ruffle's golden AND with real Flash: the s28 FP32 capture
 (`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/movieclip_hittest_shapeflag.pinned.txt`)
@@ -465,7 +443,7 @@ Ruffle-vs-Flash question. (FP32 differs from the Ruffle golden only on lines
 35/37/39, the same-frame stale-bounds quirk; see the s28 `w2-hittest-shape-stale`
 RvF entry and flash_fixes.)
 
-### `movieclip_hittest_shapeflag` — Noto Sans vs Flash device font glyph outlines (5 diff lines; was 7)
+### `movieclip_hittest_shapeflag` — Noto Sans vs Flash device font glyph outlines (4 diff lines: 171, 173, 175, 177)
 
 **Example diff (text glyph boundary):**
 ```
@@ -477,7 +455,9 @@ RvF entry and flash_fixes.)
 Hit testing against text glyphs uses Noto Sans TTF outlines (our device font substitute).
 Flash Player uses its own proprietary built-in device fonts with different glyph outlines.
 At coordinates near glyph curve boundaries (originally lines 71, 163, 165, 167, 171, 175, 177;
-as of s26 only line 71 and the 171–177 run still differ), the
+as of s26 only line 71 and the 171–177 run still differ; s29 `w1-disposition-audit`: line 71 is in the
+`// layers` section, `hitTest(300, 400, true)`, FP32 true vs ours false: a shape-geometry miss, not a
+glyph, and an open lead), the
 Noto Sans outline includes or excludes the test point differently than Flash's font.
 
 Not fixable without Flash's actual glyph outlines, which are proprietary.
@@ -557,9 +537,13 @@ crate and VP6 (codecs 4/5) with `nihav`; we use libavcodec (`flv1`, `vp6f`,
 > libavcodec's H.263 IDCT differs from `h263-rs`'s f32 basis-table IDCT
 > (`h263/src/decoder/cpu/idct.rs`). See the `h263` entry below.
 
-### `visual/video/colorconversion/h263` — Spark IDCT precision (10 808 outlier channels, max 2)
+### `visual/video/colorconversion/h263` — Spark IDCT precision (3 outlier channels, max 1; FAAN)
 
 <!-- image-axis: visual/video/colorconversion/h263 output -->
+
+**s29 restatement:** the FAAN IDCT (`7b6a69124`) landed; the residue is the single pixel
+(447,289) the FAAN arm predicted, 3 channels at max 1 vs tolerance 0 / max_outliers 0
+(baseline `image_results_graphics.json` at `014124ed5`). The sweep below is the pre-FAAN history.
 
 640×480, `tolerance = 0`, `max_outliers = 0`, `quality = "low"`. The trace side
 passes; only the image comparison fails.
@@ -588,124 +572,11 @@ list: the **trace test passes**, and a global `ruffle-tests/ignored_tests.txt`
 entry is the only kind that carries an image-axis disposition — which this entry
 already supplies to `scripts/image_triage.py` via the scope marker above.
 
-### `visual/video/deblocking` — Spark IDCT precision, one Cb level on one chroma row (104 outlier channels, max 4)
-
-<!-- image-axis: visual/video/deblocking output -->
-
-1024×1536 (12 tiled `DefineVideoStream`s), `tolerance = 0`, `max_outliers = 0`.
-The trace side passes; only the image comparison fails.
-
-**Superseded note (2026-08-12, session 14 `w2-gfx-deblock`).** This entry
-replaces the "Explicitly NOT dispositioned: `visual/video/deblocking` is live
-work" paragraph that stood here. The live work is **done**: the H.263 Annex J
-deblocking filter is ported (`video_codec.c`, strength from `PQUANT` via
-`video_deblock_strength()`), the `DefineVideoStream` flags byte is now read and
-threaded through `ng_record_video` → `video_decoder_create`, and
-`MAX_EMBEDDED_VIDEO_STREAMS` went 8 → 16 (this test has 12; streams 9–12 were
-being silently dropped). Measured band move:
-**2 906 999 → 104 outlier channels, max 255 → 4, mean 56.2435 → 0.0000**
-(−99.9964 %), with **11 of the 12 streams byte-exact**. Details:
-`SWFRecompDocs/plans/session14-fanout-reports/w2-gfx-deblock-report.md` §3.2/§3a.
-
-What remains is the **same mechanism as the `h263` entry above** — libavcodec's
-H.263 IDCT vs `h263-rs`'s f32 basis-table IDCT — and it is now pinned tightly:
-
-- All 104 channels are in **stream 9 only**, on **chroma row 232** (luma rows
-  464–465 of that 496² picture), in three short runs of chroma columns.
-- Each is **one Cb level**: R never moves, G moves by 1 on four channels, B by
-  2 or 4 — exactly the fingerprint of a ±1 Cb sample through the BT.601
-  integer conversion (`B = gray + cb·132201 >> 16`, 2.017 levels per step).
-- It is **not** a filter-lane bug: stream 9's planes are 496×496 luma and
-  248×248 chroma, both exactly divisible by 8, so the filter's
-  remainder-lane behaviour cannot express itself there at all. Stream 9 is also
-  the least-quantised 496² stream (`PQUANT 2`, 13 305-byte payload vs
-  6 376–6 542 for streams 10–12), i.e. the most retained coefficients and the
-  largest IDCT rounding surface.
-
-**Decision:** accept the image comparison permanently, capped with the `h263`
-entry — every `idct_algo` arm was already swept for that test and none reaches
-`max_outliers = 0`, the closest being a float IDCT that is a CI determinism
-hazard across shards. Not added to any ignore list: the trace test passes, and
-the `image-axis` scope marker above is what dispositions the pixel axis for
-`scripts/image_triage.py`. **Standing invariant:** the marker is scoped to the
-single `output` comparison of this test — a new comparison, or a materially
-larger excess, is not covered and must be re-triaged.
-
-Two riders from the same measurement, deliberately **not** dispositioned here:
-`from_gnash …/Video-EmbedSquareTest` (189 channels at *exactly* 255 in a 26-row
-band — a missing/extra element, not a decode artifact; it is misfiled in the
-video bucket) and `visual/video/h264{,_multinalu}` (codec 7, never reaches the
-Spark path; a decoder arc).
-
-### `avm1/netstream_play_flv` — Sorenson Spark pixel parity (44 outliers, max diff 3)
-
-<!-- image-axis: avm1/netstream_play_flv output -->
-
-**Scope (2026-08-13, session 15 `w2-gfx-smalls`):** the subject is written
-suite-qualified on purpose. Written bare, `scripts/image_triage.py` matched it
-by **basename** against `avm2/netstream_play_flv` — a different test with a
-different mechanism (blank render, 229 724 outlier channels, max diff 255) —
-and silently deleted that row from the pixel board. The qualified name resolves
-`exact` for avm1 and does not resolve at all for avm2; the avm2 row is
-re-documented as live work in the entry immediately below.
-
-The trace test (22/22) passes — `onStatus` events, NetStream lifecycle, and FLV
-metadata parsing all match Ruffle. After the 2026-05-13 Phase 1 landing of
-GPU-side matrix-scale rendering for the Video display object
-(`renderer_draw_bitmap_quad_scaled`, see
-`SWFRecompDocs/plans/video-display-flash-parity-plan.md`), the decoded frame is
-rendered at the SWF-declared bounds (160×120) per Flash's documented Video
-render rule; the on-stage size matches expected.
-
-The remaining diff had **three** terms, and this entry's figures have been
-restated twice as they were peeled off:
-
-| measurement | outliers | max diff |
-|---|---:|---:|
-| pre-2026-08-06 (as first written: `sws_scale` colour + IDCT + stretch) | ~52 000 | 64 |
-| session-13 baseline `fb36ba110` (exact BT.601 port landed) | 1 654 | 8 |
-| session-14 `w2-gfx-deblock` (deblocking filter landed) | **44** | **3** |
-
-The **colour-conversion** term (`sws_scale`'s chroma interpolation) was removed
-by the session-13 port of Ruffle's exact BT.601 integer conversion. The
-**missing deblocking filter** was the second term and was hiding inside the
-"IDCT precision" label until session 14: FLV carries no per-stream deblocking
-field, so Ruffle's hardcoded `UseVideoPacketValue` plus this stream's set packet
-bit and `PQUANT 3` give strength 2, and porting the filter drops the excess
-97.3 % (see `w2-gfx-deblock-report.md` §3b). What is left — 93 channels at 1,
-42 at 2, 2 at 3, inside a 58×57-pixel region — really is the GPU
-**sample-stretch** (320×234 → 160×120) magnifying the Spark **IDCT precision**
-difference documented in the `h263` entry above. Both are valid H.263/Spark
-decoders; the residual is arithmetic precision, not a correctness gap.
-
-(The 44/3 figures are a local Dawn measurement made with the session-14 deblock
-patch applied; re-baseline them from the first `images=true` CI run that carries
-it.)
-
-**Decision:** Accept; content decodes correctly and renders at the correct
-on-stage size. Trace test continues to pass.
-
-### `avm2/netstream_play_flv` — NOT dispositioned (blank render, live work)
-
-<!-- image-axis: none -->
-
-This entry exists so `scripts/image_triage.py` resolves the avm2 test
-**explicitly** instead of falling through to a basename match on the avm1 entry
-above (or to the bare `netstream_play_flv` line in the global
-`ruffle-tests/ignored_tests.txt`, which the tool also reads as an image-axis
-disposition). It is **not** an accepted diff on either axis.
-
-| | avm1 entry above | this test |
-|---|---|---|
-| status | renders, Spark decode parity | `blank_render` — nothing drawn |
-| excess | 44 outliers, max diff 3 | **229 724** outlier channels, max diff **255**, `e_large` |
-| mechanism | H.263 IDCT precision × GPU stretch | AVM2 `NetStream` playback never reaches a decoded frame |
-
-The trace axis is separately triaged in `ruffle-tests/tests/swfs/avm2/ignored_tests.txt`
-("do need real playback state and a decoder"); that is a suite-local, trace-axis
-statement and says nothing about the pixels. Measured at run `31647430265`
-(`bf585e448`). Re-triage with the video/decoder arc — it is a live pixel row, not
-a capped one.
+> **s29 prune (`w2-disposition-land`):** the `visual/video/deblocking`, `avm1/netstream_play_flv` and
+> `avm2/netstream_play_flv` entries that stood here are deleted: since the FAAN IDCT (`7b6a69124`) all
+> three pass the image comparison at 0 outliers (and both `netstream_play_flv` traces pass), so they
+> are no longer accepted diffs, and with the avm1 entry gone the avm2 basename-resolver stub has
+> nothing to collide with. History: `git log -S'netstream_play_flv' -- ACCEPTED_DIFFS.md`.
 
 ### ~~`from_shumway/bitmapdata/getpixel-from-embedded` — JPEG decoder parity (1 diff line of 2; trace axis)~~ — **RESOLVED 2026-11-24 (s27 `w2-jpeg-flash-decode`)**
 
@@ -1082,6 +953,23 @@ Diagnostic that identifies this class: **every line on both sides is a `PASSED!`
 (or otherwise identical in content) and only the *sequence* differs. If any
 assertion actually fails, it is a real bug and does not belong here.
 
+### `avm2/bom` (3 diff lines of 9), `avm2/loader_load` (2 diff lines of 128) — FP32 order is nondeterministic
+
+<!-- image-axis: none -->
+
+Both print `URLVariables.toString()`, which joins in `for (p in this)` order (`bom`:
+`firstName=Tom&lastName=Jones` decoded from `lastName=Jones&firstName=Tom`; `loader_load:81`:
+`cccc=true&aaa=bbb`). The s29 coordinator ran an AS3 for-in fixture (Object, URLVariables and
+decoded URLVariables over 7 key sets) twice in FP32
+(`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-disposition-audit/forin_order/flash.r{1,2}.txt`):
+the order is hash-scattered, insertion order is irrelevant (`a,b` and `b,a` both give `b,a` in r1),
+and **4 of the 7 key sets reorder between the two runs** (`aaa,cccc` gives `cccc,aaa` in r1 and
+`aaa,cccc` in r2). Both goldens are therefore ONE FP32 run's order; no deterministic implementation
+matches it in general. We print insertion order.
+
+**Decision: accept (Flash-nondeterministic, like `eforin_*`).** Kept in
+`ruffle-tests/tests/swfs/avm2/ignored_tests.txt`. Ceilings: `bom` 6/9, `loader_load` 126/128.
+
 ### `from_avmplus/ecma3/Statements/eforin_001` (4 diff lines of 16)
 
 Source (`Test.as:19-24`) enumerates the literal
@@ -1151,64 +1039,37 @@ and would still leave Ruffle unmatched. Added to
 
 ---
 
-## Category 13: AOT Ceiling — Runtime-Loaded ABC (Flex `framework_*.swz`)
+## Category 13: Signed-RSL `.swz` loads (`URLRequest.digest`) — **s29: the AOT-ceiling framing is Ruffle-only**
 
-SWFRecomp is an ahead-of-time recompiler: every ABC in the corpus is translated
-to C at build time. A SWF fetched *at runtime* and handed to
-`Loader.loadBytes()` therefore cannot define classes — there is no bytecode
-interpreter in the runtime to execute it. Two `avm2` tests load the real
-325 305-byte Adobe Flex `framework_4.5.0.20967.swz` (shipped in the test
-directory, pinned by a SHA-256 `URLRequest.digest`) and then read `mx.*`
-definitions back out of an ApplicationDomain. Both are permanent won't-dos.
+FP32 refuses both loads before any SWZ ABC is needed (URLRequest.digest set → securityError #2046,
+unhandled → #2044 + stack; captures s28 trace-provenance). The AOT-ceiling framing applies only to
+Ruffle's goldens. loader_applicationDomain now matches FP32 byte-exact (s29 patch + flash_fix);
+swz misses only the [file:line] stack suffixes.
 
-This is a *ceiling*, not a bug: closing it would mean shipping an AVM2
-interpreter alongside the recompiled code, which is the opposite of the
-project's AOT design (`swfrecomp-purpose-beat-ruffle-perf`).
+(History: until s29 both rows were filed here as a permanent AOT ceiling: the Ruffle goldens list
+`mx.*` classes from the 325 305-byte Flex `framework_4.5.0.20967.swz`, which only an AVM2 interpreter
+could define at runtime. FP32 never gets that far: the test sets a SHA-256 `URLRequest.digest`, and
+the player rejects the unsigned file. The `avm2/loader_applicationDomain` subsection is deleted; it
+passes 3/3 against its flash_fixes golden.)
 
-### `avm2/loader_applicationDomain` — Flex framework SWZ (4 diff lines of 4)
-
-<!-- image-axis: none -->
-
-`Test.as` `URLLoader`s `framework_4.5.0.20967.swz` as BINARY, `loadBytes()`s it
-into `ApplicationDomain.currentDomain`, and traces
-`getDefinitionByName("mx.events.PropertyChangeEvent")`,
-`getDefinitionByName("mx.core.ByteArrayAsset")` and `getDefinitionByName("Test")`
-twice (once through the shared domain, once through a domain-less child Loader).
-
-```
-expected:                          actual:
-[class PropertyChangeEvent]        (no output)
-[class ByteArrayAsset]
-[class Test]
-[class Test]
-```
-
-Every traced value depends on `mx.*` classes that exist only inside the SWZ's
-ABC. Nothing is traced before them, so the test produces 0 matching lines.
-
-**Decision: accept permanently.** Listed in
-`ruffle-tests/tests/swfs/avm2/ignored_tests.txt` since s11. Suite-local,
-deliberately — the test has no `[[image_comparisons]]`, so a global entry would
-wrongly disposition a pixel-axis row (see that file's header, traps 1–2).
-See `avm2/_investigation/CURRENT_STATUS.md:476` and the loader-arc tranche-6
-scoreboard.
-
-### `avm2/swz` — Flex framework SWZ, domain-relative lookup (2 diff lines of 2)
+### `avm2/swz` — FP32 #2046 report without `[file:line]` stack suffixes (2 diff lines of 3)
 
 <!-- image-axis: none -->
 
-Same SWZ, same fetch, but reads the definitions off the *child* Loader's
-`contentLoaderInfo.applicationDomain`:
+Golden = FP32 (flash_fixes, s29). With the s29 digest → #2046 path we print:
 
 ```
-expected:                          actual:
-[class ByteArrayAsset]             (no output)
-[class BitmapAsset]
+expected (FP32):                                              actual:
+Error #2044: Unhandled securityError:. text=Error #2046: …    (same)
+	at Test()[/Users/…/avm2/swz/Test.as:12]                  	at Test()
+	at test_fla::MainTimeline/frame1()[test_fla.MainTimeline::frame1:3]   	at test_fla::MainTimeline/frame1()
 ```
 
-Identical mechanism and identical ceiling.
+The suffixes come from the SWF's ABC `debugfile`/`debugline` opcodes, which we drop
+(`abc_verifier.cpp`); FP's debug player prints them. Open lead (s29 w1-disposition-audit L1), not a
+ceiling.
 
-**Decision: accept permanently.** Listed in
+**Decision: accept until the debug-line lead lands.** Listed in
 `ruffle-tests/tests/swfs/avm2/ignored_tests.txt` (suite-local, same rationale).
 
 ---
@@ -1302,28 +1163,27 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | `movieclip_getbounds` | Float precision (morph getBounds matrix) | 2 | Accept; 0.0001px beyond epsilon |
 | `movieclip_library_state_values` | Test harness limitation (default mouse position) | 1 | Accept; Ruffle infrastructure artifact |
 | `movieclip_library_state_values` | Test harness limitation (VFS URL path format) | 1 | Accept; anomalous expected output |
-| `native_objects_swf6` | Ruffle vs Flash (TextField in SWF6) | 1 | Accept; we match Flash, Ruffle's test is `known_failure` |
 | `native_subclasses` | Platform UB (Date timezone) | 1 | Accept; timezone-dependent |
 | `mcl_replace_root_swf7_to_swf5` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | **RESOLVED s28** (w1b-rm-avm1-misc B1): FP32 prints the golden (`rest=`); the function version follows the base clip's current movie. Passes |
 | `mcl_replace_root_swf7_to_swf6` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | **RESOLVED s28** (same) |
 | ~~`movieclip_state_values`~~ | ~~Missing feature~~ | ~~75~~ | **REMOVED** — now PASS (114/114) via image loading support |
 | ~~`string_paths_reference_launder`~~ | ~~Ruffle known failure (stack_push)~~ | ~~2~~ | **RESOLVED 2026-08-01** — now PASS; we match Flash where Ruffle does not. De-listed from `ruffle-tests/ignored_tests.txt` |
-| `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
-| `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 5 (was 7; s26) | Accept; proprietary Flash font metrics |
+| `tab_ordering_properties_tab_index_edge_case` | FP32 raw-vs-coerce discriminator unknown (Category 7; s29 HOLD) | 3 of 4 | Accept pending the FP32 fixture run (`w2-disposition-land-oracle/tabindex/`); corpus golden == FP32, MTASC L3b fixtures coerce in FP32 |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 4 (171–177; was 7; s29 recount) | Accept; proprietary Flash font metrics |
+| `movieclip_hittest_shapeflag` | Hit test accuracy ('layers' shape geometry, line 71: FP32 true, ours false) | 1 | open lead (s29 w1-disposition-audit L4), not a font issue |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 0 (was 1; line 137 no longer differs, s26) | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash's dissolve permutation is not Ruffle's Feistel (corrected s26) | 20 (trace lines; **no image comparison exists**; was ~38) | Accept; 98.5% match, no Ruffle oracle for `ruffle_matched` |
-| `avm1/netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | **44** image outliers, max diff **3** (was ~52k/64, then 1654/8) | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected twice: the colour half was `sws_scale` (ported exactly, 2026-08-06) and the second half was the missing deblocking filter (ported 2026-08-12); the residual is Spark IDCT precision × the GPU sample-stretch |
-| `visual/video/deblocking` | Spark IDCT precision on the least-quantised stream (Category 9) — deblocking filter + flags byte + `MAX_EMBEDDED_VIDEO_STREAMS` 8→16 all landed 2026-08-12 | **104** image outlier channels, max **4**, mean 0.0 (was 2 906 999 / 255) | Accept (image axis only; trace passes). 11 of 12 streams byte-exact; all 104 channels are one Cb level on chroma row 232 of stream 9, whose planes have no remainder lane — decoder precision, not the filter |
-| `visual/video/colorconversion/h263` | Spark IDCT precision after the exact BT.601 port (Category 9) | 10 808 image outlier channels, max 2 | Accept (image axis only; trace passes). Every `idct_algo` arm still fails `max_outliers = 0`, and the closest one is a float IDCT = CI determinism hazard |
+| `visual/video/colorconversion/h263` | Spark IDCT precision, FAAN IDCT landed (Category 9) | 3 image outlier channels, max 1 | Accept (image axis only; trace passes). The single pixel (447,289) the FAAN arm predicted; tolerance 0 / max_outliers 0 upstream |
 | ~~`from_shumway/bitmapdata/getpixel-from-embedded`~~ | ~~JPEG decoder parity (Category 9)~~ | **0** | **RESOLVED 2026-11-24 (s27 `w2-jpeg-flash-decode`): IJG v7+ DCT-scaled chroma + truncating YCbCr reproduce Flash `200d04`; ignore entry pruned** |
 | ~~`visual/simple_shapes/masks`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
 | ~~`visual/simple_shapes/masks_equal_clipdepth`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
 | `avm2/verify_method_info_duplicate` | Cross-test inconsistent Flash captures (Category 2) — the trailing `#1065` contradicts the PASSING `verify_method_info_oob` | 1 of 2 | Accept; the +1 is only reachable by keying the error on `1121`, which would demote `_oob` to `ruffle_matched`. Suite-local ignore only |
 | ~~`watch_special_recursion_swf7`~~ (= `watch_recursion_swf7`) | ~~Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 1042/1042. De-listed from `ignored_tests.txt`; see Category 10** |
 | ~~`watch_special_recursion_double_swf7`~~ (= `watch_recursion_double_swf7`) | ~~Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 3118/3118. De-listed; see Category 10** |
+| `avm2/bom` | FP32 for-in order nondeterministic between runs (Category 12) | 3 of 9 | Accept; the golden is one FP32 run's hash order |
+| `avm2/loader_load` | FP32 for-in order nondeterministic between runs (Category 12) | 2 of 128 | Accept; same mechanism as `bom` |
 | `from_avmplus/ecma3/Statements/eforin_001` | Implementation-defined `for...in` order (Category 12) | 4 of 16 | Accept; every line is `PASSED!` on both sides, only the sequence differs; avmplus, Ruffle and we produce three different orders; ours is `newobject` insertion order (last pair first), not source order |
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
-| `avm2/loader_applicationDomain` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 4 of 4 | Accept; would require shipping an AVM2 interpreter |
-| `avm2/swz` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 2 of 2 | Accept; same mechanism as `loader_applicationDomain` |
+| `avm2/swz` | FP32 #2046 path landed; [file:line] stack suffixes missing (Category 13) | 2 of 3 | open (ABC debug lines) |
 | `avm2/number_tostring` | Corrupt upstream oracle: 31 impossible base-N digits in the Flash capture; upstream `ignore = true` (Category 14) | 168 of 1050 | **RESOLVED s28** (w2b-avm2-d2a): the "impossible digits" ARE Flash's base-N printer, and the exact avmplus D2A port reproduces them: passes (168 → 0). Ignore entry pruned |

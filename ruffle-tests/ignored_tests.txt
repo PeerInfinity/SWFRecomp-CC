@@ -189,13 +189,15 @@ sandbox_type_remote
 # (string_relational_compare removed 2026-08-01 — now `pass` in BOTH avm1 and
 #  avm2 (verified locally). The RUFFLE_VS_FLASH_DIFFERENCES.md entry has been
 #  marked RESOLVED in the same change; see it for what changed.)
-# globals_swf5: we hide LocalConnection/NetConnection/Video in SWF5 (gnash -v5 semantics,
-# keeps 3 gnash passes); a Flash capture shows them VISIBLE (s24 §3, s26 trace-tail-audit),
-# so Ruffle's expected output is Flash-correct here. 294/304. See RvF "SWF5 Constructor Visibility".
-globals_swf5
-# Global decls tests: Ruffle's expected output has Object.prototype methods as ENUMERABLE
-# (Flash uses DONT_ENUM) and constructor as own property on all objects (Flash inherits it).
-# These tests are validated against Flash-correct output via --expected-suffix=flash instead.
+# (globals_swf5 removed 2026-11-26, s29 w2-disposition-land: LocalConnection/NetConnection/Video
+#  are now visible in SWF5 as FP32 shows; the gnash -v5 rows assert Equals2, not visibility, and
+#  stay pass. Now pass 304/304.)
+# Global decls tests: the goldens ARE Flash (s28 trace-provenance: pinned FP32 byte-identical for
+# global_proto_decls; _delete differs only on the host-dependent System.capabilities.manufacturer
+# position; global_instance_decls only on 1 host-timezone Date line). Real gaps, NO-GO (L) of record:
+# per-native-function `.prototype` presence (~470 lines), READ_ONLY flags (~90), missing native
+# members (~700). (_global builtins are DONT_ENUM since s29 w2-disposition-land.) Reopen: build the
+# native-object table from the FP32 golden (s29 w1-disposition-audit §1 item 1).
 global_proto_decls
 global_proto_decls_delete
 global_instance_decls
@@ -209,7 +211,8 @@ global_instance_decls
 # or internally inconsistent expected output (Ruffle test generation bugs).
 date
 movieclip_library_state_values
-native_objects_swf6
+# (native_objects_swf6 removed 2026-11-26, s29 w2-disposition-land: SWF<=6 `textField` instance
+#  shadows TextField in actionNewObject, as FP32 does. Now pass 115/115.)
 tab_ordering_properties_tab_index_edge_case
 # It was listed here with no ACCEPTED_DIFFS.md entry to back it up, and the
 # diff was fixable: actionSetVariable's `_global` addProperty-setter branch
@@ -220,7 +223,8 @@ tab_ordering_properties_tab_index_edge_case
 
 # --- Shape hit test accuracy limits ---
 # 332/338 lines pass. Remaining 6 diffs at exact geometric boundaries:
-# Noto Sans glyph outlines vs Flash device fonts (5), morph boundary precision (1).
+# 4 lines at Noto Sans glyph boundaries (171–177), 1 'layers' shape-geometry miss (71: FP32 true,
+# ours false; open lead), 1 morph boundary (296).
 # See ACCEPTED_DIFFS.md Category 8 (s26 recount).
 movieclip_hittest_shapeflag
 
@@ -235,17 +239,8 @@ movieclip_hittest_shapeflag
 # line. See ACCEPTED_DIFFS.md.
 bitmap_data_thorough/pixelDissolve
 
-# --- Video decoder implementation differences ---
-# Trace test passes (22/22). Image test fails (~53k outliers, max diff 140).
-# MECHANISM CORRECTED 2026-08-06 (s13): the old "libavcodec H.263 is 1-3 levels
-# off from h263-rs" wording blamed the decoders. The dominant term was actually
-# libswscale's sws_scale YUV->RGB conversion (chroma interpolation + rounding),
-# which the s13 video patch replaces with Ruffle's exact BT.601 integer
-# conversion. What remains is Spark IDCT precision plus the GPU sample-stretch
-# (320x234 -> 160x120). Rendered content is visually correct (Japanese-flag test
-# pattern at correct position and size). See ACCEPTED_DIFFS.md Category 9 and
-# SWFRecompDocs/plans/video-codec-support-plan.md.
-netstream_play_flv
+# (netstream_play_flv removed 2026-11-26, s29 w2-disposition-land: trace and image both pass
+#  since the FAAN IDCT, 7b6a69124.)
 
 # --- Watch deep re-entrancy (SWF7 recursion depth) — RESOLVED 2026-08-12 ---
 # watch_recursion_swf7 and watch_recursion_double_swf7 were listed here as

@@ -1618,6 +1618,7 @@ static Avm2Value nfe_to_string(Avm2Activation* act)
 // avm2_io_error_event_new), which the Loader pipeline dispatches from.
 static Avm2Class* g_progress_event_class;
 static Avm2Class* g_io_error_event_class;
+static Avm2Class* g_security_error_event_class;
 static Avm2Class* g_status_event_class;
 static Avm2Class* g_async_error_event_class;
 static Avm2Class* g_http_status_event_class;
@@ -1663,6 +1664,7 @@ static void register_net_events(Avm2Context* ctx)
 
 	Avm2Class* sec = avm2_builtin_class(ctx, "flash.events",
 	                                    "SecurityErrorEvent", er);
+	g_security_error_event_class = sec;
 	sec->instance_init.fn = error_event_init;
 	sec->instance_init.debug_name = "SecurityErrorEvent";
 	event_override_method(ctx, sec, "toString", sece_to_string);
@@ -1794,6 +1796,29 @@ Avm2Object* avm2_async_error_event_new(Avm2Context* ctx, const Avm2String* text,
 	args[4] = (error_obj != NULL) ? avm2_object_value(error_obj) : avm2_null();
 	Avm2Value v = avm2_class_construct(ctx, g_async_error_event_class, args, 5);
 	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
+// flash.events.SecurityErrorEvent, same shape as IOErrorEvent (s29).
+Avm2Object* avm2_security_error_event_new(Avm2Context* ctx, const Avm2String* type,
+                                          const Avm2String* text, int32_t error_id)
+{
+	if (g_security_error_event_class == NULL) return NULL;
+	Avm2Value args[5];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(0);
+	args[2] = avm2_bool(0);
+	args[3] = avm2_string(text);
+	args[4] = avm2_integer(error_id);
+	Avm2Value v = avm2_class_construct(ctx, g_security_error_event_class, args, 5);
+	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
+// Does `obj` itself carry a listener for `type` (hasEventListener)?
+int avm2_dispatcher_has_listener(Avm2Context* ctx, Avm2Object* obj,
+                                 const Avm2String* type)
+{
+	Avm2EventDispatcherExt* ext = avm2_dispatcher_ext_of(ctx, obj);
+	return ext != NULL && ed_list_has_type(ext->head, type) != 0;
 }
 
 Avm2Object* avm2_io_error_event_new(Avm2Context* ctx, const Avm2String* type,

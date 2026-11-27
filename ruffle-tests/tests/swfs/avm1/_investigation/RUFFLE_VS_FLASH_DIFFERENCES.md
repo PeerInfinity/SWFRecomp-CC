@@ -151,7 +151,7 @@ This pattern repeats for every prototype object in the test (~50+ prototypes × 
 
 **Decision:** Keep Flash-correct DONT_ENUM behavior. Accept as permanent Ruffle difference. Not added to ignored_tests.txt because the tests have other fixable diffs alongside this systematic difference.
 
-## SWF5 Constructor Visibility: LocalConnection, NetConnection, Video
+## SWF5 Constructor Visibility: LocalConnection, NetConnection, Video (RESOLVED s29: see EOF)
 
 **Test:** `globals_swf5`
 
@@ -1348,3 +1348,29 @@ so 0xCC draws 203; FP32 draws 204 (W1 glyph interior 204,51,0). Our non-skewed p
 
 **Decision:** match Flash for skewed AVM1 text (landed). Prune criterion: Ruffle drops the size snap for skewed boxes and
 adopts an exact-coverage rasteriser, or a Flash capture contradicts the rule.
+## s29 w1-disposition-audit / w2-disposition-land: corrections and new Ruffle≠Flash entries (2026-11-26)
+
+- **avm2/dependent_strings:** FP32 has no `ruffle::isDependent()`; each call traces `""` (capture
+  `SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__dependent_strings.r1.txt`). We match FP32
+  exactly. flash_fixes swap → pass 83/83 (was mm 46/84 vs the Ruffle golden).
+- **avm2/swz, avm2/loader_applicationDomain:** FP32 refuses a URLLoader fetch whose `URLRequest.digest` is set:
+  `Error #2044: Unhandled securityError:. text=Error #2046: The loaded file did not have a valid signature.` + stack
+  (Linux == Windows; `trace-provenance/avm2__{swz,loader_applicationDomain}.r1.txt`). Ruffle loads the SWZ and lists
+  its classes. flash_fixes swap for both. With the s29 patch (`URLRequest.digest` stored; `ul_start_load` /
+  `ul_deliver` dispatch `SecurityErrorEvent` #2046 and print the #2044 report when unhandled)
+  `loader_applicationDomain` passes 3/3; `swz` matches line 1 and misses FP's `[file:line]` stack suffixes (1/3).
+- **avm2/bom, avm2/loader_load:** CORRECTION to "AVM2 dynamic-property enumeration order": FP32 order is
+  nondeterministic; the golden is one run. The s29 coordinator's AS3 for-in fixture (`session29-fanout-reports/
+  w1-local-oracles/w1-disposition-audit/forin_order/flash.r{1,2}.txt`) shows a hash-scattered order that changes
+  between two FP32 runs of the same SWF (4 of 7 key sets reorder) and ignores insertion order. Neither Ruffle's
+  hashbrown order nor our insertion order is "Flash's order"; the rows are re-dispositioned as Flash-nondeterministic
+  (ACCEPTED_DIFFS Category 12, kept ignored).
+- **SWF5 Constructor Visibility (globals_swf5):** CORRECTION: FP32 shows LocalConnection/NetConnection/Video visible
+  in SWF5 AND passes gnash `X == undefined` (the SWF5 Equals2 function rule). We now show them (s29 patch:
+  `ensureGlobalInit` no longer sets `flash_flags = 0x0080` on them); `globals_swf5` pass 304/304, gnash
+  `LocalConnection-v5` / `NetConnection-v5` / `Video-v5` stay pass 7/7. This was never a Ruffle-vs-Flash difference.
+  The old entry is RESOLVED.
+- **avm1/native_objects_swf6 line 56:** not a Ruffle≠Flash case either. FP32 prints `new TextField(): non-object:
+  undefined` because SWF ≤ 6 names are case-insensitive and the test's earlier `createTextField("textField", …)`
+  instance shadows the class. Fixed in `actionNewObject`; regression fixtures `avm1_textfield_ctor_shadow_swf6/7`
+  (FP32 goldens).

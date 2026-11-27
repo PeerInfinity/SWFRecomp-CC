@@ -50487,21 +50487,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	#undef REG_FUNC
 	#undef REG_OBJ
 
-	// Mark select SWF6+ constructors on _global with flash_flags=0x0080
-	// (hidden in SWF5 via version mask 0x7480, visible in SWF6+).
-	// Flash Player does not expose these in SWF5. Ruffle does, so globals_swf5
-	// expects them visible — that test is in RUFFLE_VS_FLASH_DIFFERENCES.md.
-	// Gnash tests (LocalConnection-v5, NetConnection-v5, Video-v5) confirm Flash behavior.
-	{
-		const char* swf6_names[] = {
-			"LocalConnection", "NetConnection", "Video",
-		};
-		for (int i = 0; i < 3; i++) {
-			u32 nlen = (u32)strlen(swf6_names[i]);
-			ASProperty* p = findPropertyRaw(global_object, swf6_names[i], nlen);
-			if (p != NULL) p->flash_flags = 0x0080;
-		}
-	}
+	// LocalConnection / NetConnection / Video are VISIBLE in SWF5 (FP32:
+	// avm1/globals_swf5). They were hidden here (flash_flags 0x0080) for gnash
+	// LocalConnection-v5 / NetConnection-v5 / Video-v5, but those only assert
+	// `X == undefined`, which is TRUE in SWF5 for any function without an own
+	// valueOf/toString (actionEquals2's SWF5 function arm, s28 B6), so the hide
+	// was never needed. s29 w1-disposition-audit / w2-disposition-land.
 
 	// Version-hide `flash` in SWF<8. flash_flags 0x1480:
 	//   SWF5 mask 0x7480 → hidden; SWF6 mask 0x7500 → hidden;
@@ -50523,6 +50514,13 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		ver_val.str_size = PLAYER_VER_LEN; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_player_ver;
 		setProperty(app_context, (ASObject*)root_movieclip.dynamic_props, "$version", 8, &ver_val);
 	}
+
+	// Every builtin on _global is DONT_ENUM in Flash: FP32's first
+	// `for (k in _global)` in avm1/global_proto_decls lists none of them.
+	// Script-added globals (set after this point) stay enumerable.
+	// s29 w1-disposition-audit L5 / w2-disposition-land.
+	for (u32 i = 0; i < global_object->num_used; i++)
+		global_object->properties[i].flags &= (u8) ~PROPERTY_FLAG_ENUMERABLE;
 
 	g_global_init_done = 1;
 
@@ -65859,6 +65857,24 @@ void actionNewObject(SWFAppContext* app_context)
 	else if (strcmp(ctor_name, "TextField") == 0)
 	{
 		// Handle TextField constructor — new TextField()
+		// SWF <= 6 resolves names case-insensitively, so a `textField` instance
+		// (createTextField("textField", ...)) or variable on the scope chain
+		// shadows the TextField class: NewObject then finds a non-function and
+		// Flash yields undefined (FP32: avm1/native_objects_swf6 line 56,
+		// "new TextField(): non-object: undefined"). Same rule as the Color arm.
+		if (g_swf_version <= 6)
+		{
+			PUSH_STR("TextField", 9);
+			actionGetVariable(app_context);
+			ActionVar _tfv; popVar(app_context, &_tfv);
+			if (_tfv.type != ACTION_STACK_VALUE_FUNCTION &&
+			    _tfv.type != ACTION_STACK_VALUE_UNDEFINED &&
+			    _tfv.type != ACTION_STACK_VALUE_NULL)
+			{
+				pushUndefined(app_context);
+				return;
+			}
+		}
 		// Creates an empty object with __proto__ set to TextField.prototype
 		ASObject* tf_obj = allocObject(app_context, 4);
 		tf_obj->native_type = NATIVE_TEXTFIELD;

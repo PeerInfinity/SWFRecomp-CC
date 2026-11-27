@@ -7926,6 +7926,7 @@ typedef struct Avm2UrlRequestExt
 	Avm2Value data;
 	Avm2Value content_type;
 	Avm2Value request_headers;
+	Avm2Value digest;   // URLRequest.digest (signed-RSL load; s29 disposition audit)
 } Avm2UrlRequestExt;
 
 static int str_eq_lit(const Avm2String* s, const char* lit)
@@ -7958,6 +7959,21 @@ static Avm2Value urlreq_ctor(Avm2Activation* act)
 	e->content_type = avm2_string(avm2_string_from_literal(ctx,
 		"application/x-www-form-urlencoded"));
 	e->request_headers = avm2_null();
+	e->digest = avm2_null();
+	return avm2_undefined();
+}
+
+// URLRequest.digest: stored verbatim. A load that carries one is a signed-RSL
+// (.swz) fetch; see avm2_display.c ul_start_load for what FP32 does with it.
+static Avm2Value urlreq_get_digest(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); return e ? e->digest : avm2_null(); }
+
+static Avm2Value urlreq_set_digest(Avm2Activation* act)
+{
+	Avm2UrlRequestExt* e = urlreq_ext(act);
+	if (e && act->argc > 0)
+		e->digest = val_is_nullish(act->args[0]) ? avm2_null()
+			: avm2_string(avm2_coerce_to_string(act->ctx, act->args[0]));
 	return avm2_undefined();
 }
 
@@ -8392,7 +8408,7 @@ static void register_net(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, req, "data", urlreq_get_data, urlreq_set_data);
 	avm2_builtin_add_getset(ctx, req, "contentType", urlreq_get_ctype, urlreq_set_ctype);
 	avm2_builtin_add_getset(ctx, req, "requestHeaders", urlreq_get_headers, urlreq_set_headers);
-	avm2_builtin_add_getset(ctx, req, "digest", net_get_null, net_noop);
+	avm2_builtin_add_getset(ctx, req, "digest", urlreq_get_digest, urlreq_set_digest);
 
 	// flash.net.URLRequestMethod / URLLoaderDataFormat / URLRequestHeader
 	Avm2Class* rm = avm2_builtin_class(ctx, "flash.net", "URLRequestMethod",

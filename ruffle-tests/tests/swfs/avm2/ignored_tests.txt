@@ -218,11 +218,10 @@ weird_superinterface_properties
 # nor `ruffle_matched` is reachable. avm1 ACCEPTED_DIFFS.md Category 14.
 bytearray_oom
 
-# 2026-08-05 s11 wave-1 triage: recorded won't-dos (need the real Flex
-# framework_*.swz executed under AOT — impossible; see avm2
-# CURRENT_STATUS.md:476 and loader-arc tranche-6 scoreboard).
-# Documented in avm1/_investigation/ACCEPTED_DIFFS.md Category 13 (2026-08-06).
-loader_applicationDomain
+# swz: FP32 = securityError #2046 (3 lines); we print it without the [file:line] debug suffixes
+# (needs ABC debugfile/debugline at runtime). s29 w1-disposition-audit / w2-disposition-land;
+# avm1/_investigation/ACCEPTED_DIFFS.md Category 13. (loader_applicationDomain removed
+# 2026-11-26: FP32 golden via flash_fixes + the URLRequest.digest -> #2046 path, pass 3/3.)
 swz
 
 # --- 2026-08-06 s13 hygiene: dispositioned won't-dos that were never listed ---
@@ -235,20 +234,16 @@ swz
 # none of these four tests has an [[image_comparisons]] block, so a global entry
 # would buy nothing and mislabel the pixel board.
 #
-# loader_load, bom: Ruffle enumerates AVM2 dynamic properties in hashbrown
-#   bucket order; URLVariables.toString joins in `for (p in this)` order. We use
-#   insertion order (NOT Flash's: avmplus order is pointer-hashed; neither row is
-#   known_failure — s26 w1-trace-tail-audit §6). Unreproducible without emulating
-#   FNV-1a + the hashbrown SIMD bucket layout. bom's ceiling is 6/9,
-#   loader_load's 126/128.
-#   avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
-#   "AVM2 dynamic-property enumeration order: URLVariables.toString".
-# dependent_strings: the test calls text.ruffle::isDependent() under
-#   `namespace ruffle = "__ruffle__"` — a Ruffle-internal debug hook onto its
-#   rope-string representation, with no Flash equivalent. We throw, the test's
-#   own catch traces a blank line, and all 38 boolean rows blank. Flash would do
-#   the same; output.txt is Ruffle describing its own string internals. Same doc,
-#   "Ruffle-internal rope-string introspection: ruffle::isDependent()".
+# loader_load, bom: FLASH-NONDETERMINISTIC (s29 coordinator FP32 runs,
+#   session29-fanout-reports/w1-local-oracles/w1-disposition-audit/forin_order:
+#   FP32's AVM2 for-in order is hash-scattered AND differs between two runs of the
+#   same SWF; insertion order is irrelevant). URLVariables.toString joins in
+#   `for (p in this)` order, so the golden is ONE FP32 run's order. Same category
+#   as eforin_*: no deterministic implementation can match it. bom's ceiling is
+#   6/9, loader_load's 126/128. avm1/_investigation/ACCEPTED_DIFFS.md
+#   "AVM2 for-in order is Flash-nondeterministic" + RVF EOF s29 entry.
+# (dependent_strings removed 2026-11-26, s29 w2-disposition-land: golden swapped to the FP32
+#  capture via flash_fixes; FP32 traces "" for each ruffle::isDependent() call, as we do. pass.)
 # verify_method_info_duplicate: its expected trailing #1065 contradicts the
 #   PASSING sibling verify_method_info_oob, whose output.txt is the VerifyError
 #   alone; both errors come out of the same abc_parser.cpp loop, so emitting the
@@ -257,7 +252,6 @@ swz
 #   win (the 2026-08-01 prune criterion). avm1 ACCEPTED_DIFFS.md Category 2.
 loader_load
 bom
-dependent_strings
 verify_method_info_duplicate
 
 # --- sandbox_type_remote (added 2026-10-16, s22) ---

@@ -342,6 +342,13 @@ static const Avm2String* callstack_snapshot(Avm2Context* ctx)
 	return avm2_string_new(ctx, buf, n);
 }
 
+// The "\n\tat X()" tail of the current stack, for C-side reports that FP's
+// debug player prints with a stack (unhandled ErrorEvents; s29).
+const Avm2String* avm2_error_callstack_tail(Avm2Context* ctx)
+{
+	return callstack_snapshot(ctx);
+}
+
 // ---------------------------------------------------------------------------
 // Try frames
 // ---------------------------------------------------------------------------

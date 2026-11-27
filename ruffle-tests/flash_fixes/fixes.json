@@ -702,5 +702,38 @@
     "reason": "Flash LOW, Linux == Windows exactly. Golden is 268 px over tol 3 (max 255) from Flash. Ours vs FP32 with the s28 LOW model: 104 (was 536).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW swap candidates (Windows check)",
     "added": "2026-11-26"
+  },
+  {
+    "test": "avm2/dependent_strings",
+    "file": "output.txt",
+    "upstream_sha256": "8a560703303501c347fec258addb1711cd8f3a3119069c2be191c74f4c414948",
+    "fix": "avm2/dependent_strings/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__dependent_strings.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
+    "reason": "Ruffle's golden prints the result of ruffle::isDependent() (a Ruffle-internal debug hook, not a Flash API); FP32 traces \"\" for every such call. Our output == FP32 (no code change). mm -> pass.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-disposition-land",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "avm2/loader_applicationDomain",
+    "file": "output.txt",
+    "upstream_sha256": "fea57d93a65052f6a50ea4cd4b83b4b4bd7b75f50487158085d5240d0deeddd3",
+    "fix": "avm2/loader_applicationDomain/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__loader_applicationDomain.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
+    "reason": "FP32 refuses a URLLoader fetch whose URLRequest.digest is set (signed-RSL .swz): 'Error #2044: Unhandled securityError:. text=Error #2046: The loaded file did not have a valid signature.' + 2-frame stack (Linux == Windows). Ruffle loads the SWZ and lists its classes. Lands with the s29 w2-disposition-land digest -> #2046 path: ours == FP32 byte-exact, mm -> pass.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-disposition-land",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "avm2/swz",
+    "file": "output.txt",
+    "upstream_sha256": "2e9e8caecb1d7ae1a610e5b2035e8b5a72989fcb6e80bf87c23f86152f449846",
+    "fix": "avm2/swz/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__swz.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
+    "reason": "Same FP32 #2046 securityError path as loader_applicationDomain (Linux == Windows); Ruffle loads the SWZ and lists its asset classes. With the s29 w2-disposition-land patch we print line 1 exactly; the 2 stack lines lack FP's [file:line] debug suffixes (ABC debugline, open lead L1). Stays mm (1/3).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-disposition-land",
+    "added": "2026-11-26"
   }
 ]
