@@ -955,5 +955,49 @@
     "reason": "The upstream golden is EMPTY by Ruffle convention (its test.toml: uncaught errors are not compared). FP32 rejects the ABC at load (avmplus Traits::buildBindings: slot_id > the trait block's nameCount) and logs VerifyError #1107 + ReferenceError #1065 (document class SlotTest never defined). Ours does not implement the check yet (O3): stays failing vs Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-rm-avm2-land slot-id VerifyError #1107",
     "added": "2026-11-26"
+  },
+  {
+    "test": "from_shumway/acid/acid-color",
+    "file": "output.expected.png",
+    "upstream_sha256": "67b5143aecdf4a1f414da538ef2bc8d431ade68f706cfe2ff53d00d6b13c1bf9",
+    "fix": "from_shumway/acid/acid-color/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-color.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "from_shumway/acid/acid-color",
+    "file": "frame1.expected.png",
+    "upstream_sha256": "5f2cfe4e68fe5ae749b2321d106a237e41cb2d88706cfcdebb1c1bc933441ce5",
+    "fix": "from_shumway/acid/acid-color/frame1.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-color__frame1.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "from_shumway/acid/acid-gc",
+    "file": "output.expected.png",
+    "upstream_sha256": "20be0aa92b173f732ca3da9144281e66d3b94f01cb9a9d7be4c71663c2998d4b",
+    "fix": "from_shumway/acid/acid-gc/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-gc.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "from_shumway/acid/acid-gradient-1",
+    "file": "output.expected.png",
+    "upstream_sha256": "18852694407f302d4de5bd028386f3eac4bc817bed3031220e98a0ab2fbd9858",
+    "fix": "from_shumway/acid/acid-gradient-1/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-gradient-1.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
+    "added": "2026-11-27"
   }
 ]

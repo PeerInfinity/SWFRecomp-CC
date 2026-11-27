@@ -1428,3 +1428,16 @@ Diagnosis: `SWFRecompDocs/plans/session29-fanout-reports/w1-rm-avm2-report.md`. 
    `output.txt` swaps to the captures; we do not implement the check yet (lead O3), so both stay failing vs Flash.
 
 Prune criterion: Ruffle adopts the FP behaviour (per item), or upstream re-captures the goldens.
+
+## s29 LOW TSNAP golden swaps (s29 coordinator, 2026-11-27)
+
+**Tests:** `from_shumway/acid/acid-color` (output, frame1), `from_shumway/acid/acid-gc`, `from_shumway/acid/acid-gradient-1`.
+
+Flash Player 32 at quality LOW snaps each placed object's device translation to a whole pixel per display-list level,
+ties to even (s29 `w2-lowq-tsnap`, `1fcf2b1c1`; fixture `regression/lowq_tsnap_tie_probe`, FP32 golden). With it our
+LOW render of these four comparisons equals the FP32 LOW capture at 0 channels. The Ruffle goldens (GPU pixel-centre
+LOW, no translation snap) are 2 to 3 792 outliers away. Fresh FP32 LOW captures (LNX == WIN, 0 px; identical to the
+s27 golden-provenance captures) in `SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/`.
+
+**Decision:** match Flash; goldens swapped through `flash_fixes` (4 entries). Prune criterion: Ruffle's LOW renderer
+adopts the translation snap, or upstream re-bakes these goldens from Flash.
