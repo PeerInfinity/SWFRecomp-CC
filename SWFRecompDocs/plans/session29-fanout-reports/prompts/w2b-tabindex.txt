@@ -1,0 +1,26 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 29 (dual-axis #21), slot `w2b-tabindex`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2b-tabindex` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session29-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Your branch is `fanout/w2b-tabindex`; deliver `SWFRecompDocs/plans/session29-fanout-reports/w2b-tabindex-report.md` and `SWFRecompDocs/plans/session29-fanout-reports/w2b-tabindex.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Also read `CLAUDE.md`. Check `SWFRecompDocs/plans/session29-fanout-reports/SIBLING_FILE_MAP.md` (if present) for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+
+**AVM1 MovieClip `tabIndex` raw-string mode: fit the FP32 rule and land it (S).**
+
+Context: `session29-fanout-reports/w2-disposition-land-report.md` §3 (the prototype rule was held), FP32 results
+`w1-local-oracles/w2-disposition-land/README.md` (13 fixtures, `t00…t12`) and the MTASC captures
+`w1-local-oracles/w1-disposition-audit/L3b_tabindex*/flash.txt` (class-main coerces on `_root`).
+Facts: on the root, the first set being a string keeps tabIndex RAW in every bytecode form; a fresh
+`createEmptyMovieClip` child coerces (t08); a READ before the first set coerces (t11). MTASC's class bootstrap also
+coerces — find what it does to the root first (disassemble `L3b_tabindex_v8/test.swf`: does it read/enumerate the
+root, or `ASSetPropFlags` it?) and fold it into the rule. Candidate: "raw while the property has never been accessed
+and the clip was placed by the timeline", or a lazily-created native property. Prove the rule predicts ALL 13 + 4 MTASC
+captures before implementing; also replace the `actionSetMember` NaN-keeps-previous arm (report lead L-tab) if the
+captures show it wrong.
+Land: `avm1/tab_ordering_properties_tab_index_edge_case` rm→pass; `tab_ordering_properties` and the 17 `avm1/*tab*`
+rows unchanged; add regression rows for t08, t11 and one MTASC case with their FP32 goldens (copy SWFs; read
+`regression/README.md`). If no rule fits all captures, deliver a HOLD with the table. Siblings: w2-rm-avm1-gnash-land
+and w2-timers-goto-land edit action.c too — keep to the tabIndex block of `actionSetMember`; name every function.
