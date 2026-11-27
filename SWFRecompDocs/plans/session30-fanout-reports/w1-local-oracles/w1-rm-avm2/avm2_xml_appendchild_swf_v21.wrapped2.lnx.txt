@@ -1,0 +1,8 @@
+[test.swf] <root>
+  <a>Test</a>
+</root>
+[test.swf] <root>
+  <a>Test</a>
+  <a>Test</a>
+</root>
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
