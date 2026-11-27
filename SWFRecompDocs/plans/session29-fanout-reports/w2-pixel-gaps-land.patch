@@ -1,0 +1,316 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index b0056a182..d276e995c 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -1081,6 +1081,10 @@ typedef struct TextFieldGlyphInfo {
+     int device_xform;
+     float m_a, m_b, m_c, m_d;
+     float m_tx, m_ty;
++    // s29 w2-pixel-gaps-land (tag.c tf_glyph_quarter_snap LOW arm): 1 when the field's CSMTextSettings
++    // say antiAliasType "advanced" (FlashType). Flash anti-aliases those even
++    // at quality LOW; plain ("normal") fields are aliased and pen-snapped there.
++    int csm_advanced;
+ } TextFieldGlyphInfo;
+ 
+ typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 66a345c9b..7b4c5c4e1 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -32336,6 +32336,19 @@ static int tf_transform_positive_scale_only(float a, float b, float c, float d)
+ 	    && a > 0.0f && d > 0.0f;
+ }
+ 
++// s29 w2-pixel-gaps-land: CSMTextSettings antiAliasType == advanced (FlashType),
++// read by tag.c tf_glyph_quarter_snap's quality=LOW arm. Only the tag's
++// CSMTextSettings is read; a runtime antiAliasType assignment is not plumbed
++// (no corpus row needs it).
++static int tf_glyph_csm_advanced(int tf_idx)
++{
++	extern int ng_getTextFieldCSMApplied(int idx);
++	extern const char* ng_getTextFieldCSMAntiAliasType(int idx);
++	if (tf_idx < 0 || !ng_getTextFieldCSMApplied(tf_idx)) return 0;
++	const char* t = ng_getTextFieldCSMAntiAliasType(tf_idx);
++	return t != NULL && strcmp(t, "advanced") == 0;
++}
++
+ // s27 w2-avm1-text-layout: fill TextFieldGlyphInfo's world-matrix fields.
+ // Returns 0 when the field must not draw glyphs (device font under a
+ // rotated / sheared / reflected transform, the box iterator's cull). An
+@@ -33498,6 +33511,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 		// bounds — leave at 0 (their mc->x already encodes the visual origin).
+ 		info.bounds_xmin_twips = 0;
+ 		info.bounds_ymin_twips = 0;
++		info.csm_advanced = tf_glyph_csm_advanced(mc->ng_textfield_idx);
+ 		if (mc->ng_textfield_idx >= 0) {
+ 			s32 _bxmin, _bxmax, _bymin, _bymax;
+ 			ng_getTextFieldBounds(mc->ng_textfield_idx, &_bxmin, &_bxmax, &_bymin, &_bymax);
+@@ -33885,6 +33899,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 	info.mc = NULL;
+ 	info.device_font = !(ng_getTextFieldFlags(tf_idx) & 0x0080);
+ 	info.word_wrap = (ng_getTextFieldFlags(tf_idx) & 0x0001) ? 1 : 0; // s27 w1-text-wordwrap
++	info.csm_advanced = tf_glyph_csm_advanced(tf_idx);
+ 	info.sel_begin = -1;
+ 	info.sel_end = -1;
+ 	// s27 w2-avm1-text-layout: scale / rotation of the placement and its
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 9a07be06c..6aa723840 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3822,6 +3822,26 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
+ 	// visual/filters/blur_scales_with_screen 30440 -> 0 and
+ 	// drop_shadow_scales_with_screen 400 -> 0.
+ 	if (obj == NULL || !cab_snaps(obj)) return 0;
++#if !defined(MSAA_SAMPLES) || MSAA_SAMPLES > 1
++	// s29 w2-pixel-gaps-land (w1-pixel-flash-gaps prototype C): Flash 32 at
++	// quality HIGH composites an UNFILTERED cacheAsBitmap shape at its
++	// sub-pixel position: FP32 lowq_sample_point.high.png row 3 (a 25-px rect
++	// at (7.5, 127.5) has 50 % edges and 25 % corners), identical on the real
++	// screen (s29 --screen capture), and the FP32 golden of
++	// visual/cache_as_bitmap/avm1_color (1200 -> 230 channels). LOW keeps the
++	// snap: its aliased raster can't tell the two apart and the LOW
++	// Flash-golden scroll_rect needs it. (MSAA_SAMPLES is only defaulted
++	// further down this file, hence the !defined arm.) Kill switch:
++	// SWF_CAB_HIGH_SNAP=1 restores the HIGH snap.
++	if (obj->filter_type == 0) {
++		static int cab_high_snap = -1;
++		if (cab_high_snap < 0) {
++			const char* e = getenv("SWF_CAB_HIGH_SNAP");
++			cab_high_snap = (e != NULL && e[0] == '1');
++		}
++		if (!cab_high_snap) return 0;
++	}
++#endif
+ 	float xmin, ymin;
+ 	if (!cab_world_bounds_min(obj, world, &xmin, &ymin)) return 0;
+ 	// Ruffle's bounds (and the blit it snaps) are taken under the STAGE VIEW
+@@ -8362,8 +8382,11 @@ static float tf_tab_stop(float line_x, s16 ascent, s16 descent, int em, u16 fh,
+ //    in Flash, not from these outlines; snapping our stand-in face moved 11
+ //    Ruffle-golden comparisons (visual/filters/*, edittext_scroll,
+ //    String_path_variable_button) with no Flash basis.
+-//  * Antialiased builds only (MSAA_SAMPLES > 1). The quality = "low" Flash
+-//    captures available (draw() wrapper) fit no single grid/pen rule.
++//  * The 1/4-px grid is the antialiased-build (MSAA_SAMPLES > 1) rule. At
++//    quality = "low" (MSAA_SAMPLES == 1) the rule is different: pen -> whole
++//    device px, outline unsnapped, FlashType fields untouched (s29, fit on
++//    FP32 LOW goldens; the older "no LOW rule fits" note was measured on
++//    old-stub captures that were really HIGH).
+ //  * Identity-matrix arm only: no Flash capture pins the grid for a scaled or
+ //    rotated field (a device-space snap measured slightly AWAY from Flash on
+ //    regression/avm1_edittext_rotated_glyphs).
+@@ -8386,6 +8409,34 @@ static void tf_glyph_quarter_snap(float* xy, const TextFieldGlyphInfo* info,
+ 		xy[2 * v]     = rintf(vx.f * scale / q) * q + px;
+ 		xy[2 * v + 1] = rintf(vy.f * scale / q) * q + py;
+ 	}
++#elif !defined(TF_GLYPH_NO_QSNAP) && !defined(TF_GLYPH_NO_LOW_PEN) \
++      && defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
++	// s29 w2-pixel-gaps-land (w1-pixel-flash-gaps prototype A): Flash Player 32
++	// at quality = LOW draws a plain ("normal" antiAliasType) embedded-font
++	// field aliased with its pen rounded to a WHOLE device px, the outline
++	// unsnapped. Fit on the FP32 LOW goldens gnash place_object_test /
++	// shape_test (text channels 5073 -> 2604 and 1128 -> 543; morph_test1
++	// frames 2-6 -129 each) and visual/simple_shapes/text_field_mask (FP32 LOW
++	// capture, flash_fixes). FlashType fields (CSMTextSettings antiAliasType
++	// advanced) stay anti-aliased in Flash even at LOW (acid-color-0 FP32 LOW
++	// capture), so they are left alone. Kill switch: SWF_TF_LOW_PEN_SNAP=0
++	// (or -DTF_GLYPH_NO_LOW_PEN).
++	(void)sd; (void)g_offset; (void)scale;
++	static int low_pen_on = -1;
++	if (low_pen_on < 0) {
++		const char* e = getenv("SWF_TF_LOW_PEN_SNAP");
++		low_pen_on = !(e != NULL && e[0] == '0');
++	}
++	if (!low_pen_on || info->device_font || info->csm_advanced) return;
++	const float dscale = (context != NULL && context->stage_scale > 0.0f)
++	                   ? context->stage_scale : 1.0f;
++	const float q = 20.0f / dscale;   // 1 device px, in stage twips
++	const float dx = rintf(x_pos / q) * q - x_pos;
++	const float dy = rintf(y_pos / q) * q - y_pos;
++	for (size_t v = 0; v < g_size; v++) {
++		xy[2 * v]     += dx;
++		xy[2 * v + 1] += dy;
++	}
+ #else
+ 	(void)xy; (void)info; (void)sd; (void)g_offset; (void)g_size; (void)scale;
+ 	(void)x_pos; (void)y_pos;
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 73e887f10..98c86068d 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -3974,6 +3974,12 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
+ 	                 || (fabs(Ax + By) + fabs(Bx - Ay) <= 1e-6 * m_mag);
+ 	const int flash_dev = hairline_flash_width && !similar;
+ 
++	static int centre_q_all = -1;   // s29 w2-pixel-gaps-land kill switch
++	if (centre_q_all < 0)
++	{
++		const char* e = getenv("SWF_STROKE_CENTRE_QSNAP_ALL");
++		centre_q_all = (e != NULL && e[0] == '1');
++	}
+ 	float* out = (float*) malloc((size_t) src->n * 2 * sizeof(float));
+ 	if (out == NULL) return NULL;
+ 	for (unsigned v = 0; v < src->n; v++)
+@@ -3997,8 +4003,18 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
+ 		}
+ 		else if (axis != 0) { odx *= kx; ody *= ky; }
+ 		else { odx *= k_uni; ody *= k_uni; }
+-		cdx = floor(4.0 * cdx + 0.5) * 0.25;
+-		cdy = floor(4.0 * cdy + 0.5) * 0.25;
++		// s29 w2-pixel-gaps-land (w1-pixel-flash-gaps prototype B): the 1/4-px
++		// centre grid only on a centre that ends an exactly axis-aligned segment
++		// (STROKE_SNAP_VERT / HORZ), which is all the s28 Flash evidence for it
++		// covered. Quantising every centre of a flattened curve / oblique
++		// polyline moved from_shumway/acid/acid-shapes (Flash golden) 88 -> 243
++		// over its tol-32 limit; this rule restores 88 and leaves the drawapi
++		// snap fixtures unchanged. SWF_STROKE_CENTRE_QSNAP_ALL=1 restores the
++		// every-centre grid.
++		if ((sf & (STROKE_SNAP_VERT | STROKE_SNAP_HORZ)) || centre_q_all) {
++			cdx = floor(4.0 * cdx + 0.5) * 0.25;
++			cdy = floor(4.0 * cdy + 0.5) * 0.25;
++		}
+ 		if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf);
+ 		const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
+ 		out[v * 2]     = (float) (( By * ndx - Bx * ndy) / det);
+diff --git a/ruffle-tests/flash_fixes/README.md b/ruffle-tests/flash_fixes/README.md
+index 3baf48513..a9132a90b 100644
+--- a/ruffle-tests/flash_fixes/README.md
++++ b/ruffle-tests/flash_fixes/README.md
+@@ -45,6 +45,8 @@ download.
+ | 33 quality=low image rows (28 tests: 6 avm2, `morph_test1` ×6, 14 `blend_modes`, `cache_as_bitmap/{drawing_api,nested_rotation}`, `gradient_focal_point`, `color_matrix`, `fonts/glyph`, `gradients/focal_radial`, `simple_shapes/layers`) | `*.expected.png` | 2026-11-25 | s28 lowq-recapture: FP32 `--quality low` (LNX ×2 deterministic, WIN == LNX in tol; 4 non-LAYER blends from `--screen`) | **land only together with the w2-lowq-sample-point model.** Without it every row fails vs Flash; with it all fail except `focal_radial` (PASS). Report: `SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture-report.md` §6 |
+ | `visual/simple_shapes/gradients/{gradients,reflect,repeat}`, `visual/opaque_background` | `output.expected.png` | 2026-11-25 | s28 lowq-corner-rule (same FP32 LOW captures; LNX == WIN exact) | **land with the lowq model** (`lowq-final.patch`). Ours vs Flash: master → model 5 874 → 3, 645 528 → 5 628, 649 083 → 5 628, 3 474 → 1 956 channels; all still fail (gradients by 3). Report: `SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule-report.md` |
+ | `from_shumway/invalidClipDepth`, `from_shumway/acid/acid-filter` | `output.expected.png` | 2026-11-26 | s28 lowq-corner-rule LNX FP32 LOW + s29 coordinator WIN FP32 LOW (WIN == LNX exact) | invalidClipDepth expected fail → pass (ours == FP32); acid-filter stays fail (104 vs Flash) |
++| `visual/simple_shapes/text_field_mask` | `output.expected.png` | 2026-11-26 | s29 coordinator FP32 LOW (LNX == WIN byte for byte; `session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/`) | **land with w2-pixel-gaps-land prototype A** (LOW glyph pen → whole device px). Golden (Ruffle) is 2 378 ch from Flash. Ours vs Flash: master 2 404 → A 1 336 ch; fails either way |
++| `from_shumway/gradientTransform` | `output.expected.png` | 2026-11-26 | same dir: FP32 LOW (LNX == WIN byte for byte); FP32 HIGH == upstream golden exactly | golden was Flash HIGH on a quality=low row. Ours vs Flash LOW: 3 ch over tol 3 (max 21), was 6 over vs the HIGH golden; fails either way |
+ 
+ **Graded** in run `45547012629` at `7c3cfdcb7` (results `e1425f417`) vs `cb14cd063`: 0 status moves in either axis.
+ Excess channels vs the new Flash goldens:
+diff --git a/ruffle-tests/flash_fixes/fixes.json b/ruffle-tests/flash_fixes/fixes.json
+index cfc47e07d..ea04f49b8 100644
+--- a/ruffle-tests/flash_fixes/fixes.json
++++ b/ruffle-tests/flash_fixes/fixes.json
+@@ -702,5 +702,27 @@
+     "reason": "Flash LOW, Linux == Windows exactly. Golden is 268 px over tol 3 (max 255) from Flash. Ours vs FP32 with the s28 LOW model: 104 (was 536).",
+     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW swap candidates (Windows check)",
+     "added": "2026-11-26"
++  },
++  {
++    "test": "visual/simple_shapes/text_field_mask",
++    "file": "output.expected.png",
++    "upstream_sha256": "245bbbe565caebe7a88c40ba7120563d8d3a2cb57e4fd75c20c6bd7d6144b137",
++    "fix": "visual/simple_shapes/text_field_mask/output.expected.png",
++    "kind": "image",
++    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.low.png (s29 coordinator, Linux LNX 32,0,0,465, quality=low, tick 1, new stub); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.win.low.png byte-identical (0 ch at tol 0)",
++    "reason": "Flash LOW, Linux == Windows exactly. Golden (Ruffle) differs from Flash by 1189 px / 2378 ch at tol 0 (max 255), all in the big embedded-font 'W' glyphs. Ours vs FP32 (s29 w2-pixel-gaps-land): master 2404 ch -> 1336 ch with the LOW glyph pen -> whole device px rule (tag.c tf_glyph_quarter_snap).",
++    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-pixel-gaps-land golden swaps (text_field_mask, gradientTransform)",
++    "added": "2026-11-26"
++  },
++  {
++    "test": "from_shumway/gradientTransform",
++    "file": "output.expected.png",
++    "upstream_sha256": "e5c1b6995d46ddd9300b0c248c547178996dbc6f500ebd7dc51fa13c9ece6c31",
++    "fix": "from_shumway/gradientTransform/output.expected.png",
++    "kind": "image",
++    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.low.png (s29 coordinator, Linux, quality=low as test.toml runs it, new stub); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.win.low.png byte-identical; SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.high.png == upstream golden exactly (the golden is Flash at HIGH)",
++    "reason": "The upstream golden is Flash at quality HIGH (0 px vs FP32 HIGH at tol 3) but the row runs at quality LOW. FP32 LOW differs from it by 3 px / 9 ch over tol 3 (max 15); Linux == Windows. Grade the LOW row against Flash LOW.",
++    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-pixel-gaps-land golden swaps (text_field_mask, gradientTransform)",
++    "added": "2026-11-26"
+   }
+ ]
+diff --git a/ruffle-tests/flash_fixes/from_shumway/gradientTransform/output.expected.png b/ruffle-tests/flash_fixes/from_shumway/gradientTransform/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..53bbefefb0d58d138a57e535645d30a3586df37a
+GIT binary patch
+literal 215
+zcmeAS@N?(olHy`uVBq!ia0vp^sX#2r!3HEX<~%3`Qu91r978JRyuG!N_pkwvOQ4#^
+z@-XX)|9-1E&ath!`YA}IY!YWl!~fY02iPMyc5S^Tvf<N-Ga5_R%wv`>K36W{d9ga)
+z_WaY_+hQ{%zbkWHo9rTDULW|N+1K#!Pa_u*XBR^lkuD;5v~7vN>_@GiQ#&-;Dt;Rs
+zT{h!kjigeS;vxy9u7%2{eikmewySE{Y3bye#Wvq-zuNrx$n@_3XZ4zgC$9iq%HZkh
+K=d#Wzp$PyJWLMV!
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/flash_fixes/visual/simple_shapes/text_field_mask/output.expected.png b/ruffle-tests/flash_fixes/visual/simple_shapes/text_field_mask/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..55fda530cfeb13d91674f84c45b2844b60ff86a0
+GIT binary patch
+literal 2968
+zcmeHJ`%@EF6ke^ZuYzsS8Er|hb%s_^q@W0fK(RWApe<TJ8VIC_5dj%MNWwzsXh&)X
+zh=NEk5^M*oltLnpV1Uhbu&~G@VGs=glAs__x5+kSl3<?Q*vIsL(EHQ5=bpKD&i%gc
+zoOAKZBN1+E-d_U%fLr9j{YL>{xi<hTyR_;p+;gq7xg7x3CP(fM|B88Ct5jA_eZT2I
+z%=IBFoU8e0cWlA(<2T?P#TiLyGg%GyZ!{5T0Wce1MEnNlUh4_~aC{gIeET+SIdEc?
+z2eA2bE&y!mTLBEd;|+Xv!EYJh|J`cf((8~{?q6(HPKm{czF^pGncxH+QCKz#Dh$@!
+z-r7zhpHfp)EHg~fFrk<_#9{rty@ll?IB}K&qN!;U%@Z#Mnvto+jTjL#msgo|mj|O{
+zG_*xv%R&kDa;IGl)(wY)rK9<Z&_of)AC5J5r}`^noF>Ki2HB>-v;9%CKWIjRUF^%r
+z<l1)BVpk`sOjF%9G(I2`YY>Zkot6iQEX-MY@7?Uv{3i-gB*<YN%gc^(o-#LRj1L6L
+z--Tk|Y2G!*UbZnqwjEB*Ep48CiUbW+OO2WFmIODDu#N{d<&meW*>O|^^_siWm3x(M
+zujXH7xU#fj%^!#u<B1g5Dd}#;jHSs6qz;SeJ1oxJ$|QP6KuxRxL{_}mNzy@cFe_A9
+zh-i#Txv!8hnOLK}n`Z4299DrNgepeZBRV|+f;%QQnAxCv#2K<xbGBcTU%t-l&f`s@
+zZAlE<b3^w4!Bpt85*Q5H8LeYxFV;nZS&)DRemvS~l(dS>`P|IT6ZeXLf=W(D5lhBZ
+z?O_`q@#cyQCl@LO0<wdMd~I0TGeyd59X6f+&tY;rGmyL~iEl<pi-wz1%F{tP(YdXj
+zyGzR=pTg0rg)%r;TT+RqV9w}ZMVAcxqx=D@UxM}KLM3<sW816118PaFcpk*=FtpIr
+zmM%$KfeS>28XQy6@{&YexeB%k^1u=7tCzChu+=^e4nL@WZ!6zJz8NnrW%j;#UZP|O
+z87Bv%V{sa$yd}Pv>ctr~x%0q_kngm))zTYEG*4U2eu_n`oM2~+NrF`k5QXj6NA-#p
+z_Va2pDqwS}Hotc*MhKLr_1x8)*}p;+bgZPf1Zk*@;~<}E{Ijt2jrC82a=lR8lqc>U
+zmyM%L(ArzwZmg~0SJQD!I}J?A^pfqu=wa-o-7}|3qvg(%e{8AfT*$!#^1bNU%0*B2
+zkcTd2uOvDLQ&|Lo6+(5~qRKeX-oY8^Ne63wVY7`#@AKuqy-c6PHT52u>akOT!8(?H
+zh#jKqF)Q>ORpEkcwpE7ukm}?@@y}Skf{NzIyHVAGhMP!!61F>C(9*R#Q+Epzsp506
+zMZc|lyAS0$+5m|HUvd*|ESkl_D&=|$60}fp?}7SH%LIPd8b4!U&ODaY6n!&(KLai7
+zZ{Z+hQ=oc?)o3|1IjjIn!W>sMxs6Veu(Z8ie%_4-TBtSJP$`?rDOgY$Y5v-6T#@+`
+zda@Bup$-Rurv%s6Xm8*A!@fOQ>L^pHvy8O}7Cn`Lnqc}xnqZEW2VL0{qH1VShdxX)
+zQPCDpVD{k@?Pw3&(dD9P3oS1KSB&Hk*tNRqIiglR@|3DFP$OqUP$@0%3$@FP4JvIn
+zv5DS-w&#j-J~l=TTs%V3xr&LJd@|)_B_V~V2wf6zqzB7_s}0N!-A)2+oJz^gn4F1m
+ziD5{^=7t=*Q(w^V|3{^h;3(dx&OGb!OUQ*aPvJ30L%tOW${Yz^tlmf&x*GAqIRlRA
+zy~zT)CoGf`JfyL#V;;vx(uVo}wzo3u?z|G}-QwJ5rXnQk5?$As52vnk)d;k)cTO)2
+z5y|xu#F~t^&tA$ZU>DP+)z@9}^=R<QjRvpUoLJ@rLZYtBri7DWeBuTo4;<Owx-aG2
+EUr~Q_9{>OV
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index eebdc5dd3..b4417b857 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -842,3 +842,10 @@ from_gnash/misc-ming.all/place_object_test   # two pairs at one depth, newcomer
+ # tier=1
+ from_shumway/acid/acid-stroke-0                     # 5 line styles x 11 matrices, LOW   1 cmp
+ regression/avm1_stroke_pixel_snap_matrix            # 224 snapped/AA strokes, skew rows  1 cmp
++# s29 w2-pixel-gaps-land: unfiltered cacheAsBitmap is NOT snapped at HIGH (tag.c cab_snap_delta,
++# SWF_CAB_HIGH_SNAP=1 restores it) and the drawing-API 1/4-px centre grid only on axis-aligned
++# segment ends (render_webgpu.c render_webgpu_stroke_snap, SWF_STROKE_CENTRE_QSNAP_ALL=1). No
++# standing member saw the cacheAsBitmap change. Both goldens are Flash; both still fail.
++# tier=2
++visual/cache_as_bitmap/avm1_color                   # cached clip at a sub-px position, HIGH  1 cmp
++from_shumway/acid/acid-shapes                       # thick curved drawing-API strokes, HIGH   1 cmp
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
+index 9c40ab5b7..c9d0b0332 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
+@@ -1320,3 +1320,26 @@ Done
+ **Decision:** match Flash. `avm2_bitmap.c::bd_palette_map` reads `avm2_array_get(arr, i)`; the off-by-one is not
+ replicated. Our AVM1 arm (`action.c::bitmapDataPaletteMap`) and Ruffle's AVM1 arm both already read `arr[i]`. Prune
+ criterion: Ruffle's AVM2 `palette_map` switches to `arr[i]`.
++
++## Two image goldens swapped to FP32 LOW: `text_field_mask`, `gradientTransform` (s29 w2-pixel-gaps-land, 2026-11-26)
++
++**Tests:** `visual/simple_shapes/text_field_mask`, `from_shumway/gradientTransform` (both `quality = "low"`).
++**Evidence:** coordinator FP32 captures, new stub, Linux LNX 32,0,0,465 and Windows, byte-identical across hosts:
++`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/{text_field_mask,gradientTransform}{,.win}.low.png`
++and `gradientTransform.high.png` (README in the same directory).
++
++| test | golden → FP32 LOW | ours → FP32 LOW, master | ours → FP32 LOW, w2-pixel-gaps-land |
++|---|---|---:|---:|
++| `text_field_mask` (tol 0) | Ruffle render: 1 189 px / 2 378 ch, max 255 (the big embedded "W" glyphs) | 2 404 ch | **1 336 ch** (prototype A) |
++| `gradientTransform` (tol 3) | Flash **HIGH** exactly (0 px vs FP32 HIGH); vs FP32 LOW 3 px / 9 ch over, max 15 | 3 ch over (max 21) | 3 ch over (unchanged) |
++
++- `text_field_mask`: Ruffle draws this plain (non-FlashType) embedded-font field at LOW with sub-pixel pen positions;
++  Flash LOW rounds the glyph pen to a whole device px (the same rule fits the FP32 LOW gnash goldens
++  `place_object_test` / `shape_test` / `morph_test1`). Against the Ruffle golden the rule is a priced loss
++  (630 → 1 738 ch); against Flash it is a gain (2 404 → 1 336).
++- `gradientTransform`: the upstream golden was made at HIGH but the row runs at LOW; FP32 LOW differs from FP32 HIGH on
++  3 ramp pixels. Our LOW render vs the HIGH golden was 6 ch over, vs Flash LOW 3 ch over.
++
++**Decision:** both `output.expected.png` goldens are replaced by the FP32 LOW capture via `ruffle-tests/flash_fixes/`
++(platform-stable, README rule 1). Both rows still fail; the residuals above are the honest Flash gap. Prune criterion:
++upstream ships a Flash LOW golden (the entry then prints `UPSTREAMED`).

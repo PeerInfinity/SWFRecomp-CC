@@ -849,3 +849,10 @@ regression/avm1_stroke_pixel_snap_matrix            # 224 snapped/AA strokes, sk
 # tier=1
 regression/avm1_edittext_rotated_color       # rot30/shear/90deg, text 0xCC3300, grey under  1 cmp
 regression/avm1_edittext_rotated_paragraph   # 200 glyphs rotated 30deg, run-budget stress  1 cmp
+# s29 w2-pixel-gaps-land: unfiltered cacheAsBitmap is NOT snapped at HIGH (tag.c cab_snap_delta,
+# SWF_CAB_HIGH_SNAP=1 restores it) and the drawing-API 1/4-px centre grid only on axis-aligned
+# segment ends (render_webgpu.c render_webgpu_stroke_snap, SWF_STROKE_CENTRE_QSNAP_ALL=1). No
+# standing member saw the cacheAsBitmap change. Both goldens are Flash; both still fail.
+# tier=2
+visual/cache_as_bitmap/avm1_color                   # cached clip at a sub-px position, HIGH  1 cmp
+from_shumway/acid/acid-shapes                       # thick curved drawing-API strokes, HIGH   1 cmp

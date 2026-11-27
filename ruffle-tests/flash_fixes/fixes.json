@@ -735,5 +735,27 @@
     "reason": "Same FP32 #2046 securityError path as loader_applicationDomain (Linux == Windows); Ruffle loads the SWZ and lists its asset classes. With the s29 w2-disposition-land patch we print line 1 exactly; the 2 stack lines lack FP's [file:line] debug suffixes (ABC debugline, open lead L1). Stays mm (1/3).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-disposition-land",
     "added": "2026-11-26"
+  },
+  {
+    "test": "visual/simple_shapes/text_field_mask",
+    "file": "output.expected.png",
+    "upstream_sha256": "245bbbe565caebe7a88c40ba7120563d8d3a2cb57e4fd75c20c6bd7d6144b137",
+    "fix": "visual/simple_shapes/text_field_mask/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.low.png (s29 coordinator, Linux LNX 32,0,0,465, quality=low, tick 1, new stub); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.win.low.png byte-identical (0 ch at tol 0)",
+    "reason": "Flash LOW, Linux == Windows exactly. Golden (Ruffle) differs from Flash by 1189 px / 2378 ch at tol 0 (max 255), all in the big embedded-font 'W' glyphs. Ours vs FP32 (s29 w2-pixel-gaps-land): master 2404 ch -> 1336 ch with the LOW glyph pen -> whole device px rule (tag.c tf_glyph_quarter_snap).",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-pixel-gaps-land golden swaps (text_field_mask, gradientTransform)",
+    "added": "2026-11-26"
+  },
+  {
+    "test": "from_shumway/gradientTransform",
+    "file": "output.expected.png",
+    "upstream_sha256": "e5c1b6995d46ddd9300b0c248c547178996dbc6f500ebd7dc51fa13c9ece6c31",
+    "fix": "from_shumway/gradientTransform/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.low.png (s29 coordinator, Linux, quality=low as test.toml runs it, new stub); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.win.low.png byte-identical; SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.high.png == upstream golden exactly (the golden is Flash at HIGH)",
+    "reason": "The upstream golden is Flash at quality HIGH (0 px vs FP32 HIGH at tol 3) but the row runs at quality LOW. FP32 LOW differs from it by 3 px / 9 ch over tol 3 (max 15); Linux == Windows. Grade the LOW row against Flash LOW.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-pixel-gaps-land golden swaps (text_field_mask, gradientTransform)",
+    "added": "2026-11-26"
   }
 ]

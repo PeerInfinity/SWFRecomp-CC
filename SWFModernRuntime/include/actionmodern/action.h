@@ -1081,6 +1081,10 @@ typedef struct TextFieldGlyphInfo {
     int device_xform;
     float m_a, m_b, m_c, m_d;
     float m_tx, m_ty;
+    // s29 w2-pixel-gaps-land (tag.c tf_glyph_quarter_snap LOW arm): 1 when the field's CSMTextSettings
+    // say antiAliasType "advanced" (FlashType). Flash anti-aliases those even
+    // at quality LOW; plain ("normal") fields are aliased and pen-snapped there.
+    int csm_advanced;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);

@@ -3822,6 +3822,26 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
 	// visual/filters/blur_scales_with_screen 30440 -> 0 and
 	// drop_shadow_scales_with_screen 400 -> 0.
 	if (obj == NULL || !cab_snaps(obj)) return 0;
+#if !defined(MSAA_SAMPLES) || MSAA_SAMPLES > 1
+	// s29 w2-pixel-gaps-land (w1-pixel-flash-gaps prototype C): Flash 32 at
+	// quality HIGH composites an UNFILTERED cacheAsBitmap shape at its
+	// sub-pixel position: FP32 lowq_sample_point.high.png row 3 (a 25-px rect
+	// at (7.5, 127.5) has 50 % edges and 25 % corners), identical on the real
+	// screen (s29 --screen capture), and the FP32 golden of
+	// visual/cache_as_bitmap/avm1_color (1200 -> 230 channels). LOW keeps the
+	// snap: its aliased raster can't tell the two apart and the LOW
+	// Flash-golden scroll_rect needs it. (MSAA_SAMPLES is only defaulted
+	// further down this file, hence the !defined arm.) Kill switch:
+	// SWF_CAB_HIGH_SNAP=1 restores the HIGH snap.
+	if (obj->filter_type == 0) {
+		static int cab_high_snap = -1;
+		if (cab_high_snap < 0) {
+			const char* e = getenv("SWF_CAB_HIGH_SNAP");
+			cab_high_snap = (e != NULL && e[0] == '1');
+		}
+		if (!cab_high_snap) return 0;
+	}
+#endif
 	float xmin, ymin;
 	if (!cab_world_bounds_min(obj, world, &xmin, &ymin)) return 0;
 	// Ruffle's bounds (and the blit it snaps) are taken under the STAGE VIEW
@@ -8631,8 +8651,11 @@ static float tf_tab_stop(float line_x, s16 ascent, s16 descent, int em, u16 fh, 
 //    in Flash, not from these outlines; snapping our stand-in face moved 11
 //    Ruffle-golden comparisons (visual/filters/*, edittext_scroll,
 //    String_path_variable_button) with no Flash basis.
-//  * Antialiased builds only (MSAA_SAMPLES > 1). The quality = "low" Flash
-//    captures available (draw() wrapper) fit no single grid/pen rule.
+//  * The 1/4-px grid is the antialiased-build (MSAA_SAMPLES > 1) rule. At
+//    quality = "low" (MSAA_SAMPLES == 1) the rule is different: pen -> whole
+//    device px, outline unsnapped, FlashType fields untouched (s29, fit on
+//    FP32 LOW goldens; the older "no LOW rule fits" note was measured on
+//    old-stub captures that were really HIGH).
 //  * Identity-matrix arm only: no Flash capture pins the grid for a scaled or
 //    rotated field (a device-space snap measured slightly AWAY from Flash on
 //    regression/avm1_edittext_rotated_glyphs).
@@ -8654,6 +8677,34 @@ static void tf_glyph_quarter_snap(float* xy, const TextFieldGlyphInfo* info,
 		vy.u = sd[g_offset + v][1];
 		xy[2 * v]     = rintf(vx.f * scale / q) * q + px;
 		xy[2 * v + 1] = rintf(vy.f * scale / q) * q + py;
+	}
+#elif !defined(TF_GLYPH_NO_QSNAP) && !defined(TF_GLYPH_NO_LOW_PEN) \
+      && defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	// s29 w2-pixel-gaps-land (w1-pixel-flash-gaps prototype A): Flash Player 32
+	// at quality = LOW draws a plain ("normal" antiAliasType) embedded-font
+	// field aliased with its pen rounded to a WHOLE device px, the outline
+	// unsnapped. Fit on the FP32 LOW goldens gnash place_object_test /
+	// shape_test (text channels 5073 -> 2604 and 1128 -> 543; morph_test1
+	// frames 2-6 -129 each) and visual/simple_shapes/text_field_mask (FP32 LOW
+	// capture, flash_fixes). FlashType fields (CSMTextSettings antiAliasType
+	// advanced) stay anti-aliased in Flash even at LOW (acid-color-0 FP32 LOW
+	// capture), so they are left alone. Kill switch: SWF_TF_LOW_PEN_SNAP=0
+	// (or -DTF_GLYPH_NO_LOW_PEN).
+	(void)sd; (void)g_offset; (void)scale;
+	static int low_pen_on = -1;
+	if (low_pen_on < 0) {
+		const char* e = getenv("SWF_TF_LOW_PEN_SNAP");
+		low_pen_on = !(e != NULL && e[0] == '0');
+	}
+	if (!low_pen_on || info->device_font || info->csm_advanced) return;
+	const float dscale = (context != NULL && context->stage_scale > 0.0f)
+	                   ? context->stage_scale : 1.0f;
+	const float q = 20.0f / dscale;   // 1 device px, in stage twips
+	const float dx = rintf(x_pos / q) * q - x_pos;
+	const float dy = rintf(y_pos / q) * q - y_pos;
+	for (size_t v = 0; v < g_size; v++) {
+		xy[2 * v]     += dx;
+		xy[2 * v + 1] += dy;
 	}
 #else
 	(void)xy; (void)info; (void)sd; (void)g_offset; (void)g_size; (void)scale;

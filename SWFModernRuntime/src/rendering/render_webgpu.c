@@ -4044,6 +4044,12 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 	                 || (fabs(Ax + By) + fabs(Bx - Ay) <= 1e-6 * m_mag);
 	const int flash_dev = hairline_flash_width && !similar;
 
+	static int centre_q_all = -1;   // s29 w2-pixel-gaps-land kill switch
+	if (centre_q_all < 0)
+	{
+		const char* e = getenv("SWF_STROKE_CENTRE_QSNAP_ALL");
+		centre_q_all = (e != NULL && e[0] == '1');
+	}
 	float* out = (float*) malloc((size_t) src->n * 2 * sizeof(float));
 	if (out == NULL) return NULL;
 	for (unsigned v = 0; v < src->n; v++)
@@ -4068,8 +4074,18 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 		}
 		else if (axis != 0) { odx *= kx; ody *= ky; }
 		else { odx *= k_uni; ody *= k_uni; }
-		cdx = floor(4.0 * cdx + 0.5) * 0.25;
-		cdy = floor(4.0 * cdy + 0.5) * 0.25;
+		// s29 w2-pixel-gaps-land (w1-pixel-flash-gaps prototype B): the 1/4-px
+		// centre grid only on a centre that ends an exactly axis-aligned segment
+		// (STROKE_SNAP_VERT / HORZ), which is all the s28 Flash evidence for it
+		// covered. Quantising every centre of a flattened curve / oblique
+		// polyline moved from_shumway/acid/acid-shapes (Flash golden) 88 -> 243
+		// over its tol-32 limit; this rule restores 88 and leaves the drawapi
+		// snap fixtures unchanged. SWF_STROKE_CENTRE_QSNAP_ALL=1 restores the
+		// every-centre grid.
+		if ((sf & (STROKE_SNAP_VERT | STROKE_SNAP_HORZ)) || centre_q_all) {
+			cdx = floor(4.0 * cdx + 0.5) * 0.25;
+			cdy = floor(4.0 * cdy + 0.5) * 0.25;
+		}
 		if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf, hinted);
 		const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
 		out[v * 2]     = (float) (( By * ndx - Bx * ndy) / det);

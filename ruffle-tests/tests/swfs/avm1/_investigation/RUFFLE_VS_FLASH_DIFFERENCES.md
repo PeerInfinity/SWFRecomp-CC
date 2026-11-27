@@ -1374,3 +1374,25 @@ adopts an exact-coverage rasteriser, or a Flash capture contradicts the rule.
   undefined` because SWF ≤ 6 names are case-insensitive and the test's earlier `createTextField("textField", …)`
   instance shadows the class. Fixed in `actionNewObject`; regression fixtures `avm1_textfield_ctor_shadow_swf6/7`
   (FP32 goldens).
+## Two image goldens swapped to FP32 LOW: `text_field_mask`, `gradientTransform` (s29 w2-pixel-gaps-land, 2026-11-26)
+
+**Tests:** `visual/simple_shapes/text_field_mask`, `from_shumway/gradientTransform` (both `quality = "low"`).
+**Evidence:** coordinator FP32 captures, new stub, Linux LNX 32,0,0,465 and Windows, byte-identical across hosts:
+`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/{text_field_mask,gradientTransform}{,.win}.low.png`
+and `gradientTransform.high.png` (README in the same directory).
+
+| test | golden → FP32 LOW | ours → FP32 LOW, master | ours → FP32 LOW, w2-pixel-gaps-land |
+|---|---|---:|---:|
+| `text_field_mask` (tol 0) | Ruffle render: 1 189 px / 2 378 ch, max 255 (the big embedded "W" glyphs) | 2 404 ch | **1 336 ch** (prototype A) |
+| `gradientTransform` (tol 3) | Flash **HIGH** exactly (0 px vs FP32 HIGH); vs FP32 LOW 3 px / 9 ch over, max 15 | 3 ch over (max 21) | 3 ch over (unchanged) |
+
+- `text_field_mask`: Ruffle draws this plain (non-FlashType) embedded-font field at LOW with sub-pixel pen positions;
+  Flash LOW rounds the glyph pen to a whole device px (the same rule fits the FP32 LOW gnash goldens
+  `place_object_test` / `shape_test` / `morph_test1`). Against the Ruffle golden the rule is a priced loss
+  (630 → 1 738 ch); against Flash it is a gain (2 404 → 1 336).
+- `gradientTransform`: the upstream golden was made at HIGH but the row runs at LOW; FP32 LOW differs from FP32 HIGH on
+  3 ramp pixels. Our LOW render vs the HIGH golden was 6 ch over, vs Flash LOW 3 ch over.
+
+**Decision:** both `output.expected.png` goldens are replaced by the FP32 LOW capture via `ruffle-tests/flash_fixes/`
+(platform-stable, README rule 1). Both rows still fail; the residuals above are the honest Flash gap. Prune criterion:
+upstream ships a Flash LOW golden (the entry then prints `UPSTREAMED`).

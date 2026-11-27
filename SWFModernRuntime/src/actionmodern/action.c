@@ -32336,6 +32336,19 @@ static int tf_transform_positive_scale_only(float a, float b, float c, float d)
 	    && a > 0.0f && d > 0.0f;
 }
 
+// s29 w2-pixel-gaps-land: CSMTextSettings antiAliasType == advanced (FlashType),
+// read by tag.c tf_glyph_quarter_snap's quality=LOW arm. Only the tag's
+// CSMTextSettings is read; a runtime antiAliasType assignment is not plumbed
+// (no corpus row needs it).
+static int tf_glyph_csm_advanced(int tf_idx)
+{
+	extern int ng_getTextFieldCSMApplied(int idx);
+	extern const char* ng_getTextFieldCSMAntiAliasType(int idx);
+	if (tf_idx < 0 || !ng_getTextFieldCSMApplied(tf_idx)) return 0;
+	const char* t = ng_getTextFieldCSMAntiAliasType(tf_idx);
+	return t != NULL && strcmp(t, "advanced") == 0;
+}
+
 // s27 w2-avm1-text-layout: fill TextFieldGlyphInfo's world-matrix fields.
 // Returns 0 when the field must not draw glyphs (device font under a
 // rotated / sheared / reflected transform, the box iterator's cull). An
@@ -33498,6 +33511,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		// bounds — leave at 0 (their mc->x already encodes the visual origin).
 		info.bounds_xmin_twips = 0;
 		info.bounds_ymin_twips = 0;
+		info.csm_advanced = tf_glyph_csm_advanced(mc->ng_textfield_idx);
 		if (mc->ng_textfield_idx >= 0) {
 			s32 _bxmin, _bxmax, _bymin, _bymax;
 			ng_getTextFieldBounds(mc->ng_textfield_idx, &_bxmin, &_bxmax, &_bymin, &_bymax);
@@ -33885,6 +33899,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.mc = NULL;
 	info.device_font = !(ng_getTextFieldFlags(tf_idx) & 0x0080);
 	info.word_wrap = (ng_getTextFieldFlags(tf_idx) & 0x0001) ? 1 : 0; // s27 w1-text-wordwrap
+	info.csm_advanced = tf_glyph_csm_advanced(tf_idx);
 	info.sel_begin = -1;
 	info.sel_end = -1;
 	// s27 w2-avm1-text-layout: scale / rotation of the placement and its
