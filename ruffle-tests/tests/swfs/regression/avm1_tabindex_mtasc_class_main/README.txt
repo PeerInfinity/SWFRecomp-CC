@@ -1,0 +1,1 @@
+Built with MTASC: mtasc -cp <std> -main -header 300:200:30 Test.as -swf test.swf -version 8. output.txt = FP32 capture (session29-fanout-reports/w1-local-oracles/w1-disposition-audit/L3b_tabindex_v8).

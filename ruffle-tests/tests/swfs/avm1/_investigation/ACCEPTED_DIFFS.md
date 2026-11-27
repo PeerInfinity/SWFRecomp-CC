@@ -371,6 +371,14 @@ the 293-line test causes this 4-line known-failure test to fail.
 
 **Decision:** Accept; Ruffle known failure, contradicts `tab_ordering_properties` expectations.
 
+> **RESOLVED s29 (2026-11-27, `w2b-tabindex`).** The 13 FP32 fixtures + 3 MTASC captures fit one rule: the
+> timeline root has no native tabIndex accessor until a name lookup on the root misses its own properties (a
+> read of `tabIndex`, an unresolved scope name such as MTASC's `GetVariable "Test"`, a prototype method call);
+> a set before that is a plain, sticky own property (raw). Script-created clips coerce from the start; a
+> non-numeric value coerces to INT_MIN (not "keep previous"). Landed in `action.c` `tabRootNoteLookup` +
+> `actionSetMember`'s tabIndex block; `tab_ordering_properties` stays 293/293 (it reads first). Pruned from
+> `ignored_tests.txt`. The HOLD note below is kept for history.
+
 > **s29 HOLD (2026-11-26, `w2-disposition-land`).** The "irreconcilable" premise is wrong in a new
 > way: FP32 reproduces THIS golden byte-exact (pinned and `--no-pin`; `session29-fanout-reports/
 > w1-local-oracles/w1-disposition-audit/tab_edge_corpus.*.flash.txt`), yet the MTASC SWF6/7/8
@@ -1168,7 +1176,7 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | `mcl_replace_root_swf7_to_swf6` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | **RESOLVED s28** (same) |
 | ~~`movieclip_state_values`~~ | ~~Missing feature~~ | ~~75~~ | **REMOVED** — now PASS (114/114) via image loading support |
 | ~~`string_paths_reference_launder`~~ | ~~Ruffle known failure (stack_push)~~ | ~~2~~ | **RESOLVED 2026-08-01** — now PASS; we match Flash where Ruffle does not. De-listed from `ruffle-tests/ignored_tests.txt` |
-| `tab_ordering_properties_tab_index_edge_case` | FP32 raw-vs-coerce discriminator unknown (Category 7; s29 HOLD) | 3 of 4 | Accept pending the FP32 fixture run (`w2-disposition-land-oracle/tabindex/`); corpus golden == FP32, MTASC L3b fixtures coerce in FP32 |
+| ~~`tab_ordering_properties_tab_index_edge_case`~~ | ~~FP32 raw-vs-coerce discriminator unknown (Category 7; s29 HOLD)~~ | ~~3 of 4~~ | **RESOLVED s29** (`w2b-tabindex`): now PASS 4/4 (root raw-property rule, see the entry) — | Accept pending the FP32 fixture run (`w2-disposition-land-oracle/tabindex/`); corpus golden == FP32, MTASC L3b fixtures coerce in FP32 |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 4 (171–177; was 7; s29 recount) | Accept; proprietary Flash font metrics |
 | `movieclip_hittest_shapeflag` | Hit test accuracy ('layers' shape geometry, line 71: FP32 true, ours false) | 1 | open lead (s29 w1-disposition-audit L4), not a font issue |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |

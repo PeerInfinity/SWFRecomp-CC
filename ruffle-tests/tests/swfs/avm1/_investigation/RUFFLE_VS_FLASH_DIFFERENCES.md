@@ -1441,3 +1441,15 @@ s27 golden-provenance captures) in `SWFRecompDocs/plans/session29-fanout-reports
 
 **Decision:** match Flash; goldens swapped through `flash_fixes` (4 entries). Prune criterion: Ruffle's LOW renderer
 adopts the translation snap, or upstream re-bakes these goldens from Flash.
+
+## s29 w2b-tabindex: `_root.tabIndex` raw-property mode (2026-11-27)
+
+- **avm1/tab_ordering_properties_tab_index_edge_case** (`known_failure`): FP32 prints `asdf asdf2 5 asdf3` (raw; capture
+  `SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-disposition-audit/tab_edge_corpus.flash.txt`); Ruffle
+  prints `-2147483648 -2147483648 5 -2147483648` (`output.ruffle.txt`, its i32 setter always runs). Rule fitted on 13
+  single-variable FP32 fixtures + 3 MTASC captures (`w1-local-oracles/w2-disposition-land/`, `L3b_tabindex*`): the
+  timeline root has no native tabIndex accessor until a name lookup on the root misses its own properties (a read
+  of `tabIndex`, an unresolved scope name, a prototype method call); a set before that makes a plain, sticky own
+  property. Script-created clips coerce from the start, and a non-numeric value coerces to INT_MIN (Ruffle agrees
+  on INT_MIN for strings/objects). We match FP32 (`action.c` `tabRootNoteLookup`, `actionSetMember` tabIndex block):
+  rm → pass. Regression rows `avm1_tabindex_{fn2_root_raw,fresh_child_coerce,read_first_coerce,mtasc_class_main}`.

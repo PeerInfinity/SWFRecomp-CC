@@ -213,7 +213,8 @@ date
 movieclip_library_state_values
 # (native_objects_swf6 removed 2026-11-26, s29 w2-disposition-land: SWF<=6 `textField` instance
 #  shadows TextField in actionNewObject, as FP32 does. Now pass 115/115.)
-tab_ordering_properties_tab_index_edge_case
+# (tab_ordering_properties_tab_index_edge_case removed 2026-11-27, s29 w2b-tabindex: FP32 root
+#  raw-property rule landed in actionSetMember / tabRootNoteLookup. Now pass 4/4.)
 # It was listed here with no ACCEPTED_DIFFS.md entry to back it up, and the
 # diff was fixable: actionSetVariable's `_global` addProperty-setter branch
 # returned before ever consulting the timeline watch table, so the watcher

@@ -51570,6 +51570,63 @@ static void swf5TextFieldRefToClip(SWFAppContext* app_context)
 	if (p != NULL) STACK_TOP_VALUE = (u64) p;
 }
 
+// ---- s29 w2b-tabindex: FP32 `_root.tabIndex` raw-property mode ----------
+// FP32 captures (session29-fanout-reports/w1-local-oracles/w2-disposition-land
+// t00..t12 + w1-disposition-audit/L3b_tabindex*): on the timeline-placed ROOT
+// the native MovieClip tabIndex accessor is not there until some name lookup
+// on the root misses its own properties (a read of `this.tabIndex`, an
+// unresolved `GetVariable "Test"` in MTASC's class bootstrap, a prototype
+// method call). A SetMember before that creates a plain own property: the
+// value stays RAW ("asdf") and the own property shadows the accessor forever
+// (`5` then "asdf3" both stay raw). Lookups satisfied by an own property (a
+// root timeline variable / function, t04-t06) and the keyword targets
+// (`this`, `_root`, ...) do not materialise it. Script-created clips coerce
+// from the start (t08). Over-triggering is the safe direction: it falls back
+// to the coercing setter, our only behaviour before this rule.
+static int g_tab_root_native = 0;  // root's native tabIndex accessor exists
+static int g_tab_root_raw = 0;     // root carries a plain own tabIndex
+
+static void tabRootNoteLookup(const char* name, u32 len)
+{
+	if (g_tab_root_native || g_tab_root_raw) return;
+	if (name == NULL) { g_tab_root_native = 1; return; }
+	if ((len == 4 && memcmp(name, "this", 4) == 0) ||
+	    (len == 5 && memcmp(name, "_root", 5) == 0) ||
+	    (len == 7 && memcmp(name, "_global", 7) == 0) ||
+	    (len == 7 && memcmp(name, "_parent", 7) == 0) ||
+	    (len > 6 && memcmp(name, "_level", 6) == 0))
+		return;
+	extern hashmap* var_map;
+	extern MovieClip root_movieclip;
+	ActionVar* v = NULL;
+	if (var_map != NULL && hashmap_get(var_map, name, len, (uintptr_t*)&v) && v != NULL)
+		return;  // own root timeline variable / function
+	if (root_movieclip.dynamic_props != NULL &&
+	    getProperty((ASObject*)root_movieclip.dynamic_props, name, len) != NULL)
+		return;
+	g_tab_root_native = 1;
+}
+
+// Scope-chain lookup (GetVariable / CallFunction): only a root-context
+// lookup walks the root's own properties first.
+static void tabRootNoteScopeLookup(const char* name, u32 len)
+{
+	if (g_tab_root_native || g_tab_root_raw) return;
+	extern MovieClip root_movieclip;
+	if (g_current_context != NULL && g_current_context != &root_movieclip) return;
+	tabRootNoteLookup(name, len);
+}
+
+// Member lookup (GetMember / CallMethod) on an explicit receiver.
+static void tabRootNoteMemberLookup(const ActionVar* obj, const char* name, u32 len)
+{
+	if (g_tab_root_native || g_tab_root_raw) return;
+	extern MovieClip root_movieclip;
+	if (obj == NULL || obj->type != ACTION_STACK_VALUE_MOVIECLIP) return;
+	if ((MovieClip*)(uintptr_t)obj->data.numeric_value != &root_movieclip) return;
+	tabRootNoteLookup(name, len);
+}
+
 static void actionGetVariableImpl(SWFAppContext* app_context);
 
 void actionGetVariable(SWFAppContext* app_context)
@@ -51614,6 +51671,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
 
 	// Pop variable name
 	POP();
+	tabRootNoteScopeLookup(var_name, var_name_len);  // s29 w2b-tabindex
 	// Handle slash-path resolution (paths starting with '/' or containing '/')
 	{
 		int has_slash = (memchr(var_name, '/', var_name_len) != NULL);
@@ -61773,6 +61831,23 @@ void actionSetMember(SWFAppContext* app_context)
 			// tabIndex coercion: all non-undefined values coerced to integer (text fields: u32, buttons/MCs: i32)
 			if (prop_name_len == 8 && strncmp(prop_name, "tabIndex", 8) == 0)
 			{
+				// s29 w2b-tabindex: the untouched timeline root has no native
+				// tabIndex accessor yet, so the set makes a plain (enumerable)
+				// own property that keeps the RAW value and stays sticky.
+				// See tabRootNoteLookup.
+				extern MovieClip root_movieclip;
+				if (mc == &root_movieclip && !MC_IS_TEXTFIELD(mc) && !mc->is_button_mc &&
+				    (g_tab_root_raw || !g_tab_root_native))
+				{
+					g_tab_root_raw = 1;
+					if (mc->dynamic_props == NULL) {
+						mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
+					}
+					setProperty(app_context, (ASObject*) mc->dynamic_props,
+						"tabIndex", 8, &value_var);
+					setGlobalVariableByName(prop_name, &value_var);
+					return;
+				}
 				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
 				{
 					double dval = varToDoubleSimple(&value_var);
@@ -61782,10 +61857,12 @@ void actionSetMember(SWFAppContext* app_context)
 						VAL(double, &value_var.data.numeric_value) =
 							isnan(dval) ? 0.0 : (double)(uint32_t)ecmaToInt32(dval);
 					} else {
-						// Buttons / MovieClips: signed 32-bit coercion, NaN → preserve previous
-						if (isnan(dval)) return;
+						// Buttons / MovieClips: signed 32-bit coercion, NaN → INT_MIN
+						// (FP32 L3b_tabindex*: `m.tabIndex = 0; m.tabIndex = "t"`
+						// reads -2147483648, not the previous 0; s29 w2b-tabindex).
 						value_var.type = ACTION_STACK_VALUE_F64;
-						VAL(double, &value_var.data.numeric_value) = (double)ecmaToInt32(dval);
+						VAL(double, &value_var.data.numeric_value) =
+							isnan(dval) ? (double)INT_MIN : (double)ecmaToInt32(dval);
 					}
 				}
 				// Regular MCs (not textfield, not button): tabIndex is non-enumerable
@@ -62985,6 +63062,7 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 	// 2. Pop object (second on stack)
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
+	tabRootNoteMemberLookup(&obj_var, prop_name, prop_name_len);  // s29 w2b-tabindex
 
 	// 2a. MovieClip "soft reference" rebinding: if the receiver is a dead
 	// MovieClip (removeMovieClip was called) but a live clip now exists at
@@ -70199,6 +70277,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	const char* func_name = _cf_buf;
 	u32 func_name_string_id = STACK_TOP_ID;  // Preserve string_id for var_array lookup
 	POP();
+	tabRootNoteScopeLookup(func_name, func_name_len);  // s29 w2b-tabindex
 	{
 		// s27 w1-avm1-leftovers (item 6): canonical spelling for the builtin arms
 		// (same length, so func_name_len and _cf_buf's NUL stay valid).
@@ -76245,6 +76324,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	// 2. Pop object (receiver/this) from stack
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
+	if (!method_is_empty) tabRootNoteMemberLookup(&obj_var, method_name, method_name_len);  // s29 w2b-tabindex
 	// 3. Pop number of arguments
 	ActionVar num_args_var;
 	popVar(app_context, &num_args_var);

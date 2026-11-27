@@ -1,0 +1,301 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 56e11112b..0a0db77ea 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -51555,6 +51555,63 @@ static void swf5TextFieldRefToClip(SWFAppContext* app_context)
+ 	if (p != NULL) STACK_TOP_VALUE = (u64) p;
+ }
+ 
++// ---- s29 w2b-tabindex: FP32 `_root.tabIndex` raw-property mode ----------
++// FP32 captures (session29-fanout-reports/w1-local-oracles/w2-disposition-land
++// t00..t12 + w1-disposition-audit/L3b_tabindex*): on the timeline-placed ROOT
++// the native MovieClip tabIndex accessor is not there until some name lookup
++// on the root misses its own properties (a read of `this.tabIndex`, an
++// unresolved `GetVariable "Test"` in MTASC's class bootstrap, a prototype
++// method call). A SetMember before that creates a plain own property: the
++// value stays RAW ("asdf") and the own property shadows the accessor forever
++// (`5` then "asdf3" both stay raw). Lookups satisfied by an own property (a
++// root timeline variable / function, t04-t06) and the keyword targets
++// (`this`, `_root`, ...) do not materialise it. Script-created clips coerce
++// from the start (t08). Over-triggering is the safe direction: it falls back
++// to the coercing setter, our only behaviour before this rule.
++static int g_tab_root_native = 0;  // root's native tabIndex accessor exists
++static int g_tab_root_raw = 0;     // root carries a plain own tabIndex
++
++static void tabRootNoteLookup(const char* name, u32 len)
++{
++	if (g_tab_root_native || g_tab_root_raw) return;
++	if (name == NULL) { g_tab_root_native = 1; return; }
++	if ((len == 4 && memcmp(name, "this", 4) == 0) ||
++	    (len == 5 && memcmp(name, "_root", 5) == 0) ||
++	    (len == 7 && memcmp(name, "_global", 7) == 0) ||
++	    (len == 7 && memcmp(name, "_parent", 7) == 0) ||
++	    (len > 6 && memcmp(name, "_level", 6) == 0))
++		return;
++	extern hashmap* var_map;
++	extern MovieClip root_movieclip;
++	ActionVar* v = NULL;
++	if (var_map != NULL && hashmap_get(var_map, name, len, (uintptr_t*)&v) && v != NULL)
++		return;  // own root timeline variable / function
++	if (root_movieclip.dynamic_props != NULL &&
++	    getProperty((ASObject*)root_movieclip.dynamic_props, name, len) != NULL)
++		return;
++	g_tab_root_native = 1;
++}
++
++// Scope-chain lookup (GetVariable / CallFunction): only a root-context
++// lookup walks the root's own properties first.
++static void tabRootNoteScopeLookup(const char* name, u32 len)
++{
++	if (g_tab_root_native || g_tab_root_raw) return;
++	extern MovieClip root_movieclip;
++	if (g_current_context != NULL && g_current_context != &root_movieclip) return;
++	tabRootNoteLookup(name, len);
++}
++
++// Member lookup (GetMember / CallMethod) on an explicit receiver.
++static void tabRootNoteMemberLookup(const ActionVar* obj, const char* name, u32 len)
++{
++	if (g_tab_root_native || g_tab_root_raw) return;
++	extern MovieClip root_movieclip;
++	if (obj == NULL || obj->type != ACTION_STACK_VALUE_MOVIECLIP) return;
++	if ((MovieClip*)(uintptr_t)obj->data.numeric_value != &root_movieclip) return;
++	tabRootNoteLookup(name, len);
++}
++
+ static void actionGetVariableImpl(SWFAppContext* app_context);
+ 
+ void actionGetVariable(SWFAppContext* app_context)
+@@ -51599,6 +51656,7 @@ static void actionGetVariableImpl(SWFAppContext* app_context)
+ 
+ 	// Pop variable name
+ 	POP();
++	tabRootNoteScopeLookup(var_name, var_name_len);  // s29 w2b-tabindex
+ 	// Handle slash-path resolution (paths starting with '/' or containing '/')
+ 	{
+ 		int has_slash = (memchr(var_name, '/', var_name_len) != NULL);
+@@ -61758,6 +61816,23 @@ void actionSetMember(SWFAppContext* app_context)
+ 			// tabIndex coercion: all non-undefined values coerced to integer (text fields: u32, buttons/MCs: i32)
+ 			if (prop_name_len == 8 && strncmp(prop_name, "tabIndex", 8) == 0)
+ 			{
++				// s29 w2b-tabindex: the untouched timeline root has no native
++				// tabIndex accessor yet, so the set makes a plain (enumerable)
++				// own property that keeps the RAW value and stays sticky.
++				// See tabRootNoteLookup.
++				extern MovieClip root_movieclip;
++				if (mc == &root_movieclip && !MC_IS_TEXTFIELD(mc) && !mc->is_button_mc &&
++				    (g_tab_root_raw || !g_tab_root_native))
++				{
++					g_tab_root_raw = 1;
++					if (mc->dynamic_props == NULL) {
++						mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
++					}
++					setProperty(app_context, (ASObject*) mc->dynamic_props,
++						"tabIndex", 8, &value_var);
++					setGlobalVariableByName(prop_name, &value_var);
++					return;
++				}
+ 				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
+ 				{
+ 					double dval = varToDoubleSimple(&value_var);
+@@ -61767,10 +61842,12 @@ void actionSetMember(SWFAppContext* app_context)
+ 						VAL(double, &value_var.data.numeric_value) =
+ 							isnan(dval) ? 0.0 : (double)(uint32_t)ecmaToInt32(dval);
+ 					} else {
+-						// Buttons / MovieClips: signed 32-bit coercion, NaN → preserve previous
+-						if (isnan(dval)) return;
++						// Buttons / MovieClips: signed 32-bit coercion, NaN → INT_MIN
++						// (FP32 L3b_tabindex*: `m.tabIndex = 0; m.tabIndex = "t"`
++						// reads -2147483648, not the previous 0; s29 w2b-tabindex).
+ 						value_var.type = ACTION_STACK_VALUE_F64;
+-						VAL(double, &value_var.data.numeric_value) = (double)ecmaToInt32(dval);
++						VAL(double, &value_var.data.numeric_value) =
++							isnan(dval) ? (double)INT_MIN : (double)ecmaToInt32(dval);
+ 					}
+ 				}
+ 				// Regular MCs (not textfield, not button): tabIndex is non-enumerable
+@@ -62970,6 +63047,7 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 	// 2. Pop object (second on stack)
+ 	ActionVar obj_var;
+ 	popVar(app_context, &obj_var);
++	tabRootNoteMemberLookup(&obj_var, prop_name, prop_name_len);  // s29 w2b-tabindex
+ 
+ 	// 2a. MovieClip "soft reference" rebinding: if the receiver is a dead
+ 	// MovieClip (removeMovieClip was called) but a live clip now exists at
+@@ -70184,6 +70262,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	const char* func_name = _cf_buf;
+ 	u32 func_name_string_id = STACK_TOP_ID;  // Preserve string_id for var_array lookup
+ 	POP();
++	tabRootNoteScopeLookup(func_name, func_name_len);  // s29 w2b-tabindex
+ 	{
+ 		// s27 w1-avm1-leftovers (item 6): canonical spelling for the builtin arms
+ 		// (same length, so func_name_len and _cf_buf's NUL stay valid).
+@@ -76230,6 +76309,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 	// 2. Pop object (receiver/this) from stack
+ 	ActionVar obj_var;
+ 	popVar(app_context, &obj_var);
++	if (!method_is_empty) tabRootNoteMemberLookup(&obj_var, method_name, method_name_len);  // s29 w2b-tabindex
+ 	// 3. Pop number of arguments
+ 	ActionVar num_args_var;
+ 	popVar(app_context, &num_args_var);
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/README.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/README.txt
+new file mode 100644
+index 000000000..746fe7f6d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/README.txt
+@@ -0,0 +1 @@
++SWF generated by SWFRecompDocs/plans/session29-fanout-reports/w2-disposition-land-oracle/tabindex/make_fixtures.py; output.txt = FP32 capture (see regression/README.md).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/output.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/output.txt
+new file mode 100644
+index 000000000..5d7586fde
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/output.txt
+@@ -0,0 +1,4 @@
++asdf
++asdf2
++5
++asdf3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/test.swf b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..1341713fda1b0bb60062cc15a70de2fc5380d274
+GIT binary patch
+literal 297
+zcmZ<@59ZKhWMHUZV2x*B;9tPNz{AMkBFF#)&P@OR|F>uU4`lXnGNb`176yi=4Aa;d
+z7~+fa^Gg_HrU@`Glq4p3=B1=oFfb$*r=&6XBTI83N&BfG%K$Av)o4VlPJSev?5sdX
+Yk!zzdUY#5aKyLy;8iTDkg9DHO07}?M-~a#s
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/test.toml b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/test.toml
+new file mode 100644
+index 000000000..568cadba5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fn2_root_raw/test.toml
+@@ -0,0 +1 @@
++num_ticks = 2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/README.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/README.txt
+new file mode 100644
+index 000000000..746fe7f6d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/README.txt
+@@ -0,0 +1 @@
++SWF generated by SWFRecompDocs/plans/session29-fanout-reports/w2-disposition-land-oracle/tabindex/make_fixtures.py; output.txt = FP32 capture (see regression/README.md).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/output.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/output.txt
+new file mode 100644
+index 000000000..46ad91b5b
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/output.txt
+@@ -0,0 +1,4 @@
++-2147483648
++-2147483648
++5
++-2147483648
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/test.swf b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..3ef14592b1fe95c615b54589fb7774401ad7fa2f
+GIT binary patch
+literal 290
+zcmZ<@59Ux}WMHUZV2x*B;9tPNz{AMkBFF#)&P@OR|F>uU0c1`SW?%;@VqnN+U}pl+
+zB^jB;3^LQi7#Na^QWHy3U2_XcDt+_IGE<#%G7A`j#HTTX6w6E#0IE$)^2|#~tzckC
+rEKW&d@P|opAxZhE!9;;pqiQfBq=O$x2Rkd!airQ{j7tZD1JE=8&*ekd
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/test.toml b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/test.toml
+new file mode 100644
+index 000000000..568cadba5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_fresh_child_coerce/test.toml
+@@ -0,0 +1 @@
++num_ticks = 2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/README.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/README.txt
+new file mode 100644
+index 000000000..7fb904333
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/README.txt
+@@ -0,0 +1 @@
++Built with MTASC: mtasc -cp <std> -main -header 300:200:30 Test.as -swf test.swf -version 8. output.txt = FP32 capture (session29-fanout-reports/w1-local-oracles/w1-disposition-audit/L3b_tabindex_v8).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/Test.as b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/Test.as
+new file mode 100644
+index 000000000..e425580ac
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/Test.as
+@@ -0,0 +1,3 @@
++class Test { static function main(mc) { var r:Object = _root; r.tabIndex="s"; trace(r.tabIndex); r.tabIndex=5; trace(r.tabIndex); r.tabIndex="t"; trace(r.tabIndex);
++ _root.createEmptyMovieClip("m",2); var m:Object = r.m; m.tabIndex=0; m.tabIndex="t"; trace(m.tabIndex);
++ _root.createEmptyMovieClip("n",3); var n:Object = r.n; n.tabIndex=undefined; n.tabIndex="u"; trace(n.tabIndex); n.tabIndex=7; trace(n.tabIndex); } }
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/output.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/output.txt
+new file mode 100644
+index 000000000..4ecc2b8ad
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/output.txt
+@@ -0,0 +1,6 @@
++-2147483648
++5
++-2147483648
++-2147483648
++-2147483648
++7
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/test.swf b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..582a89f553fffcab87fb6d1bb028a13e95777d76
+GIT binary patch
+literal 381
+zcmV-@0fPQRS5pW$0ssJb+H8?APr^VH$Nz1w?SY61F=<R1M-vxk7lTMNVE`Inb7%@S
+z*x1shJq>&UnHamd`l(#~2JZOoS`r6uc=vxV?|%2sduwPvfcXWSYv}8HIt>eSJdHxP
+zeM*s(=lfo;cnOwaaWxAIfqnZ^Hh9}d979$7Wt`4~7+Ic*RBW;kNf52z=V>Y+g85+e
+z6s}P~Ai*LJ0}<XQnb-`|w<zq#QHB*>(VI>~;pJ)e5C_Wwr4A0a)A`VGt;s}lRcXhi
+zMdOUZJJ}eQ3=CW!QKC6jV(ePdxpfIWS>Ritm`e?YQ(9mKH@T(Wks4i;4JB+7HLa@F
+zjrN~X8@5hOoL3i9h8h#6>fq7>b0m%t4hm<fq^7U~#gNaN|5BQgVmhS>W^&U|1QPs6
+z5zK>O61IIXtg7Sk1h(9Z&a~=-){TR%aYu6N(pZMG-n8!zdxH_gb5vBDQ+rZ#mBV!E
+bIolP9>&lxkad1oNF8}}l|NjF3?eJefGpVp$
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/test.toml b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/test.toml
+new file mode 100644
+index 000000000..568cadba5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_mtasc_class_main/test.toml
+@@ -0,0 +1 @@
++num_ticks = 2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/README.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/README.txt
+new file mode 100644
+index 000000000..746fe7f6d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/README.txt
+@@ -0,0 +1 @@
++SWF generated by SWFRecompDocs/plans/session29-fanout-reports/w2-disposition-land-oracle/tabindex/make_fixtures.py; output.txt = FP32 capture (see regression/README.md).
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/output.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/output.txt
+new file mode 100644
+index 000000000..7e3142e0f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/output.txt
+@@ -0,0 +1,5 @@
++undefined
++-2147483648
++-2147483648
++5
++-2147483648
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/test.swf b/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..6bfd9fcd61a503d6c4d900ad953edd793bdf7cf9
+GIT binary patch
+literal 289
+zcmZ<@59Uy0WMHUZV2x*B;9tPNz{AMkBFF#)&P@OR|F>uU4rESaV_+!B$Sh`%nZ^ZV
+zB_?_1rKDCc_^BaD2p~x?Bo?QnG590N;?xGT3T_@)n-OvP_>uInvjW{no^8f>^f5R9
+GjRgRovq;_m
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/test.toml b/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/test.toml
+new file mode 100644
+index 000000000..568cadba5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_read_first_coerce/test.toml
+@@ -0,0 +1 @@
++num_ticks = 2
