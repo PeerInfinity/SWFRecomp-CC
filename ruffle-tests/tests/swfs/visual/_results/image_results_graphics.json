@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T06:45:07.295817+00:00",
+    "timestamp": "2026-11-27T16:16:11.805346+00:00",
     "suite": "visual",
     "stem": "results_graphics",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "source": "results_graphics.json",
-    "incomplete": true,
+    "incomplete": false,
     "run_id": "45938113471",
     "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45938113471",
-    "run_attempt": "1"
+    "run_attempt": "2"
   },
   "tests_with_comparisons": 148,
   "comparisons": 241,
   "ignored": 2,
-  "pass": 177,
+  "pass": 182,
   "fail": 59,
-  "skip": 5,
+  "skip": 0,
   "no_render": 0,
   "fail_known_failure": 2,
   "ruffle_matched_fail": 0,
-  "pass_rate": 73.4,
+  "pass_rate": 75.5,
   "results": [
     {
       "suite": "visual",
@@ -1907,51 +1907,163 @@
       "suite": "visual",
       "test": "cache_as_bitmap/oversize/swf_9_too_big",
       "comparison": "output",
-      "trace_status": null,
+      "trace_status": "pass",
       "known_failure": true,
-      "status": "skip",
-      "reason": "test_not_run",
-      "message": "no image comparison recorded for this run"
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 300,
+      "height": 200,
+      "total_channels": 240000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
     },
     {
       "suite": "visual",
       "test": "cache_as_bitmap/scroll_rect",
       "comparison": "output",
-      "trace_status": null,
+      "trace_status": "pass",
       "known_failure": false,
-      "status": "skip",
-      "reason": "test_not_run",
-      "message": "no image comparison recorded for this run"
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
     },
     {
       "suite": "visual",
       "test": "cache_as_bitmap/scroll_rect_scaled",
       "comparison": "output",
-      "trace_status": null,
+      "trace_status": "pass",
       "known_failure": false,
-      "status": "skip",
-      "reason": "test_not_run",
-      "message": "no image comparison recorded for this run"
+      "status": "pass",
+      "message": "Image check passed: 697 outliers (limit 900), max difference 128 (2 checks)",
+      "max_diff": 128,
+      "expected_source": "repo",
+      "width": 275,
+      "height": 275,
+      "total_channels": 302500,
+      "diff_channels": 2299,
+      "mean_diff": 0.4807,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 2800,
+          "outliers": 2299,
+          "passed": true
+        },
+        {
+          "tolerance": 64,
+          "max_outliers": 900,
+          "outliers": 697,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 2,
+      "failed_checks": 0,
+      "outliers": 697,
+      "max_outliers": 900,
+      "tolerance": 64,
+      "excess_outliers": 0
     },
     {
       "suite": "visual",
       "test": "cache_as_bitmap/shape_changed",
       "comparison": "output",
-      "trace_status": null,
+      "trace_status": "pass",
       "known_failure": false,
-      "status": "skip",
-      "reason": "test_not_run",
-      "message": "no image comparison recorded for this run"
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 0,
+      "excess_outliers": 0
     },
     {
       "suite": "visual",
       "test": "cache_as_bitmap/text",
       "comparison": "output",
-      "trace_status": null,
+      "trace_status": "pass",
       "known_failure": false,
-      "status": "skip",
-      "reason": "test_not_run",
-      "message": "no image comparison recorded for this run"
+      "status": "pass",
+      "message": "Image check passed: 1257 outliers (limit 1500), max difference 223 (2 checks)",
+      "max_diff": 223,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 11058,
+      "mean_diff": 0.664,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 12000,
+          "outliers": 11058,
+          "passed": true
+        },
+        {
+          "tolerance": 128,
+          "max_outliers": 1500,
+          "outliers": 1257,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 2,
+      "failed_checks": 0,
+      "outliers": 1257,
+      "max_outliers": 1500,
+      "tolerance": 128,
+      "excess_outliers": 0
     },
     {
       "suite": "visual",

@@ -1,27 +1,27 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-27 06:45 UTC
+**Date**: 2026-11-27 16:16 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 6m 20s
+**Run Duration**: 6m 46s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 19 |
-| Passing | **18** (94.7%) |
+| Total tests | 20 |
+| Passing | **19** (95.0%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **19** (100.0%) |
+| Effective pass | **20** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 94 |
-| Matching lines | 92 (97.9%) |
+| Total expected lines | 95 |
+| Matching lines | 93 (97.9%) |
 | Mismatched lines | 2 |
 
 ## Passing Tests
 
-**18 tests passing**
+**19 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -34,15 +34,16 @@
 | 7 | `func_dict` | 3 | 19.1s |  |
 | 8 | `initaction_in_definesprite` | 2 | 25.8s |  |
 | 9 | `jump_after_end` | 3 | 19.4s |  |
-| 10 | `missing_bitmap` | 0 | 19.3s |  |
-| 11 | `mixed-bytecode-as2` | 1 | 1.7s |  |
-| 12 | `registers` | 36 | 19.7s |  |
-| 13 | `tags_after_last_showframe` | 1 | 19.2s |  |
-| 14 | `trace-as2/arguments` | 8 | 20.7s |  |
-| 15 | `trace-as2/root_onload` | 4 | 25.0s |  |
-| 16 | `trace-as2/shortstack` | 2 | 19.4s |  |
-| 17 | `trace-as2/super` | 8 | 25.4s |  |
-| 18 | `trace-as2/this` | 8 | 19.9s |  |
+| 10 | `jump_to_prev_block` | 1 | 25.4s |  |
+| 11 | `missing_bitmap` | 0 | 19.3s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 1.7s |  |
+| 13 | `registers` | 36 | 19.7s |  |
+| 14 | `tags_after_last_showframe` | 1 | 19.2s |  |
+| 15 | `trace-as2/arguments` | 8 | 20.7s |  |
+| 16 | `trace-as2/root_onload` | 4 | 25.0s |  |
+| 17 | `trace-as2/shortstack` | 2 | 19.4s |  |
+| 18 | `trace-as2/super` | 8 | 25.4s |  |
+| 19 | `trace-as2/this` | 8 | 19.9s |  |
 
 ## Ruffle-Matched Tests
 

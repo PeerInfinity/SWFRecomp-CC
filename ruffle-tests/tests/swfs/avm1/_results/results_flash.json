@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T16:08:39.066390+00:00",
+    "timestamp": "2026-11-27T16:16:16.910027+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 26.3,
+    "duration_seconds": 1.49,
     "total_available": 3
   },
   "total": 3,
@@ -20,8 +20,8 @@
       "test": "global_instance_decls",
       "phases": {
         "recomp": 0.007,
-        "compile": 24.169,
-        "run": 0.031
+        "compile": 0.72,
+        "run": 0.026
       },
       "num_frames": 1,
       "lines": {
@@ -29,7 +29,7 @@
         "expected_lines": 853,
         "matching_lines": 378
       },
-      "duration": 24.21,
+      "duration": 0.76,
       "status": "output_mismatch",
       "detail": "475 line(s) differ (actual=734, expected=853)",
       "actual_output": "_global.TextSnapshot, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  getCount, DONT_ENUM, type=[function with prototype]\n  setSelected, DONT_ENUM, type=[function]\n  getSelected, DONT_ENUM, type=[function with prototype]\n  getText, DONT_ENUM, type=[function with prototype]\n  getSelectedText, DONT_ENUM, type=[function with prototype]\n  hitTestTextNearPos, DONT_ENUM, type=[function with prototype]\n  findText, DONT_ENUM, type=[function with prototype]\n  setSelectColor, DONT_ENUM, type=[function]\n  getTextRunInfo, DONT_ENUM, type=[function]\n_global.PrintJob, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.MovieClipLoader, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  _listeners, own, DONT_ENUM, type=[object]\n_global.LocalConnection, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.textRenderer, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.flash.automation.Configuration, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  getTestAutomationConfiguration, DONT_ENUM, type=[function]\n  getDeviceConfiguration, DONT_ENUM, type=[function]\n  setDeviceConfiguration, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.ActionGenerator, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  generateAction, DONT_ENUM, type=[function]\n  generateActions, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.StageCapture, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.external.ExternalInterface, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.flash.net.FileReferenceList, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n... (684 lines after) ...",
@@ -38,9 +38,9 @@
     {
       "test": "global_proto_decls",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.969,
-        "run": 0.027
+        "recomp": 0.006,
+        "compile": 0.359,
+        "run": 0.028
       },
       "num_frames": 1,
       "lines": {
@@ -48,7 +48,7 @@
         "expected_lines": 3714,
         "matching_lines": 145
       },
-      "duration": 1.01,
+      "duration": 0.4,
       "status": "output_mismatch",
       "detail": "3720 line(s) differ (actual=3865, expected=3714)",
       "actual_output": "Testing _global\n  TextSnapshot, own, DONT_ENUM, type=[function with prototype]\n  PrintJob, own, DONT_ENUM, type=[function with prototype]\n  MovieClipLoader, own, DONT_ENUM, type=[function with prototype]\n  LocalConnection, own, DONT_ENUM, type=[function with prototype]\n  textRenderer, own, DONT_ENUM, type=[function with prototype]\n  flash, own, DONT_ENUM, type=[object]\n  System, own, DONT_ENUM, type=[object]\n  SoundCodec, own, DONT_ENUM, type=[object]\n  Accessibility, own, DONT_ENUM, type=[object]\n  Video, own, DONT_ENUM, type=[function with prototype]\n  Stage, own, DONT_ENUM, type=[object]\n  TextFormat, own, DONT_ENUM, type=[function with prototype]\n  Button, own, DONT_ENUM, type=[function with prototype]\n  Key, own, DONT_ENUM, type=[object]\n  Mouse, own, DONT_ENUM, type=[object]\n  Selection, own, DONT_ENUM, type=[object]\n  LoadVars, own, DONT_ENUM, type=[function with prototype]\n  XML, own, DONT_ENUM, type=[function with prototype]\n  XMLNode, own, DONT_ENUM, type=[function with prototype]\n  Sound, own, DONT_ENUM, type=[function with prototype]\n  Math, own, DONT_ENUM, type=[object]\n  Array, own, DONT_ENUM, type=[function with prototype]\n  String, own, DONT_ENUM, type=[function with prototype]\n  Date, own, DONT_ENUM, type=[function with prototype]\n  Boolean, own, DONT_ENUM, type=[function with prototype]\n  Number, own, DONT_ENUM, type=[function with prototype]\n  clearRequestHeaders, own, DONT_ENUM, type=[function]\n  addRequestHeader, own, DONT_ENUM, type=[function]\n  showRedrawRegions, own, DONT_ENUM, type=[function]\n  setTimeout, own, DONT_ENUM, type=[function]\n  clearInterval, own, DONT_ENUM, type=[function]\n  clearTimeout, own, DONT_ENUM, type=[function]\n  setInterval, own, DONT_ENUM, type=[function]\n  isFinite, own, DONT_ENUM, type=[function]\n  isNaN, own, DONT_ENUM, type=[function]\n  updateAfterEvent, own, DONT_ENUM, type=[function]\n  trace, own, DONT_ENUM, type=[function]\n  parseFloat, own, DONT_ENUM, type=[function]\n  parseInt, own, DONT_ENUM, type=[function]\n  unescape, own, DONT_ENUM, type=[function]\n  escape, own, DONT_ENUM, type=[function]\n  ASSetNativeAccessor, own, DONT_ENUM, type=[function with prototype]\n  ASSetNative, own, DONT_ENUM, type=[function with prototype]\n  ASSetPropFlags, own, DONT_ENUM, type=[function]\n  RemoteLSOUsage, own, DONT_ENUM, type=[function with prototype]\n  AssetCache, own, DONT_ENUM, type=[function with prototype]\n  AsSetupError, own, DONT_ENUM, type=[function with prototype]\n  Error, own, DONT_ENUM, type=[function with prototype]\n  ContextMenu, own, DONT_ENUM, type=[function with prototype]\n... (3815 lines after) ...",
@@ -58,8 +58,8 @@
       "test": "global_proto_decls_delete",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.937,
-        "run": 0.016
+        "compile": 0.19,
+        "run": 0.017
       },
       "num_frames": 1,
       "lines": {
@@ -67,7 +67,7 @@
         "expected_lines": 874,
         "matching_lines": 338
       },
-      "duration": 0.97,
+      "duration": 0.22,
       "status": "output_mismatch",
       "detail": "2033 line(s) differ (actual=2371, expected=874)",
       "actual_output": "... (326 lines before) ...\n  UNKNOWN, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.setClipboard\nTesting _global.System.security.PolicyFileResolver\n  prototype, DONT_DELETE\nTesting _global.System.security.PolicyFileResolver.prototype\nTesting _global.System.security.sandboxType\nTesting _global.System.security.escapeDomain\nTesting _global.System.security.chooseLocalSwfPath\nTesting _global.System.security.loadPolicyFile\nTesting _global.System.security.allowInsecureDomain\nTesting _global.System.security.allowDomain\nTesting _global.System.security.__constructor__\n  prototype, DONT_DELETE\nTesting _global.System.security.__constructor__.prototype\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.security\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  __proto__, DONT_DELETE\nTesting _global.System.useCodepage\nTesting _global.System.exactSettings\nTesting _global.System.showSettings\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\nTesting _global.System.Product\n... (1995 lines after) ...",

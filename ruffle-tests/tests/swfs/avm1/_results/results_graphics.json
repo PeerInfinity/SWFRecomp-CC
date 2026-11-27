@@ -1,23 +1,21 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T06:45:05.523532+00:00",
+    "timestamp": "2026-11-27T16:16:08.528748+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 3871.89,
+    "duration_seconds": 3947.42,
     "total_available": 791,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 764,
-  "pass": 750,
+  "total": 791,
+  "pass": 776,
   "ruffle_matched": 5,
-  "fail": 9,
-  "pass_rate": 98.2,
-  "effective_pass": 755,
-  "effective_pass_rate": 98.8,
+  "fail": 10,
+  "pass_rate": 98.1,
+  "effective_pass": 781,
+  "effective_pass_rate": 98.7,
   "breakdown": {
-    "output_mismatch": 9
+    "output_mismatch": 10
   },
   "tests": [
     {
@@ -4330,6 +4328,441 @@
         "matching_lines": 58
       },
       "duration": 1.61,
+      "status": "pass"
+    },
+    {
+      "test": "escape",
+      "phases": {
+        "recomp": 0.016,
+        "compile": 3.252,
+        "run": 6.984
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 10.26,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order1",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 2.005,
+        "run": 0.977
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 2.99,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order2",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 2.039,
+        "run": 0.432
+      },
+      "num_frames": 15,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.48,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order3",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.935,
+        "run": 0.433
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 2.38,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order4",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 2.2,
+        "run": 0.429
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 2.64,
+      "status": "pass"
+    },
+    {
+      "test": "export_assets",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 1.815,
+        "run": 0.429
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 2.26,
+      "status": "pass"
+    },
+    {
+      "test": "extends_chain",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 2.467,
+        "run": 0.427
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 134,
+        "expected_lines": 134,
+        "matching_lines": 134
+      },
+      "duration": 2.91,
+      "status": "pass"
+    },
+    {
+      "test": "extends_native_type",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.905,
+        "run": 0.423
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "duration": 2.34,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface",
+      "phases": {
+        "recomp": 0.022,
+        "compile": 2.076,
+        "run": 0.45
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 84,
+        "expected_lines": 84,
+        "matching_lines": 84
+      },
+      "duration": 2.55,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_escapexml",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.715,
+        "run": 0.426
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      },
+      "duration": 3.15,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_jsquotestring",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.839,
+        "run": 0.426
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 2.28,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_monkeypatch",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 3.034,
+        "run": 0.43
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 65,
+        "expected_lines": 139,
+        "matching_lines": 4
+      },
+      "duration": 3.48,
+      "status": "output_mismatch",
+      "detail": "135 line(s) differ (actual=65, expected=139)",
+      "actual_output": "// call(\"f\", 1, \"two\")\nnull\n\n// addCallback(\"name\", instance, method)\nfalse\n\n// callback(\"<invoke/>\")\nundefined\n\n// _toXML(\"a<b\")\n<string>a&lt;b</string>\n\n// _toXML([1])\n<array><property id=\"0\"><number>1</number></property></array>\n\n// _toXML({})\n<object></object>\n\n// _arrayToXML([1])\n<array><property id=\"0\"><number>1</number></property></array>\n\n// _objectToXML({k: 1})\n<object><property id=\"k\"><number>1</number></property></object>\n\n// _argumentsToXML([\"f\", 1])\n<arguments><number>1</number></arguments>\n\n// _toAS(<string>a&amp;b</string>)\na&amp;b\n\n// _toAS(<array/>)\nundefined\n\n// _toAS(<object/>)\nundefined\n\n// _arrayToAS(<array><property id=\"0\"><number>1</number></property></array>)\n\n\n// _objectToAS(<object><property id=\"k\"><number>1</number></property></object>)\nundefined\n\n// _argumentsToAS(<arguments><number>1</number></arguments>)\n\n\n// _toJS(\"a\")\nundefined\n\n// _toJS([1])\nundefined\n... (15 lines after) ...",
+      "expected_output": "// call(\"f\", 1, \"two\")\n  get ExternalInterface.available\n  get ExternalInterface._initJS\n  call ExternalInterface._initJS()\n  get ExternalInterface._useSetReturnValueHack\n  call ExternalInterface._useSetReturnValueHack()\n  get ExternalInterface._objectID\n  call ExternalInterface._objectID()\n  get ExternalInterface._toJS\n  call ExternalInterface._toJS(1)\n  get ExternalInterface._toJS\n  call ExternalInterface._toJS(\"two\")\n  get ExternalInterface._evalJS\n  call ExternalInterface._evalJS(\"try { document.getElementById(\"objectID\").SetReturnValue(__flash__toXML(f(js,js)) ); } catch (e) { document.getElementById(\"objectID\").SetReturnValue(\"<undefined/>\"); }\")\n  get ExternalInterface._argumentsToXML\n  call ExternalInterface._argumentsToXML([\"f\", 1, \"two\"])\n  get ExternalInterface._callOut\n  call ExternalInterface._callOut(\"<invoke name=\"f\" returntype=\"xml\"><arguments/></invoke>\")\n  get ExternalInterface._toAS\n  call ExternalInterface._toAS(<number> node)\n_toAS result\n\n// addCallback(\"name\", instance, method)\n  get ExternalInterface.available\n  get ExternalInterface._initJS\n  call ExternalInterface._initJS()\n  get ExternalInterface._addCallback\n  call ExternalInterface._addCallback(\"name\", [function])\n_addCallback result\n\n// callback(\"<invoke/>\")\n  get ExternalInterface._callIn\n  call ExternalInterface._callIn([object Object], [function], \"<invoke/>\")\n  instance is the instance: true\n  method is the method: true\n_callIn result\n\n// _toXML(\"a<b\")\n  get ExternalInterface._escapeXML\n  call ExternalInterface._escapeXML(\"a<b\")\n<string>_escapeXML result</string>\n\n// _toXML([1])\n  get ExternalInterface._arrayToXML\n  call ExternalInterface._arrayToXML([1])\n_arrayToXML result\n\n// _toXML({})\n  get ExternalInterface._objectToXML\n  call ExternalInterface._objectToXML([object Object])\n... (89 lines after) ..."
+    },
+    {
+      "test": "external_interface_toas_basic",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.221,
+        "run": 0.427
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 354,
+        "expected_lines": 354,
+        "matching_lines": 354
+      },
+      "duration": 2.66,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_toxml_array",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.882,
+        "run": 0.43
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 25,
+        "matching_lines": 25
+      },
+      "duration": 2.32,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_toxml_basic",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.029,
+        "run": 0.432
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 179,
+        "expected_lines": 179,
+        "matching_lines": 179
+      },
+      "duration": 2.47,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_unescapexml",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.911,
+        "run": 0.429
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 40
+      },
+      "duration": 2.35,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_browse_cancel",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.961,
+        "run": 0.425
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 2.4,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_download_cancel",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.782,
+        "run": 0.422
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.21,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_download_httperror_dns_error",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.799,
+        "run": 0.426
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 2.24,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_download_httperror_status_code",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.765,
+        "run": 0.426
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 23
+      },
+      "duration": 2.22,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_download_success",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.817,
+        "run": 0.427
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      },
+      "duration": 2.25,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_list_asbroadcaster",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.787,
+        "run": 0.433
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 2.23,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_list_browse_cancel",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.759,
+        "run": 0.427
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 2.2,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_list_browse_invalid_filters",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.93,
+        "run": 0.426
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "duration": 2.37,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_list_browse_select",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.769,
+        "run": 0.426
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.2,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_listeners_per_instance",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.847,
+        "run": 0.424
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      },
+      "duration": 2.28,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_upload_httperror_dns_error",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.82,
+        "run": 0.424
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 2.26,
       "status": "pass"
     },
     {

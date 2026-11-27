@@ -1,22 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T06:45:05.625080+00:00",
+    "timestamp": "2026-11-27T16:16:08.662081+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 146.94,
+    "duration_seconds": 151.67,
     "total_available": 47,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 0,
     "filtered": true
   },
-  "total": 45,
-  "pass": 45,
+  "total": 47,
+  "pass": 47,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 45,
+  "effective_pass": 47,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -306,6 +304,38 @@
         "matching_lines": 9
       },
       "duration": 1.64,
+      "status": "pass"
+    },
+    {
+      "test": "loadevent",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 2.005,
+        "run": 0.424
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 2.44,
+      "status": "pass"
+    },
+    {
+      "test": "loadvariables/loadvariables",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.77,
+        "run": 0.426
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.21,
       "status": "pass"
     },
     {

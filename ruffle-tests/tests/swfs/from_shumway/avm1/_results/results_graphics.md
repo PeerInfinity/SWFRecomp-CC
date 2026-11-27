@@ -1,25 +1,25 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-27 06:45 UTC
+**Date**: 2026-11-27 16:16 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 2m 27s
+**Run Duration**: 2m 32s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 45 |
-| Passing | **45** (100.0%) |
+| Total tests | 47 |
+| Passing | **47** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 475 |
-| Matching lines | 475 (100.0%) |
+| Total expected lines | 491 |
+| Matching lines | 491 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**45 tests passing**
+**47 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -41,33 +41,35 @@
 | 16 | `hitarea` | 4 | 26.4s |  |
 | 17 | `label` | 4 | 19.4s |  |
 | 18 | `levels` | 9 | 1.6s |  |
-| 19 | `loadvariables/loadvars` | 2 | 1.6s |  |
-| 20 | `lookup` | 3 | 1.6s |  |
-| 21 | `mouse-transparency` | 1 | 1.8s |  |
-| 22 | `moviecliploader` | 7 | 1.9s |  |
-| 23 | `nativeinheritance` | 6 | 1.7s |  |
-| 24 | `nested-button` | 1 | 1.6s |  |
-| 25 | `operations` | 13 | 1.6s |  |
-| 26 | `property-paths/property-paths-6` | 6 | 1.5s |  |
-| 27 | `property-paths/property-paths-7` | 7 | 2.2s |  |
-| 28 | `propertycase/propertycase` | 7 | 2.1s |  |
-| 29 | `propertycase/propertycase-preserving-6` | 2 | 2.5s |  |
-| 30 | `propertycase/propertycase-preserving-7` | 5 | 2.2s |  |
-| 31 | `rollover` | 4 | 1.7s |  |
-| 32 | `scope` | 14 | 1.6s |  |
-| 33 | `setinterval` | 20 | 2.5s |  |
-| 34 | `settimeout` | 17 | 1.7s |  |
-| 35 | `super` | 11 | 1.9s |  |
-| 36 | `target` | 18 | 2.1s |  |
-| 37 | `text-bind` | 0 | 20.4s |  |
-| 38 | `textfield/textfield-html` | 4 | 1.6s |  |
-| 39 | `textfield/textfield-text-setters` | 8 | 1.7s |  |
-| 40 | `undefined/undefined-swf6` | 39 | 2.7s |  |
-| 41 | `undefined/undefined-swf7` | 39 | 1.7s |  |
-| 42 | `watch` | 2 | 1.6s |  |
-| 43 | `xml/xmlbuild` | 1 | 1.7s |  |
-| 44 | `xml/xmlload` | 4 | 2.8s |  |
-| 45 | `xml/xmlstring` | 9 | 1.6s |  |
+| 19 | `loadevent` | 9 | 2.4s |  |
+| 20 | `loadvariables/loadvariables` | 7 | 2.2s |  |
+| 21 | `loadvariables/loadvars` | 2 | 1.6s |  |
+| 22 | `lookup` | 3 | 1.6s |  |
+| 23 | `mouse-transparency` | 1 | 1.8s |  |
+| 24 | `moviecliploader` | 7 | 1.9s |  |
+| 25 | `nativeinheritance` | 6 | 1.7s |  |
+| 26 | `nested-button` | 1 | 1.6s |  |
+| 27 | `operations` | 13 | 1.6s |  |
+| 28 | `property-paths/property-paths-6` | 6 | 1.5s |  |
+| 29 | `property-paths/property-paths-7` | 7 | 2.2s |  |
+| 30 | `propertycase/propertycase` | 7 | 2.1s |  |
+| 31 | `propertycase/propertycase-preserving-6` | 2 | 2.5s |  |
+| 32 | `propertycase/propertycase-preserving-7` | 5 | 2.2s |  |
+| 33 | `rollover` | 4 | 1.7s |  |
+| 34 | `scope` | 14 | 1.6s |  |
+| 35 | `setinterval` | 20 | 2.5s |  |
+| 36 | `settimeout` | 17 | 1.7s |  |
+| 37 | `super` | 11 | 1.9s |  |
+| 38 | `target` | 18 | 2.1s |  |
+| 39 | `text-bind` | 0 | 20.4s |  |
+| 40 | `textfield/textfield-html` | 4 | 1.6s |  |
+| 41 | `textfield/textfield-text-setters` | 8 | 1.7s |  |
+| 42 | `undefined/undefined-swf6` | 39 | 2.7s |  |
+| 43 | `undefined/undefined-swf7` | 39 | 1.7s |  |
+| 44 | `watch` | 2 | 1.6s |  |
+| 45 | `xml/xmlbuild` | 1 | 1.7s |  |
+| 46 | `xml/xmlload` | 4 | 2.8s |  |
+| 47 | `xml/xmlstring` | 9 | 1.6s |  |
 
 ## Near-Passing Tests
 

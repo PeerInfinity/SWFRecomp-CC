@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-27 06:45 UTC
+**Date**: 2026-11-27 16:16 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 3m 8s
+**Run Duration**: 3m 42s
 
 **Filtered**: 0 tests ignored out of 12 available
 
@@ -12,16 +12,16 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 11 |
-| Passing | **11** (100.0%) |
+| Total tests | 12 |
+| Passing | **12** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 735 |
-| Matching lines | 735 (100.0%) |
+| Total expected lines | 979 |
+| Matching lines | 979 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**11 tests passing**
+**12 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -34,8 +34,9 @@
 | 7 | `links_in_scrolled_text` | 1 | 1.8s |  |
 | 8 | `style_changes_in_html` | 0 | 26.0s |  |
 | 9 | `text_caret_placement_align` | 248 | 26.4s |  |
-| 10 | `text_caret_placement_scroll` | 108 | 25.9s |  |
-| 11 | `text_caret_placement_translated_bounds` | 140 | 16.6s |  |
+| 10 | `text_caret_placement_leading` | 244 | 34.0s |  |
+| 11 | `text_caret_placement_scroll` | 108 | 25.9s |  |
+| 12 | `text_caret_placement_translated_bounds` | 140 | 16.6s |  |
 
 ## Near-Passing Tests
 

@@ -1,21 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T06:45:05.611888+00:00",
+    "timestamp": "2026-11-27T16:16:08.642675+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 63.98,
+    "duration_seconds": 73.64,
     "total_available": 12,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 11,
-  "pass": 9,
+  "total": 12,
+  "pass": 10,
   "ruffle_matched": 1,
   "fail": 1,
-  "pass_rate": 81.8,
-  "effective_pass": 10,
-  "effective_pass_rate": 90.9,
+  "pass_rate": 83.3,
+  "effective_pass": 11,
+  "effective_pass_rate": 91.7,
   "breakdown": {
     "output_mismatch": 1
   },
@@ -168,6 +166,22 @@
         "matching_lines": 3
       },
       "duration": 7.38,
+      "status": "pass"
+    },
+    {
+      "test": "avm2_loads_avm1_loads_into_root",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 9.165,
+        "run": 0.441
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 9.62,
       "status": "pass"
     },
     {

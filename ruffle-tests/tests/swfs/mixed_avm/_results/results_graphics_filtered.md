@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-27 06:45 UTC
+**Date**: 2026-11-27 16:16 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 1m 4s
+**Run Duration**: 1m 14s
 
 **Filtered**: 0 tests ignored out of 12 available
 
@@ -12,13 +12,13 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 11 |
-| Passing | **9** (81.8%) |
+| Total tests | 12 |
+| Passing | **10** (83.3%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **10** (90.9%) |
+| Effective pass | **11** (91.7%) |
 | Failing | 1 |
-| Total expected lines | 77 |
-| Matching lines | 55 (71.4%) |
+| Total expected lines | 79 |
+| Matching lines | 57 (72.2%) |
 | Mismatched lines | 22 |
 
 ### Failure Breakdown
@@ -29,7 +29,7 @@
 
 ## Passing Tests
 
-**9 tests passing**
+**10 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -40,8 +40,9 @@
 | 5 | `avm2_loads_avm1` | 14 | 10.4s |  |
 | 6 | `avm2_loads_avm1_doabc` | 4 | 7.2s |  |
 | 7 | `avm2_loads_avm1_loads_avm2_doabc` | 3 | 7.4s |  |
-| 8 | `avm2_loads_avm1_v10` | 8 | 7.1s |  |
-| 9 | `avm2_loads_avm1_v9` | 8 | 6.9s |  |
+| 8 | `avm2_loads_avm1_loads_into_root` | 2 | 9.6s |  |
+| 9 | `avm2_loads_avm1_v10` | 8 | 7.1s |  |
+| 10 | `avm2_loads_avm1_v9` | 8 | 6.9s |  |
 
 ## Ruffle-Matched Tests
 
