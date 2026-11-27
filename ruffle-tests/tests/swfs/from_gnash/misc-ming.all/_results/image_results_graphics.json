@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T18:08:32.257944+00:00",
+    "timestamp": "2026-11-27T21:14:50.737412+00:00",
     "suite": "from_gnash/misc-ming.all",
     "stem": "results_graphics",
-    "git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
+    "git_sha": "a18a0e03349f07a0a41e1c7bb971b8eafe349891",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "46040854188",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/46040854188",
+    "run_id": "46061659732",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/46061659732",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 7,
   "comparisons": 18,
   "ignored": 1,
-  "pass": 8,
-  "fail": 10,
+  "pass": 9,
+  "fail": 9,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 4,
   "ruffle_matched_fail": 0,
-  "pass_rate": 44.4,
+  "pass_rate": 50.0,
   "results": [
     {
       "suite": "from_gnash/misc-ming.all",
@@ -369,30 +369,29 @@
       "comparison": "frame1",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 193 outliers exceed limit of 0, max difference 255",
-      "reason": "pixel_mismatch",
-      "max_diff": 255,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
       "expected_source": "repo",
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 193,
-      "mean_diff": 0.0256,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 193,
-          "passed": false
+          "outliers": 0,
+          "passed": true
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 1,
-      "outliers": 193,
+      "failed_checks": 0,
+      "outliers": 0,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 193
+      "excess_outliers": 0
     },
     {
       "suite": "from_gnash/misc-ming.all",
@@ -401,29 +400,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 1401 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 198 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 11401,
-      "mean_diff": 0.1381,
+      "diff_channels": 10399,
+      "mean_diff": 0.0316,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 1401,
+          "outliers": 198,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 1401,
+      "outliers": 198,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 1401
+      "excess_outliers": 198
     },
     {
       "suite": "from_gnash/misc-ming.all",
@@ -432,29 +431,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 1401 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 198 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 11401,
-      "mean_diff": 0.1381,
+      "diff_channels": 10399,
+      "mean_diff": 0.0316,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 1401,
+          "outliers": 198,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 1401,
+      "outliers": 198,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 1401
+      "excess_outliers": 198
     },
     {
       "suite": "from_gnash/misc-ming.all",
@@ -463,29 +462,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 1401 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 198 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 11401,
-      "mean_diff": 0.1381,
+      "diff_channels": 10399,
+      "mean_diff": 0.0316,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 1401,
+          "outliers": 198,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 1401,
+      "outliers": 198,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 1401
+      "excess_outliers": 198
     },
     {
       "suite": "from_gnash/misc-ming.all",
@@ -494,29 +493,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 1401 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 198 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 11401,
-      "mean_diff": 0.1381,
+      "diff_channels": 10399,
+      "mean_diff": 0.0316,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 1401,
+          "outliers": 198,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 1401,
+      "outliers": 198,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 1401
+      "excess_outliers": 198
     },
     {
       "suite": "from_gnash/misc-ming.all",
@@ -525,29 +524,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 598 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 198 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 598,
-      "mean_diff": 0.0794,
+      "diff_channels": 198,
+      "mean_diff": 0.0263,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 598,
+          "outliers": 198,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 598,
+      "outliers": 198,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 598
+      "excess_outliers": 198
     },
     {
       "suite": "from_gnash/misc-ming.all",

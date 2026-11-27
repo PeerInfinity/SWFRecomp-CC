@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T16:16:08.528748+00:00",
-    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "new_timestamp": "2026-11-27T18:08:28.154602+00:00",
-    "new_git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
+    "old_timestamp": "2026-11-27T18:08:28.154602+00:00",
+    "old_git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
+    "new_timestamp": "2026-11-27T21:14:48.943813+00:00",
+    "new_git_sha": "a18a0e03349f07a0a41e1c7bb971b8eafe349891",
     "partial": false,
     "same_commit": false
   },
@@ -14,20 +14,85 @@
     "old_total": 791,
     "old_pass_rate": 98.1,
     "new_pass": 776,
-    "new_ruffle_matched": 5,
-    "new_effective_pass": 781,
+    "new_ruffle_matched": 6,
+    "new_effective_pass": 782,
     "new_total": 791,
     "new_pass_rate": 98.1,
     "old_mismatched_lines": 12119,
-    "new_mismatched_lines": 12119,
+    "new_mismatched_lines": 10454,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 1665,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 791,
+    "status_changed": 1,
+    "unchanged": 787,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "global_instance_decls",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 734,
+        "expected_lines": 758,
+        "matching_lines": 17
+      },
+      "new_lines": {
+        "actual_lines": 726,
+        "expected_lines": 758,
+        "matching_lines": 20
+      }
+    },
+    {
+      "test": "global_proto_decls",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 3865,
+        "expected_lines": 4562,
+        "matching_lines": 62
+      },
+      "new_lines": {
+        "actual_lines": 4510,
+        "expected_lines": 4562,
+        "matching_lines": 1633
+      }
+    },
+    {
+      "test": "global_proto_decls_delete",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 2371,
+        "expected_lines": 4158,
+        "matching_lines": 461
+      },
+      "new_lines": {
+        "actual_lines": 4111,
+        "expected_lines": 4158,
+        "matching_lines": 550
+      }
+    },
+    {
+      "test": "movieclip_hittest_shapeflag",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 338,
+        "expected_lines": 338,
+        "matching_lines": 332
+      },
+      "new_lines": {
+        "actual_lines": 338,
+        "expected_lines": 338,
+        "matching_lines": 334
+      }
+    }
+  ]
 }

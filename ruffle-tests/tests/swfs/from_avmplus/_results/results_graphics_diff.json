@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T16:16:08.580429+00:00",
-    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "new_timestamp": "2026-11-27T18:08:28.220411+00:00",
-    "new_git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
+    "old_timestamp": "2026-11-27T18:08:28.220411+00:00",
+    "old_git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
+    "new_timestamp": "2026-11-27T21:14:48.984403+00:00",
+    "new_git_sha": "a18a0e03349f07a0a41e1c7bb971b8eafe349891",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 1572,
     "old_total": 1574,
     "old_pass_rate": 99.4,
-    "new_pass": 1564,
-    "new_ruffle_matched": 8,
+    "new_pass": 1567,
+    "new_ruffle_matched": 5,
     "new_effective_pass": 1572,
     "new_total": 1574,
-    "new_pass_rate": 99.4,
+    "new_pass_rate": 99.6,
     "old_mismatched_lines": 43,
-    "new_mismatched_lines": 43,
+    "new_mismatched_lines": 40,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 3,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 1574,
+    "status_changed": 3,
+    "unchanged": 1571,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3/Math/e15_1_2_2",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "regress/bug_479786",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "regress/bug_558863_swf10",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    }
+  ]
 }
