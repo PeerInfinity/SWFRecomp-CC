@@ -6,18 +6,18 @@
     "total_available": 790,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 12,
+    "ignored_count": 9,
     "filtered": true
   },
-  "total": 778,
-  "pass": 769,
+  "total": 781,
+  "pass": 770,
   "ruffle_matched": 6,
-  "fail": 3,
-  "pass_rate": 98.8,
-  "effective_pass": 775,
-  "effective_pass_rate": 99.6,
+  "fail": 5,
+  "pass_rate": 98.6,
+  "effective_pass": 776,
+  "effective_pass_rate": 99.4,
   "breakdown": {
-    "output_mismatch": 3,
+    "output_mismatch": 5,
     "ruffle_matched": 6
   },
   "tests": [
@@ -5017,6 +5017,25 @@
       "expected_output": "### Testing weird prototypes...\n// Object = {}\n{}: object without __proto__\n// Object = { prototype: 5 }\ntypeof {}.__proto__: number\n// Object = { prototype: undefined }\ntypeof {}.__proto__: undefined\n// Object = { prototype: <real Object>.prototype }\ntypeof {}.__proto__: object\n// Object = 5\n{}: object without __proto__\n// delete Object\n\"Object\" in _global: false\n{}: object without __proto__\n\n### Monkey-patching-globals...\n// hiding flash.filters...\nflash.filters: undefined\n\n### Testing Object\n// {}\nv.className: MyObject\n// new OBJECT()\nv.className: Object\n// OBJECT()\nv: object without __proto__\n\n### Testing Function\n// function() {}\nv.className: MyFunction\n// FUNCTION()\nv: object without __proto__\n// ASnative(...)\nv.className: MyFunction\n\n### Testing Array\n// []\nv.className: MyArray\n// new ARRAY()\nv.className: Array\n// ARRAY()\nv.className: MyArray\n// A_STRING.split()\nv.className: MyArray\n// AN_ARRAY.slice()\nv.className: MyArray\n// A_COLOR_MATRIX_FILTER.matrix\nv.className: MyArray\n// A_CONVOLUTION_FILTER.matrix\nv.className: MyArray\n... (256 lines after) ..."
     },
     {
+      "test": "globals_swf5",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.027,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 304,
+        "expected_lines": 304,
+        "matching_lines": 295
+      },
+      "duration": 1.04,
+      "status": "output_mismatch",
+      "detail": "9 line(s) differ (actual=304, expected=304)",
+      "actual_output": "... (60 lines before) ...\n// LoadVars\n[type Function]\nfunction\nobject\n// LocalConnection\nundefined\nundefined\nundefined\n// Math\n[object Object]\nobject\nundefined\n// Microphone\n[type Function]\nfunction\nobject\n// Mouse\n[object Object]\nobject\nundefined\n// MovieClip\n[type Function]\nfunction\nobject\n// MovieClipLoader\n[type Function]\nfunction\nobject\n// NetConnection\nundefined\nundefined\nundefined\n// NetStream\n[type Function]\nfunction\nobject\n// Number\n[type Function]\nfunction\nobject\n// Object\n[type Function]\nfunction\nobject\n// PrintJob\n[type Function]\nfunction\nobject\n// Selection\n[object Object]\n... (194 lines after) ...",
+      "expected_output": "... (60 lines before) ...\n// LoadVars\n[type Function]\nfunction\nobject\n// LocalConnection\n[type Function]\nfunction\nobject\n// Math\n[object Object]\nobject\nundefined\n// Microphone\n[type Function]\nfunction\nobject\n// Mouse\n[object Object]\nobject\nundefined\n// MovieClip\n[type Function]\nfunction\nobject\n// MovieClipLoader\n[type Function]\nfunction\nobject\n// NetConnection\n[type Function]\nfunction\nobject\n// NetStream\n[type Function]\nfunction\nobject\n// Number\n[type Function]\nfunction\nobject\n// Object\n[type Function]\nfunction\nobject\n// PrintJob\n[type Function]\nfunction\nobject\n// Selection\n[object Object]\n... (194 lines after) ..."
+    },
+    {
       "test": "globals_swf6",
       "phases": {
         "recomp": 0.005,
@@ -7852,6 +7871,25 @@
       "status": "pass"
     },
     {
+      "test": "native_objects_swf6",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.483,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 115,
+        "expected_lines": 115,
+        "matching_lines": 114
+      },
+      "duration": 1.49,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=115, expected=115)",
+      "actual_output": "... (50 lines before) ...\nSystem: non-native\nSystem.capabilities: non-native\nnew System.Product(): non-native (readonly proto)\nSystem.security: non-native\nSystem.IME: non-native (readonly proto)\nnew TextField(): native\ntextField: native\ntimelineEditText: native\nnew TextField.StyleSheet(): non-object: undefined\nnew TextFormat(): native\nnew TextSnapshot(): non-native\nnew TextSnapshot(3): non-native\nnew TextSnapshot(timelineButton): non-native\nnew TextSnapshot(_root): native\nnew TextSnapshot(_root, 4): non-native\nnew TextSnapshot(_root, _root): non-native\nnew Video(): non-native\ntimelineVideo: native\nnew XML(): native\nnew XML(\"\"): native\nnew XML(\"<a></a>\"): native\nnew XMLNode(): non-native\nnew XMLNode(1): non-native\nnew XMLNode(1, \"name\"): native\nnew XMLNode(1, \"name\", 1): native\nnew XMLNode(1, \"name\", true): native\nnew XMLNode(1, \"name\", 1, 2): native\nnew XMLSocket(): non-native\nflash: non-object: undefined\nflash.automation: non-object: undefined\nnew flash.automation.ActionGenerator() /* not a class */: non-object: undefined\nnew flash.automation.Configuration() /* not a class */: non-object: undefined\nnew flash.automation.StageCapture(): non-object: undefined\nflash.display: non-object: undefined\nnew flash.display.BitmapData(): non-object: undefined\nnew flash.display.BitmapData(1,1): non-object: undefined\nflash.external: non-object: undefined\nnew flash.external.ExternalInterface() /* not a class */: non-object: undefined\nflash.filters: non-object: undefined\nnew flash.filters.BevelFilter(): non-object: undefined\nnew flash.filters.BitmapFilter(): non-object: undefined\nnew flash.filters.BlurFilter(): non-object: undefined\nnew flash.filters.ColorMatrixFilter(): non-object: undefined\nnew flash.filters.ColorMatrixFilter([...]): non-object: undefined\nnew flash.filters.ConvolutionFilter(): non-object: undefined\nnew flash.filters.ConvolutionFilter([...]): non-object: undefined\nnew flash.filters.DisplacementMapFilter(): non-object: undefined\nnew flash.filters.DisplacementMapFilter([...]): non-object: undefined\nnew flash.filters.DropShadowFilter(): non-object: undefined\nnew flash.filters.GlowFilter(): non-object: undefined\n... (15 lines after) ...",
+      "expected_output": "... (50 lines before) ...\nSystem: non-native\nSystem.capabilities: non-native\nnew System.Product(): non-native (readonly proto)\nSystem.security: non-native\nSystem.IME: non-native (readonly proto)\nnew TextField(): non-object: undefined\ntextField: native\ntimelineEditText: native\nnew TextField.StyleSheet(): non-object: undefined\nnew TextFormat(): native\nnew TextSnapshot(): non-native\nnew TextSnapshot(3): non-native\nnew TextSnapshot(timelineButton): non-native\nnew TextSnapshot(_root): native\nnew TextSnapshot(_root, 4): non-native\nnew TextSnapshot(_root, _root): non-native\nnew Video(): non-native\ntimelineVideo: native\nnew XML(): native\nnew XML(\"\"): native\nnew XML(\"<a></a>\"): native\nnew XMLNode(): non-native\nnew XMLNode(1): non-native\nnew XMLNode(1, \"name\"): native\nnew XMLNode(1, \"name\", 1): native\nnew XMLNode(1, \"name\", true): native\nnew XMLNode(1, \"name\", 1, 2): native\nnew XMLSocket(): non-native\nflash: non-object: undefined\nflash.automation: non-object: undefined\nnew flash.automation.ActionGenerator() /* not a class */: non-object: undefined\nnew flash.automation.Configuration() /* not a class */: non-object: undefined\nnew flash.automation.StageCapture(): non-object: undefined\nflash.display: non-object: undefined\nnew flash.display.BitmapData(): non-object: undefined\nnew flash.display.BitmapData(1,1): non-object: undefined\nflash.external: non-object: undefined\nnew flash.external.ExternalInterface() /* not a class */: non-object: undefined\nflash.filters: non-object: undefined\nnew flash.filters.BevelFilter(): non-object: undefined\nnew flash.filters.BitmapFilter(): non-object: undefined\nnew flash.filters.BlurFilter(): non-object: undefined\nnew flash.filters.ColorMatrixFilter(): non-object: undefined\nnew flash.filters.ColorMatrixFilter([...]): non-object: undefined\nnew flash.filters.ConvolutionFilter(): non-object: undefined\nnew flash.filters.ConvolutionFilter([...]): non-object: undefined\nnew flash.filters.DisplacementMapFilter(): non-object: undefined\nnew flash.filters.DisplacementMapFilter([...]): non-object: undefined\nnew flash.filters.DropShadowFilter(): non-object: undefined\nnew flash.filters.GlowFilter(): non-object: undefined\n... (15 lines after) ..."
+    },
+    {
       "test": "native_objects_swf7",
       "phases": {
         "recomp": 0.004,
@@ -7977,6 +8015,22 @@
         "matching_lines": 6
       },
       "duration": 30.77,
+      "status": "pass"
+    },
+    {
+      "test": "netstream_play_flv",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 24.713,
+        "run": 0.003
+      },
+      "num_frames": 60,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 24.73,
       "status": "pass"
     },
     {

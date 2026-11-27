@@ -6,26 +6,26 @@
 
 **Run Duration**: 213m 13s
 
-**Filtered**: 31 tests ignored out of 1351 available
+**Filtered**: 29 tests ignored out of 1351 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1320 |
-| Passing | **1303** (98.7%) |
+| Total tests | 1322 |
+| Passing | **1303** (98.6%) |
 | Ruffle-matched | 16 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1319** (99.9%) |
-| Failing | 1 |
-| Total expected lines | 162638 |
-| Matching lines | 161393 (99.2%) |
-| Mismatched lines | 1245 |
+| Effective pass | **1319** (99.8%) |
+| Failing | 3 |
+| Total expected lines | 162726 |
+| Matching lines | 161439 (99.2%) |
+| Mismatched lines | 1287 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Output Mismatch | 3 | 100.0% |
 
 ## Passing Tests
 
@@ -1364,9 +1364,11 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `dependent_strings` | 54.8% | 46 | 84 | 38 |  |
 
 ## Segfaults
 
@@ -1382,8 +1384,10 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**3 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `audio_computespectrum` | 0.0% | 0/118 | 0 | 118 |  |
+| 1 | `dependent_strings` | 54.8% | 46/84 | 83 | 84 |  |
+| 2 | `audio_computespectrum` | 0.0% | 0/118 | 0 | 118 |  |
+| 3 | `loader_applicationDomain` | 0.0% | 0/4 | 0 | 4 |  |
