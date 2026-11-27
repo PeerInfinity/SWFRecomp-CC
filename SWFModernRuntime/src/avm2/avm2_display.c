@@ -19572,6 +19572,27 @@ static void avm2_render_video(Avm2Context* ctx, Avm2Object* obj,
 // matrix maps local twips -> stage twips (Y-down), then stage_to_ndc; no
 // coordinate flip is applied because shape_data already stores shape-local
 // Y-down coordinates (the recompiler's FRAME_HEIGHT round-trip cancels).
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+// s29 w2b-lowq-stroke: the shift TSNAP (avm2_lowq_tsnap, below) added to this
+// shape's world translation, own + ancestors (twips), rides the slot's free
+// z-column x / y (m[8], m[9]; the column multiplies z = 0). hairline_restage
+// (render_webgpu.c) strokes a 1-px noScale hairline under a non-axis matrix
+// at the UNSNAPPED translation (from_shumway/acid/acid-stroke-0). Not inside
+// a cached / filtered subtree (no TSNAP there).
+static int g_avm2_tsnap_off;
+static double g_avm2_tsnap_acc[2];
+static int g_avm2_filter_active;
+static void avm2_lowq_tsnap_slot(float m16[16])
+{
+	if (g_avm2_tsnap_off > 0 || g_avm2_filter_active) return;
+	m16[8] = (float) g_avm2_tsnap_acc[0];
+	m16[9] = (float) g_avm2_tsnap_acc[1];
+}
+#define AVM2_LOWQ_TSNAP_SLOT(m) avm2_lowq_tsnap_slot(m)
+#else
+#define AVM2_LOWQ_TSNAP_SLOT(m) ((void) 0)
+#endif
+
 static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
                               const Mat* world, double alpha)
 {
@@ -19584,6 +19605,7 @@ static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
 	{
 		float m16[16];
 		avm2_world_to_mat16(world, m16);
+		AVM2_LOWQ_TSNAP_SLOT(m16);   // s29 w2b-lowq-stroke
 		xid = g_avm2_xform_next++;
 		renderer_write_transform(context, xid, m16);
 	}

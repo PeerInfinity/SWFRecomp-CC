@@ -1329,11 +1329,19 @@ static void ng_sprite_park_no_end_tag(DisplayObject* obj)
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
+static void advance_sprite_frames_impl(SWFAppContext* app_context);
 void advance_sprite_frames(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) return;
 #endif
+	const size_t saved_key = actionAQGetOrderKey();
+	advance_sprite_frames_impl(app_context);
+	actionAQSetOrderKey(saved_key);
+}
+
+static void advance_sprite_frames_impl(SWFAppContext* app_context)
+{
 
 	// Iterate in reverse-instantiation order (largest place_seq first), mirroring
 	// Ruffle's clip_exec_list LIFO traversal in core/src/avm1/runtime.rs (push at
@@ -1392,6 +1400,10 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
 		if (obj->attach_registration) continue; // timeline owned by the attached-clip pump
+		// s29 browser-attach-order: entries this clip's advance queues keep its
+		// exec-list slot (actionAQOrderSortSince). A nested recursion stamps its
+		// own children and restores this on return (key saved at entry).
+		if (obj->place_seq != 0) actionAQSetOrderKey(obj->place_seq);
 		Character* ch = &dictionary[obj->char_id];
 
 		// Recurse into button display lists to advance their sprite children
@@ -2002,11 +2014,19 @@ void ng_construct_pending_registerclass_sprites(SWFAppContext* app_context)
 // Deferred recursion pass: for each root-level sprite, swap into its display
 // list and call advance_sprite_frames (which will now recurse normally since
 // g_advance_defer_nested is 0).
+static void advance_nested_sprite_frames_impl(SWFAppContext* app_context);
 void advance_nested_sprite_frames(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) return;
 #endif
+	const size_t saved_key = actionAQGetOrderKey();
+	advance_nested_sprite_frames_impl(app_context);
+	actionAQSetOrderKey(saved_key);
+}
+
+static void advance_nested_sprite_frames_impl(SWFAppContext* app_context)
+{
 
 	// Reverse-instantiation order (place_seq DESC) — same Ruffle clip_exec_list
 	// LIFO semantics as advance_sprite_frames. The cap is tested against the
@@ -2054,6 +2074,7 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
 		if (obj->attach_registration) continue; // timeline owned by the attached-clip pump
+		if (obj->place_seq != 0) actionAQSetOrderKey(obj->place_seq);  // s29 browser-attach-order
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 		if (obj->sprite_display_list == NULL) continue;
@@ -4108,12 +4129,33 @@ static void lowq_tsnap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
 	obj->transform_id = slot;
 	renderer_write_transform(context, slot, snapped);
 }
+// s29 w2b-lowq-stroke: the shift TSNAP added to a shape entry's translation
+// (own + ancestors, twips) rides its slot's free z-column x / y (m[8], m[9];
+// the column multiplies z = 0, so it moves nothing). hairline_restage
+// (render_webgpu.c) strokes 1-px noScale hairlines with the UNSNAPPED
+// translation (from_shumway/acid/acid-stroke-0). Slot copy only: `composed`
+// itself (handed to the children) is unchanged.
+static const float* lowq_tsnap_slot_xform(const DisplayObject* obj,
+                                          const float composed[16], float buf[16])
+{
+	if (!lowq_tsnap_on() || obj == NULL || obj->char_id == 0 || g_tsnap_off > 0) return composed;
+	if (g_tsnap_acc[0] == 0.0f && g_tsnap_acc[1] == 0.0f) return composed;
+	CharacterType t = dictionary[obj->char_id].type;
+	if (t != CHAR_TYPE_SHAPE && t != CHAR_TYPE_MORPH_SHAPE) return composed;
+	if (cab_snaps(obj)) return composed;
+	memcpy(buf, composed, 16 * sizeof(float));
+	buf[8] = g_tsnap_acc[0];
+	buf[9] = g_tsnap_acc[1];
+	return buf;
+}
+#define LOWQ_TSNAP_SLOT(o, c, buf) lowq_tsnap_slot_xform((o), (c), (buf))
 #define LOWQ_TSNAP_IN_PLACE(o, w) lowq_tsnap_level((o), (w))
 #define LOWQ_TSNAP_ATTACHED(o, w) lowq_tsnap_attached((o), (w))
 #define LOWQ_TSNAP_SEED_CLEAR() lowq_tsnap_seed(0, 0.0f, 0.0f)
 #define LOWQ_TSNAP_WORLD(o, in, buf) lowq_tsnap_world((o), (in), (buf))
 #define LOWQ_TSNAP_ROOT_LEAF(a, o) lowq_tsnap_root_leaf((a), (o))
 #else
+#define LOWQ_TSNAP_SLOT(o, c, buf) (c)
 #define LOWQ_TSNAP_IN_PLACE(o, w) ((void) 0)
 #define LOWQ_TSNAP_ATTACHED(o, w) ((void) 0)
 #define LOWQ_TSNAP_SEED_CLEAR() ((void) 0)
@@ -4477,14 +4519,17 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 
 		// Allocate a dynamic transform slot to avoid overwriting shared slots
 		u32 new_slot = g_next_dynamic_xform_slot;
+		float tsnap_slot_buf[16];   // s29 w2b-lowq-stroke (LOWQ_TSNAP_SLOT)
+		const float* slot_xform = LOWQ_TSNAP_SLOT(obj, composed, tsnap_slot_buf);
+		(void) tsnap_slot_buf;
 		if (new_slot < g_xform_slot_capacity) {
 			g_next_dynamic_xform_slot++;
 			xform_overrides_push(obj, obj->transform_id);
 			obj->transform_id = new_slot;
-			renderer_write_transform(context, new_slot, composed);
+			renderer_write_transform(context, new_slot, slot_xform);
 		} else {
 			// Fallback: overwrite in-place (may cause visual artifacts)
-			renderer_write_transform(context, obj->transform_id, composed);
+			renderer_write_transform(context, obj->transform_id, slot_xform);
 		}
 		cm_world_note(obj, composed);
 

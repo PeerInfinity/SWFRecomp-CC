@@ -1,0 +1,6771 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 746e99c0..9d1a96ec 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -19572,6 +19572,27 @@ static void avm2_render_video(Avm2Context* ctx, Avm2Object* obj,
+ // matrix maps local twips -> stage twips (Y-down), then stage_to_ndc; no
+ // coordinate flip is applied because shape_data already stores shape-local
+ // Y-down coordinates (the recompiler's FRAME_HEIGHT round-trip cancels).
++#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
++// s29 w2b-lowq-stroke: the shift TSNAP (avm2_lowq_tsnap, below) added to this
++// shape's world translation, own + ancestors (twips), rides the slot's free
++// z-column x / y (m[8], m[9]; the column multiplies z = 0). hairline_restage
++// (render_webgpu.c) strokes a 1-px noScale hairline under a non-axis matrix
++// at the UNSNAPPED translation (from_shumway/acid/acid-stroke-0). Not inside
++// a cached / filtered subtree (no TSNAP there).
++static int g_avm2_tsnap_off;
++static double g_avm2_tsnap_acc[2];
++static int g_avm2_filter_active;
++static void avm2_lowq_tsnap_slot(float m16[16])
++{
++	if (g_avm2_tsnap_off > 0 || g_avm2_filter_active) return;
++	m16[8] = (float) g_avm2_tsnap_acc[0];
++	m16[9] = (float) g_avm2_tsnap_acc[1];
++}
++#define AVM2_LOWQ_TSNAP_SLOT(m) avm2_lowq_tsnap_slot(m)
++#else
++#define AVM2_LOWQ_TSNAP_SLOT(m) ((void) 0)
++#endif
++
+ static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
+                               const Mat* world, double alpha)
+ {
+@@ -19584,6 +19605,7 @@ static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
+ 	{
+ 		float m16[16];
+ 		avm2_world_to_mat16(world, m16);
++		AVM2_LOWQ_TSNAP_SLOT(m16);   // s29 w2b-lowq-stroke
+ 		xid = g_avm2_xform_next++;
+ 		renderer_write_transform(context, xid, m16);
+ 	}
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index dcd5ff62..25b970eb 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -4107,12 +4107,33 @@ static void lowq_tsnap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
+ 	obj->transform_id = slot;
+ 	renderer_write_transform(context, slot, snapped);
+ }
++// s29 w2b-lowq-stroke: the shift TSNAP added to a shape entry's translation
++// (own + ancestors, twips) rides its slot's free z-column x / y (m[8], m[9];
++// the column multiplies z = 0, so it moves nothing). hairline_restage
++// (render_webgpu.c) strokes 1-px noScale hairlines with the UNSNAPPED
++// translation (from_shumway/acid/acid-stroke-0). Slot copy only: `composed`
++// itself (handed to the children) is unchanged.
++static const float* lowq_tsnap_slot_xform(const DisplayObject* obj,
++                                          const float composed[16], float buf[16])
++{
++	if (!lowq_tsnap_on() || obj == NULL || obj->char_id == 0 || g_tsnap_off > 0) return composed;
++	if (g_tsnap_acc[0] == 0.0f && g_tsnap_acc[1] == 0.0f) return composed;
++	CharacterType t = dictionary[obj->char_id].type;
++	if (t != CHAR_TYPE_SHAPE && t != CHAR_TYPE_MORPH_SHAPE) return composed;
++	if (cab_snaps(obj)) return composed;
++	memcpy(buf, composed, 16 * sizeof(float));
++	buf[8] = g_tsnap_acc[0];
++	buf[9] = g_tsnap_acc[1];
++	return buf;
++}
++#define LOWQ_TSNAP_SLOT(o, c, buf) lowq_tsnap_slot_xform((o), (c), (buf))
+ #define LOWQ_TSNAP_IN_PLACE(o, w) lowq_tsnap_level((o), (w))
+ #define LOWQ_TSNAP_ATTACHED(o, w) lowq_tsnap_attached((o), (w))
+ #define LOWQ_TSNAP_SEED_CLEAR() lowq_tsnap_seed(0, 0.0f, 0.0f)
+ #define LOWQ_TSNAP_WORLD(o, in, buf) lowq_tsnap_world((o), (in), (buf))
+ #define LOWQ_TSNAP_ROOT_LEAF(a, o) lowq_tsnap_root_leaf((a), (o))
+ #else
++#define LOWQ_TSNAP_SLOT(o, c, buf) (c)
+ #define LOWQ_TSNAP_IN_PLACE(o, w) ((void) 0)
+ #define LOWQ_TSNAP_ATTACHED(o, w) ((void) 0)
+ #define LOWQ_TSNAP_SEED_CLEAR() ((void) 0)
+@@ -4476,14 +4497,17 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 
+ 		// Allocate a dynamic transform slot to avoid overwriting shared slots
+ 		u32 new_slot = g_next_dynamic_xform_slot;
++		float tsnap_slot_buf[16];   // s29 w2b-lowq-stroke (LOWQ_TSNAP_SLOT)
++		const float* slot_xform = LOWQ_TSNAP_SLOT(obj, composed, tsnap_slot_buf);
++		(void) tsnap_slot_buf;
+ 		if (new_slot < g_xform_slot_capacity) {
+ 			g_next_dynamic_xform_slot++;
+ 			xform_overrides_push(obj, obj->transform_id);
+ 			obj->transform_id = new_slot;
+-			renderer_write_transform(context, new_slot, composed);
++			renderer_write_transform(context, new_slot, slot_xform);
+ 		} else {
+ 			// Fallback: overwrite in-place (may cause visual artifacts)
+-			renderer_write_transform(context, obj->transform_id, composed);
++			renderer_write_transform(context, obj->transform_id, slot_xform);
+ 		}
+ 		cm_world_note(obj, composed);
+ 
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 524835ea..764bf8c0 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -2101,6 +2101,225 @@ static int stroke_hint_ends = 1;
+ // s29 n-seam-caps: W = 3 snapped caps as Flash's octagon (stroke_snap_place);
+ // SWF_STROKE_CAP_OCTAGON=0 keeps the disc.
+ static int stroke_cap_octagon = 1;
++#if MSAA_SAMPLES == 1
++// s29 w2b-lowq-stroke: quality LOW strokes a 1-px noScale hairline with the
++// UNSNAPPED translation: the TSNAP shift tag.c (lowq_tsnap_slot_xform) left
++// in the slot's z-column x / y is taken back off its device centres in
++// hairline_restage (from_shumway/acid/acid-stroke-0). SWF_LOWQ_HAIR_UNSNAP=0 off.
++static int lowq_hair_unsnap = 1;
++// s29 w2b-lowq-stroke: Flash Player 32's quality-LOW stroke raster
++// (regression/lowq_stroke_probe, FP32 LNX == WIN == --screen; report §2):
++//  - the device width is quantised to W = round(w) (w = 4 / 4.5 / 5 / 5.25
++//    render identically, so do 5.5 / 5.75 / 6);
++//  - W <= 5 is the THIN regime: a pen of n = min(W, 4) px along the
++//    segment's minor device axis, butt ends (W = 5 draws as 4: 0-degree band
++//    4 px, 45-degree run 4 px);
++//  - W >= 6 is the polygon of width W (round caps / joins, as at HIGH);
++//  - an axis-aligned band covers [lo, lo + n), lo = p - floor(n / 2) with
++//    p = ceil(c - 1/2) (c = device centreline), EXCEPT n = 3, whose extra
++//    pixel sits RIGHT of travel (y down): travel up / right lo = p - 1,
++//    down / left lo = p - 2 (48 band cells, W = 1..6, c + 0 / .25 / .5 / .75,
++//    cw and ccw; drawing_order's 12 band edges);
++//  - a thin diagonal is the same pen along the minor axis (n = 3: 30 / 45 /
++//    60 degrees, 3 px per column / row, its centre 1/2 px right of travel).
++// lowq_stroke_place applies it per vertex. SWF_LOWQ_STROKE=0 restores the
++// HIGH-calibrated rule at LOW (byte-identical to the s29 baseline).
++static int lowq_stroke_rule = 1;
++static double lowq_n4_poly = 4.5;   // SWF_LOWQ_N4=<width> (A/B only)
++// Thin pen n (0 = polygon regime); *W = snapped band width (0 = AA),
++// *target = the device width to re-expand the stroke to.
++static inline int lowq_stroke_width(double w_px, int* W, double* target)
++{
++	// Round half up on the quarter-pixel grid (u = round(4 w)): 5.5 -> 6.
++	int Wq = ((int) floor(4.0 * w_px + 0.5) + 2) / 4;
++	if (Wq < 1) Wq = 1;
++	if (Wq <= 5)
++	{
++		const int n = (Wq > 4) ? 4 : Wq;
++		*W = n;
++		*target = (double) n;
++		return n;
++	}
++	*W = (Wq % 2 == 0) ? Wq : 0;
++	*target = (double) Wq;
++	return 0;
++}
++// Band centre of an axis-aligned LOW band of width W around device c; r = +1
++// when right-of-travel is the +axis direction (y down), -1 otherwise.
++// A run thinner than one device pixel (a hairline under a down-scaling stage,
++// from_shumway/gradientTransform at w = 0.993: FP32 LOW keeps the band at
++// col 0 for c = 0.75) keeps the HIGH placement L = floor(E / 4); the probe's
++// exactly-1-px bands round half down (c = 8.75 -> 9). Set per run.
++static int lowq_subpx_hair = 0;
++static inline double stroke_snap_centre(double e, int W);
++static inline double lowq_band_centre(double c, int W, int r)
++{
++	if (W == 1 && lowq_subpx_hair) return stroke_snap_centre(c, 1);
++	const double p = ceil(c - 0.5);
++	if (W % 2 == 0) return p;
++	if (W == 3 && r < 0) return p - 0.5;
++	return p + 0.5;
++}
++// Per-run direction scratch (lowq_run_dirs).
++typedef struct { u32 kx, ky; float dx, dy; signed char rh, rv; } LowqDirSlot;
++static LowqDirSlot* lowq_dir_tab = NULL;
++static size_t lowq_dir_cap = 0;
++static float* lowq_vdir = NULL;
++static size_t lowq_vdir_cap = 0;
++static LowqDirSlot* lowq_dir_find(u32 kx, u32 ky, size_t mask, int insert)
++{
++	size_t h = ((size_t) kx * 2654435761u ^ (size_t) ky * 40503u) & mask;
++	for (;;)
++	{
++		LowqDirSlot* e = &lowq_dir_tab[h];
++		if (e->kx == kx && e->ky == ky && (e->rh != 2)) return e;
++		if (e->rh == 2) { if (!insert) return NULL; e->kx = kx; e->ky = ky; e->rh = 0; e->rv = 0; e->dx = 0; e->dy = 0; return e; }
++		h = (h + 1) & mask;
++	}
++}
++// Centre i of a run: the recompiler's table (u32 float bits) or a drawing-API
++// soup (floats).
++typedef struct { size_t ci0; const float* fcen; } LowqCen;
++static inline void lowq_cen_get(const LowqCen* c, size_t i, u32 out[2])
++{
++	if (c->fcen != NULL) memcpy(out, &c->fcen[2 * i], 2 * sizeof(u32));
++	else { out[0] = hairline_centres[c->ci0 + i][0]; out[1] = hairline_centres[c->ci0 + i][1]; }
++}
++// Device direction of every vertex's own segment, plus per centre the
++// right-of-travel sign of the horizontal (rh) / vertical (rv) segment through
++// it (for join / cap vertices). Segment quads: the recompiler's drawLines
++// emits (A+n, A-n, B+n), (B-n, A-n, B+n) and the drawing-API builders
++// (A+n, A-n, B+n), (A-n, B-n, B+n): with vertices 1 / 2 on distinct centres
++// they are start / end, otherwise vertices 0 / 1 are. Returns 0 when the
++// scratch cannot be allocated.
++static int lowq_run_dirs(const LowqCen* cs, size_t rn, double Ax, double Bx, double Ay, double By)
++{
++	if (rn > lowq_vdir_cap)
++	{
++		float* nv = (float*) realloc(lowq_vdir, rn * 2 * sizeof(float));
++		if (nv == NULL) return 0;
++		lowq_vdir = nv; lowq_vdir_cap = rn;
++	}
++	size_t cap = 16;
++	while (cap < 2 * rn) cap <<= 1;
++	if (cap > lowq_dir_cap)
++	{
++		LowqDirSlot* nt = (LowqDirSlot*) realloc(lowq_dir_tab, cap * sizeof(LowqDirSlot));
++		if (nt == NULL) return 0;
++		lowq_dir_tab = nt; lowq_dir_cap = cap;
++	}
++	for (size_t i = 0; i < cap; i++) lowq_dir_tab[i].rh = 2;   // empty
++	const size_t mask = cap - 1;
++	for (size_t t = 0; t + 2 < rn; t += 3)
++	{
++		u32 k0[2], k1[2], k2[2];
++		lowq_cen_get(cs, t, k0);
++		lowq_cen_get(cs, t + 1, k1);
++		lowq_cen_get(cs, t + 2, k2);
++		const u32* c1 = k1;
++		const u32* c2 = k2;
++		if (cs->fcen != NULL && k1[0] == k2[0] && k1[1] == k2[1]) { c1 = k0; c2 = k1; }
++		float dx = 0.0f, dy = 0.0f;
++		if (c1[0] != c2[0] || c1[1] != c2[1])
++		{
++			union { float f; u32 u; } ax, ay, bx, by;
++			ax.u = c1[0]; ay.u = c1[1]; bx.u = c2[0]; by.u = c2[1];
++			const double ex = (double) bx.f - ax.f, ey = (double) by.f - ay.f;
++			dx = (float) (Ax * ex + Bx * ey);
++			dy = (float) (Ay * ex + By * ey);
++			const u32* ends[2] = { c1, c2 };
++			for (int k = 0; k < 2; k++)
++			{
++				LowqDirSlot* e = lowq_dir_find(ends[k][0], ends[k][1], mask, 1);
++				if (e->dx == 0.0f && e->dy == 0.0f) { e->dx = dx; e->dy = dy; }
++				const double adx = fabs(dx), ady = fabs(dy);
++				if (ady <= 1e-6 * adx && e->rh == 0) e->rh = (dx > 0) ? 1 : -1;
++				if (adx <= 1e-6 * ady && e->rv == 0) e->rv = (dy > 0) ? -1 : 1;
++			}
++		}
++		for (int k = 0; k < 3; k++) { lowq_vdir[2 * (t + k)] = dx; lowq_vdir[2 * (t + k) + 1] = dy; }
++	}
++	for (size_t v = rn - rn % 3; v < rn; v++) { lowq_vdir[2 * v] = 0.0f; lowq_vdir[2 * v + 1] = 0.0f; }
++	return 1;
++}
++// One stroke vertex under the LOW rule (device px; see lowq_stroke_rule).
++// n = thin pen (0 = polygon regime), W = snapped band width (0 = none),
++// axis_ok = the matrix is axis-aligned (fx / fy meaningful), (vdx, vdy) =
++// own segment direction (0 = a join / cap vertex: taken from its centre).
++static void lowq_stroke_place(double* cdx, double* cdy, double* odx, double* ody,
++                              int n, int W, int axis_ok, int fx, int fy, unsigned sf,
++                              double vdx, double vdy, const LowqDirSlot* ce)
++{
++	if (vdx == 0.0 && vdy == 0.0 && ce != NULL) { vdx = ce->dx; vdy = ce->dy; }
++	const double avx = fabs(vdx), avy = fabs(vdy);
++	const int seg_h = (avy <= 1e-6 * avx) && avx > 0.0;
++	const int seg_v = (avx <= 1e-6 * avy) && avy > 0.0;
++	if (axis_ok && W != 0 && (fx || fy))
++	{
++		// Axis-aligned band(s): the centre snaps on each flagged axis.
++		int rh = ce ? ce->rh : 0, rv = ce ? ce->rv : 0;
++		if (seg_h) rh = (vdx > 0) ? 1 : -1;
++		if (seg_v) rv = (vdy > 0) ? -1 : 1;
++		if (fx) *cdx = lowq_band_centre(*cdx, W, rv ? rv : 1);
++		if (fy) *cdy = lowq_band_centre(*cdy, W, rh ? rh : 1);
++		// Thin regime: butt ends (the band stops at the quantised end).
++		if (n != 0 && (sf & STROKE_SNAP_END) && (fx ^ fy))
++		{
++			if (fy) *odx = 0.0; else *ody = 0.0;
++		}
++		return;
++	}
++	if (n == 0 || (avx == 0.0 && avy == 0.0)) return;
++	// A device-horizontal / -vertical segment under a non-axis matrix (a
++	// shear keeps x-parallel edges horizontal): the band rule on its minor
++	// axis, the pen n px across it, butt ends.
++	if (seg_h || seg_v)
++	{
++		const double h0 = 0.5 * n;
++		if (seg_h)
++		{
++			const double s0 = (*ody > 1e-9) ? 1.0 : (*ody < -1e-9) ? -1.0 : 0.0;
++			*cdy = lowq_band_centre(*cdy, n, (vdx > 0) ? 1 : -1);
++			*odx = 0.0; *ody = s0 * h0;
++		}
++		else
++		{
++			const double s0 = (*odx > 1e-9) ? 1.0 : (*odx < -1e-9) ? -1.0 : 0.0;
++			*cdx = lowq_band_centre(*cdx, n, (vdy > 0) ? -1 : 1);
++			*ody = 0.0; *odx = s0 * h0;
++		}
++		return;
++	}
++	// n = 4 is a pen only on an exact 45-degree diagonal (4 px per row /
++	// column, probe rows 0 / 2); at 26.6 / 30 / 60 degrees Flash draws a
++	// round-capped polygon ~4.5 px wide (per-column extent fits a half-width
++	// of 2.55..2.6 px / cos at 30 degrees): re-expand the offset to that.
++	if (n == 4 && fabs(avx - avy) > 1e-3 * (avx + avy))
++	{
++		const double k = lowq_n4_poly / 4.0;
++		*odx *= k; *ody *= k;
++		return;
++	}
++	// Thin diagonal: a pen of n px along the minor device axis, the
++	// segment's ends butt. n = 3 sits 1/2 px right of travel.
++	const double h = 0.5 * n;
++	// Minor axis y for a mostly-horizontal segment; an exact 45-degree tie
++	// takes the x pen (the LOW vertex snap only moves y, so a 1-px y pen on a
++	// 45-degree edge can sample to nothing).
++	if (avx > avy * (1.0 + 1e-3))
++	{
++		const double s = (*ody > 1e-9) ? 1.0 : (*ody < -1e-9) ? -1.0 : 0.0;
++		*odx = 0.0; *ody = s * h;
++		if (n == 3) *cdy += (vdx > 0) ? 0.5 : -0.5;
++	}
++	else
++	{
++		const double s = (*odx > 1e-9) ? 1.0 : (*odx < -1e-9) ? -1.0 : 0.0;
++		*ody = 0.0; *odx = s * h;
++		if (n == 3) *cdx += (vdy > 0) ? -0.5 : 0.5;
++	}
++}
++#endif
+ // s28 n-join-disc goal 2: a single no*Scale flag scales the width by the
+ // SIGNED device component of v = M*(1,1) (NoVScale v.x, NoHScale v.y, y
+ // down), clamped at 0 -> hairline. Flash 32, 34 cells
+@@ -2139,6 +2358,14 @@ static void hairline_init(WebGPURenderContext* ctx)
+ 		stroke_hint_ends = !(e7 != NULL && e7[0] == '0');
+ 		const char* e6 = getenv("SWF_STROKE_CAP_OCTAGON");
+ 		stroke_cap_octagon = !(e6 != NULL && e6[0] == '0');
++#if MSAA_SAMPLES == 1
++		const char* e8 = getenv("SWF_LOWQ_HAIR_UNSNAP");
++		lowq_hair_unsnap = !(e8 != NULL && e8[0] == '0');
++		const char* e9 = getenv("SWF_LOWQ_STROKE");
++		lowq_stroke_rule = !(e9 != NULL && e9[0] == '0');
++		const char* e10 = getenv("SWF_LOWQ_N4");
++		lowq_n4_poly = (e10 != NULL && atof(e10) > 0.0) ? atof(e10) : 4.5;
++#endif
+ 	}
+ 	// The CPU xform mirror also serves the drawing-API stroke snap
+ 	// (render_webgpu_stroke_snap), so it exists whether or not the movie has
+@@ -3771,6 +3998,12 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
+ 	const double Ay = -Hh * b, By = -Hh * d;
+ 	const double Cy = Hh * (1.0 - ((double) p[1] * t[12] + (double) p[5] * t[13] + (double) p[13]));
+ 	const double det = Ax * By - Bx * Ay;
++#if MSAA_SAMPLES == 1
++	// s29 w2b-lowq-stroke: device shift of the slot's TSNAP (z-column x / y,
++	// twips; lowq_tsnap_slot_xform), 0 when the slot carries none.
++	const double tsnap_dx = lowq_hair_unsnap ? Wh * ((double) p[0] * t[8] + (double) p[4] * t[9]) : 0.0;
++	const double tsnap_dy = lowq_hair_unsnap ? -Hh * ((double) p[1] * t[8] + (double) p[5] * t[9]) : 0.0;
++#endif
+ 	const double ax_x = fabs(Ax) + fabs(Bx), ax_y = fabs(Ay) + fabs(By);
+ 	// 0 = no snapping (rotated / skewed / singular), 1 = axis-aligned, 2 = 90deg.
+ 	int axis = 0;
+@@ -3859,6 +4092,16 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
+ 		else if (u == 12) W = 3;
+ 		double target_px = W ? (double) W : 2.0 * floor(u / 2.0) / 4.0;
+ 		if (target_px < 1.0) target_px = 1.0;
++#if MSAA_SAMPLES == 1
++		// s29 w2b-lowq-stroke: the LOW width quantisation (lowq_stroke_width).
++		int lq_n = 0;
++		const LowqCen lq_cs = { hairline_runs[r][2], NULL };
++		const int lq_on = lowq_stroke_rule && fabs(det) > 1e-12
++		                  && lowq_run_dirs(&lq_cs, rn, Ax, Bx, Ay, By);
++		const size_t lq_mask = lowq_dir_cap - 1;
++		if (lq_on) lq_n = lowq_stroke_width(w_px, &W, &target_px);
++		lowq_subpx_hair = (w_px < 1.0 - 1e-6);
++#endif
+ 		// Uniform re-expansion factor (emitted local width -> target device).
+ 		const double k_uni = target_px / (emitted * (scale / 20.0));
+ 		const int snap_ok = (W != 0 && axis != 0);
+@@ -3891,6 +4134,11 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
+ 			// is as wide horizontally as vertically); otherwise uniformly.
+ 			double cdx = Ax * cx.f + Bx * cy.f + Cx;
+ 			double cdy = Ay * cx.f + By * cy.f + Cy;
++#if MSAA_SAMPLES == 1
++			// s29 w2b-lowq-stroke: a 1-px noScale hairline under a non-axis
++			// matrix strokes at the unsnapped translation.
++			if (no_scale && W == 1 && axis == 0) { cdx -= tsnap_dx; cdy -= tsnap_dy; }
++#endif
+ 			const double ox = vx.f - cx.f, oy = vy.f - cy.f;
+ 			double odx = Ax * ox + Bx * oy;
+ 			double ody = Ay * ox + By * oy;
+@@ -3909,6 +4157,15 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
+ 			// (with the half width a multiple of 1/4, so do the edges).
+ 			cdx = floor(4.0 * cdx + 0.5) * 0.25;
+ 			cdy = floor(4.0 * cdy + 0.5) * 0.25;
++#if MSAA_SAMPLES == 1
++			if (lq_on)
++			{
++				const LowqDirSlot* ce = lowq_dir_find(cen[0], cen[1], lq_mask, 0);
++				lowq_stroke_place(&cdx, &cdy, &odx, &ody, lq_n, W, axis != 0, fx, fy, sf,
++				                  lowq_vdir[2 * v], lowq_vdir[2 * v + 1], ce);
++			}
++			else
++#endif
+ 			if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf, hinted);
+ 			const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
+ 			// Back to local.
+@@ -4026,6 +4283,16 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
+ 	else if (u == 12) W = 3;
+ 	double target_px = W ? (double) W : 2.0 * floor(u / 2.0) / 4.0;
+ 	if (target_px < 1.0) target_px = 1.0;
++#if MSAA_SAMPLES == 1
++	// s29 w2b-lowq-stroke: the LOW stroke rule (see lowq_stroke_rule); the
++	// drawing API shares it with the timeline (probe row 2 cols 8-15).
++	int lq_n = 0;
++	const LowqCen lq_cs = { 0, src->cen };
++	const int lq_on = lowq_stroke_rule && lowq_run_dirs(&lq_cs, src->n, Ax, Bx, Ay, By);
++	const size_t lq_mask = lowq_dir_cap - 1;
++	if (lq_on) lq_n = lowq_stroke_width(w_px, &W, &target_px);
++	lowq_subpx_hair = (w_px < 1.0 - 1e-6);
++#endif
+ 	const double emitted = src->emitted_twips;
+ 	const double ax_x = fabs(Ax) + fabs(Bx), ax_y = fabs(Ay) + fabs(By);
+ 	int axis = 0;
+@@ -4086,6 +4353,17 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
+ 			cdx = floor(4.0 * cdx + 0.5) * 0.25;
+ 			cdy = floor(4.0 * cdy + 0.5) * 0.25;
+ 		}
++#if MSAA_SAMPLES == 1
++		if (lq_on)
++		{
++			u32 kc[2];
++			memcpy(kc, &src->cen[v * 2], sizeof(kc));
++			const LowqDirSlot* lce = lowq_dir_find(kc[0], kc[1], lq_mask, 0);
++			lowq_stroke_place(&cdx, &cdy, &odx, &ody, lq_n, W, axis != 0, fx, fy, sf,
++			                  lowq_vdir[2 * v], lowq_vdir[2 * v + 1], lce);
++		}
++		else
++#endif
+ 		if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf, hinted);
+ 		const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
+ 		out[v * 2]     = (float) (( By * ndx - Bx * ndy) / det);
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 2365a5ee..e43354ec 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -863,3 +863,7 @@ from_shumway/acid/acid-shapes                       # thick curved drawing-API s
+ regression/lowq_tsnap_tie_probe                     # placement / tie / nesting rows, LOW  1 cmp
+ # tier=2
+ visual/blend_modes/add                              # per-level vs world snap, LOW       1 cmp
++# s29 w2b-lowq-stroke: Flash LOW stroke raster (render_webgpu.c lowq_stroke_*,
++# hairline_restage / render_webgpu_stroke_snap LOW arm). FP32 golden.
++# tier=1
++regression/lowq_stroke_probe                        # LOW width / thin pen / band / hairline  1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/cells.json b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/cells.json
+new file mode 100644
+index 00000000..949058fe
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/cells.json
+@@ -0,0 +1,5747 @@
++[
++ {
++  "row": 0,
++  "col": 0,
++  "what": "static 45deg line",
++  "width": 3,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   6,
++   6,
++   34,
++   34
++  ],
++  "row_span_polygon": 4.243,
++  "col_span_polygon": 4.243,
++  "minor_axis_pen_span": 3,
++  "thin_clamp_span": 3
++ },
++ {
++  "row": 0,
++  "col": 8,
++  "what": "static 45deg line",
++  "width": 3,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   354,
++   34,
++   326,
++   6
++  ],
++  "row_span_polygon": 4.243,
++  "col_span_polygon": 4.243,
++  "minor_axis_pen_span": 3,
++  "thin_clamp_span": 3
++ },
++ {
++  "row": 0,
++  "col": 1,
++  "what": "static 45deg line",
++  "width": 4,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   46,
++   6,
++   74,
++   34
++  ],
++  "row_span_polygon": 5.657,
++  "col_span_polygon": 5.657,
++  "minor_axis_pen_span": 4,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 0,
++  "col": 9,
++  "what": "static 45deg line",
++  "width": 4,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   394,
++   34,
++   366,
++   6
++  ],
++  "row_span_polygon": 5.657,
++  "col_span_polygon": 5.657,
++  "minor_axis_pen_span": 4,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 0,
++  "col": 2,
++  "what": "static 45deg line",
++  "width": 4.5,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   86,
++   6,
++   114,
++   34
++  ],
++  "row_span_polygon": 6.364,
++  "col_span_polygon": 6.364,
++  "minor_axis_pen_span": 4.5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 0,
++  "col": 10,
++  "what": "static 45deg line",
++  "width": 4.5,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   434,
++   34,
++   406,
++   6
++  ],
++  "row_span_polygon": 6.364,
++  "col_span_polygon": 6.364,
++  "minor_axis_pen_span": 4.5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 0,
++  "col": 3,
++  "what": "static 45deg line",
++  "width": 5,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   126,
++   6,
++   154,
++   34
++  ],
++  "row_span_polygon": 7.071,
++  "col_span_polygon": 7.071,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 0,
++  "col": 11,
++  "what": "static 45deg line",
++  "width": 5,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   474,
++   34,
++   446,
++   6
++  ],
++  "row_span_polygon": 7.071,
++  "col_span_polygon": 7.071,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 0,
++  "col": 4,
++  "what": "static 45deg line",
++  "width": 5.25,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   166,
++   6,
++   194,
++   34
++  ],
++  "row_span_polygon": 7.425,
++  "col_span_polygon": 7.425,
++  "minor_axis_pen_span": 5.25,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 0,
++  "col": 12,
++  "what": "static 45deg line",
++  "width": 5.25,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   514,
++   34,
++   486,
++   6
++  ],
++  "row_span_polygon": 7.425,
++  "col_span_polygon": 7.425,
++  "minor_axis_pen_span": 5.25,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 0,
++  "col": 5,
++  "what": "static 45deg line",
++  "width": 5.5,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   206,
++   6,
++   234,
++   34
++  ],
++  "row_span_polygon": 7.778,
++  "col_span_polygon": 7.778,
++  "minor_axis_pen_span": 5.5,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 0,
++  "col": 13,
++  "what": "static 45deg line",
++  "width": 5.5,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   554,
++   34,
++   526,
++   6
++  ],
++  "row_span_polygon": 7.778,
++  "col_span_polygon": 7.778,
++  "minor_axis_pen_span": 5.5,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 0,
++  "col": 6,
++  "what": "static 45deg line",
++  "width": 5.75,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   246,
++   6,
++   274,
++   34
++  ],
++  "row_span_polygon": 8.132,
++  "col_span_polygon": 8.132,
++  "minor_axis_pen_span": 5.75,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 0,
++  "col": 14,
++  "what": "static 45deg line",
++  "width": 5.75,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   594,
++   34,
++   566,
++   6
++  ],
++  "row_span_polygon": 8.132,
++  "col_span_polygon": 8.132,
++  "minor_axis_pen_span": 5.75,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 0,
++  "col": 7,
++  "what": "static 45deg line",
++  "width": 6,
++  "theta": 45,
++  "reverse": false,
++  "ends": [
++   286,
++   6,
++   314,
++   34
++  ],
++  "row_span_polygon": 8.485,
++  "col_span_polygon": 8.485,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 0,
++  "col": 15,
++  "what": "static 45deg line",
++  "width": 6,
++  "theta": 45,
++  "reverse": true,
++  "ends": [
++   634,
++   34,
++   606,
++   6
++  ],
++  "row_span_polygon": 8.485,
++  "col_span_polygon": 8.485,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 0,
++  "what": "static 30deg line",
++  "width": 3,
++  "theta": 30,
++  "ends": [
++   7.9,
++   53.0,
++   32.1,
++   67.0
++  ],
++  "row_span_polygon": 6.0,
++  "col_span_polygon": 3.464,
++  "minor_axis_pen_span": 3,
++  "thin_clamp_span": 3
++ },
++ {
++  "row": 1,
++  "col": 8,
++  "what": "static 60deg line",
++  "width": 3,
++  "theta": 60,
++  "ends": [
++   333.0,
++   47.9,
++   347.0,
++   72.1
++  ],
++  "row_span_polygon": 3.464,
++  "col_span_polygon": 6.0,
++  "minor_axis_pen_span": 3,
++  "thin_clamp_span": 3
++ },
++ {
++  "row": 1,
++  "col": 1,
++  "what": "static 30deg line",
++  "width": 4,
++  "theta": 30,
++  "ends": [
++   47.9,
++   53.0,
++   72.1,
++   67.0
++  ],
++  "row_span_polygon": 8.0,
++  "col_span_polygon": 4.619,
++  "minor_axis_pen_span": 4,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 1,
++  "col": 9,
++  "what": "static 60deg line",
++  "width": 4,
++  "theta": 60,
++  "ends": [
++   373.0,
++   47.9,
++   387.0,
++   72.1
++  ],
++  "row_span_polygon": 4.619,
++  "col_span_polygon": 8.0,
++  "minor_axis_pen_span": 4,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 1,
++  "col": 2,
++  "what": "static 30deg line",
++  "width": 4.5,
++  "theta": 30,
++  "ends": [
++   87.9,
++   53.0,
++   112.1,
++   67.0
++  ],
++  "row_span_polygon": 9.0,
++  "col_span_polygon": 5.196,
++  "minor_axis_pen_span": 4.5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 1,
++  "col": 10,
++  "what": "static 60deg line",
++  "width": 4.5,
++  "theta": 60,
++  "ends": [
++   413.0,
++   47.9,
++   427.0,
++   72.1
++  ],
++  "row_span_polygon": 5.196,
++  "col_span_polygon": 9.0,
++  "minor_axis_pen_span": 4.5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 1,
++  "col": 3,
++  "what": "static 30deg line",
++  "width": 5,
++  "theta": 30,
++  "ends": [
++   127.9,
++   53.0,
++   152.1,
++   67.0
++  ],
++  "row_span_polygon": 10.0,
++  "col_span_polygon": 5.774,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 1,
++  "col": 11,
++  "what": "static 60deg line",
++  "width": 5,
++  "theta": 60,
++  "ends": [
++   453.0,
++   47.9,
++   467.0,
++   72.1
++  ],
++  "row_span_polygon": 5.774,
++  "col_span_polygon": 10.0,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 1,
++  "col": 4,
++  "what": "static 30deg line",
++  "width": 5.25,
++  "theta": 30,
++  "ends": [
++   167.9,
++   53.0,
++   192.1,
++   67.0
++  ],
++  "row_span_polygon": 10.5,
++  "col_span_polygon": 6.062,
++  "minor_axis_pen_span": 5.25,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 12,
++  "what": "static 60deg line",
++  "width": 5.25,
++  "theta": 60,
++  "ends": [
++   493.0,
++   47.9,
++   507.0,
++   72.1
++  ],
++  "row_span_polygon": 6.062,
++  "col_span_polygon": 10.5,
++  "minor_axis_pen_span": 5.25,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 5,
++  "what": "static 30deg line",
++  "width": 5.5,
++  "theta": 30,
++  "ends": [
++   207.9,
++   53.0,
++   232.1,
++   67.0
++  ],
++  "row_span_polygon": 11.0,
++  "col_span_polygon": 6.351,
++  "minor_axis_pen_span": 5.5,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 13,
++  "what": "static 60deg line",
++  "width": 5.5,
++  "theta": 60,
++  "ends": [
++   533.0,
++   47.9,
++   547.0,
++   72.1
++  ],
++  "row_span_polygon": 6.351,
++  "col_span_polygon": 11.0,
++  "minor_axis_pen_span": 5.5,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 6,
++  "what": "static 30deg line",
++  "width": 5.75,
++  "theta": 30,
++  "ends": [
++   247.9,
++   53.0,
++   272.1,
++   67.0
++  ],
++  "row_span_polygon": 11.5,
++  "col_span_polygon": 6.64,
++  "minor_axis_pen_span": 5.75,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 14,
++  "what": "static 60deg line",
++  "width": 5.75,
++  "theta": 60,
++  "ends": [
++   573.0,
++   47.9,
++   587.0,
++   72.1
++  ],
++  "row_span_polygon": 6.64,
++  "col_span_polygon": 11.5,
++  "minor_axis_pen_span": 5.75,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 7,
++  "what": "static 30deg line",
++  "width": 6,
++  "theta": 30,
++  "ends": [
++   287.9,
++   53.0,
++   312.1,
++   67.0
++  ],
++  "row_span_polygon": 12.0,
++  "col_span_polygon": 6.928,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 1,
++  "col": 15,
++  "what": "static 60deg line",
++  "width": 6,
++  "theta": 60,
++  "ends": [
++   613.0,
++   47.9,
++   627.0,
++   72.1
++  ],
++  "row_span_polygon": 6.928,
++  "col_span_polygon": 12.0,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 2,
++  "col": 0,
++  "what": "static line angle sweep",
++  "width": 5,
++  "theta": 0,
++  "ends": [
++   6.0,
++   100.0,
++   34.0,
++   100.0
++  ],
++  "row_span_polygon": null,
++  "col_span_polygon": 5.0,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 1,
++  "what": "static line angle sweep",
++  "width": 5,
++  "theta": 26.565,
++  "ends": [
++   47.5,
++   93.75,
++   72.5,
++   106.25
++  ],
++  "row_span_polygon": 11.18,
++  "col_span_polygon": 5.59,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 2,
++  "what": "static line angle sweep",
++  "width": 5,
++  "theta": 45,
++  "ends": [
++   90.1,
++   90.1,
++   109.9,
++   109.9
++  ],
++  "row_span_polygon": 7.071,
++  "col_span_polygon": 7.071,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 3,
++  "what": "static line angle sweep",
++  "width": 4,
++  "theta": 0,
++  "ends": [
++   126.0,
++   100.0,
++   154.0,
++   100.0
++  ],
++  "row_span_polygon": null,
++  "col_span_polygon": 4.0,
++  "minor_axis_pen_span": 4,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 4,
++  "what": "static line angle sweep",
++  "width": 4,
++  "theta": 26.565,
++  "ends": [
++   167.5,
++   93.75,
++   192.5,
++   106.25
++  ],
++  "row_span_polygon": 8.944,
++  "col_span_polygon": 4.472,
++  "minor_axis_pen_span": 4,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 5,
++  "what": "static line angle sweep",
++  "width": 6,
++  "theta": 0,
++  "ends": [
++   206.0,
++   100.0,
++   234.0,
++   100.0
++  ],
++  "row_span_polygon": null,
++  "col_span_polygon": 6.0,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 2,
++  "col": 6,
++  "what": "static line angle sweep",
++  "width": 6,
++  "theta": 26.565,
++  "ends": [
++   247.5,
++   93.75,
++   272.5,
++   106.25
++  ],
++  "row_span_polygon": 13.416,
++  "col_span_polygon": 6.708,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 2,
++  "col": 7,
++  "what": "static line angle sweep",
++  "width": 4.5,
++  "theta": 0,
++  "ends": [
++   286.0,
++   100.0,
++   314.0,
++   100.0
++  ],
++  "row_span_polygon": null,
++  "col_span_polygon": 4.5,
++  "minor_axis_pen_span": 4.5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 8,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 3,
++  "theta": 45,
++  "ends": [
++   330.1005050633883,
++   90.10050506338834,
++   349.8994949366117,
++   109.89949493661166
++  ],
++  "row_span_polygon": 4.243,
++  "col_span_polygon": 4.243,
++  "minor_axis_pen_span": 3,
++  "thin_clamp_span": 3
++ },
++ {
++  "row": 2,
++  "col": 9,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 4,
++  "theta": 45,
++  "ends": [
++   370.1005050633883,
++   90.10050506338834,
++   389.8994949366117,
++   109.89949493661166
++  ],
++  "row_span_polygon": 5.657,
++  "col_span_polygon": 5.657,
++  "minor_axis_pen_span": 4,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 10,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 4.5,
++  "theta": 45,
++  "ends": [
++   410.1005050633883,
++   90.10050506338834,
++   429.8994949366117,
++   109.89949493661166
++  ],
++  "row_span_polygon": 6.364,
++  "col_span_polygon": 6.364,
++  "minor_axis_pen_span": 4.5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 11,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 5,
++  "theta": 45,
++  "ends": [
++   450.1005050633883,
++   90.10050506338834,
++   469.8994949366117,
++   109.89949493661166
++  ],
++  "row_span_polygon": 7.071,
++  "col_span_polygon": 7.071,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 12,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 5.5,
++  "theta": 45,
++  "ends": [
++   490.1005050633883,
++   90.10050506338834,
++   509.8994949366117,
++   109.89949493661166
++  ],
++  "row_span_polygon": 7.778,
++  "col_span_polygon": 7.778,
++  "minor_axis_pen_span": 5.5,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 2,
++  "col": 13,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 6,
++  "theta": 45,
++  "ends": [
++   530.1005050633884,
++   90.10050506338834,
++   549.8994949366116,
++   109.89949493661166
++  ],
++  "row_span_polygon": 8.485,
++  "col_span_polygon": 8.485,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 2,
++  "col": 14,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 5,
++  "theta": 30,
++  "ends": [
++   567.8756443470179,
++   93.0,
++   592.1243556529821,
++   107.0
++  ],
++  "row_span_polygon": 10.0,
++  "col_span_polygon": 5.774,
++  "minor_axis_pen_span": 5,
++  "thin_clamp_span": 4
++ },
++ {
++  "row": 2,
++  "col": 15,
++  "what": "AVM1 Drawing-API lineStyle line",
++  "width": 6,
++  "theta": 30,
++  "ends": [
++   607.8756443470179,
++   93.0,
++   632.1243556529821,
++   107.0
++  ],
++  "row_span_polygon": 12.0,
++  "col_span_polygon": 6.928,
++  "minor_axis_pen_span": 6,
++  "thin_clamp_span": null
++ },
++ {
++  "row": 3,
++  "col": 0,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "cw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 32.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     31,
++     32
++    ],
++    "high_snap": [
++     32,
++     33
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 8.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     8,
++     9
++    ],
++    "high_snap": [
++     8,
++     9
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     129
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     151,
++     152
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 1,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "cw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 72.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     71,
++     72
++    ],
++    "high_snap": [
++     72,
++     73
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 48.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     48,
++     49
++    ],
++    "high_snap": [
++     48,
++     49
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     129
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     151,
++     152
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 2,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "cw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 112.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     111,
++     112
++    ],
++    "high_snap": [
++     112,
++     113
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 88.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     88,
++     89
++    ],
++    "high_snap": [
++     88,
++     89
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     129
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     151,
++     152
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 3,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "cw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 152.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     152,
++     153
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 128.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     129,
++     130
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     129,
++     130
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     153
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 4,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "ccw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 168.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     167,
++     168
++    ],
++    "high_snap": [
++     168,
++     169
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 192.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     192,
++     193
++    ],
++    "high_snap": [
++     192,
++     193
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     153
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     127,
++     128
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 5,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "ccw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 208.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     207,
++     208
++    ],
++    "high_snap": [
++     208,
++     209
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 232.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     232,
++     233
++    ],
++    "high_snap": [
++     232,
++     233
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     153
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     127,
++     128
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 6,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "ccw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 248.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     247,
++     248
++    ],
++    "high_snap": [
++     248,
++     249
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 272.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     272,
++     273
++    ],
++    "high_snap": [
++     272,
++     273
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     153
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     127,
++     128
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 7,
++  "what": "stroke-only rect band",
++  "width": 1,
++  "direction": "ccw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 288.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     288,
++     289
++    ],
++    "high_snap": [
++     288,
++     289
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 312.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     313,
++     314
++    ],
++    "high_snap": [
++     312,
++     313
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     153,
++     154
++    ],
++    "high_snap": [
++     152,
++     153
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     129
++    ],
++    "high_snap": [
++     128,
++     129
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 8,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "cw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 352.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     351,
++     353
++    ],
++    "high_snap": [
++     351,
++     353
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 328.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     328,
++     330
++    ],
++    "high_snap": [
++     327,
++     329
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     130
++    ],
++    "high_snap": [
++     127,
++     129
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     151,
++     153
++    ],
++    "high_snap": [
++     151,
++     153
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 9,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "cw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 392.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     391,
++     393
++    ],
++    "high_snap": [
++     391,
++     393
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 368.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     368,
++     370
++    ],
++    "high_snap": [
++     367,
++     369
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     130
++    ],
++    "high_snap": [
++     127,
++     129
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     151,
++     153
++    ],
++    "high_snap": [
++     151,
++     153
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 10,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "cw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 432.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     431,
++     433
++    ],
++    "high_snap": [
++     432,
++     434
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 408.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     408,
++     410
++    ],
++    "high_snap": [
++     408,
++     410
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     130
++    ],
++    "high_snap": [
++     128,
++     130
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     151,
++     153
++    ],
++    "high_snap": [
++     152,
++     154
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 11,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "cw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 472.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     472,
++     474
++    ],
++    "high_snap": [
++     472,
++     474
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 448.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     449,
++     451
++    ],
++    "high_snap": [
++     448,
++     450
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     129,
++     131
++    ],
++    "high_snap": [
++     128,
++     130
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     154
++    ],
++    "high_snap": [
++     152,
++     154
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 12,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "ccw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 488.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     487,
++     489
++    ],
++    "high_snap": [
++     487,
++     489
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 512.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     512,
++     514
++    ],
++    "high_snap": [
++     511,
++     513
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     154
++    ],
++    "high_snap": [
++     151,
++     153
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     127,
++     129
++    ],
++    "high_snap": [
++     127,
++     129
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 13,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "ccw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 528.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     527,
++     529
++    ],
++    "high_snap": [
++     527,
++     529
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 552.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     552,
++     554
++    ],
++    "high_snap": [
++     551,
++     553
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     154
++    ],
++    "high_snap": [
++     151,
++     153
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     127,
++     129
++    ],
++    "high_snap": [
++     127,
++     129
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 14,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "ccw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 568.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     567,
++     569
++    ],
++    "high_snap": [
++     568,
++     570
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 592.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     592,
++     594
++    ],
++    "high_snap": [
++     592,
++     594
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     152,
++     154
++    ],
++    "high_snap": [
++     152,
++     154
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     127,
++     129
++    ],
++    "high_snap": [
++     128,
++     130
++    ]
++   }
++  ]
++ },
++ {
++  "row": 3,
++  "col": 15,
++  "what": "stroke-only rect band",
++  "width": 2,
++  "direction": "ccw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 608.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     608,
++     610
++    ],
++    "high_snap": [
++     608,
++     610
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 632.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     633,
++     635
++    ],
++    "high_snap": [
++     632,
++     634
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 152.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     153,
++     155
++    ],
++    "high_snap": [
++     152,
++     154
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 128.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     128,
++     130
++    ],
++    "high_snap": [
++     128,
++     130
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 0,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "cw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 32.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     30,
++     33
++    ],
++    "right_of_travel_gen": [
++     30,
++     33
++    ],
++    "high_snap": [
++     31,
++     34
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 8.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     7,
++     10
++    ],
++    "right_of_travel_gen": [
++     7,
++     10
++    ],
++    "high_snap": [
++     7,
++     10
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     167,
++     170
++    ],
++    "right_of_travel_gen": [
++     167,
++     170
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     190,
++     193
++    ],
++    "right_of_travel_gen": [
++     190,
++     193
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 1,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "cw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 72.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     70,
++     73
++    ],
++    "right_of_travel_gen": [
++     70,
++     73
++    ],
++    "high_snap": [
++     71,
++     74
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 48.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     47,
++     50
++    ],
++    "right_of_travel_gen": [
++     47,
++     50
++    ],
++    "high_snap": [
++     47,
++     50
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     167,
++     170
++    ],
++    "right_of_travel_gen": [
++     167,
++     170
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     190,
++     193
++    ],
++    "right_of_travel_gen": [
++     190,
++     193
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 2,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "cw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 112.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     110,
++     113
++    ],
++    "right_of_travel_gen": [
++     110,
++     113
++    ],
++    "high_snap": [
++     111,
++     114
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 88.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     87,
++     90
++    ],
++    "right_of_travel_gen": [
++     87,
++     90
++    ],
++    "high_snap": [
++     87,
++     90
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     167,
++     170
++    ],
++    "right_of_travel_gen": [
++     167,
++     170
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     190,
++     193
++    ],
++    "right_of_travel_gen": [
++     190,
++     193
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 3,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "cw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 152.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     151,
++     154
++    ],
++    "right_of_travel_gen": [
++     151,
++     154
++    ],
++    "high_snap": [
++     151,
++     154
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 128.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     128,
++     131
++    ],
++    "right_of_travel_gen": [
++     128,
++     131
++    ],
++    "high_snap": [
++     127,
++     130
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     168,
++     171
++    ],
++    "right_of_travel_gen": [
++     168,
++     171
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     191,
++     194
++    ],
++    "right_of_travel_gen": [
++     191,
++     194
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 4,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "ccw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 168.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     166,
++     169
++    ],
++    "right_of_travel_gen": [
++     166,
++     169
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 192.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     191,
++     194
++    ],
++    "right_of_travel_gen": [
++     191,
++     194
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     191,
++     194
++    ],
++    "right_of_travel_gen": [
++     191,
++     194
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     166,
++     169
++    ],
++    "right_of_travel_gen": [
++     166,
++     169
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 5,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "ccw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 208.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     206,
++     209
++    ],
++    "right_of_travel_gen": [
++     206,
++     209
++    ],
++    "high_snap": [
++     207,
++     210
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 232.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     231,
++     234
++    ],
++    "right_of_travel_gen": [
++     231,
++     234
++    ],
++    "high_snap": [
++     231,
++     234
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     191,
++     194
++    ],
++    "right_of_travel_gen": [
++     191,
++     194
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     166,
++     169
++    ],
++    "right_of_travel_gen": [
++     166,
++     169
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 6,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "ccw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 248.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     246,
++     249
++    ],
++    "right_of_travel_gen": [
++     246,
++     249
++    ],
++    "high_snap": [
++     247,
++     250
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 272.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     271,
++     274
++    ],
++    "right_of_travel_gen": [
++     271,
++     274
++    ],
++    "high_snap": [
++     271,
++     274
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     191,
++     194
++    ],
++    "right_of_travel_gen": [
++     191,
++     194
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     166,
++     169
++    ],
++    "right_of_travel_gen": [
++     166,
++     169
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 7,
++  "what": "stroke-only rect band",
++  "width": 3,
++  "direction": "ccw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 288.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_w3": [
++     287,
++     290
++    ],
++    "right_of_travel_gen": [
++     287,
++     290
++    ],
++    "high_snap": [
++     287,
++     290
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 312.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_w3": [
++     312,
++     315
++    ],
++    "right_of_travel_gen": [
++     312,
++     315
++    ],
++    "high_snap": [
++     311,
++     314
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_w3": [
++     192,
++     195
++    ],
++    "right_of_travel_gen": [
++     192,
++     195
++    ],
++    "high_snap": [
++     191,
++     194
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_w3": [
++     167,
++     170
++    ],
++    "right_of_travel_gen": [
++     167,
++     170
++    ],
++    "high_snap": [
++     167,
++     170
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 8,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "cw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 352.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     350,
++     354
++    ],
++    "high_snap": [
++     350,
++     354
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 328.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     327,
++     331
++    ],
++    "high_snap": [
++     326,
++     330
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     167,
++     171
++    ],
++    "high_snap": [
++     166,
++     170
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     190,
++     194
++    ],
++    "high_snap": [
++     190,
++     194
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 9,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "cw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 392.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     390,
++     394
++    ],
++    "high_snap": [
++     390,
++     394
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 368.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     367,
++     371
++    ],
++    "high_snap": [
++     366,
++     370
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     167,
++     171
++    ],
++    "high_snap": [
++     166,
++     170
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     190,
++     194
++    ],
++    "high_snap": [
++     190,
++     194
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 10,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "cw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 432.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     430,
++     434
++    ],
++    "high_snap": [
++     431,
++     435
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 408.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     407,
++     411
++    ],
++    "high_snap": [
++     407,
++     411
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     167,
++     171
++    ],
++    "high_snap": [
++     167,
++     171
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     190,
++     194
++    ],
++    "high_snap": [
++     191,
++     195
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 11,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "cw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 472.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     471,
++     475
++    ],
++    "high_snap": [
++     471,
++     475
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 448.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     448,
++     452
++    ],
++    "high_snap": [
++     447,
++     451
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     168,
++     172
++    ],
++    "high_snap": [
++     167,
++     171
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     191,
++     195
++    ],
++    "high_snap": [
++     191,
++     195
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 12,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "ccw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 488.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     486,
++     490
++    ],
++    "high_snap": [
++     486,
++     490
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 512.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     511,
++     515
++    ],
++    "high_snap": [
++     510,
++     514
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     191,
++     195
++    ],
++    "high_snap": [
++     190,
++     194
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     166,
++     170
++    ],
++    "high_snap": [
++     166,
++     170
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 13,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "ccw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 528.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     526,
++     530
++    ],
++    "high_snap": [
++     526,
++     530
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 552.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     551,
++     555
++    ],
++    "high_snap": [
++     550,
++     554
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     191,
++     195
++    ],
++    "high_snap": [
++     190,
++     194
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     166,
++     170
++    ],
++    "high_snap": [
++     166,
++     170
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 14,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "ccw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 568.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     566,
++     570
++    ],
++    "high_snap": [
++     567,
++     571
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 592.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     591,
++     595
++    ],
++    "high_snap": [
++     591,
++     595
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     191,
++     195
++    ],
++    "high_snap": [
++     191,
++     195
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     166,
++     170
++    ],
++    "high_snap": [
++     167,
++     171
++    ]
++   }
++  ]
++ },
++ {
++  "row": 4,
++  "col": 15,
++  "what": "stroke-only rect band",
++  "width": 4,
++  "direction": "ccw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 608.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     607,
++     611
++    ],
++    "high_snap": [
++     607,
++     611
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 632.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     632,
++     636
++    ],
++    "high_snap": [
++     631,
++     635
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 192.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     192,
++     196
++    ],
++    "high_snap": [
++     191,
++     195
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 168.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     167,
++     171
++    ],
++    "high_snap": [
++     167,
++     171
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 0,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "cw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 32.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     29,
++     34
++    ],
++    "high_snap": [
++     30,
++     35
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 8.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     6,
++     11
++    ],
++    "high_snap": [
++     6,
++     11
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     211
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     229,
++     234
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 1,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "cw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 72.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     69,
++     74
++    ],
++    "high_snap": [
++     70,
++     75
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 48.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     46,
++     51
++    ],
++    "high_snap": [
++     46,
++     51
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     211
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     229,
++     234
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 2,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "cw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 112.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     109,
++     114
++    ],
++    "high_snap": [
++     110,
++     115
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 88.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     86,
++     91
++    ],
++    "high_snap": [
++     86,
++     91
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     211
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     229,
++     234
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 3,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "cw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 152.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     150,
++     155
++    ],
++    "high_snap": [
++     150,
++     155
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 128.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     127,
++     132
++    ],
++    "high_snap": [
++     126,
++     131
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     207,
++     212
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     235
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 4,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "ccw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 168.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     165,
++     170
++    ],
++    "high_snap": [
++     166,
++     171
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 192.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     190,
++     195
++    ],
++    "high_snap": [
++     190,
++     195
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     235
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     205,
++     210
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 5,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "ccw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 208.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     205,
++     210
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 232.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     230,
++     235
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     235
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     205,
++     210
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 6,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "ccw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 248.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     245,
++     250
++    ],
++    "high_snap": [
++     246,
++     251
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 272.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     270,
++     275
++    ],
++    "high_snap": [
++     270,
++     275
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     235
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     205,
++     210
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 7,
++  "what": "stroke-only rect band",
++  "width": 5,
++  "direction": "ccw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 288.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     286,
++     291
++    ],
++    "high_snap": [
++     286,
++     291
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 312.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     311,
++     316
++    ],
++    "high_snap": [
++     310,
++     315
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     231,
++     236
++    ],
++    "high_snap": [
++     230,
++     235
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     211
++    ],
++    "high_snap": [
++     206,
++     211
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 8,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "cw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 352.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     349,
++     355
++    ],
++    "high_snap": [
++     349,
++     355
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 328.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     326,
++     332
++    ],
++    "high_snap": [
++     325,
++     331
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     212
++    ],
++    "high_snap": [
++     205,
++     211
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     229,
++     235
++    ],
++    "high_snap": [
++     229,
++     235
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 9,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "cw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 392.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     389,
++     395
++    ],
++    "high_snap": [
++     389,
++     395
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 368.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     366,
++     372
++    ],
++    "high_snap": [
++     365,
++     371
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     212
++    ],
++    "high_snap": [
++     205,
++     211
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     229,
++     235
++    ],
++    "high_snap": [
++     229,
++     235
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 10,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "cw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 432.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     429,
++     435
++    ],
++    "high_snap": [
++     430,
++     436
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 408.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     406,
++     412
++    ],
++    "high_snap": [
++     406,
++     412
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     212
++    ],
++    "high_snap": [
++     206,
++     212
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     229,
++     235
++    ],
++    "high_snap": [
++     230,
++     236
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 11,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "cw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "right",
++    "c": 472.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     470,
++     476
++    ],
++    "high_snap": [
++     470,
++     476
++    ]
++   },
++   {
++    "edge": "left",
++    "c": 448.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     447,
++     453
++    ],
++    "high_snap": [
++     446,
++     452
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     207,
++     213
++    ],
++    "high_snap": [
++     206,
++     212
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     236
++    ],
++    "high_snap": [
++     230,
++     236
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 12,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "ccw",
++  "frac": 0.0,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 488.0,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     485,
++     491
++    ],
++    "high_snap": [
++     485,
++     491
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 512.0,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     510,
++     516
++    ],
++    "high_snap": [
++     509,
++     515
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.0,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     236
++    ],
++    "high_snap": [
++     229,
++     235
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.0,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     205,
++     211
++    ],
++    "high_snap": [
++     205,
++     211
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 13,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "ccw",
++  "frac": 0.25,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 528.25,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     525,
++     531
++    ],
++    "high_snap": [
++     525,
++     531
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 552.25,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     550,
++     556
++    ],
++    "high_snap": [
++     549,
++     555
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.25,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     236
++    ],
++    "high_snap": [
++     229,
++     235
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.25,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     205,
++     211
++    ],
++    "high_snap": [
++     205,
++     211
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 14,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "ccw",
++  "frac": 0.5,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 568.5,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     565,
++     571
++    ],
++    "high_snap": [
++     566,
++     572
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 592.5,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     590,
++     596
++    ],
++    "high_snap": [
++     590,
++     596
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.5,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     230,
++     236
++    ],
++    "high_snap": [
++     230,
++     236
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.5,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     205,
++     211
++    ],
++    "high_snap": [
++     206,
++     212
++    ]
++   }
++  ]
++ },
++ {
++  "row": 5,
++  "col": 15,
++  "what": "stroke-only rect band",
++  "width": 6,
++  "direction": "ccw",
++  "frac": 0.75,
++  "edges": [
++   {
++    "edge": "left",
++    "c": 608.75,
++    "travel": "down",
++    "axis": "x",
++    "right_of_travel_gen": [
++     606,
++     612
++    ],
++    "high_snap": [
++     606,
++     612
++    ]
++   },
++   {
++    "edge": "right",
++    "c": 632.75,
++    "travel": "up",
++    "axis": "x",
++    "right_of_travel_gen": [
++     631,
++     637
++    ],
++    "high_snap": [
++     630,
++     636
++    ]
++   },
++   {
++    "edge": "bottom",
++    "c": 232.75,
++    "travel": "right",
++    "axis": "y",
++    "right_of_travel_gen": [
++     231,
++     237
++    ],
++    "high_snap": [
++     230,
++     236
++    ]
++   },
++   {
++    "edge": "top",
++    "c": 208.75,
++    "travel": "left",
++    "axis": "y",
++    "right_of_travel_gen": [
++     206,
++     212
++    ],
++    "high_snap": [
++     206,
++     212
++    ]
++   }
++  ]
++ },
++ {
++  "row": 6,
++  "col": 0,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 0.5,
++  "ty": 240.5,
++  "left_px_half_even": 5,
++  "top_px_half_even": 245,
++  "left_px_half_down": 5,
++  "top_px_half_down": 245
++ },
++ {
++  "row": 6,
++  "col": 1,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 41.5,
++  "ty": 241.5,
++  "left_px_half_even": 47,
++  "top_px_half_even": 247,
++  "left_px_half_down": 46,
++  "top_px_half_down": 246
++ },
++ {
++  "row": 6,
++  "col": 2,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 82.5,
++  "ty": 242.5,
++  "left_px_half_even": 87,
++  "top_px_half_even": 247,
++  "left_px_half_down": 87,
++  "top_px_half_down": 247
++ },
++ {
++  "row": 6,
++  "col": 3,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 123.5,
++  "ty": 243.5,
++  "left_px_half_even": 129,
++  "top_px_half_even": 249,
++  "left_px_half_down": 128,
++  "top_px_half_down": 248
++ },
++ {
++  "row": 6,
++  "col": 4,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 160.5,
++  "ty": 241.5,
++  "left_px_half_even": 165,
++  "top_px_half_even": 247,
++  "left_px_half_down": 165,
++  "top_px_half_down": 246
++ },
++ {
++  "row": 6,
++  "col": 5,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 201.5,
++  "ty": 240.5,
++  "left_px_half_even": 207,
++  "top_px_half_even": 245,
++  "left_px_half_down": 206,
++  "top_px_half_down": 245
++ },
++ {
++  "row": 6,
++  "col": 6,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 242.5,
++  "ty": 243.5,
++  "left_px_half_even": 247,
++  "top_px_half_even": 249,
++  "left_px_half_down": 247,
++  "top_px_half_down": 248
++ },
++ {
++  "row": 6,
++  "col": 7,
++  "what": "TSNAP .5 tie (fill rect 5..25 local)",
++  "tx": 283.5,
++  "ty": 242.5,
++  "left_px_half_even": 289,
++  "top_px_half_even": 247,
++  "left_px_half_down": 288,
++  "top_px_half_down": 247
++ },
++ {
++  "row": 6,
++  "col": 8,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   320.5,
++   240.5
++  ],
++  "child": 0.5,
++  "left_px_per_level_half_even": 325,
++  "top_px_per_level_half_even": 245,
++  "left_px_per_level_half_down": 325,
++  "left_px_world_half_even": 326
++ },
++ {
++  "row": 6,
++  "col": 9,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   361.5,
++   241.5
++  ],
++  "child": 0.5,
++  "left_px_per_level_half_even": 367,
++  "top_px_per_level_half_even": 247,
++  "left_px_per_level_half_down": 366,
++  "left_px_world_half_even": 367
++ },
++ {
++  "row": 6,
++  "col": 10,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   400.5,
++   240.5
++  ],
++  "child": 1.5,
++  "left_px_per_level_half_even": 407,
++  "top_px_per_level_half_even": 247,
++  "left_px_per_level_half_down": 406,
++  "left_px_world_half_even": 407
++ },
++ {
++  "row": 6,
++  "col": 11,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   441.5,
++   241.5
++  ],
++  "child": 1.5,
++  "left_px_per_level_half_even": 449,
++  "top_px_per_level_half_even": 249,
++  "left_px_per_level_half_down": 447,
++  "left_px_world_half_even": 448
++ },
++ {
++  "row": 6,
++  "col": 12,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   482.5,
++   242.5
++  ],
++  "child": 1.5,
++  "left_px_per_level_half_even": 489,
++  "top_px_per_level_half_even": 249,
++  "left_px_per_level_half_down": 488,
++  "left_px_world_half_even": 489
++ },
++ {
++  "row": 6,
++  "col": 13,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   521.5,
++   241.5
++  ],
++  "child": 2.5,
++  "left_px_per_level_half_even": 529,
++  "top_px_per_level_half_even": 249,
++  "left_px_per_level_half_down": 528,
++  "left_px_world_half_even": 529
++ },
++ {
++  "row": 6,
++  "col": 14,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   563.5,
++   243.5
++  ],
++  "child": 3.5,
++  "left_px_per_level_half_even": 573,
++  "top_px_per_level_half_even": 253,
++  "left_px_per_level_half_down": 571,
++  "left_px_world_half_even": 572
++ },
++ {
++  "row": 6,
++  "col": 15,
++  "what": "nested TSNAP .5 ties",
++  "parent": [
++   602.5,
++   242.5
++  ],
++  "child": 2.5,
++  "left_px_per_level_half_even": 609,
++  "top_px_per_level_half_even": 249,
++  "left_px_per_level_half_down": 609,
++  "left_px_world_half_even": 610
++ },
++ {
++  "row": 7,
++  "col": 0,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 16.05,
++  "ty": 294.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   16,
++   294
++  ]
++ },
++ {
++  "row": 7,
++  "col": 8,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 336.05,
++  "ty": 294.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   336,
++   294
++  ]
++ },
++ {
++  "row": 8,
++  "col": 0,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 6.05,
++  "ty": 334.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   6,
++   334
++  ]
++ },
++ {
++  "row": 8,
++  "col": 8,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 326.05,
++  "ty": 334.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   326,
++   334
++  ]
++ },
++ {
++  "row": 9,
++  "col": 0,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 16.05,
++  "ty": 374.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   16,
++   374
++  ]
++ },
++ {
++  "row": 9,
++  "col": 8,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 326.05,
++  "ty": 374.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   326,
++   374
++  ]
++ },
++ {
++  "row": 10,
++  "col": 8,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 336.05,
++  "ty": 414.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   336,
++   414
++  ]
++ },
++ {
++  "row": 7,
++  "col": 1,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 56.55,
++  "ty": 294.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   57,
++   295
++  ]
++ },
++ {
++  "row": 7,
++  "col": 9,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 376.55,
++  "ty": 294.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   377,
++   295
++  ]
++ },
++ {
++  "row": 8,
++  "col": 1,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 46.55,
++  "ty": 334.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   47,
++   335
++  ]
++ },
++ {
++  "row": 8,
++  "col": 9,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 366.55,
++  "ty": 334.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   367,
++   335
++  ]
++ },
++ {
++  "row": 9,
++  "col": 1,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 56.55,
++  "ty": 374.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   57,
++   375
++  ]
++ },
++ {
++  "row": 9,
++  "col": 9,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 366.55,
++  "ty": 374.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   367,
++   375
++  ]
++ },
++ {
++  "row": 10,
++  "col": 9,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 376.55,
++  "ty": 414.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   377,
++   415
++  ]
++ },
++ {
++  "row": 7,
++  "col": 2,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 96.75,
++  "ty": 294.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   97,
++   294
++  ]
++ },
++ {
++  "row": 7,
++  "col": 10,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 416.75,
++  "ty": 294.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   417,
++   294
++  ]
++ },
++ {
++  "row": 8,
++  "col": 2,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 86.75,
++  "ty": 334.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   87,
++   334
++  ]
++ },
++ {
++  "row": 8,
++  "col": 10,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 406.75,
++  "ty": 334.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   407,
++   334
++  ]
++ },
++ {
++  "row": 9,
++  "col": 2,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 96.75,
++  "ty": 374.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   97,
++   374
++  ]
++ },
++ {
++  "row": 9,
++  "col": 10,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 406.75,
++  "ty": 374.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   407,
++   374
++  ]
++ },
++ {
++  "row": 10,
++  "col": 10,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 416.75,
++  "ty": 414.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   417,
++   414
++  ]
++ },
++ {
++  "row": 7,
++  "col": 3,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 136.0,
++  "ty": 294.0,
++  "frac": [
++   0.0,
++   0.0
++  ],
++  "tsnap_half_even": [
++   136,
++   294
++  ]
++ },
++ {
++  "row": 7,
++  "col": 11,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 456.0,
++  "ty": 294.0,
++  "frac": [
++   0.0,
++   0.0
++  ],
++  "tsnap_half_even": [
++   456,
++   294
++  ]
++ },
++ {
++  "row": 8,
++  "col": 3,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 126.0,
++  "ty": 334.0,
++  "frac": [
++   0.0,
++   0.0
++  ],
++  "tsnap_half_even": [
++   126,
++   334
++  ]
++ },
++ {
++  "row": 8,
++  "col": 11,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 446.0,
++  "ty": 334.0,
++  "frac": [
++   0.0,
++   0.0
++  ],
++  "tsnap_half_even": [
++   446,
++   334
++  ]
++ },
++ {
++  "row": 9,
++  "col": 3,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 136.0,
++  "ty": 374.0,
++  "frac": [
++   0.0,
++   0.0
++  ],
++  "tsnap_half_even": [
++   136,
++   374
++  ]
++ },
++ {
++  "row": 9,
++  "col": 11,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 446.0,
++  "ty": 374.0,
++  "frac": [
++   0.0,
++   0.0
++  ],
++  "tsnap_half_even": [
++   446,
++   374
++  ]
++ },
++ {
++  "row": 10,
++  "col": 11,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 456.0,
++  "ty": 414.0,
++  "frac": [
++   0.0,
++   0.0
++  ],
++  "tsnap_half_even": [
++   456,
++   414
++  ]
++ },
++ {
++  "row": 7,
++  "col": 4,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 176.25,
++  "ty": 294.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   176,
++   294
++  ]
++ },
++ {
++  "row": 7,
++  "col": 12,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 496.25,
++  "ty": 294.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   496,
++   294
++  ]
++ },
++ {
++  "row": 8,
++  "col": 4,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 166.25,
++  "ty": 334.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   166,
++   334
++  ]
++ },
++ {
++  "row": 8,
++  "col": 12,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 486.25,
++  "ty": 334.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   486,
++   334
++  ]
++ },
++ {
++  "row": 9,
++  "col": 4,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 176.25,
++  "ty": 374.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   176,
++   374
++  ]
++ },
++ {
++  "row": 9,
++  "col": 12,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 486.25,
++  "ty": 374.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   486,
++   374
++  ]
++ },
++ {
++  "row": 10,
++  "col": 12,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 496.25,
++  "ty": 414.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   496,
++   414
++  ]
++ },
++ {
++  "row": 7,
++  "col": 5,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 216.5,
++  "ty": 294.5,
++  "frac": [
++   0.5,
++   0.5
++  ],
++  "tsnap_half_even": [
++   216,
++   294
++  ]
++ },
++ {
++  "row": 7,
++  "col": 13,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 536.5,
++  "ty": 294.5,
++  "frac": [
++   0.5,
++   0.5
++  ],
++  "tsnap_half_even": [
++   536,
++   294
++  ]
++ },
++ {
++  "row": 8,
++  "col": 5,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 206.5,
++  "ty": 334.5,
++  "frac": [
++   0.5,
++   0.5
++  ],
++  "tsnap_half_even": [
++   206,
++   334
++  ]
++ },
++ {
++  "row": 8,
++  "col": 13,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 526.5,
++  "ty": 334.5,
++  "frac": [
++   0.5,
++   0.5
++  ],
++  "tsnap_half_even": [
++   526,
++   334
++  ]
++ },
++ {
++  "row": 9,
++  "col": 5,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 216.5,
++  "ty": 374.5,
++  "frac": [
++   0.5,
++   0.5
++  ],
++  "tsnap_half_even": [
++   216,
++   374
++  ]
++ },
++ {
++  "row": 9,
++  "col": 13,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 526.5,
++  "ty": 374.5,
++  "frac": [
++   0.5,
++   0.5
++  ],
++  "tsnap_half_even": [
++   526,
++   374
++  ]
++ },
++ {
++  "row": 10,
++  "col": 13,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 536.5,
++  "ty": 414.5,
++  "frac": [
++   0.5,
++   0.5
++  ],
++  "tsnap_half_even": [
++   536,
++   414
++  ]
++ },
++ {
++  "row": 7,
++  "col": 6,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 256.5,
++  "ty": 294.0,
++  "frac": [
++   0.5,
++   0.0
++  ],
++  "tsnap_half_even": [
++   256,
++   294
++  ]
++ },
++ {
++  "row": 7,
++  "col": 14,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 576.5,
++  "ty": 294.0,
++  "frac": [
++   0.5,
++   0.0
++  ],
++  "tsnap_half_even": [
++   576,
++   294
++  ]
++ },
++ {
++  "row": 8,
++  "col": 6,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 246.5,
++  "ty": 334.0,
++  "frac": [
++   0.5,
++   0.0
++  ],
++  "tsnap_half_even": [
++   246,
++   334
++  ]
++ },
++ {
++  "row": 8,
++  "col": 14,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 566.5,
++  "ty": 334.0,
++  "frac": [
++   0.5,
++   0.0
++  ],
++  "tsnap_half_even": [
++   566,
++   334
++  ]
++ },
++ {
++  "row": 9,
++  "col": 6,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 256.5,
++  "ty": 374.0,
++  "frac": [
++   0.5,
++   0.0
++  ],
++  "tsnap_half_even": [
++   256,
++   374
++  ]
++ },
++ {
++  "row": 9,
++  "col": 14,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 566.5,
++  "ty": 374.0,
++  "frac": [
++   0.5,
++   0.0
++  ],
++  "tsnap_half_even": [
++   566,
++   374
++  ]
++ },
++ {
++  "row": 10,
++  "col": 14,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 576.5,
++  "ty": 414.0,
++  "frac": [
++   0.5,
++   0.0
++  ],
++  "tsnap_half_even": [
++   576,
++   414
++  ]
++ },
++ {
++  "row": 7,
++  "col": 7,
++  "what": "1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 296.0,
++  "ty": 294.5,
++  "frac": [
++   0.0,
++   0.5
++  ],
++  "tsnap_half_even": [
++   296,
++   294
++  ]
++ },
++ {
++  "row": 7,
++  "col": 15,
++  "what": "1px noScale 8x8 square placed directly, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 616.0,
++  "ty": 294.5,
++  "frac": [
++   0.0,
++   0.5
++  ],
++  "tsnap_half_even": [
++   616,
++   294
++  ]
++ },
++ {
++  "row": 8,
++  "col": 7,
++  "what": "1px noScale 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 286.0,
++  "ty": 334.5,
++  "frac": [
++   0.0,
++   0.5
++  ],
++  "tsnap_half_even": [
++   286,
++   334
++  ]
++ },
++ {
++  "row": 8,
++  "col": 15,
++  "what": "1px noScale 8x8 square placed directly, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 606.0,
++  "ty": 334.5,
++  "frac": [
++   0.0,
++   0.5
++  ],
++  "tsnap_half_even": [
++   606,
++   334
++  ]
++ },
++ {
++  "row": 9,
++  "col": 7,
++  "what": "filled 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 296.0,
++  "ty": 374.5,
++  "frac": [
++   0.0,
++   0.5
++  ],
++  "tsnap_half_even": [
++   296,
++   374
++  ]
++ },
++ {
++  "row": 9,
++  "col": 15,
++  "what": "filled 8x8 square in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 606.0,
++  "ty": 374.5,
++  "frac": [
++   0.0,
++   0.5
++  ],
++  "tsnap_half_even": [
++   606,
++   374
++  ]
++ },
++ {
++  "row": 10,
++  "col": 15,
++  "what": "fill + 1px noScale 8x8 square in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 616.0,
++  "ty": 414.5,
++  "frac": [
++   0.0,
++   0.5
++  ],
++  "tsnap_half_even": [
++   616,
++   414
++  ]
++ },
++ {
++  "row": 10,
++  "col": 0,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 18.0,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   18,
++   406
++  ]
++ },
++ {
++  "row": 10,
++  "col": 1,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 58.25,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   58,
++   406
++  ]
++ },
++ {
++  "row": 10,
++  "col": 2,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 98.35,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   98,
++   406
++  ]
++ },
++ {
++  "row": 10,
++  "col": 3,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 138.45,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   138,
++   406
++  ]
++ },
++ {
++  "row": 10,
++  "col": 4,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 178.5,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   178,
++   406
++  ]
++ },
++ {
++  "row": 10,
++  "col": 5,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 218.55,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   219,
++   406
++  ]
++ },
++ {
++  "row": 10,
++  "col": 6,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 258.65,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   259,
++   406
++  ]
++ },
++ {
++  "row": 10,
++  "col": 7,
++  "what": "filled 16x16 square rotated 30deg, direct",
++  "tx": 298.75,
++  "ty": 406,
++  "matrix": [
++   0.866,
++   0.5,
++   -0.5,
++   0.866
++  ],
++  "tsnap_half_even": [
++   299,
++   406
++  ]
++ },
++ {
++  "row": 11,
++  "col": 0,
++  "what": "acid-stroke-0 shape 9 (32x32 1px noScale) in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 54.05,
++  "ty": 476.3,
++  "frac": [
++   0.05,
++   0.3
++  ],
++  "tsnap_half_even": [
++   54,
++   476
++  ]
++ },
++ {
++  "row": 11,
++  "col": 1,
++  "what": "acid-stroke-0 shape 9 (32x32 1px noScale) in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 136.75,
++  "ty": 476.3,
++  "frac": [
++   0.75,
++   0.3
++  ],
++  "tsnap_half_even": [
++   137,
++   476
++  ]
++ },
++ {
++  "row": 11,
++  "col": 2,
++  "what": "acid-stroke-0 shape 9 (32x32 1px noScale) in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 310.55,
++  "ty": 476.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   311,
++   477
++  ]
++ },
++ {
++  "row": 11,
++  "col": 3,
++  "what": "acid-stroke-0 shape 9 (32x32 1px noScale) in sprite, para51",
++  "matrix": [
++   2.0,
++   0.0,
++   1.4142,
++   1.4142
++  ],
++  "tx": 392.55,
++  "ty": 476.95,
++  "frac": [
++   0.55,
++   0.95
++  ],
++  "tsnap_half_even": [
++   393,
++   477
++  ]
++ },
++ {
++  "row": 11,
++  "col": 4,
++  "what": "acid-stroke-0 shape 9 (32x32 1px noScale) in sprite, para41",
++  "matrix": [
++   2.0,
++   0.0,
++   -1.4142,
++   1.4142
++  ],
++  "tx": 566.25,
++  "ty": 476.25,
++  "frac": [
++   0.25,
++   0.25
++  ],
++  "tsnap_half_even": [
++   566,
++   476
++  ]
++ }
++]
+diff --git a/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/create_test_swf.py b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/create_test_swf.py
+new file mode 100644
+index 00000000..da77103a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/create_test_swf.py
+@@ -0,0 +1,337 @@
++#!/usr/bin/env python3
++"""s29 w2b-lowq-stroke: Flash LOW stroke-raster probe (LOCAL ORACLE REQUEST 1 of
++w2-lowq-tsnap). AVM1, SWF 8, 640x560, white. The SWF sets `_quality = "LOW"`
++itself (frame-1 DoAction), so a direct pinned capture is LOW whatever the stub.
++
++Cells are 40x40 px (row r at y = 40 r, col c at x = 40 c) except row 11
++(y = 440..560, 128-px cells). Every placement is on an EVEN integer unless the
++cell says otherwise, so TSNAP (round half-even) is a no-op there. cells.json
++lists every cell, its geometry and the pixel each candidate rule predicts.
++
++ row 0   45-degree single line (6,6)->(34,34), w = 3 4 4.5 5 5.25 5.5 5.75 6;
++         cols 8-15 the same line drawn in the reverse direction (34,34)->(6,6)
++ row 1   30-degree line (cols 0-7) and 60-degree line (cols 8-15), same widths
++ row 2   cols 0-7: w=5 at 0 / 26.565 / 45 deg, w=4 at 0 / 26.565, w=6 at
++         0 / 26.565, w=4.5 at 0 deg; cols 8-15: AVM1 Drawing-API lineStyle at
++         45 deg w = 3 4 4.5 5 5.5 6, and at 30 deg w = 5 6
++ rows 3-5 stroke-only rect bands, rect (8+f, 8+f)-(32+f, 32+f), f = 0 .25 .5 .75:
++         row 3 W=1 cw | W=1 ccw | W=2 cw | W=2 ccw   (4 fractions each)
++         row 4 W=3 cw | W=3 ccw | W=4 cw | W=4 ccw
++         row 5 W=5 cw | W=5 ccw | W=6 cw | W=6 ccw
++ row 6   TSNAP ties: cols 0-7 a filled 20x20 rect placed at (40c + kx + .5,
++         240 + ky + .5); cols 8-15 a sprite at (40c + kp + .5, 240 + kp + .5)
++         holding the rect at (kc + .5, kc + .5)
++ row 7   1-px noScale (noHScale + noVScale) 8x8 square under acid-stroke-0's
++         para41 matrix (2, 0, -1.4142, 1.4142): cols 0-7 inside a sprite (the
++         acid id-10 structure) at 8 translation fractions; cols 8-15 the shape
++         placed directly
++ row 8   the same under para51 (2, 0, +1.4142, 1.4142)
++ row 9   filled 8x8 square inside a sprite, para41 (cols 0-7), para51 (8-15)
++ row 10  cols 0-7: filled square rotated 30 deg, placed directly at x + f
++         (f = 0 .25 .35 .45 .5 .55 .65 .75); cols 8-15: para41 sprite holding
++         fill + 1-px noScale stroke square (one shape)
++ row 11  acid-size: acid-stroke-0's shape 9 (32x32, 1-px noScale) in a sprite,
++         5 cells: para41 (.05,.3), para51 (.75,.3), para41 (.55,.95),
++         para51 (.55,.95), para41 (.25,.25)
++"""
++import json, math, pathlib, struct, sys
++
++HERE = pathlib.Path(__file__).resolve().parent
++REPO = HERE.parents[4]
++REG = REPO / 'ruffle-tests' / 'tests' / 'swfs' / 'regression'
++sys.path.insert(0, str(REG / '_lib'))
++sys.path.insert(0, str(REG / 'lowq_sample_point_probe'))
++from avm1asm import tag, show_frame, end_tag, do_action, push, SET_VARIABLE, GET_VARIABLE, SET_MEMBER, CALL_METHOD, POP, Bits  # noqa
++from create_test_swf import (matrix, rect, tw, Path, solid, define_shape3, line3, rect_path, rgba)  # noqa
++
++W_STAGE, H_STAGE = 640, 560
++WIDTHS = [3, 4, 4.5, 5, 5.25, 5.5, 5.75, 6]
++RECT_FRACS = [0.0, 0.25, 0.5, 0.75]
++FRACS8 = [(0.05, 0.3), (0.55, 0.95), (0.75, 0.3), (0.0, 0.0), (0.25, 0.25), (0.5, 0.5), (0.5, 0.0), (0.0, 0.5)]
++ROT_FRACS = [0.0, 0.25, 0.35, 0.45, 0.5, 0.55, 0.65, 0.75]
++TIE_K = [(0, 0), (1, 1), (2, 2), (3, 3), (0, 1), (1, 0), (2, 3), (3, 2)]
++NEST_K = [(0, 0), (1, 0), (0, 1), (1, 1), (2, 1), (1, 2), (3, 3), (2, 2)]
++MATS = {'para41': (2.0, 0.0, -1.4142, 1.4142), 'para51': (2.0, 0.0, 1.4142, 1.4142)}
++
++
++def place(depth, cid, a=1.0, b=0.0, c=0.0, d=1.0, tx=0.0, ty=0.0):
++    body = struct.pack('<BHH', 0x02 | 0x04, depth, cid) + matrix(a, b, c, d, tw(tx), tw(ty))
++    return tag(26, body)
++
++
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + tags + show_frame() + end_tag())
++
++
++def line2(width_px, c, no_scale=False):
++    """LINESTYLE2: round caps / round join, optional noHScale + noVScale."""
++    f1 = 0x06 if no_scale else 0x00   # StartCap(2) Join(2) HasFill NoHScale NoVScale PixelHinting
++    return struct.pack('<HBB', tw(width_px), f1, 0x00) + rgba(c)
++
++
++def define_shape4(sid, path, fills, lines, margin=0):
++    eb = rect(*path.bounds())
++    body = struct.pack('<H', sid) + rect(*path.bounds(margin)) + eb
++    flags = 0x01 if any(l[2] & 0x06 == 0 for l in lines) else 0
++    flags |= 0x02 if any(l[2] & 0x06 for l in lines) else 0
++    body += bytes([flags])
++    body += bytes([len(fills)]) + b''.join(fills)
++    body += bytes([len(lines)]) + b''.join(lines)
++    body += path.records(len(fills), len(lines))
++    return tag(83, body)
++
++
++def rhe(x):  # round half to even on the twip grid
++    q = round(x * 20) / 20
++    return round(q)
++
++
++def half_down(x):
++    return math.ceil(round(x * 20) / 20 - 0.5)
++
++
++def line_ends(theta_deg, cx=20.0, cy=20.0, half=14.0):
++    t = math.radians(theta_deg)
++    return (cx - half * math.cos(t), cy - half * math.sin(t), cx + half * math.cos(t), cy + half * math.sin(t))
++
++
++def spans(w, theta_deg):
++    t = math.radians(theta_deg)
++    s, c = abs(math.sin(t)), abs(math.cos(t))
++    out = {}
++    # horizontal run per scanline (theta > 0) and vertical run per column (theta < 90)
++    out['row_span_polygon'] = round(w / s, 3) if s > 1e-9 else None
++    out['col_span_polygon'] = round(w / c, 3) if c > 1e-9 else None
++    out['minor_axis_pen_span'] = w
++    out['thin_clamp_span'] = min(w, 4) if w <= 5 else None
++    return out
++
++
++def band_predictions(c_lo, c_hi, W, cw):
++    """Edges of a rect stroked cw (y-down: top -> right, right -> down, ...) or ccw.
++    Each edge: centreline c, travel direction, and per rule the band [lo, hi).
++    right_of_travel_w3: s29 w2-lowq-tsnap fit (W=3): p = rhe(c) for up / right
++    travel, rhe(c) - 1 for down / left; pen = [p - 1, p + 2).
++    right_of_travel_gen: band centre rhe(c) + r/2 (r = +1 when right-of-travel is
++    +axis), W px wide, lo = ceil(centre - W/2) for odd W (exact for W = 3),
++    lo = rhe(c) - W/2 + (r > 0) for even W (a guess).
++    high_snap: HIGH stroke_snap_centre rule L = floor((E - 2W + 2) / 4)."""
++    if cw:
++        edges = [('top', c_lo, 'right'), ('right', c_hi, 'down'), ('bottom', c_hi, 'left'), ('left', c_lo, 'up')]
++    else:
++        edges = [('left', c_lo, 'down'), ('bottom', c_hi, 'right'), ('right', c_hi, 'up'), ('top', c_lo, 'left')]
++    out = []
++    for name, c, trav in edges:
++        # right of travel in y-down: right -> +y, down -> -x, left -> -y, up -> +x
++        r = {'right': +1, 'down': -1, 'left': -1, 'up': +1}[trav]
++        p = rhe(c) if trav in ('up', 'right') else rhe(c) - 1
++        e = {'edge': name, 'c': c, 'travel': trav, 'axis': 'y' if name in ('top', 'bottom') else 'x'}
++        if W == 3:
++            e['right_of_travel_w3'] = [p - 1, p + 2]
++        cen = rhe(c) + 0.5 * r
++        if W % 2:
++            lo = math.ceil(cen - W / 2)
++        else:
++            lo = rhe(c) - W // 2 + (1 if r > 0 else 0)
++        e['right_of_travel_gen'] = [lo, lo + W]
++        E = math.floor(4 * c + 0.5)
++        L = math.floor((E - 2 * W + 2) / 4)
++        e['high_snap'] = [L, L + W]
++        out.append(e)
++    return out
++
++
++def build():
++    defs, places, cells, act_cells = b'', b'', [], []
++    ids = [0]
++    dep = [0]
++
++    def new_id():
++        ids[0] += 1
++        return ids[0]
++
++    def put(cid, **m):
++        nonlocal places
++        dep[0] += 1
++        places += place(dep[0], cid, **m)
++
++    def line_shape(x0, y0, x1, y1, w):
++        sid = new_id(); p = Path()
++        p.move(x0, y0, line=1); p.line(x1, y1)
++        return sid, define_shape3(sid, p, [], [line3(w, 0x000000)], margin=w)
++
++    # row 0: 45 deg, both directions
++    for col, w in enumerate(WIDTHS):
++        for half, rev in ((0, False), (1, True)):
++            x0, y0, x1, y1 = (34, 34, 6, 6) if rev else (6, 6, 34, 34)
++            sid, t = line_shape(x0, y0, x1, y1, w); defs += t
++            c = col + 8 * half
++            put(sid, tx=40 * c, ty=0)
++            cells.append(dict(row=0, col=c, what='static 45deg line', width=w, theta=45, reverse=rev,
++                              ends=[x0 + 40 * c, y0, x1 + 40 * c, y1], **spans(w, 45)))
++    # row 1: 30 deg / 60 deg
++    for col, w in enumerate(WIDTHS):
++        for half, th in ((0, 30), (1, 60)):
++            x0, y0, x1, y1 = line_ends(th)
++            sid, t = line_shape(x0, y0, x1, y1, w); defs += t
++            c = col + 8 * half
++            put(sid, tx=40 * c, ty=40)
++            cells.append(dict(row=1, col=c, what='static %ddeg line' % th, width=w, theta=th,
++                              ends=[tw(x0) / 20 + 40 * c, tw(y0) / 20 + 40, tw(x1) / 20 + 40 * c, tw(y1) / 20 + 40],
++                              **spans(w, th)))
++    # row 2 cols 0-7: angle sweep
++    sweep = [(5, 0), (5, 26.565), (5, 45), (4, 0), (4, 26.565), (6, 0), (6, 26.565), (4.5, 0)]
++    for col, (w, th) in enumerate(sweep):
++        x0, y0, x1, y1 = line_ends(th)
++        sid, t = line_shape(x0, y0, x1, y1, w); defs += t
++        put(sid, tx=40 * col, ty=80)
++        cells.append(dict(row=2, col=col, what='static line angle sweep', width=w, theta=th,
++                          ends=[tw(x0) / 20 + 40 * col, tw(y0) / 20 + 80, tw(x1) / 20 + 40 * col, tw(y1) / 20 + 80],
++                          **spans(w, th)))
++    # row 2 cols 8-15: Drawing API (actions below)
++    dapi = [(3, 45), (4, 45), (4.5, 45), (5, 45), (5.5, 45), (6, 45), (5, 30), (6, 30)]
++    for k, (w, th) in enumerate(dapi):
++        col = 8 + k
++        x0, y0, x1, y1 = line_ends(th)
++        act_cells.append(('line', col, 80, w, (x0, y0, x1, y1)))
++        cells.append(dict(row=2, col=col, what='AVM1 Drawing-API lineStyle line', width=w, theta=th,
++                          ends=[x0 + 40 * col, y0 + 80, x1 + 40 * col, y1 + 80], **spans(w, th)))
++    # rows 3-5: rect bands
++    plan = [(3, [(1, True), (1, False), (2, True), (2, False)]),
++            (4, [(3, True), (3, False), (4, True), (4, False)]),
++            (5, [(5, True), (5, False), (6, True), (6, False)])]
++    for row, groups in plan:
++        for g, (W, cw) in enumerate(groups):
++            for k, f in enumerate(RECT_FRACS):
++                col = 4 * g + k
++                sid = new_id(); p = Path()
++                x0 = y0 = 8 + f
++                x1 = y1 = 32 + f
++                if cw:
++                    rect_path(p, x0, y0, 24, 24, line=1)
++                else:
++                    p.move(x0, y0, line=1); p.line(x0, y1); p.line(x1, y1); p.line(x1, y0); p.line(x0, y0)
++                defs += define_shape3(sid, p, [], [line3(W, 0x000000)], margin=W)
++                put(sid, tx=40 * col, ty=40 * row)
++                bx = band_predictions(40 * col + x0, 40 * col + x1, W, cw)
++                by = band_predictions(40 * row + y0, 40 * row + y1, W, cw)
++                edges = [e for e in bx if e['axis'] == 'x'] + [e for e in by if e['axis'] == 'y']
++                cells.append(dict(row=row, col=col, what='stroke-only rect band', width=W,
++                                  direction='cw' if cw else 'ccw', frac=f, edges=edges))
++    # row 6: TSNAP ties (.5 on odd / even)
++    rid = new_id(); p = Path(); rect_path(p, 5, 5, 20, 20, fill0=1)
++    defs += define_shape3(rid, p, [solid(0x008000)])
++    for col, (kx, ky) in enumerate(TIE_K):
++        tx, ty = 40 * col + kx + 0.5, 240 + ky + 0.5
++        put(rid, tx=tx, ty=ty)
++        cells.append(dict(row=6, col=col, what='TSNAP .5 tie (fill rect 5..25 local)', tx=tx, ty=ty,
++                          left_px_half_even=rhe(tx) + 5, top_px_half_even=rhe(ty) + 5,
++                          left_px_half_down=half_down(tx) + 5, top_px_half_down=half_down(ty) + 5))
++    for k, (kp, kc) in enumerate(NEST_K):
++        col = 8 + k
++        sp = new_id()
++        defs += sprite(sp, place(1, rid, tx=kc + 0.5, ty=kc + 0.5))
++        tx = 40 * col + kp + 0.5
++        ty = 240 + kp + 0.5
++        put(sp, tx=tx, ty=ty)
++        cells.append(dict(row=6, col=col, what='nested TSNAP .5 ties', parent=[tx, ty], child=kc + 0.5,
++                          left_px_per_level_half_even=rhe(tx) + rhe(kc + 0.5) + 5,
++                          top_px_per_level_half_even=rhe(ty) + rhe(kc + 0.5) + 5,
++                          left_px_per_level_half_down=half_down(tx) + half_down(kc + 0.5) + 5,
++                          left_px_world_half_even=rhe(tx + kc + 0.5) + 5))
++
++    # rows 7-10: sheared hairlines
++    def sq_shape(n, stroke=None, fill=None, no_scale=True):
++        sid = new_id(); p = Path()
++        st = {}
++        if fill is not None:
++            st['fill0'] = 1
++        if stroke is not None:
++            st['line'] = 1
++        rect_path(p, 0, 0, n, n, **st)
++        fills = [solid(fill)] if fill is not None else []
++        lines = [line2(stroke, 0x000000, no_scale)] if stroke is not None else []
++        return sid, define_shape4(sid, p, fills, lines, margin=1)
++
++    hair8, t = sq_shape(8, stroke=1.0); defs += t
++    fill8, t = sq_shape(8, fill=0x0000FF); defs += t
++    both8, t = sq_shape(8, stroke=1.0, fill=0x0000FF); defs += t
++    sp_hair8 = new_id(); defs += sprite(sp_hair8, place(1, hair8))
++    sp_fill8 = new_id(); defs += sprite(sp_fill8, place(1, fill8))
++    sp_both8 = new_id(); defs += sprite(sp_both8, place(1, both8))
++
++    def sheared(row, col, cid, key, fr, what, n=8, cw=40, ch=40, y0=None, x0=None):
++        a, b, c, d = MATS[key]
++        xs = [a * u + c * v for u, v in ((0, 0), (n, 0), (0, n), (n, n))]
++        ys = [b * u + d * v for u, v in ((0, 0), (n, 0), (0, n), (n, n))]
++        bx = (x0 if x0 is not None else 40 * col) + math.floor(cw / 2 - (min(xs) + max(xs)) / 2)
++        by = (y0 if y0 is not None else 40 * row) + math.floor(ch / 2 - (min(ys) + max(ys)) / 2)
++        bx -= bx % 2; by -= by % 2
++        tx, ty = bx + fr[0], by + fr[1]
++        put(cid, a=a, b=b, c=c, d=d, tx=tx, ty=ty)
++        cells.append(dict(row=row, col=col, what=what, matrix=[a, b, c, d], tx=tx, ty=ty, frac=list(fr),
++                          tsnap_half_even=[rhe(tx), rhe(ty)]))
++
++    for k, fr in enumerate(FRACS8):
++        sheared(7, k, sp_hair8, 'para41', fr, '1px noScale 8x8 square in sprite, para41')
++        sheared(7, 8 + k, hair8, 'para41', fr, '1px noScale 8x8 square placed directly, para41')
++        sheared(8, k, sp_hair8, 'para51', fr, '1px noScale 8x8 square in sprite, para51')
++        sheared(8, 8 + k, hair8, 'para51', fr, '1px noScale 8x8 square placed directly, para51')
++        sheared(9, k, sp_fill8, 'para41', fr, 'filled 8x8 square in sprite, para41')
++        sheared(9, 8 + k, sp_fill8, 'para51', fr, 'filled 8x8 square in sprite, para51')
++        sheared(10, 8 + k, sp_both8, 'para41', fr, 'fill + 1px noScale 8x8 square in sprite, para41')
++    # row 10 cols 0-7: rotated fill, direct
++    rot, t = sq_shape(16, fill=0xFF0000); defs += t
++    ca, sa = math.cos(math.radians(30)), math.sin(math.radians(30))
++    for k, f in enumerate(ROT_FRACS):
++        tx, ty = 40 * k + 18 + f, 400 + 6
++        put(rot, a=round(ca, 4), b=round(sa, 4), c=round(-sa, 4), d=round(ca, 4), tx=tx, ty=ty)
++        cells.append(dict(row=10, col=k, what='filled 16x16 square rotated 30deg, direct', tx=tx, ty=ty,
++                          matrix=[round(ca, 4), round(sa, 4), round(-sa, 4), round(ca, 4)],
++                          tsnap_half_even=[rhe(tx), rhe(ty)]))
++    # row 11: acid-size shape 9 in a sprite
++    hair32, t = sq_shape(32, stroke=1.0); defs += t
++    sp_hair32 = new_id(); defs += sprite(sp_hair32, place(1, hair32))
++    acid = [('para41', (0.05, 0.3)), ('para51', (0.75, 0.3)), ('para41', (0.55, 0.95)),
++            ('para51', (0.55, 0.95)), ('para41', (0.25, 0.25))]
++    for k, (key, fr) in enumerate(acid):
++        sheared(11, k, sp_hair32, key, fr, 'acid-stroke-0 shape 9 (32x32 1px noScale) in sprite, ' + key,
++                n=32, cw=128, ch=120, x0=128 * k, y0=440)
++
++    # frame-1 actions: _quality = "LOW"; Drawing-API cells
++    def mc(name):
++        return push(name) + GET_VARIABLE
++
++    def call(name, method, *args):
++        code = b''
++        for v in reversed(args):
++            code += push(v)
++        return code + push(len(args)) + mc(name) + push(method) + CALL_METHOD + POP
++
++    def setm(name, prop, v):
++        return mc(name) + push(prop) + push(v) + SET_MEMBER
++
++    def num(v):
++        return float(v) if v != int(v) else int(v)
++
++    act = push('_quality', 'LOW') + SET_VARIABLE
++    for i, (_, col, y, w, (x0, y0, x1, y1)) in enumerate(act_cells):
++        nm = 'd%d' % i
++        act += push(1000 + i, nm, 2) + push('this') + GET_VARIABLE + push('createEmptyMovieClip') + CALL_METHOD + POP
++        act += setm(nm, '_x', 40 * col) + setm(nm, '_y', y)
++        act += call(nm, 'lineStyle', num(w), 0x0000FF, 100)
++        act += call(nm, 'moveTo', float(x0), float(y0)) + call(nm, 'lineTo', float(x1), float(y1))
++
++    W, H = W_STAGE * 20, H_STAGE * 20
++    nb = max(W.bit_length(), H.bit_length()) + 1
++    hdr = Bits().u(nb, 5).s(0, nb).s(W, nb).s(0, nb).s(H, nb).bytes()
++    tags = tag(9, bytes([255, 255, 255])) + defs + places + do_action(act) + show_frame() + end_tag()
++    body = hdr + struct.pack('<H', 30 << 8) + struct.pack('<H', 1) + tags
++    out = HERE / 'test.swf'
++    out.write_bytes(b'FWS' + struct.pack('<BI', 8, 8 + len(body)) + body)
++    (HERE / 'cells.json').write_text(json.dumps(cells, indent=1) + '\n')
++    print('wrote', out, 8 + len(body), 'bytes,', len(cells), 'cells')
++
++
++if __name__ == '__main__':
++    build()
+diff --git a/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/output.expected.png b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..592996dcdccf71528a4f717d16f20c552bda1166
+GIT binary patch
+literal 9148
+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
+OuDkc|D%t6G@qYltrTKjT
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/output.txt b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/test.swf b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..31deddcaecfcae746e6e9feef61e80871893a2d9
+GIT binary patch
+literal 8422
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/test.toml b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/test.toml
+new file mode 100644
+index 00000000..715c4609
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/lowq_stroke_probe/test.toml
+@@ -0,0 +1,15 @@
++num_ticks = 1
++
++# s29 w2b-lowq-stroke. Golden = Flash Player 32 quality LOW (LNX capture;
++# WIN == LNX and --screen == draw(), 0 px; w1-local-oracles/w2b-lowq-stroke).
++# The SWF sets _quality = "LOW" itself. Cells: LOW stroke width quantisation
++# and thin-pen regime (rows 0-2), axis-aligned band rule W = 1..6 (rows 3-5),
++# TSNAP .5 ties (row 6, exact), sheared 1-px noScale hairlines (rows 7-11).
++# Budget = the measured residual at s29 w2b-lowq-stroke (master 22873
++# channels): 1-px diagonal hairline raster, 30/60-degree polygon caps, corners.
++[image_comparisons.output]
++tolerance = 0
++max_outliers = 5745
++
++[player_options]
++with_renderer = { optional = false, quality = "low" }

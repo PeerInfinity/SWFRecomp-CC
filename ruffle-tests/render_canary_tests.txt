@@ -863,3 +863,7 @@ from_shumway/acid/acid-shapes                       # thick curved drawing-API s
 regression/lowq_tsnap_tie_probe                     # placement / tie / nesting rows, LOW  1 cmp
 # tier=2
 visual/blend_modes/add                              # per-level vs world snap, LOW       1 cmp
+# s29 w2b-lowq-stroke: Flash LOW stroke raster (render_webgpu.c lowq_stroke_*,
+# hairline_restage / render_webgpu_stroke_snap LOW arm). FP32 golden.
+# tier=1
+regression/lowq_stroke_probe                        # LOW width / thin pen / band / hairline  1 cmp

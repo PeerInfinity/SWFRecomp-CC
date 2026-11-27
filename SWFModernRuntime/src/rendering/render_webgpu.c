@@ -2101,6 +2101,225 @@ static int stroke_hint_ends = 1;
 // s29 n-seam-caps: W = 3 snapped caps as Flash's octagon (stroke_snap_place);
 // SWF_STROKE_CAP_OCTAGON=0 keeps the disc.
 static int stroke_cap_octagon = 1;
+#if MSAA_SAMPLES == 1
+// s29 w2b-lowq-stroke: quality LOW strokes a 1-px noScale hairline with the
+// UNSNAPPED translation: the TSNAP shift tag.c (lowq_tsnap_slot_xform) left
+// in the slot's z-column x / y is taken back off its device centres in
+// hairline_restage (from_shumway/acid/acid-stroke-0). SWF_LOWQ_HAIR_UNSNAP=0 off.
+static int lowq_hair_unsnap = 1;
+// s29 w2b-lowq-stroke: Flash Player 32's quality-LOW stroke raster
+// (regression/lowq_stroke_probe, FP32 LNX == WIN == --screen; report §2):
+//  - the device width is quantised to W = round(w) (w = 4 / 4.5 / 5 / 5.25
+//    render identically, so do 5.5 / 5.75 / 6);
+//  - W <= 5 is the THIN regime: a pen of n = min(W, 4) px along the
+//    segment's minor device axis, butt ends (W = 5 draws as 4: 0-degree band
+//    4 px, 45-degree run 4 px);
+//  - W >= 6 is the polygon of width W (round caps / joins, as at HIGH);
+//  - an axis-aligned band covers [lo, lo + n), lo = p - floor(n / 2) with
+//    p = ceil(c - 1/2) (c = device centreline), EXCEPT n = 3, whose extra
+//    pixel sits RIGHT of travel (y down): travel up / right lo = p - 1,
+//    down / left lo = p - 2 (48 band cells, W = 1..6, c + 0 / .25 / .5 / .75,
+//    cw and ccw; drawing_order's 12 band edges);
+//  - a thin diagonal is the same pen along the minor axis (n = 3: 30 / 45 /
+//    60 degrees, 3 px per column / row, its centre 1/2 px right of travel).
+// lowq_stroke_place applies it per vertex. SWF_LOWQ_STROKE=0 restores the
+// HIGH-calibrated rule at LOW (byte-identical to the s29 baseline).
+static int lowq_stroke_rule = 1;
+static double lowq_n4_poly = 4.5;   // SWF_LOWQ_N4=<width> (A/B only)
+// Thin pen n (0 = polygon regime); *W = snapped band width (0 = AA),
+// *target = the device width to re-expand the stroke to.
+static inline int lowq_stroke_width(double w_px, int* W, double* target)
+{
+	// Round half up on the quarter-pixel grid (u = round(4 w)): 5.5 -> 6.
+	int Wq = ((int) floor(4.0 * w_px + 0.5) + 2) / 4;
+	if (Wq < 1) Wq = 1;
+	if (Wq <= 5)
+	{
+		const int n = (Wq > 4) ? 4 : Wq;
+		*W = n;
+		*target = (double) n;
+		return n;
+	}
+	*W = (Wq % 2 == 0) ? Wq : 0;
+	*target = (double) Wq;
+	return 0;
+}
+// Band centre of an axis-aligned LOW band of width W around device c; r = +1
+// when right-of-travel is the +axis direction (y down), -1 otherwise.
+// A run thinner than one device pixel (a hairline under a down-scaling stage,
+// from_shumway/gradientTransform at w = 0.993: FP32 LOW keeps the band at
+// col 0 for c = 0.75) keeps the HIGH placement L = floor(E / 4); the probe's
+// exactly-1-px bands round half down (c = 8.75 -> 9). Set per run.
+static int lowq_subpx_hair = 0;
+static inline double stroke_snap_centre(double e, int W);
+static inline double lowq_band_centre(double c, int W, int r)
+{
+	if (W == 1 && lowq_subpx_hair) return stroke_snap_centre(c, 1);
+	const double p = ceil(c - 0.5);
+	if (W % 2 == 0) return p;
+	if (W == 3 && r < 0) return p - 0.5;
+	return p + 0.5;
+}
+// Per-run direction scratch (lowq_run_dirs).
+typedef struct { u32 kx, ky; float dx, dy; signed char rh, rv; } LowqDirSlot;
+static LowqDirSlot* lowq_dir_tab = NULL;
+static size_t lowq_dir_cap = 0;
+static float* lowq_vdir = NULL;
+static size_t lowq_vdir_cap = 0;
+static LowqDirSlot* lowq_dir_find(u32 kx, u32 ky, size_t mask, int insert)
+{
+	size_t h = ((size_t) kx * 2654435761u ^ (size_t) ky * 40503u) & mask;
+	for (;;)
+	{
+		LowqDirSlot* e = &lowq_dir_tab[h];
+		if (e->kx == kx && e->ky == ky && (e->rh != 2)) return e;
+		if (e->rh == 2) { if (!insert) return NULL; e->kx = kx; e->ky = ky; e->rh = 0; e->rv = 0; e->dx = 0; e->dy = 0; return e; }
+		h = (h + 1) & mask;
+	}
+}
+// Centre i of a run: the recompiler's table (u32 float bits) or a drawing-API
+// soup (floats).
+typedef struct { size_t ci0; const float* fcen; } LowqCen;
+static inline void lowq_cen_get(const LowqCen* c, size_t i, u32 out[2])
+{
+	if (c->fcen != NULL) memcpy(out, &c->fcen[2 * i], 2 * sizeof(u32));
+	else { out[0] = hairline_centres[c->ci0 + i][0]; out[1] = hairline_centres[c->ci0 + i][1]; }
+}
+// Device direction of every vertex's own segment, plus per centre the
+// right-of-travel sign of the horizontal (rh) / vertical (rv) segment through
+// it (for join / cap vertices). Segment quads: the recompiler's drawLines
+// emits (A+n, A-n, B+n), (B-n, A-n, B+n) and the drawing-API builders
+// (A+n, A-n, B+n), (A-n, B-n, B+n): with vertices 1 / 2 on distinct centres
+// they are start / end, otherwise vertices 0 / 1 are. Returns 0 when the
+// scratch cannot be allocated.
+static int lowq_run_dirs(const LowqCen* cs, size_t rn, double Ax, double Bx, double Ay, double By)
+{
+	if (rn > lowq_vdir_cap)
+	{
+		float* nv = (float*) realloc(lowq_vdir, rn * 2 * sizeof(float));
+		if (nv == NULL) return 0;
+		lowq_vdir = nv; lowq_vdir_cap = rn;
+	}
+	size_t cap = 16;
+	while (cap < 2 * rn) cap <<= 1;
+	if (cap > lowq_dir_cap)
+	{
+		LowqDirSlot* nt = (LowqDirSlot*) realloc(lowq_dir_tab, cap * sizeof(LowqDirSlot));
+		if (nt == NULL) return 0;
+		lowq_dir_tab = nt; lowq_dir_cap = cap;
+	}
+	for (size_t i = 0; i < cap; i++) lowq_dir_tab[i].rh = 2;   // empty
+	const size_t mask = cap - 1;
+	for (size_t t = 0; t + 2 < rn; t += 3)
+	{
+		u32 k0[2], k1[2], k2[2];
+		lowq_cen_get(cs, t, k0);
+		lowq_cen_get(cs, t + 1, k1);
+		lowq_cen_get(cs, t + 2, k2);
+		const u32* c1 = k1;
+		const u32* c2 = k2;
+		if (cs->fcen != NULL && k1[0] == k2[0] && k1[1] == k2[1]) { c1 = k0; c2 = k1; }
+		float dx = 0.0f, dy = 0.0f;
+		if (c1[0] != c2[0] || c1[1] != c2[1])
+		{
+			union { float f; u32 u; } ax, ay, bx, by;
+			ax.u = c1[0]; ay.u = c1[1]; bx.u = c2[0]; by.u = c2[1];
+			const double ex = (double) bx.f - ax.f, ey = (double) by.f - ay.f;
+			dx = (float) (Ax * ex + Bx * ey);
+			dy = (float) (Ay * ex + By * ey);
+			const u32* ends[2] = { c1, c2 };
+			for (int k = 0; k < 2; k++)
+			{
+				LowqDirSlot* e = lowq_dir_find(ends[k][0], ends[k][1], mask, 1);
+				if (e->dx == 0.0f && e->dy == 0.0f) { e->dx = dx; e->dy = dy; }
+				const double adx = fabs(dx), ady = fabs(dy);
+				if (ady <= 1e-6 * adx && e->rh == 0) e->rh = (dx > 0) ? 1 : -1;
+				if (adx <= 1e-6 * ady && e->rv == 0) e->rv = (dy > 0) ? -1 : 1;
+			}
+		}
+		for (int k = 0; k < 3; k++) { lowq_vdir[2 * (t + k)] = dx; lowq_vdir[2 * (t + k) + 1] = dy; }
+	}
+	for (size_t v = rn - rn % 3; v < rn; v++) { lowq_vdir[2 * v] = 0.0f; lowq_vdir[2 * v + 1] = 0.0f; }
+	return 1;
+}
+// One stroke vertex under the LOW rule (device px; see lowq_stroke_rule).
+// n = thin pen (0 = polygon regime), W = snapped band width (0 = none),
+// axis_ok = the matrix is axis-aligned (fx / fy meaningful), (vdx, vdy) =
+// own segment direction (0 = a join / cap vertex: taken from its centre).
+static void lowq_stroke_place(double* cdx, double* cdy, double* odx, double* ody,
+                              int n, int W, int axis_ok, int fx, int fy, unsigned sf,
+                              double vdx, double vdy, const LowqDirSlot* ce)
+{
+	if (vdx == 0.0 && vdy == 0.0 && ce != NULL) { vdx = ce->dx; vdy = ce->dy; }
+	const double avx = fabs(vdx), avy = fabs(vdy);
+	const int seg_h = (avy <= 1e-6 * avx) && avx > 0.0;
+	const int seg_v = (avx <= 1e-6 * avy) && avy > 0.0;
+	if (axis_ok && W != 0 && (fx || fy))
+	{
+		// Axis-aligned band(s): the centre snaps on each flagged axis.
+		int rh = ce ? ce->rh : 0, rv = ce ? ce->rv : 0;
+		if (seg_h) rh = (vdx > 0) ? 1 : -1;
+		if (seg_v) rv = (vdy > 0) ? -1 : 1;
+		if (fx) *cdx = lowq_band_centre(*cdx, W, rv ? rv : 1);
+		if (fy) *cdy = lowq_band_centre(*cdy, W, rh ? rh : 1);
+		// Thin regime: butt ends (the band stops at the quantised end).
+		if (n != 0 && (sf & STROKE_SNAP_END) && (fx ^ fy))
+		{
+			if (fy) *odx = 0.0; else *ody = 0.0;
+		}
+		return;
+	}
+	if (n == 0 || (avx == 0.0 && avy == 0.0)) return;
+	// A device-horizontal / -vertical segment under a non-axis matrix (a
+	// shear keeps x-parallel edges horizontal): the band rule on its minor
+	// axis, the pen n px across it, butt ends.
+	if (seg_h || seg_v)
+	{
+		const double h0 = 0.5 * n;
+		if (seg_h)
+		{
+			const double s0 = (*ody > 1e-9) ? 1.0 : (*ody < -1e-9) ? -1.0 : 0.0;
+			*cdy = lowq_band_centre(*cdy, n, (vdx > 0) ? 1 : -1);
+			*odx = 0.0; *ody = s0 * h0;
+		}
+		else
+		{
+			const double s0 = (*odx > 1e-9) ? 1.0 : (*odx < -1e-9) ? -1.0 : 0.0;
+			*cdx = lowq_band_centre(*cdx, n, (vdy > 0) ? -1 : 1);
+			*ody = 0.0; *odx = s0 * h0;
+		}
+		return;
+	}
+	// n = 4 is a pen only on an exact 45-degree diagonal (4 px per row /
+	// column, probe rows 0 / 2); at 26.6 / 30 / 60 degrees Flash draws a
+	// round-capped polygon ~4.5 px wide (per-column extent fits a half-width
+	// of 2.55..2.6 px / cos at 30 degrees): re-expand the offset to that.
+	if (n == 4 && fabs(avx - avy) > 1e-3 * (avx + avy))
+	{
+		const double k = lowq_n4_poly / 4.0;
+		*odx *= k; *ody *= k;
+		return;
+	}
+	// Thin diagonal: a pen of n px along the minor device axis, the
+	// segment's ends butt. n = 3 sits 1/2 px right of travel.
+	const double h = 0.5 * n;
+	// Minor axis y for a mostly-horizontal segment; an exact 45-degree tie
+	// takes the x pen (the LOW vertex snap only moves y, so a 1-px y pen on a
+	// 45-degree edge can sample to nothing).
+	if (avx > avy * (1.0 + 1e-3))
+	{
+		const double s = (*ody > 1e-9) ? 1.0 : (*ody < -1e-9) ? -1.0 : 0.0;
+		*odx = 0.0; *ody = s * h;
+		if (n == 3) *cdy += (vdx > 0) ? 0.5 : -0.5;
+	}
+	else
+	{
+		const double s = (*odx > 1e-9) ? 1.0 : (*odx < -1e-9) ? -1.0 : 0.0;
+		*ody = 0.0; *odx = s * h;
+		if (n == 3) *cdx += (vdy > 0) ? -0.5 : 0.5;
+	}
+}
+#endif
 // s28 n-join-disc goal 2: a single no*Scale flag scales the width by the
 // SIGNED device component of v = M*(1,1) (NoVScale v.x, NoHScale v.y, y
 // down), clamped at 0 -> hairline. Flash 32, 34 cells
@@ -2139,6 +2358,14 @@ static void hairline_init(WebGPURenderContext* ctx)
 		stroke_hint_ends = !(e7 != NULL && e7[0] == '0');
 		const char* e6 = getenv("SWF_STROKE_CAP_OCTAGON");
 		stroke_cap_octagon = !(e6 != NULL && e6[0] == '0');
+#if MSAA_SAMPLES == 1
+		const char* e8 = getenv("SWF_LOWQ_HAIR_UNSNAP");
+		lowq_hair_unsnap = !(e8 != NULL && e8[0] == '0');
+		const char* e9 = getenv("SWF_LOWQ_STROKE");
+		lowq_stroke_rule = !(e9 != NULL && e9[0] == '0');
+		const char* e10 = getenv("SWF_LOWQ_N4");
+		lowq_n4_poly = (e10 != NULL && atof(e10) > 0.0) ? atof(e10) : 4.5;
+#endif
 	}
 	// The CPU xform mirror also serves the drawing-API stroke snap
 	// (render_webgpu_stroke_snap), so it exists whether or not the movie has
@@ -3771,6 +3998,12 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 	const double Ay = -Hh * b, By = -Hh * d;
 	const double Cy = Hh * (1.0 - ((double) p[1] * t[12] + (double) p[5] * t[13] + (double) p[13]));
 	const double det = Ax * By - Bx * Ay;
+#if MSAA_SAMPLES == 1
+	// s29 w2b-lowq-stroke: device shift of the slot's TSNAP (z-column x / y,
+	// twips; lowq_tsnap_slot_xform), 0 when the slot carries none.
+	const double tsnap_dx = lowq_hair_unsnap ? Wh * ((double) p[0] * t[8] + (double) p[4] * t[9]) : 0.0;
+	const double tsnap_dy = lowq_hair_unsnap ? -Hh * ((double) p[1] * t[8] + (double) p[5] * t[9]) : 0.0;
+#endif
 	const double ax_x = fabs(Ax) + fabs(Bx), ax_y = fabs(Ay) + fabs(By);
 	// 0 = no snapping (rotated / skewed / singular), 1 = axis-aligned, 2 = 90deg.
 	int axis = 0;
@@ -3859,6 +4092,16 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 		else if (u == 12) W = 3;
 		double target_px = W ? (double) W : 2.0 * floor(u / 2.0) / 4.0;
 		if (target_px < 1.0) target_px = 1.0;
+#if MSAA_SAMPLES == 1
+		// s29 w2b-lowq-stroke: the LOW width quantisation (lowq_stroke_width).
+		int lq_n = 0;
+		const LowqCen lq_cs = { hairline_runs[r][2], NULL };
+		const int lq_on = lowq_stroke_rule && fabs(det) > 1e-12
+		                  && lowq_run_dirs(&lq_cs, rn, Ax, Bx, Ay, By);
+		const size_t lq_mask = lowq_dir_cap - 1;
+		if (lq_on) lq_n = lowq_stroke_width(w_px, &W, &target_px);
+		lowq_subpx_hair = (w_px < 1.0 - 1e-6);
+#endif
 		// Uniform re-expansion factor (emitted local width -> target device).
 		const double k_uni = target_px / (emitted * (scale / 20.0));
 		const int snap_ok = (W != 0 && axis != 0);
@@ -3891,6 +4134,11 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 			// is as wide horizontally as vertically); otherwise uniformly.
 			double cdx = Ax * cx.f + Bx * cy.f + Cx;
 			double cdy = Ay * cx.f + By * cy.f + Cy;
+#if MSAA_SAMPLES == 1
+			// s29 w2b-lowq-stroke: a 1-px noScale hairline under a non-axis
+			// matrix strokes at the unsnapped translation.
+			if (no_scale && W == 1 && axis == 0) { cdx -= tsnap_dx; cdy -= tsnap_dy; }
+#endif
 			const double ox = vx.f - cx.f, oy = vy.f - cy.f;
 			double odx = Ax * ox + Bx * oy;
 			double ody = Ay * ox + By * oy;
@@ -3909,6 +4157,15 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 			// (with the half width a multiple of 1/4, so do the edges).
 			cdx = floor(4.0 * cdx + 0.5) * 0.25;
 			cdy = floor(4.0 * cdy + 0.5) * 0.25;
+#if MSAA_SAMPLES == 1
+			if (lq_on)
+			{
+				const LowqDirSlot* ce = lowq_dir_find(cen[0], cen[1], lq_mask, 0);
+				lowq_stroke_place(&cdx, &cdy, &odx, &ody, lq_n, W, axis != 0, fx, fy, sf,
+				                  lowq_vdir[2 * v], lowq_vdir[2 * v + 1], ce);
+			}
+			else
+#endif
 			if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf, hinted);
 			const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
 			// Back to local.
@@ -4026,6 +4283,16 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 	else if (u == 12) W = 3;
 	double target_px = W ? (double) W : 2.0 * floor(u / 2.0) / 4.0;
 	if (target_px < 1.0) target_px = 1.0;
+#if MSAA_SAMPLES == 1
+	// s29 w2b-lowq-stroke: the LOW stroke rule (see lowq_stroke_rule); the
+	// drawing API shares it with the timeline (probe row 2 cols 8-15).
+	int lq_n = 0;
+	const LowqCen lq_cs = { 0, src->cen };
+	const int lq_on = lowq_stroke_rule && lowq_run_dirs(&lq_cs, src->n, Ax, Bx, Ay, By);
+	const size_t lq_mask = lowq_dir_cap - 1;
+	if (lq_on) lq_n = lowq_stroke_width(w_px, &W, &target_px);
+	lowq_subpx_hair = (w_px < 1.0 - 1e-6);
+#endif
 	const double emitted = src->emitted_twips;
 	const double ax_x = fabs(Ax) + fabs(Bx), ax_y = fabs(Ay) + fabs(By);
 	int axis = 0;
@@ -4086,6 +4353,17 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 			cdx = floor(4.0 * cdx + 0.5) * 0.25;
 			cdy = floor(4.0 * cdy + 0.5) * 0.25;
 		}
+#if MSAA_SAMPLES == 1
+		if (lq_on)
+		{
+			u32 kc[2];
+			memcpy(kc, &src->cen[v * 2], sizeof(kc));
+			const LowqDirSlot* lce = lowq_dir_find(kc[0], kc[1], lq_mask, 0);
+			lowq_stroke_place(&cdx, &cdy, &odx, &ody, lq_n, W, axis != 0, fx, fy, sf,
+			                  lowq_vdir[2 * v], lowq_vdir[2 * v + 1], lce);
+		}
+		else
+#endif
 		if (snap_ok) stroke_snap_place(&cdx, &cdy, &odx, &ody, W, fx, fy, sf, hinted);
 		const double ndx = cdx + odx - Cx, ndy = cdy + ody - Cy;
 		out[v * 2]     = (float) (( By * ndx - Bx * ndy) / det);

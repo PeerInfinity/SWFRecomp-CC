@@ -1,0 +1,15 @@
+num_ticks = 1
+
+# s29 w2b-lowq-stroke. Golden = Flash Player 32 quality LOW (LNX capture;
+# WIN == LNX and --screen == draw(), 0 px; w1-local-oracles/w2b-lowq-stroke).
+# The SWF sets _quality = "LOW" itself. Cells: LOW stroke width quantisation
+# and thin-pen regime (rows 0-2), axis-aligned band rule W = 1..6 (rows 3-5),
+# TSNAP .5 ties (row 6, exact), sheared 1-px noScale hairlines (rows 7-11).
+# Budget = the measured residual at s29 w2b-lowq-stroke (master 22873
+# channels): 1-px diagonal hairline raster, 30/60-degree polygon caps, corners.
+[image_comparisons.output]
+tolerance = 0
+max_outliers = 5745
+
+[player_options]
+with_renderer = { optional = false, quality = "low" }
