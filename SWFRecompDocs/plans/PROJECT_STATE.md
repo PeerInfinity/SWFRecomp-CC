@@ -311,5 +311,5 @@ the booked regression fixture above. s29 moved `globals_swf5`, `native_objects_s
 | Snailiad | PARKED | 2026-09-02 | regression gate; browser demo needs arena fix |
 | In-browser recompiler | DONE (maintained) | 2026-11-22 (live verify); code 2026-10-14 | none (payload blob weak); DYNAMIC_HOST repeat-trace lead UNCONFIRMED |
 | Archipelago integration | ACTIVE in Archipelago-CC; this repo DONE / on demand | 2026-11-22 here; 2026-11-15 in Archipelago-CC | Slice 3 status UNCONFIRMED (Archipelago-CC) |
-| Docs site / Pages | ACTIVE (maintenance) | 2026-11-27 (`46032563406`) | deploy after `docs/` changes |
+| Docs site / Pages | ACTIVE (maintenance) | 2026-11-27 (`46033409898`) | deploy after `docs/` changes |
 | Upstream relationship | PARKED | 2026-09 | 2 unfiled issue candidates |
