@@ -1321,10 +1321,10 @@ void tagMain(SWFAppContext* app_context)
 			advance_nested_sprite_frames(app_context);
 		}
 		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
-		// s28 browser-attached-goto: the OFFSCREEN slot's self-goto apply pass.
-		// In this build it applies attachMovie'd roots only (the goto an
-		// attached clip's frame script could not run inline); timeline sprites
-		// keep the deferred advance_sprite_frames path (tag.c).
+		// s28 browser-attached-goto: the OFFSCREEN slot's self-goto apply pass,
+		// for attachMovie'd roots and (s30 browser-timeline-self-goto) timeline
+		// sprites, as in CI: a sprite's own frame-script gotoAndPlay lands this
+		// tick instead of stuttering through the deferred path next tick.
 		{
 			extern void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);
 			ng_apply_pending_sprite_self_gotos(app_context);
@@ -1390,9 +1390,8 @@ void tagMain(SWFAppContext* app_context)
 		// the manual flag is set too late for the advance passes; applying it here
 		// (rebuild to target, resume at target+1) avoids the one-tick-late goto +
 		// stutter the deferred top-of-loop path produces. Mirrors swf_core.c.
-		// OFFSCREEN_RENDER only (the graphics-native test mode); browser-WASM keeps
-		// the established deferred path — it is not covered by the CI suites and
-		// has its own delicate sprite-timing paths.
+		// OFFSCREEN_RENDER slot; browser-WASM calls the same pass earlier, after
+		// its own post-frame-func SCRIPT drain (above).
 #if defined(OFFSCREEN_RENDER)
 		{
 			extern void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);

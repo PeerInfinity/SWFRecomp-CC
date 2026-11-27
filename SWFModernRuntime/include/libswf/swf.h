@@ -258,13 +258,6 @@ typedef struct DisplayObject
 	u8 clone_replaced;      // 1 if slot was overwritten by an AS clone (CloneSprite / duplicateMovieClip).
 	                        // Mirrors Ruffle's `avm1_clone_target.is_some()` — survives_rewind returns false
 	                        // so backward goto removes the clone and freshly re-places the static MC.
-	u8 pending_remove;      // browser-WASM only: tagRemoveObject(2) deferred the
-	                        // immediate invalidate+clear so a same-tick Place at the
-	                        // same depth can reclaim the cached MC instead of leaking
-	                        // a fresh one each frame_func re-run. Cleared by
-	                        // tagPlaceObject2/Ratio (reclaim path) or finalized by
-	                        // tagShowFrame fallback. See browser_wasm_frame_func_rerun
-	                        // auto-memory.
 	u8 as_hidden;           // 1 if AS set _visible=false on the MC linked to this entry
 	                        // (synced from actionSetProperty via mc->display_obj). Zero-init
 	                        // = visible. The render loop skips drawing entries with this set;

@@ -1142,9 +1142,7 @@ static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* 
 static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject* obj);
 #endif
 
-// Forward decl — definition further down in this file. Used by both
-// browser-WASM (pending_remove finalize path in tagShowFrame and the
-// Place tags' consume_pending_remove block) and NO_GRAPHICS/OFFSCREEN_RENDER.
+// Forward decl — definition further down in this file. Used by every build.
 static void clear_display_entry(SWFAppContext* app_context, size_t depth);
 
 // ---------------------------------------------------------------------------
@@ -2549,13 +2547,6 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 		// top-of-loop path handles it next tick exactly as before. An attached
 		// root has no deferred path, so its gotoAndStop is applied here too.
 		if (!obj->sprite_manual_next_frame || (!obj->sprite_is_playing && att_mc == NULL)) continue;
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-		// Browser (s28 browser-attached-goto): attached roots only. A timeline
-		// sprite's self-goto keeps the browser's deferred advance_sprite_frames
-		// path: applying it here dropped a nested sprite from enumeration
-		// (browser-root-goto report §5a), not yet bisected.
-		if (att_mc == NULL) continue;
-#endif
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count == 0) continue;
 
@@ -2618,8 +2609,12 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 		if (att_mc) { actionSetCurrentContext(sg_saved_ctx); actionSetBaseClip(sg_saved_base); }
 		catch_up_mode = saved_sg_cm;
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-		// Initialize children placed by the rebuilt target frame.
+		// Initialize children placed by the rebuilt target frame. Browser-WASM:
+		// timeline sprites only (s30 browser-timeline-self-goto); an attached root
+		// takes the build-only tail below instead.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		if (att_mc == NULL)
+#endif
 		{
 			int any_needs_init = 0;
 			for (size_t ci = 1; ci <= max_depth; ci++) {
@@ -2637,29 +2632,13 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 				process_sprite_needs_init(app_context, parent_for_init ? parent_for_init : &root_movieclip);
 			}
 		}
-#endif
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-		// Browser: the replay's RemoveObject2 only marked pending_remove; finalize
-		// them, then build the sprites the target frame placed (their frame 0),
+		// Browser: build the sprites the target frame placed (their frame 0),
 		// without advancing pre-existing siblings -- ng_gotoFrameByMC's browser
 		// tail, which the deleted advance_attached_clip_frames approximated.
 		if (att_mc)
 		{
-			for (size_t j = 1; j <= max_depth; ++j)
-			{
-				if (display_list[j].pending_remove)
-				{
-					if (display_list[j].sprite_display_list != NULL)
-					{
-						ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
-						                display_list[j].sprite_dl_capacity);
-						display_list[j].sprite_display_list = NULL;
-					}
-					display_list[j].char_id = 0;
-					display_list[j].pending_remove = 0;
-				}
-			}
 			extern int g_build_only;
 			int saved_defer = g_advance_defer_nested;
 			int saved_bo = g_build_only;
@@ -11012,53 +10991,6 @@ void tagRerenderFrame(SWFAppContext* app_context)
 }
 #endif
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-// Browser-WASM: recursively finalize tagRemoveObject(2)'d entries that weren't
-// reclaimed by a same-tick Place. tagRemoveObject2 only marks pending_remove=1;
-// the finalize walk used to scan the ROOT display list only, so a remove inside
-// a NESTED sprite that advanced this tick (and had no replacement placement at
-// that depth) was never cleared and kept rendering. Pong's "2 Player" advances
-// the unnamed sprite_26 frame 0→1, whose frame_1 removes the depth-1 label and
-// the depth-4 "1 Player" button with no replacement — they ghosted on top of
-// the Enter Names form. Recurse into sprite children (operating on the global
-// display_list so clear_display_entry/invalidate target the right list) so
-// those nested removals are finalized before render. Buttons are skipped:
-// their state display lists are rebuilt by ng_update_button_states.
-static void finalize_pending_removes_recursive(SWFAppContext* app_context)
-{
-	for (size_t d = 1; d <= max_depth; d++)
-	{
-		DisplayObject* obj = &display_list[d];
-		if (obj->char_id != 0 && dictionary[obj->char_id].type == CHAR_TYPE_SPRITE
-		    && obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
-		{
-			DisplayObject* saved_dl = display_list;
-			size_t saved_max = max_depth;
-			size_t saved_cap = display_list_capacity;
-			display_list = obj->sprite_display_list;
-			max_depth = obj->sprite_max_depth;
-			display_list_capacity = obj->sprite_dl_capacity;
-			finalize_pending_removes_recursive(app_context);
-			obj->sprite_display_list = display_list;
-			obj->sprite_max_depth = max_depth;
-			obj->sprite_dl_capacity = display_list_capacity;
-			display_list = saved_dl;
-			max_depth = saved_max;
-			display_list_capacity = saved_cap;
-			obj = &display_list[d];
-		}
-		if (obj->pending_remove)
-		{
-			obj->pending_remove = 0;
-			if (obj->char_id != 0)
-			{
-				invalidate_mc_for_dl_entry(app_context, obj);
-				clear_display_entry(app_context, d);
-			}
-		}
-	}
-}
-#endif
 
 #ifndef NO_GRAPHICS
 // Compute an MC's local-to-world (stage-space) transform by walking its parent
@@ -11547,21 +11479,6 @@ void tagShowFrame(SWFAppContext* app_context)
 		upgrade_attached_clip_initialized(app_context);
 	}
 #endif
-	// Browser-WASM: finalize any tagRemoveObject(2)'d entries that weren't
-	// reclaimed by a same-tick tagPlaceObject2(Ratio) BEFORE the AQ_KIND_LOAD
-	// drain. pending_remove was deferred at tagRemoveObject2 time to give
-	// Remove+Place pairs in re-running frame_funcs a chance to skip the
-	// invalidate+recreate churn. Anything still flagged here is a genuine
-	// removal — fire the invalidate + clear now so LOAD handlers don't bind
-	// to stale cached MCs. Concrete case: Doodle Jump gameplay frame_1 places
-	// a fresh "hero" at depth 4 (queues LOAD on AQ_KIND_LOAD) and removes the
-	// menu's "hero" at depth 9 (sets pending_remove). When LOAD drains,
-	// findOrCreateMovieClip("hero", root) would otherwise pick up the menu
-	// hero MC still in the cache, store `var score = 0` on it, and then
-	// (post-drain) the finalize walk would invalidate it — so the next
-	// tick's ENTER_FRAME dispatch creates a fresh hero MC with no score
-	// property, and `_root.score_txt.text = "" + score` produces "undefined".
-	finalize_pending_removes_recursive(app_context);
 	// Browser-WASM: drain deferred LOAD clip-actions queued onto
 	// AQ_KIND_LOAD at placement time. By now advance_sprite_frames has
 	// populated sprite children (e.g. button_txt inside Doodle Jump's
@@ -13609,67 +13526,6 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 	ng_ensureDisplayListSize(app_context, depth);
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM: consume any deferred pending_remove from a same-tick
-	// tagRemoveObject(2) at this depth.
-	//  * Same char_id  -> reclaim the cached MC by running a modify-style
-	//    update inline (mirrors line ~5528's modify-detect for sprites,
-	//    extended to textfields/buttons which the existing gate skips via
-	//    its `sprite_display_list != NULL` requirement). Also refresh any
-	//    textfield variable binding so a bound TF re-reads its AS variable
-	//    on every same-(char, depth) re-placement — without this the TF
-	//    would stick on whatever value was set the first time it was
-	//    placed.
-	//  * Different char_id -> fire the deferred invalidate + clear now, then
-	//    fall through to the fresh-place path so a new MC is constructed.
-	if (display_list[depth].pending_remove)
-	{
-		display_list[depth].pending_remove = 0;
-		if (display_list[depth].char_id != 0
-		    && display_list[depth].char_id == char_id)
-		{
-			// transform_id==0 = no matrix in this move tag (recompiler sentinel,
-			// swf.cpp:3611) → keep the existing matrix (Flash semantics).
-			if (transform_id != 0 && !display_list[depth].transformed_by_script) {
-				display_list[depth].transform_id = transform_id;
-				ng_cache_transform(&display_list[depth], transform_id);
-			}
-			if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
-				display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
-				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
-				init_cx_fields(&display_list[depth]);
-			}
-			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
-			display_list[depth].placed_at_frame = current_frame;
-			display_list[depth].place_gen = g_place_gen;
-			if (depth > max_depth) max_depth = depth;
-			// Modify-path discards any pending instance_name / clip_actions
-			// (Ruffle apply_place_object behaviour).
-			g_pending_clip_actions = NULL;
-			g_pending_clip_action_count = 0;
-			g_pending_instance_name = NULL;
-			// Refresh textfield variable binding so bound TFs re-read their
-			// AS variable on every same-(char, depth) re-placement.
-			{
-				int _tf_idx = ng_find_textfield(char_id);
-				if (_tf_idx >= 0 && display_list[depth].instance_name != NULL)
-				{
-					extern MovieClip root_movieclip;
-					MovieClip* _tf_mc = actionFindOrCreateMovieClip(app_context,
-						display_list[depth].instance_name, &root_movieclip);
-					if (_tf_mc != NULL)
-						actionTryBindTextFieldVariable(app_context, _tf_mc, /*set_initial_value=*/1);
-				}
-			}
-			return;
-		}
-		if (display_list[depth].char_id != 0)
-		{
-			invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
-			clear_display_entry(app_context, depth);
-		}
-	}
-#endif
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
@@ -14632,28 +14488,6 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 #endif
 	ng_ensureDisplayListSize(app_context, depth);
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM: consume any deferred pending_remove from a same-tick
-	// tagRemoveObject(2) at this depth. Different (char_id, ratio) -> fire
-	// the deferred invalidate + clear now and fall through to fresh-place.
-	// Same (char_id, ratio) -> fall through; the existing modify-detect
-	// below reuses the cached MC, closing the leak for Doodle Jump
-	// gameplay frame_1 depth 2 'container' (the canonical case:
-	// tagRemoveObject2(2) + tagSetInstanceName(2, "container") +
-	// tagPlaceObject2Ratio(2, 25, ..., ratio=1, ...) repeated each tick
-	// while frame is stopped).
-	if (display_list[depth].pending_remove)
-	{
-		display_list[depth].pending_remove = 0;
-		if (display_list[depth].char_id != 0
-		    && (display_list[depth].char_id != char_id
-		        || display_list[depth].ratio != ratio))
-		{
-			invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
-			clear_display_entry(app_context, depth);
-		}
-	}
-#endif
 
 	// Phase 3: Refuse Place (move=0, has_character=1) of a DIFFERENT character on
 	// an already-occupied depth. See tagPlaceObject2 for full rationale.
@@ -15855,8 +15689,7 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 		// down-state → sprite_11) get MCs registered in child_mc_cache via
 		// process_sprite_needs_init's actionFindOrCreateMovieClip. The MC's
 		// `display_obj` is &sprite_display_list[child_depth]. When the button
-		// is removed (tagRemoveObject2 → pending_remove → finalize walk →
-		// clear_display_entry), this FREE invalidates that pointer — but the
+		// is removed (tagRemoveObject2 → clear_display_entry), this FREE invalidates that pointer — but the
 		// MC is still in child_mc_cache and would still be rendered by the
 		// root-attached-MC render pass in tagShowFrame (which reads
 		// d->sprite_display_list and walks the freed memory). Surfaces as
