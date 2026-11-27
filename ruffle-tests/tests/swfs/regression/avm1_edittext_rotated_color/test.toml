@@ -1,0 +1,19 @@
+num_ticks = 1
+
+# s29 w2-text-coverage-land. Golden: FLASH PLAYER 32 capture (s29 coordinator,
+# session29-fanout-reports/w1-local-oracles/w1-text-pixels/W1_color/flash.png;
+# draw() == --screen, 0 px). Pins Flash's coloured coverage write
+# out = floor((dst * (16 - n) + c * n) / 16) with the EXACT colour byte (tag.c
+# tf_cov_level_rgba). Budget from the measured residual at tolerance 16:
+# 72 channels with tf_cpu_cov_fill (all edge-geometry: 37 coloured px whose
+# level n differs, the rot30/shear border; every coloured px whose level
+# matches Flash's is byte-exact), 1589 with SWF_TF_CPU_COV=0 (4x MSAA).
+# The 90-degree fields stay on the MSAA path: their glyph interior is
+# 203,51,0 (Ruffle's Fixed8 colour multiply) vs Flash's 204,51,0, 1 off,
+# under this tolerance.
+[image_comparisons.output]
+tolerance = 16
+max_outliers = 144
+
+[player_options]
+with_renderer = { optional = false }

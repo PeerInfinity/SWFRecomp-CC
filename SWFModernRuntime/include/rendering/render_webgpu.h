@@ -450,6 +450,10 @@ void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, flo
 // y rule; 0x8000u = Flash LOW outward rect fill (render_webgpu.c LOWQ notes).
 void render_webgpu_draw_rect_ex(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id, u32 style_flags);
 void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
+// s29 w2-text-coverage-land: one draw of pixel-aligned coverage runs with
+// per-run colour slots (tag.c tf_cpu_cov_fill); 0 = pools full, nothing drawn.
+int render_webgpu_draw_cov_runs(WebGPURenderContext* context, const float* xywh, const u16* pal_idx, u32 n_runs, const float* pal_rgba, u32 n_pal, u32 transform_id, u32 cxform_id);
+void render_webgpu_dyn_room(WebGPURenderContext* context, u32* verts_left, u32* colors_left);
 struct StrokeSnapSrc;
 const float* render_webgpu_stroke_snap(WebGPURenderContext* context, const struct StrokeSnapSrc* src, u32 transform_id, u32* out_n);
 void render_webgpu_draw_gradient_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, u8 gradient_type, u8 spread_mode, u8 interpolation, float focal_ratio, const u8* gradient_ramp, const float* gradient_matrix, u32 transform_id, u32 cxform_id);

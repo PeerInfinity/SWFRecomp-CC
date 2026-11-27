@@ -1320,3 +1320,31 @@ Done
 **Decision:** match Flash. `avm2_bitmap.c::bd_palette_map` reads `avm2_array_get(arr, i)`; the off-by-one is not
 replicated. Our AVM1 arm (`action.c::bitmapDataPaletteMap`) and Ruffle's AVM1 arm both already read `arr[i]`. Prune
 criterion: Ruffle's AVM2 `palette_map` switches to `arr[i]`.
+
+## s29 skewed text box: Flash does not size-snap a sheared/rotated EditText box; HIGH coverage is 4 sub-scanlines x exact x (s29 w2-text-coverage-land, 2026-11-26)
+
+**Tests:** `regression/avm1_edittext_rotated_glyphs`, `regression/avm1_edittext_rotated_borders`,
+`regression/avm1_edittext_rotated_color` (FP32 goldens); `visual/edittext/edittext_border_transform` .04 / .06 (Ruffle
+goldens).
+
+Ruffle's `EditTextPixelSnapping::apply` (edit_text.rs ~3614, quality != Low) rounds a skewed text box's size along its
+snapped axis with `rint(s - 0.35)`: the `rotated_glyphs` shear field's C = 27.5 px becomes 27, so its slanted edge has
+slope 27/55. Flash Player 32 (FP32 capture of `rotated_glyphs`) keeps the box unsnapped: the shear edge's per-row ink
+repeats every 2 rows exactly (7+13 / 15+5 sixteenths), slope 0.5. Flash rounds the skewed box's corners to 1/4 device
+px and composes glyph translations unrounded (rot30 glyph bottom 69.75 px; Ruffle's per-push whole-twip rounding,
+`render/src/matrix.rs` `Mul`, gives 70.0). Flash's HIGH quality coverage is 4 sub-scanlines per row at y + j/4 with
+exact horizontal coverage, n = round(16 cov), written as floor((dst (16 - n) + c n) / 16) with the exact colour byte;
+Ruffle (and our old path) uses the GPU's MSAA. Evidence and fits:
+`SWFRecompDocs/plans/session29-fanout-reports/w1-text-pixels-report.md` §2,
+`w2-text-coverage-land-report.md`.
+
+Example (`edittext_border_transform` .04, vs Ruffle golden): px > 2 181 -> 86, still pass (limit 20 outliers at its
+tolerance). Our skewed AVM1 text now takes Flash's rule (`tag.c` `tf_cpu_cov_fill`), which happens to move the two
+Ruffle-golden rows toward Ruffle too.
+
+Also measured on W1 (not changed here): Ruffle colours embedded glyphs with `Fixed8::from_f32(c / 255)` (`font_like.rs`),
+so 0xCC draws 203; FP32 draws 204 (W1 glyph interior 204,51,0). Our non-skewed paths keep the Ruffle multiply
+(`TF_FIXED8_MULT`, s24 w2-text-pitch); the skewed coverage path uses the exact byte.
+
+**Decision:** match Flash for skewed AVM1 text (landed). Prune criterion: Ruffle drops the size snap for skewed boxes and
+adopts an exact-coverage rasteriser, or a Flash capture contradicts the rule.

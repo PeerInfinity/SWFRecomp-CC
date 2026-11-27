@@ -1,0 +1,12 @@
+# s29 w2-text-coverage-land: 200-glyph rotated paragraph, the coverage-run
+# budget stress (see create_test_swf.py). No golden yet: the comparison is
+# skip until the FLASH capture (report LOCAL ORACLE REQUEST F1) is archived;
+# it still renders, so it is a render-canary member (md5 identity).
+num_ticks = 1
+
+[image_comparisons.output]
+tolerance = 128
+max_outliers = 0
+
+[player_options]
+with_renderer = { optional = false }

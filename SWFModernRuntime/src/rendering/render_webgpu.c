@@ -4204,6 +4204,73 @@ void render_webgpu_draw_rect_ex(WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
+// render_webgpu_draw_cov_runs: s29 w2-text-coverage-land. ONE draw for a batch
+// of pixel-aligned coverage runs (tag.c tf_cpu_cov_fill: Flash HIGH's
+// 4-sub-scanline / exact-x coverage rule for skewed AVM1 text). Each run is a
+// quad {x, y, w, h} in the transform slot's space; its colour is a per-VERTEX
+// colour slot (style_y), so a whole field's runs at up to 16 coverage levels x
+// N colours share one draw and n_pal colour slots, not one draw + slot per run
+// (the w1 prototype's MAX_DYNAMIC_RECTS blocker). All-or-nothing: returns 0
+// and draws nothing when the dynamic pools cannot hold the batch.
+// render_webgpu_dyn_room reports what is left so the caller can fall back to
+// its MSAA path BEFORE it commits a glyph to the batch.
+// ---------------------------------------------------------------------------
+void render_webgpu_dyn_room(WebGPURenderContext* ctx, u32* verts_left, u32* colors_left)
+{
+	u32 v = 0, c = 0;
+	if (ctx != NULL && ctx->renderer_ok) {
+		if (ctx->dynamic_vertex_used < MAX_DYNAMIC_VERTICES)
+			v = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
+		if (ctx->dynamic_rect_count < MAX_DYNAMIC_RECTS)
+			c = MAX_DYNAMIC_RECTS - ctx->dynamic_rect_count;
+	}
+	if (verts_left) *verts_left = v;
+	if (colors_left) *colors_left = c;
+}
+
+int render_webgpu_draw_cov_runs(WebGPURenderContext* ctx,
+	const float* xywh, const u16* pal_idx, u32 n_runs,
+	const float* pal_rgba, u32 n_pal,
+	u32 transform_id, u32 cxform_id)
+{
+	if (!ctx->renderer_ok) return 0;
+	if (n_runs == 0) return 1;
+	if (n_pal == 0 || xywh == NULL || pal_idx == NULL || pal_rgba == NULL) return 0;
+	const u32 nv = 6u * n_runs;
+	if (n_runs > MAX_DYNAMIC_VERTICES / 6u
+	    || ctx->dynamic_vertex_used + nv > MAX_DYNAMIC_VERTICES
+	    || ctx->dynamic_rect_count + n_pal > MAX_DYNAMIC_RECTS)
+		return 0;
+	u32* verts = (u32*)malloc((size_t)nv * 4 * sizeof(u32));
+	if (verts == NULL) return 0;
+	const u32 color_base = ctx->dynamic_color_base + ctx->dynamic_rect_count;
+	ctx->dynamic_rect_count += n_pal;
+	for (u32 i = 0; i < n_pal; i++)
+		stage_dyn_color(ctx, color_base + i, &pal_rgba[4 * i]);
+	for (u32 i = 0; i < n_runs; i++) {
+		union { float f; u32 u; } x0, y0, x1, y1;
+		x0.f = xywh[4 * i];                  y0.f = xywh[4 * i + 1];
+		x1.f = xywh[4 * i] + xywh[4 * i + 2]; y1.f = xywh[4 * i + 1] + xywh[4 * i + 3];
+		const u32 sy = color_base + (pal_idx[i] < n_pal ? pal_idx[i] : 0u);
+		u32* q = &verts[(size_t)i * 24];
+		const u32 vv[6][2] = { { x0.u, y0.u }, { x1.u, y0.u }, { x0.u, y1.u },
+		                       { x1.u, y0.u }, { x1.u, y1.u }, { x0.u, y1.u } };
+		for (int k = 0; k < 6; k++) {
+			q[4 * k + 0] = vv[k][0];
+			q[4 * k + 1] = vv[k][1];
+			q[4 * k + 2] = 0x00u;   // solid colour fill
+			q[4 * k + 3] = sy;
+		}
+	}
+	const u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	ctx->dynamic_vertex_used += nv;
+	stage_dyn_verts(ctx, vert_base, verts, nv);
+	free(verts);
+	render_webgpu_draw_shape(ctx, vert_base, nv, transform_id, cxform_id);
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
 // Clip-mask stencil state helpers
 // ---------------------------------------------------------------------------
 

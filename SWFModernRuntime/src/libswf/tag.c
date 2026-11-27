@@ -7678,6 +7678,227 @@ static void tf_border_line_segment(float ax, float ay, float bx, float by,
 	renderer_draw_rect(context, 0.0f, 0.0f, 1.0f, 1.0f, r, g, b, 1.0f, slot, 0);
 }
 
+// s29 w2-text-coverage-land (from the w1-text-pixels prototype): Flash
+// Player 32's HIGH-quality coverage rule, fitted on the FP32 capture of
+// regression/avm1_edittext_rotated_glyphs: FOUR sub-scanlines per pixel row at
+// y + j/4 (j = 0..3), EXACT horizontal coverage on each, the total quantised
+// to n = round(16 * cov). It is not a 4x4 grid (best grid phase 825 px > 2 vs
+// this rule's 196), and 4x MSAA (one sample per sub-row) cannot express it:
+// our slanted hairline weight oscillated 1.00/1.25/1.50 along the shear edge
+// where Flash holds 20/16. Used only for SKEWED AVM1 text fields (rotated /
+// sheared world matrix), where the geometry is ours on the CPU.
+//
+// Colour (FP32 capture W1, text 0xCC3300, black border over a 0x808080 rect):
+// Flash writes  out = floor((dst * (16 - n) + c * n) / 16)  per channel, with
+// the EXACT colour byte (a covered glyph pixel is 204,51,0; Ruffle's Fixed8
+// colour multiply would draw 203). tf_cov_level_rgba encodes that for the GPU
+// blend (SrcAlpha, OneMinusSrcAlpha, round-to-nearest unorm8 store).
+//
+// Emit: polygons are scan-converted here into runs of equal n and APPENDED to
+// a per-field batch (g_tfcov_*); tf_cov_flush draws the whole batch as ONE
+// renderer_draw_cov_runs call (one draw, one colour slot per distinct
+// (colour, n)). Draw order inside the batch is the append order, so it is the
+// prototype's per-run order. Callers flush before any other draw.
+// SWF_TF_CPU_COV=0 opts out (the A/B leg = the old MSAA path).
+typedef struct { int n; float x[4], y[4]; } TfCovPoly;
+typedef struct { float a, b; } TfCovIv;
+static int tf_cov_iv_cmp(const void* p, const void* q)
+{
+	float d = ((const TfCovIv*)p)->a - ((const TfCovIv*)q)->a;
+	return (d > 0.0f) - (d < 0.0f);
+}
+// Per-field run batch (stage twips, transform slot 0).
+enum { TF_COV_MAXPAL = 256 };
+static float* g_tfcov_xywh = NULL;
+static u16* g_tfcov_pal_idx = NULL;
+static u32 g_tfcov_nruns = 0, g_tfcov_cap = 0;
+static float g_tfcov_pal[TF_COV_MAXPAL * 4];
+static u32 g_tfcov_pal_key[TF_COV_MAXPAL];
+static u32 g_tfcov_npal = 0;
+// Dropped/fallback accounting for the stress fixture (SWF_TF_CPU_COV_STATS=1).
+static u32 g_tfcov_stat_fallback = 0, g_tfcov_stat_drawn = 0, g_tfcov_stat_failed = 0;
+// Never let this path eat the dynamic pools other content of the frame needs:
+// leave at least this much behind (MAX_DYNAMIC_VERTICES 262144 / RECTS 4096).
+enum { TF_COV_RESERVE_VERTS = 65536, TF_COV_RESERVE_COLORS = 512 };
+
+static void tf_cov_report_stats(void)
+{
+	if ((g_tfcov_stat_drawn || g_tfcov_stat_fallback || g_tfcov_stat_failed))
+		fprintf(stderr, "[tf_cpu_cov] runs drawn %u, fallbacks %u, failed %u\n",
+		        g_tfcov_stat_drawn, g_tfcov_stat_fallback, g_tfcov_stat_failed);
+}
+static int tf_cpu_cov_enabled(void)
+{
+	static int e = -1;
+	if (e < 0) {
+		const char* v = getenv("SWF_TF_CPU_COV");
+		e = !(v && v[0] == '0');
+		const char* st = getenv("SWF_TF_CPU_COV_STATS");
+		if (e && st && st[0] == '1') atexit(tf_cov_report_stats);
+	}
+	return e;
+}
+
+// One palette entry: coverage n/16 of colour (cr, cg, cb) bytes, for the
+// unorm8 blend (SrcAlpha, OneMinusSrcAlpha). lavapipe quantises the source
+// colour and alpha to 8 bits before blending (a float-exact bias was measured
+// 1 off at n = 10..12 on W1), so the encoding is integer: alpha 16n/255 makes
+// the destination term dst * (255 - 16n) / 255, i.e. exactly 255 - 16n on
+// white (the prototype's black-on-white rule) and 128 - 8n on 0x808080, and
+// the source byte s = round(T * 255 / 16n) with T = floor(n * (c + 1) / 16)
+// makes round(s * 16n / 255) == T. Over white that sum is Flash's
+// floor((255 * (16 - n) + c * n) / 16) for every colour (offline check: 0 of
+// 3840 (c, n) pairs off); black over 0x808080 is exact too (128 - 8n); other
+// destinations are within 1.
+static void tf_cov_level_rgba(int cr, int cg, int cb, int n, float out[4])
+{
+	const int c[3] = { cr, cg, cb };
+	if (n >= 16) {   // fully covered: the colour itself
+		out[0] = cr / 255.0f; out[1] = cg / 255.0f; out[2] = cb / 255.0f; out[3] = 1.0f;
+		return;
+	}
+	for (int k = 0; k < 3; k++) {
+		const int T = (n * (c[k] + 1)) / 16;
+		int s8 = (int)floorf((float)(T * 255) / (float)(16 * n) + 0.5f);
+		if (s8 > 255) s8 = 255;
+		out[k] = (float)s8 / 255.0f;
+	}
+	out[3] = (float)(16 * n) / 255.0f;
+}
+
+static void tf_cov_flush(void)
+{
+	if (g_tfcov_nruns > 0) {
+		if (renderer_draw_cov_runs(context, g_tfcov_xywh, g_tfcov_pal_idx, g_tfcov_nruns,
+		                           g_tfcov_pal, g_tfcov_npal, 0, 0))
+			g_tfcov_stat_drawn += g_tfcov_nruns;
+		else
+			g_tfcov_stat_failed += g_tfcov_nruns;   // unreachable: room was checked per append
+	}
+	g_tfcov_nruns = 0;
+	g_tfcov_npal = 0;
+}
+
+static int tf_cov_push_run(float x, float y, float w, float h, u32 key)
+{
+	u32 pi = 0;
+	while (pi < g_tfcov_npal && g_tfcov_pal_key[pi] != key) pi++;
+	if (pi == g_tfcov_npal) {
+		if (g_tfcov_npal >= TF_COV_MAXPAL) return 0;
+		g_tfcov_pal_key[pi] = key;
+		tf_cov_level_rgba((int)((key >> 24) & 0xFF), (int)((key >> 16) & 0xFF),
+		                  (int)((key >> 8) & 0xFF), (int)(key & 0xFF), &g_tfcov_pal[4 * pi]);
+		g_tfcov_npal++;
+	}
+	if (g_tfcov_nruns >= g_tfcov_cap) {
+		u32 nc = g_tfcov_cap ? g_tfcov_cap * 2 : 4096;
+		float* nx = (float*)realloc(g_tfcov_xywh, (size_t)nc * 4 * sizeof(float));
+		if (nx == NULL) return 0;
+		g_tfcov_xywh = nx;
+		u16* np = (u16*)realloc(g_tfcov_pal_idx, (size_t)nc * sizeof(u16));
+		if (np == NULL) return 0;
+		g_tfcov_pal_idx = np;
+		g_tfcov_cap = nc;
+	}
+	float* q = &g_tfcov_xywh[4 * (size_t)g_tfcov_nruns];
+	q[0] = x; q[1] = y; q[2] = w; q[3] = h;
+	g_tfcov_pal_idx[g_tfcov_nruns++] = (u16)pi;
+	return 1;
+}
+
+// Polygons in DEVICE px (convex, 3 or 4 vertices), colour as bytes. Appends
+// the runs to the batch. Returns 0 with the batch UNCHANGED (caller falls
+// back to its MSAA draw) when the bbox is too wide for the row buffer or the
+// batch would not fit the renderer's remaining dynamic pools.
+static int tf_cpu_cov_fill(const TfCovPoly* polys, int np, float dscale,
+	int cr, int cg, int cb)
+{
+	enum { TF_COV_MAXW = 4096, TF_COV_MAXIV = 8192 };
+	static float cov[TF_COV_MAXW + 2];
+	static TfCovIv iv[TF_COV_MAXIV];
+	if (np <= 0) return 1;
+	float minx = 1e30f, maxx = -1e30f, miny = 1e30f, maxy = -1e30f;
+	for (int i = 0; i < np; i++)
+		for (int k = 0; k < polys[i].n; k++) {
+			minx = fminf(minx, polys[i].x[k]); maxx = fmaxf(maxx, polys[i].x[k]);
+			miny = fminf(miny, polys[i].y[k]); maxy = fmaxf(maxy, polys[i].y[k]);
+		}
+	if (!(maxx > minx) || !(maxy > miny)) return 1;
+	const int x0 = (int)floorf(minx), x1 = (int)floorf(maxx);
+	const int y0 = (int)floorf(miny), y1 = (int)ceilf(maxy);
+	const int W = x1 - x0 + 1;
+	if (W > TF_COV_MAXW || y1 - y0 > 8192) { g_tfcov_stat_fallback++; return 0; }
+	const float px2tw = 20.0f / dscale;
+	const u32 runs0 = g_tfcov_nruns, npal0 = g_tfcov_npal;
+	const u32 key0 = ((u32)(cr & 0xFF) << 24) | ((u32)(cg & 0xFF) << 16) | ((u32)(cb & 0xFF) << 8);
+	for (int y = y0; y < y1; y++) {
+		memset(cov, 0, sizeof(float) * (size_t)(W + 1));
+		int any = 0;
+		for (int j = 0; j < 4; j++) {
+			const float ys = (float)y + 0.25f * (float)j;
+			int ni = 0;
+			for (int i = 0; i < np && ni < TF_COV_MAXIV; i++) {
+				const TfCovPoly* p = &polys[i];
+				float lo = 1e30f, hi = -1e30f; int hits = 0;
+				for (int k = 0; k < p->n; k++) {
+					const float ax = p->x[k], ay = p->y[k];
+					const float bx = p->x[(k + 1) % p->n], by = p->y[(k + 1) % p->n];
+					if ((ay <= ys && ys < by) || (by <= ys && ys < ay)) {
+						const float xc = ax + (ys - ay) * (bx - ax) / (by - ay);
+						lo = fminf(lo, xc); hi = fmaxf(hi, xc); hits++;
+					}
+				}
+				if (hits >= 2 && hi > lo) { iv[ni].a = lo; iv[ni].b = hi; ni++; }
+			}
+			if (ni == 0) continue;
+			qsort(iv, (size_t)ni, sizeof(TfCovIv), tf_cov_iv_cmp);
+			float ca = iv[0].a, cb2 = iv[0].b;
+			for (int i = 1; i <= ni; i++) {
+				if (i < ni && iv[i].a <= cb2 + 1e-4f) { cb2 = fmaxf(cb2, iv[i].b); continue; }
+				// accumulate [ca, cb2) into the row, 1/4 weight per sub-scanline
+				int xa = (int)floorf(ca), xb = (int)floorf(cb2);
+				for (int x = xa; x <= xb; x++) {
+					const float o = fminf(cb2, (float)(x + 1)) - fmaxf(ca, (float)x);
+					if (o > 0.0f && x >= x0 && x <= x1) { cov[x - x0] += 0.25f * o; any = 1; }
+				}
+				if (i < ni) { ca = iv[i].a; cb2 = iv[i].b; }
+			}
+		}
+		if (!any) continue;
+		int run_n = 0, run_x = 0;
+		for (int x = 0; x <= W; x++) {
+			int n = 0;
+			if (x < W) {
+				n = (int)floorf(cov[x] * 16.0f + 0.5f);
+				if (n > 16) n = 16;
+				if (n < 0) n = 0;
+			}
+			if (n != run_n || x == W) {
+				if (run_n > 0
+				    && !tf_cov_push_run((float)(x0 + run_x) * px2tw, (float)y * px2tw,
+				                        (float)(x - run_x) * px2tw, px2tw, key0 | (u32)run_n))
+					goto tf_cov_undo;
+				run_n = n; run_x = x;
+			}
+		}
+	}
+	{
+		// The whole batch (pending runs of earlier glyphs included) must fit
+		// with the reserve left over, or this polygon set takes the MSAA path.
+		u32 vl = 0, cl = 0;
+		renderer_dyn_room(context, &vl, &cl);
+		const u64 need_v = 6ull * g_tfcov_nruns + TF_COV_RESERVE_VERTS;
+		const u64 need_c = (u64)g_tfcov_npal + TF_COV_RESERVE_COLORS;
+		if (need_v <= vl && need_c <= cl) return 1;
+	}
+tf_cov_undo:
+	g_tfcov_nruns = runs0;
+	g_tfcov_npal = npal0;
+	g_tfcov_stat_fallback++;
+	return 0;
+}
+
+
 // s21 w2-px-b: Ruffle `draw_text_box` (edit_text.rs ~2939) border for an
 // EMBEDDED-font field whose world matrix rotates or shears it. The old path
 // drew four locally-thickened rects through the field's transform slot, so the
@@ -7707,6 +7928,54 @@ static int tf_border_skewed_line_rect(const TextFieldRenderInfo* info,
 	// Twips::new(2) is 0.1 px; trunc_to_pixel truncates toward zero.
 	TX = truncf(TX + 0.1f);
 	TY = truncf(TY + 0.1f);
+#if MSAA_SAMPLES > 1
+	// s29 w2-text-coverage-land (tf_cpu_cov_fill): Flash keeps the skewed
+	// box UNSIZE-SNAPPED (the shear edge's 2-row period = slope 0.5 exactly,
+	// not Ruffle's rint(27.5 - 0.35) = 27 / 55) and rounds its corners to
+	// 1/4 device px (rot30 border model error 413 -> 83 sixteenths). Slanted
+	// edges ink 1 + tan/2 px along the minor axis centred on the line; axis
+	// edges keep the pixel row/column below/right of the line.
+	if (tf_cpu_cov_enabled()) {
+		float qx[4] = { TX, TX + A, TX + A + C, TX + C };
+		float qy[4] = { TY, TY + B, TY + B + D, TY + D };
+		for (int i = 0; i < 4; i++) {
+			qx[i] = rintf(qx[i] * 4.0f) * 0.25f;
+			qy[i] = rintf(qy[i] * 4.0f) * 0.25f;
+		}
+		TfCovPoly pp[4];
+		for (int i = 0; i < 4; i++) {
+			const int j = (i + 1) & 3;
+			const float ax = qx[i], ay = qy[i], bx = qx[j], by = qy[j];
+			const float dx = bx - ax, dy = by - ay;
+			TfCovPoly* p = &pp[i];
+			p->n = 4;
+			if (fabsf(dy) < 1e-4f) {
+				const float lx = fminf(ax, bx), hx = fmaxf(ax, bx) + 1.0f;
+				p->x[0] = lx; p->y[0] = ay; p->x[1] = hx; p->y[1] = ay;
+				p->x[2] = hx; p->y[2] = ay + 1.0f; p->x[3] = lx; p->y[3] = ay + 1.0f;
+			} else if (fabsf(dx) < 1e-4f) {
+				const float ly = fminf(ay, by), hy = fmaxf(ay, by) + 1.0f;
+				p->x[0] = ax; p->y[0] = ly; p->x[1] = ax + 1.0f; p->y[1] = ly;
+				p->x[2] = ax + 1.0f; p->y[2] = hy; p->x[3] = ax; p->y[3] = hy;
+			} else {
+				const float t = fminf(fabsf(dx), fabsf(dy)) / fmaxf(fabsf(dx), fabsf(dy));
+				const float k = (t < 0.999f) ? 1.0f + 0.5f * t : 1.0f;
+				const float wx = (fabsf(dy) > fabsf(dx)) ? k : 0.0f;
+				const float wy = (fabsf(dy) > fabsf(dx)) ? 0.0f : k;
+				p->x[0] = ax - wx * 0.5f; p->y[0] = ay - wy * 0.5f;
+				p->x[1] = bx - wx * 0.5f; p->y[1] = by - wy * 0.5f;
+				p->x[2] = bx + wx * 0.5f; p->y[2] = by + wy * 0.5f;
+				p->x[3] = ax + wx * 0.5f; p->y[3] = ay + wy * 0.5f;
+			}
+		}
+		tf_cov_flush();   // nothing pending outside a glyph pass; keep order anyway
+		if (tf_cpu_cov_fill(pp, 4, dscale, (int)rintf(r * 255.0f), (int)rintf(g * 255.0f),
+		                    (int)rintf(b * 255.0f))) {
+			tf_cov_flush();
+			return 1;
+		}
+	}
+#endif
 	int x_snap = fabsf(C) < 0.001f || fabsf(D) < 0.001f;
 	int y_snap = fabsf(A) < 0.001f || fabsf(B) < 0.001f;
 	if (x_snap) {
@@ -8903,6 +9172,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				float sb_scale = (float)baseline_fh / (float)em_square;
 				float sel_top = y_pos - (float)(s32)((float)ascent * sb_scale);
 				float sel_h = (float)(ascent + descent) * sb_scale;
+				tf_cov_flush();   // s29: coverage runs drawn so far stay under the box
 				renderer_draw_rect(context, x_lo - tf_rdx, sel_top - tf_rdy, x_hi - x_lo, sel_h,
 					0.0f, 0.0f, 0.0f, 1.0f, TF_RECT_SLOT(), 0);
 				sel_invert_lo = sel_lo;
@@ -9109,8 +9379,55 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 					xy_buf[2 * v]     = ga * vx.f + gc * vy.f + gtx;
 					xy_buf[2 * v + 1] = gb * vx.f + gd * vy.f + gty;
 				}
+#if MSAA_SAMPLES > 1
+				// s29 w2-text-coverage-land: a SKEWED (rotated/sheared)
+				// glyph run takes Flash's coverage rule (tf_cpu_cov_fill), its
+				// transformed vertices rounded to 1/4 device px (rot30 glyphs
+				// 396 -> 37 sixteenths vs FP32; shear 140 -> 0).
+				const int tf_skew = !((fabsf(m[1]) < 1e-6f && fabsf(m[2]) < 1e-6f)
+				                   || (fabsf(m[0]) < 1e-6f && fabsf(m[3]) < 1e-6f));
+				if (tf_skew && tf_cpu_cov_enabled() && (g_size % 3) == 0) {
+					static TfCovPoly gpolys[TF_GLYPH_MAX_VERTS / 3];
+					const float dsc = (context != NULL && context->stage_scale > 0.0f)
+					                ? context->stage_scale : 1.0f;
+					const float tw2px = dsc / 20.0f;
+					const int nt = (int)(g_size / 3);
+					// Flash composes the glyph translation WITHOUT Ruffle's
+					// per-push whole-twip rounding (matrix.rs Mul): the rot30
+					// glyph bottom sits at 69.75 px (FP32), the rounded
+					// composition gives 70.0.
+					const float etx = tf_w[4] + tf_w[0] * tf_lx + tf_w[2] * tf_ly
+					                + m[0] * (ox + gx) + m[2] * (oy + gy);
+					const float ety = tf_w[5] + tf_w[1] * tf_lx + tf_w[3] * tf_ly
+					                + m[1] * (ox + gx) + m[3] * (oy + gy);
+					for (int t = 0; t < nt; t++) {
+						gpolys[t].n = 3;
+						for (int k = 0; k < 3; k++) {
+							union { u32 u; float f; } vx, vy;
+							vx.u = _sd[g_offset + 3 * t + k][0];
+							vy.u = _sd[g_offset + 3 * t + k][1];
+							const float sx = ga * vx.f + gc * vy.f + etx;
+							const float sy = gb * vx.f + gd * vy.f + ety;
+							gpolys[t].x[k] = rintf(sx * tw2px * 4.0f) * 0.25f;
+							gpolys[t].y[k] = rintf(sy * tw2px * 4.0f) * 0.25f;
+						}
+					}
+					// Flash's EXACT colour byte (W1: 0xCC draws 204), not the
+					// Fixed8 multiply above; selected glyphs draw white.
+					const int tf_sel = (r == 1.0f && g == 1.0f && b == 1.0f);
+					const int cr8 = tf_sel ? 255 : (int)((cur_color >> 16) & 0xFF);
+					const int cg8 = tf_sel ? 255 : (int)((cur_color >> 8) & 0xFF);
+					const int cb8 = tf_sel ? 255 : (int)(cur_color & 0xFF);
+					if (g_tfcov_npal + 16 > TF_COV_MAXPAL) tf_cov_flush();
+					if (tf_cpu_cov_fill(gpolys, nt, dsc, cr8, cg8, cb8)) goto tf_glyph_drawn;
+				}
+#endif
 			}
+			tf_cov_flush();   // keep draw order: pending coverage runs first
 			renderer_draw_tris(context, xy_buf, (u32)g_size, r, g, b, 1.0f, 0, 0);
+#if MSAA_SAMPLES > 1
+			tf_glyph_drawn:;
+#endif
 		}
 		} // end glyph-outline-available guard
 
@@ -9121,6 +9438,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			x_pos += tf_glyph_advance_twips(adv, scale, info->device_font);
 		}
 	}
+	tf_cov_flush();   // s29 w2-text-coverage-land: the field's batched coverage runs
 	#undef MAX_TF_PARAGRAPHS_ROOM
 #undef TF_RESOLVE_RUN_FONT
 #undef TF_TAB_REF

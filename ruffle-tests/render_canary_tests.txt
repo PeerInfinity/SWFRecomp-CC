@@ -842,3 +842,10 @@ from_gnash/misc-ming.all/place_object_test   # two pairs at one depth, newcomer 
 # tier=1
 from_shumway/acid/acid-stroke-0                     # 5 line styles x 11 matrices, LOW   1 cmp
 regression/avm1_stroke_pixel_snap_matrix            # 224 snapped/AA strokes, skew rows  1 cmp
+# s29 w2-text-coverage-land: Flash HIGH's coverage rule for SKEWED AVM1 text (tag.c tf_cpu_cov_fill ->
+# render_webgpu.c render_webgpu_draw_cov_runs, one batched draw per field). No standing member saw
+# a coloured skewed field or a multi-line skewed field (the run budget). W1 = FP32 golden; the
+# paragraph has no golden yet (skip; md5 A/B only, 18068 runs in one draw).
+# tier=1
+regression/avm1_edittext_rotated_color       # rot30/shear/90deg, text 0xCC3300, grey under  1 cmp
+regression/avm1_edittext_rotated_paragraph   # 200 glyphs rotated 30deg, run-budget stress  1 cmp

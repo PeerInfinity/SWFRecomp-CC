@@ -1,0 +1,796 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index 83b1822d..51e2cfc4 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -450,6 +450,10 @@ void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, flo
+ // y rule; 0x8000u = Flash LOW outward rect fill (render_webgpu.c LOWQ notes).
+ void render_webgpu_draw_rect_ex(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id, u32 style_flags);
+ void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
++// s29 w2-text-coverage-land: one draw of pixel-aligned coverage runs with
++// per-run colour slots (tag.c tf_cpu_cov_fill); 0 = pools full, nothing drawn.
++int render_webgpu_draw_cov_runs(WebGPURenderContext* context, const float* xywh, const u16* pal_idx, u32 n_runs, const float* pal_rgba, u32 n_pal, u32 transform_id, u32 cxform_id);
++void render_webgpu_dyn_room(WebGPURenderContext* context, u32* verts_left, u32* colors_left);
+ struct StrokeSnapSrc;
+ const float* render_webgpu_stroke_snap(WebGPURenderContext* context, const struct StrokeSnapSrc* src, u32 transform_id, u32* out_n);
+ void render_webgpu_draw_gradient_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, u8 gradient_type, u8 spread_mode, u8 interpolation, float focal_ratio, const u8* gradient_ramp, const float* gradient_matrix, u32 transform_id, u32 cxform_id);
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index 57befdc0..25bb807d 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -26,6 +26,8 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_draw_rect_centre(ctx, x, y, w, h, r, g, b, a, t, c) render_webgpu_draw_rect_ex(ctx, x, y, w, h, r, g, b, a, t, c, 0x9000u)
+ #define renderer_draw_rect_nolowq(ctx, x, y, w, h, r, g, b, a, t, c) render_webgpu_draw_rect_ex(ctx, x, y, w, h, r, g, b, a, t, c, 0x1000u)
+ #define renderer_draw_tris(ctx, v, n, r, g, b, a, t, c) render_webgpu_draw_tris(ctx, v, n, r, g, b, a, t, c)
++#define renderer_draw_cov_runs(ctx, r, pi, n, pal, np, t, c) render_webgpu_draw_cov_runs(ctx, r, pi, n, pal, np, t, c)
++#define renderer_dyn_room(ctx, v, c) render_webgpu_dyn_room(ctx, v, c)
+ #define renderer_draw_gradient_tris(ctx, v, n, gt, sm, interp, fr, ramp, mat, t, c) render_webgpu_draw_gradient_tris(ctx, v, n, gt, sm, interp, fr, ramp, mat, t, c)
+ #define renderer_draw_bitmap_quad(ctx, px, w, h, x, y, t, c) render_webgpu_draw_bitmap_quad(ctx, px, w, h, x, y, t, c)
+ #define renderer_draw_bitmap_quad_scaled(ctx, px, sw, sh, dw, dh, x, y, t, c) render_webgpu_draw_bitmap_quad_scaled(ctx, px, sw, sh, dw, dh, x, y, t, c)
+@@ -113,6 +115,8 @@ typedef FlashbangContext RenderContext;
+ #define renderer_draw_rect_centre(ctx, x, y, w, h, r, g, b, a, t, c) ((void)0)
+ #define renderer_draw_rect_nolowq(ctx, x, y, w, h, r, g, b, a, t, c) ((void)0)
+ #define renderer_draw_tris(ctx, v, n, r, g, b, a, t, c) ((void)0)
++#define renderer_draw_cov_runs(ctx, r, pi, n, pal, np, t, c) (0)
++#define renderer_dyn_room(ctx, v, c) do { *(v) = 0; *(c) = 0; } while (0)
+ #define renderer_draw_gradient_tris(ctx, v, n, gt, sm, interp, fr, ramp, mat, t, c) ((void)0)
+ #define renderer_draw_bitmap_quad(ctx, px, w, h, x, y, t, c) ((void)0)
+ #define renderer_draw_bitmap_quad_scaled(ctx, px, sw, sh, dw, dh, x, y, t, c) ((void)0)
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 9a07be06..fd5d6d0b 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -7678,6 +7678,227 @@ static void tf_border_line_segment(float ax, float ay, float bx, float by,
+ 	renderer_draw_rect(context, 0.0f, 0.0f, 1.0f, 1.0f, r, g, b, 1.0f, slot, 0);
+ }
+ 
++// s29 w2-text-coverage-land (from the w1-text-pixels prototype): Flash
++// Player 32's HIGH-quality coverage rule, fitted on the FP32 capture of
++// regression/avm1_edittext_rotated_glyphs: FOUR sub-scanlines per pixel row at
++// y + j/4 (j = 0..3), EXACT horizontal coverage on each, the total quantised
++// to n = round(16 * cov). It is not a 4x4 grid (best grid phase 825 px > 2 vs
++// this rule's 196), and 4x MSAA (one sample per sub-row) cannot express it:
++// our slanted hairline weight oscillated 1.00/1.25/1.50 along the shear edge
++// where Flash holds 20/16. Used only for SKEWED AVM1 text fields (rotated /
++// sheared world matrix), where the geometry is ours on the CPU.
++//
++// Colour (FP32 capture W1, text 0xCC3300, black border over a 0x808080 rect):
++// Flash writes  out = floor((dst * (16 - n) + c * n) / 16)  per channel, with
++// the EXACT colour byte (a covered glyph pixel is 204,51,0; Ruffle's Fixed8
++// colour multiply would draw 203). tf_cov_level_rgba encodes that for the GPU
++// blend (SrcAlpha, OneMinusSrcAlpha, round-to-nearest unorm8 store).
++//
++// Emit: polygons are scan-converted here into runs of equal n and APPENDED to
++// a per-field batch (g_tfcov_*); tf_cov_flush draws the whole batch as ONE
++// renderer_draw_cov_runs call (one draw, one colour slot per distinct
++// (colour, n)). Draw order inside the batch is the append order, so it is the
++// prototype's per-run order. Callers flush before any other draw.
++// SWF_TF_CPU_COV=0 opts out (the A/B leg = the old MSAA path).
++typedef struct { int n; float x[4], y[4]; } TfCovPoly;
++typedef struct { float a, b; } TfCovIv;
++static int tf_cov_iv_cmp(const void* p, const void* q)
++{
++	float d = ((const TfCovIv*)p)->a - ((const TfCovIv*)q)->a;
++	return (d > 0.0f) - (d < 0.0f);
++}
++// Per-field run batch (stage twips, transform slot 0).
++enum { TF_COV_MAXPAL = 256 };
++static float* g_tfcov_xywh = NULL;
++static u16* g_tfcov_pal_idx = NULL;
++static u32 g_tfcov_nruns = 0, g_tfcov_cap = 0;
++static float g_tfcov_pal[TF_COV_MAXPAL * 4];
++static u32 g_tfcov_pal_key[TF_COV_MAXPAL];
++static u32 g_tfcov_npal = 0;
++// Dropped/fallback accounting for the stress fixture (SWF_TF_CPU_COV_STATS=1).
++static u32 g_tfcov_stat_fallback = 0, g_tfcov_stat_drawn = 0, g_tfcov_stat_failed = 0;
++// Never let this path eat the dynamic pools other content of the frame needs:
++// leave at least this much behind (MAX_DYNAMIC_VERTICES 262144 / RECTS 4096).
++enum { TF_COV_RESERVE_VERTS = 65536, TF_COV_RESERVE_COLORS = 512 };
++
++static void tf_cov_report_stats(void)
++{
++	if ((g_tfcov_stat_drawn || g_tfcov_stat_fallback || g_tfcov_stat_failed))
++		fprintf(stderr, "[tf_cpu_cov] runs drawn %u, fallbacks %u, failed %u\n",
++		        g_tfcov_stat_drawn, g_tfcov_stat_fallback, g_tfcov_stat_failed);
++}
++static int tf_cpu_cov_enabled(void)
++{
++	static int e = -1;
++	if (e < 0) {
++		const char* v = getenv("SWF_TF_CPU_COV");
++		e = !(v && v[0] == '0');
++		const char* st = getenv("SWF_TF_CPU_COV_STATS");
++		if (e && st && st[0] == '1') atexit(tf_cov_report_stats);
++	}
++	return e;
++}
++
++// One palette entry: coverage n/16 of colour (cr, cg, cb) bytes, for the
++// unorm8 blend (SrcAlpha, OneMinusSrcAlpha). lavapipe quantises the source
++// colour and alpha to 8 bits before blending (a float-exact bias was measured
++// 1 off at n = 10..12 on W1), so the encoding is integer: alpha 16n/255 makes
++// the destination term dst * (255 - 16n) / 255, i.e. exactly 255 - 16n on
++// white (the prototype's black-on-white rule) and 128 - 8n on 0x808080, and
++// the source byte s = round(T * 255 / 16n) with T = floor(n * (c + 1) / 16)
++// makes round(s * 16n / 255) == T. Over white that sum is Flash's
++// floor((255 * (16 - n) + c * n) / 16) for every colour (offline check: 0 of
++// 3840 (c, n) pairs off); black over 0x808080 is exact too (128 - 8n); other
++// destinations are within 1.
++static void tf_cov_level_rgba(int cr, int cg, int cb, int n, float out[4])
++{
++	const int c[3] = { cr, cg, cb };
++	if (n >= 16) {   // fully covered: the colour itself
++		out[0] = cr / 255.0f; out[1] = cg / 255.0f; out[2] = cb / 255.0f; out[3] = 1.0f;
++		return;
++	}
++	for (int k = 0; k < 3; k++) {
++		const int T = (n * (c[k] + 1)) / 16;
++		int s8 = (int)floorf((float)(T * 255) / (float)(16 * n) + 0.5f);
++		if (s8 > 255) s8 = 255;
++		out[k] = (float)s8 / 255.0f;
++	}
++	out[3] = (float)(16 * n) / 255.0f;
++}
++
++static void tf_cov_flush(void)
++{
++	if (g_tfcov_nruns > 0) {
++		if (renderer_draw_cov_runs(context, g_tfcov_xywh, g_tfcov_pal_idx, g_tfcov_nruns,
++		                           g_tfcov_pal, g_tfcov_npal, 0, 0))
++			g_tfcov_stat_drawn += g_tfcov_nruns;
++		else
++			g_tfcov_stat_failed += g_tfcov_nruns;   // unreachable: room was checked per append
++	}
++	g_tfcov_nruns = 0;
++	g_tfcov_npal = 0;
++}
++
++static int tf_cov_push_run(float x, float y, float w, float h, u32 key)
++{
++	u32 pi = 0;
++	while (pi < g_tfcov_npal && g_tfcov_pal_key[pi] != key) pi++;
++	if (pi == g_tfcov_npal) {
++		if (g_tfcov_npal >= TF_COV_MAXPAL) return 0;
++		g_tfcov_pal_key[pi] = key;
++		tf_cov_level_rgba((int)((key >> 24) & 0xFF), (int)((key >> 16) & 0xFF),
++		                  (int)((key >> 8) & 0xFF), (int)(key & 0xFF), &g_tfcov_pal[4 * pi]);
++		g_tfcov_npal++;
++	}
++	if (g_tfcov_nruns >= g_tfcov_cap) {
++		u32 nc = g_tfcov_cap ? g_tfcov_cap * 2 : 4096;
++		float* nx = (float*)realloc(g_tfcov_xywh, (size_t)nc * 4 * sizeof(float));
++		if (nx == NULL) return 0;
++		g_tfcov_xywh = nx;
++		u16* np = (u16*)realloc(g_tfcov_pal_idx, (size_t)nc * sizeof(u16));
++		if (np == NULL) return 0;
++		g_tfcov_pal_idx = np;
++		g_tfcov_cap = nc;
++	}
++	float* q = &g_tfcov_xywh[4 * (size_t)g_tfcov_nruns];
++	q[0] = x; q[1] = y; q[2] = w; q[3] = h;
++	g_tfcov_pal_idx[g_tfcov_nruns++] = (u16)pi;
++	return 1;
++}
++
++// Polygons in DEVICE px (convex, 3 or 4 vertices), colour as bytes. Appends
++// the runs to the batch. Returns 0 with the batch UNCHANGED (caller falls
++// back to its MSAA draw) when the bbox is too wide for the row buffer or the
++// batch would not fit the renderer's remaining dynamic pools.
++static int tf_cpu_cov_fill(const TfCovPoly* polys, int np, float dscale,
++	int cr, int cg, int cb)
++{
++	enum { TF_COV_MAXW = 4096, TF_COV_MAXIV = 8192 };
++	static float cov[TF_COV_MAXW + 2];
++	static TfCovIv iv[TF_COV_MAXIV];
++	if (np <= 0) return 1;
++	float minx = 1e30f, maxx = -1e30f, miny = 1e30f, maxy = -1e30f;
++	for (int i = 0; i < np; i++)
++		for (int k = 0; k < polys[i].n; k++) {
++			minx = fminf(minx, polys[i].x[k]); maxx = fmaxf(maxx, polys[i].x[k]);
++			miny = fminf(miny, polys[i].y[k]); maxy = fmaxf(maxy, polys[i].y[k]);
++		}
++	if (!(maxx > minx) || !(maxy > miny)) return 1;
++	const int x0 = (int)floorf(minx), x1 = (int)floorf(maxx);
++	const int y0 = (int)floorf(miny), y1 = (int)ceilf(maxy);
++	const int W = x1 - x0 + 1;
++	if (W > TF_COV_MAXW || y1 - y0 > 8192) { g_tfcov_stat_fallback++; return 0; }
++	const float px2tw = 20.0f / dscale;
++	const u32 runs0 = g_tfcov_nruns, npal0 = g_tfcov_npal;
++	const u32 key0 = ((u32)(cr & 0xFF) << 24) | ((u32)(cg & 0xFF) << 16) | ((u32)(cb & 0xFF) << 8);
++	for (int y = y0; y < y1; y++) {
++		memset(cov, 0, sizeof(float) * (size_t)(W + 1));
++		int any = 0;
++		for (int j = 0; j < 4; j++) {
++			const float ys = (float)y + 0.25f * (float)j;
++			int ni = 0;
++			for (int i = 0; i < np && ni < TF_COV_MAXIV; i++) {
++				const TfCovPoly* p = &polys[i];
++				float lo = 1e30f, hi = -1e30f; int hits = 0;
++				for (int k = 0; k < p->n; k++) {
++					const float ax = p->x[k], ay = p->y[k];
++					const float bx = p->x[(k + 1) % p->n], by = p->y[(k + 1) % p->n];
++					if ((ay <= ys && ys < by) || (by <= ys && ys < ay)) {
++						const float xc = ax + (ys - ay) * (bx - ax) / (by - ay);
++						lo = fminf(lo, xc); hi = fmaxf(hi, xc); hits++;
++					}
++				}
++				if (hits >= 2 && hi > lo) { iv[ni].a = lo; iv[ni].b = hi; ni++; }
++			}
++			if (ni == 0) continue;
++			qsort(iv, (size_t)ni, sizeof(TfCovIv), tf_cov_iv_cmp);
++			float ca = iv[0].a, cb2 = iv[0].b;
++			for (int i = 1; i <= ni; i++) {
++				if (i < ni && iv[i].a <= cb2 + 1e-4f) { cb2 = fmaxf(cb2, iv[i].b); continue; }
++				// accumulate [ca, cb2) into the row, 1/4 weight per sub-scanline
++				int xa = (int)floorf(ca), xb = (int)floorf(cb2);
++				for (int x = xa; x <= xb; x++) {
++					const float o = fminf(cb2, (float)(x + 1)) - fmaxf(ca, (float)x);
++					if (o > 0.0f && x >= x0 && x <= x1) { cov[x - x0] += 0.25f * o; any = 1; }
++				}
++				if (i < ni) { ca = iv[i].a; cb2 = iv[i].b; }
++			}
++		}
++		if (!any) continue;
++		int run_n = 0, run_x = 0;
++		for (int x = 0; x <= W; x++) {
++			int n = 0;
++			if (x < W) {
++				n = (int)floorf(cov[x] * 16.0f + 0.5f);
++				if (n > 16) n = 16;
++				if (n < 0) n = 0;
++			}
++			if (n != run_n || x == W) {
++				if (run_n > 0
++				    && !tf_cov_push_run((float)(x0 + run_x) * px2tw, (float)y * px2tw,
++				                        (float)(x - run_x) * px2tw, px2tw, key0 | (u32)run_n))
++					goto tf_cov_undo;
++				run_n = n; run_x = x;
++			}
++		}
++	}
++	{
++		// The whole batch (pending runs of earlier glyphs included) must fit
++		// with the reserve left over, or this polygon set takes the MSAA path.
++		u32 vl = 0, cl = 0;
++		renderer_dyn_room(context, &vl, &cl);
++		const u64 need_v = 6ull * g_tfcov_nruns + TF_COV_RESERVE_VERTS;
++		const u64 need_c = (u64)g_tfcov_npal + TF_COV_RESERVE_COLORS;
++		if (need_v <= vl && need_c <= cl) return 1;
++	}
++tf_cov_undo:
++	g_tfcov_nruns = runs0;
++	g_tfcov_npal = npal0;
++	g_tfcov_stat_fallback++;
++	return 0;
++}
++
++
+ // s21 w2-px-b: Ruffle `draw_text_box` (edit_text.rs ~2939) border for an
+ // EMBEDDED-font field whose world matrix rotates or shears it. The old path
+ // drew four locally-thickened rects through the field's transform slot, so the
+@@ -7707,6 +7928,54 @@ static int tf_border_skewed_line_rect(const TextFieldRenderInfo* info,
+ 	// Twips::new(2) is 0.1 px; trunc_to_pixel truncates toward zero.
+ 	TX = truncf(TX + 0.1f);
+ 	TY = truncf(TY + 0.1f);
++#if MSAA_SAMPLES > 1
++	// s29 w2-text-coverage-land (tf_cpu_cov_fill): Flash keeps the skewed
++	// box UNSIZE-SNAPPED (the shear edge's 2-row period = slope 0.5 exactly,
++	// not Ruffle's rint(27.5 - 0.35) = 27 / 55) and rounds its corners to
++	// 1/4 device px (rot30 border model error 413 -> 83 sixteenths). Slanted
++	// edges ink 1 + tan/2 px along the minor axis centred on the line; axis
++	// edges keep the pixel row/column below/right of the line.
++	if (tf_cpu_cov_enabled()) {
++		float qx[4] = { TX, TX + A, TX + A + C, TX + C };
++		float qy[4] = { TY, TY + B, TY + B + D, TY + D };
++		for (int i = 0; i < 4; i++) {
++			qx[i] = rintf(qx[i] * 4.0f) * 0.25f;
++			qy[i] = rintf(qy[i] * 4.0f) * 0.25f;
++		}
++		TfCovPoly pp[4];
++		for (int i = 0; i < 4; i++) {
++			const int j = (i + 1) & 3;
++			const float ax = qx[i], ay = qy[i], bx = qx[j], by = qy[j];
++			const float dx = bx - ax, dy = by - ay;
++			TfCovPoly* p = &pp[i];
++			p->n = 4;
++			if (fabsf(dy) < 1e-4f) {
++				const float lx = fminf(ax, bx), hx = fmaxf(ax, bx) + 1.0f;
++				p->x[0] = lx; p->y[0] = ay; p->x[1] = hx; p->y[1] = ay;
++				p->x[2] = hx; p->y[2] = ay + 1.0f; p->x[3] = lx; p->y[3] = ay + 1.0f;
++			} else if (fabsf(dx) < 1e-4f) {
++				const float ly = fminf(ay, by), hy = fmaxf(ay, by) + 1.0f;
++				p->x[0] = ax; p->y[0] = ly; p->x[1] = ax + 1.0f; p->y[1] = ly;
++				p->x[2] = ax + 1.0f; p->y[2] = hy; p->x[3] = ax; p->y[3] = hy;
++			} else {
++				const float t = fminf(fabsf(dx), fabsf(dy)) / fmaxf(fabsf(dx), fabsf(dy));
++				const float k = (t < 0.999f) ? 1.0f + 0.5f * t : 1.0f;
++				const float wx = (fabsf(dy) > fabsf(dx)) ? k : 0.0f;
++				const float wy = (fabsf(dy) > fabsf(dx)) ? 0.0f : k;
++				p->x[0] = ax - wx * 0.5f; p->y[0] = ay - wy * 0.5f;
++				p->x[1] = bx - wx * 0.5f; p->y[1] = by - wy * 0.5f;
++				p->x[2] = bx + wx * 0.5f; p->y[2] = by + wy * 0.5f;
++				p->x[3] = ax + wx * 0.5f; p->y[3] = ay + wy * 0.5f;
++			}
++		}
++		tf_cov_flush();   // nothing pending outside a glyph pass; keep order anyway
++		if (tf_cpu_cov_fill(pp, 4, dscale, (int)rintf(r * 255.0f), (int)rintf(g * 255.0f),
++		                    (int)rintf(b * 255.0f))) {
++			tf_cov_flush();
++			return 1;
++		}
++	}
++#endif
+ 	int x_snap = fabsf(C) < 0.001f || fabsf(D) < 0.001f;
+ 	int y_snap = fabsf(A) < 0.001f || fabsf(B) < 0.001f;
+ 	if (x_snap) {
+@@ -8903,6 +9172,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 				float sb_scale = (float)baseline_fh / (float)em_square;
+ 				float sel_top = y_pos - (float)(s32)((float)ascent * sb_scale);
+ 				float sel_h = (float)(ascent + descent) * sb_scale;
++				tf_cov_flush();   // s29: coverage runs drawn so far stay under the box
+ 				renderer_draw_rect(context, x_lo - tf_rdx, sel_top - tf_rdy, x_hi - x_lo, sel_h,
+ 					0.0f, 0.0f, 0.0f, 1.0f, TF_RECT_SLOT(), 0);
+ 				sel_invert_lo = sel_lo;
+@@ -9109,8 +9379,55 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 					xy_buf[2 * v]     = ga * vx.f + gc * vy.f + gtx;
+ 					xy_buf[2 * v + 1] = gb * vx.f + gd * vy.f + gty;
+ 				}
++#if MSAA_SAMPLES > 1
++				// s29 w2-text-coverage-land: a SKEWED (rotated/sheared)
++				// glyph run takes Flash's coverage rule (tf_cpu_cov_fill), its
++				// transformed vertices rounded to 1/4 device px (rot30 glyphs
++				// 396 -> 37 sixteenths vs FP32; shear 140 -> 0).
++				const int tf_skew = !((fabsf(m[1]) < 1e-6f && fabsf(m[2]) < 1e-6f)
++				                   || (fabsf(m[0]) < 1e-6f && fabsf(m[3]) < 1e-6f));
++				if (tf_skew && tf_cpu_cov_enabled() && (g_size % 3) == 0) {
++					static TfCovPoly gpolys[TF_GLYPH_MAX_VERTS / 3];
++					const float dsc = (context != NULL && context->stage_scale > 0.0f)
++					                ? context->stage_scale : 1.0f;
++					const float tw2px = dsc / 20.0f;
++					const int nt = (int)(g_size / 3);
++					// Flash composes the glyph translation WITHOUT Ruffle's
++					// per-push whole-twip rounding (matrix.rs Mul): the rot30
++					// glyph bottom sits at 69.75 px (FP32), the rounded
++					// composition gives 70.0.
++					const float etx = tf_w[4] + tf_w[0] * tf_lx + tf_w[2] * tf_ly
++					                + m[0] * (ox + gx) + m[2] * (oy + gy);
++					const float ety = tf_w[5] + tf_w[1] * tf_lx + tf_w[3] * tf_ly
++					                + m[1] * (ox + gx) + m[3] * (oy + gy);
++					for (int t = 0; t < nt; t++) {
++						gpolys[t].n = 3;
++						for (int k = 0; k < 3; k++) {
++							union { u32 u; float f; } vx, vy;
++							vx.u = _sd[g_offset + 3 * t + k][0];
++							vy.u = _sd[g_offset + 3 * t + k][1];
++							const float sx = ga * vx.f + gc * vy.f + etx;
++							const float sy = gb * vx.f + gd * vy.f + ety;
++							gpolys[t].x[k] = rintf(sx * tw2px * 4.0f) * 0.25f;
++							gpolys[t].y[k] = rintf(sy * tw2px * 4.0f) * 0.25f;
++						}
++					}
++					// Flash's EXACT colour byte (W1: 0xCC draws 204), not the
++					// Fixed8 multiply above; selected glyphs draw white.
++					const int tf_sel = (r == 1.0f && g == 1.0f && b == 1.0f);
++					const int cr8 = tf_sel ? 255 : (int)((cur_color >> 16) & 0xFF);
++					const int cg8 = tf_sel ? 255 : (int)((cur_color >> 8) & 0xFF);
++					const int cb8 = tf_sel ? 255 : (int)(cur_color & 0xFF);
++					if (g_tfcov_npal + 16 > TF_COV_MAXPAL) tf_cov_flush();
++					if (tf_cpu_cov_fill(gpolys, nt, dsc, cr8, cg8, cb8)) goto tf_glyph_drawn;
++				}
++#endif
+ 			}
++			tf_cov_flush();   // keep draw order: pending coverage runs first
+ 			renderer_draw_tris(context, xy_buf, (u32)g_size, r, g, b, 1.0f, 0, 0);
++#if MSAA_SAMPLES > 1
++			tf_glyph_drawn:;
++#endif
+ 		}
+ 		} // end glyph-outline-available guard
+ 
+@@ -9121,6 +9438,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			x_pos += tf_glyph_advance_twips(adv, scale, info->device_font);
+ 		}
+ 	}
++	tf_cov_flush();   // s29 w2-text-coverage-land: the field's batched coverage runs
+ 	#undef MAX_TF_PARAGRAPHS_ROOM
+ #undef TF_RESOLVE_RUN_FONT
+ #undef TF_TAB_REF
+diff --git a/SWFModernRuntime/src/rendering/render_stub.c b/SWFModernRuntime/src/rendering/render_stub.c
+index f648d075..c471aa0d 100644
+--- a/SWFModernRuntime/src/rendering/render_stub.c
++++ b/SWFModernRuntime/src/rendering/render_stub.c
+@@ -62,6 +62,8 @@ void render_webgpu_upload_cxform(WebGPURenderContext* c, float* cx) { (void)c; (
+ void render_webgpu_draw_shape(WebGPURenderContext* c, size_t o, size_t n, u32 t, u32 cx) { (void)c; (void)o; (void)n; (void)t; (void)cx; }
+ void render_webgpu_draw_rect(WebGPURenderContext* c, float x, float y, float w, float h, float r, float g, float b, float a, u32 t, u32 cx) { (void)c; (void)x; (void)y; (void)w; (void)h; (void)r; (void)g; (void)b; (void)a; (void)t; (void)cx; }
+ void render_webgpu_draw_tris(WebGPURenderContext* c, const float* v, u32 n, float r, float g, float b, float a, u32 t, u32 cx) { (void)c; (void)v; (void)n; (void)r; (void)g; (void)b; (void)a; (void)t; (void)cx; }
++int render_webgpu_draw_cov_runs(WebGPURenderContext* c, const float* r, const u16* pi, u32 n, const float* pal, u32 np, u32 t, u32 cx) { (void)c; (void)r; (void)pi; (void)n; (void)pal; (void)np; (void)t; (void)cx; return 0; }
++void render_webgpu_dyn_room(WebGPURenderContext* c, u32* v, u32* cl) { (void)c; if (v) *v = 0; if (cl) *cl = 0; }
+ void render_webgpu_draw_gradient_tris(WebGPURenderContext* c, const float* v, u32 n, u8 gt, u8 sm, u8 in, float fr, const u8* ramp, const float* mat, u32 t, u32 cx) { (void)c; (void)v; (void)n; (void)gt; (void)sm; (void)in; (void)fr; (void)ramp; (void)mat; (void)t; (void)cx; }
+ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* c, const uint32_t* px, u32 w, u32 h, float x, float y, u32 t, u32 cx) { (void)c; (void)px; (void)w; (void)h; (void)x; (void)y; (void)t; (void)cx; }
+ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* c, const uint32_t* px, u32 sw, u32 sh, u32 dw, u32 dh, float x, float y, u32 t, u32 cx) { (void)c; (void)px; (void)sw; (void)sh; (void)dw; (void)dh; (void)x; (void)y; (void)t; (void)cx; }
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 73e887f1..5d3fd1e7 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -4203,6 +4203,73 @@ void render_webgpu_draw_rect_ex(WebGPURenderContext* ctx,
+ 	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
+ }
+ 
++// ---------------------------------------------------------------------------
++// render_webgpu_draw_cov_runs: s29 w2-text-coverage-land. ONE draw for a batch
++// of pixel-aligned coverage runs (tag.c tf_cpu_cov_fill: Flash HIGH's
++// 4-sub-scanline / exact-x coverage rule for skewed AVM1 text). Each run is a
++// quad {x, y, w, h} in the transform slot's space; its colour is a per-VERTEX
++// colour slot (style_y), so a whole field's runs at up to 16 coverage levels x
++// N colours share one draw and n_pal colour slots, not one draw + slot per run
++// (the w1 prototype's MAX_DYNAMIC_RECTS blocker). All-or-nothing: returns 0
++// and draws nothing when the dynamic pools cannot hold the batch.
++// render_webgpu_dyn_room reports what is left so the caller can fall back to
++// its MSAA path BEFORE it commits a glyph to the batch.
++// ---------------------------------------------------------------------------
++void render_webgpu_dyn_room(WebGPURenderContext* ctx, u32* verts_left, u32* colors_left)
++{
++	u32 v = 0, c = 0;
++	if (ctx != NULL && ctx->renderer_ok) {
++		if (ctx->dynamic_vertex_used < MAX_DYNAMIC_VERTICES)
++			v = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
++		if (ctx->dynamic_rect_count < MAX_DYNAMIC_RECTS)
++			c = MAX_DYNAMIC_RECTS - ctx->dynamic_rect_count;
++	}
++	if (verts_left) *verts_left = v;
++	if (colors_left) *colors_left = c;
++}
++
++int render_webgpu_draw_cov_runs(WebGPURenderContext* ctx,
++	const float* xywh, const u16* pal_idx, u32 n_runs,
++	const float* pal_rgba, u32 n_pal,
++	u32 transform_id, u32 cxform_id)
++{
++	if (!ctx->renderer_ok) return 0;
++	if (n_runs == 0) return 1;
++	if (n_pal == 0 || xywh == NULL || pal_idx == NULL || pal_rgba == NULL) return 0;
++	const u32 nv = 6u * n_runs;
++	if (n_runs > MAX_DYNAMIC_VERTICES / 6u
++	    || ctx->dynamic_vertex_used + nv > MAX_DYNAMIC_VERTICES
++	    || ctx->dynamic_rect_count + n_pal > MAX_DYNAMIC_RECTS)
++		return 0;
++	u32* verts = (u32*)malloc((size_t)nv * 4 * sizeof(u32));
++	if (verts == NULL) return 0;
++	const u32 color_base = ctx->dynamic_color_base + ctx->dynamic_rect_count;
++	ctx->dynamic_rect_count += n_pal;
++	for (u32 i = 0; i < n_pal; i++)
++		stage_dyn_color(ctx, color_base + i, &pal_rgba[4 * i]);
++	for (u32 i = 0; i < n_runs; i++) {
++		union { float f; u32 u; } x0, y0, x1, y1;
++		x0.f = xywh[4 * i];                  y0.f = xywh[4 * i + 1];
++		x1.f = xywh[4 * i] + xywh[4 * i + 2]; y1.f = xywh[4 * i + 1] + xywh[4 * i + 3];
++		const u32 sy = color_base + (pal_idx[i] < n_pal ? pal_idx[i] : 0u);
++		u32* q = &verts[(size_t)i * 24];
++		const u32 vv[6][2] = { { x0.u, y0.u }, { x1.u, y0.u }, { x0.u, y1.u },
++		                       { x1.u, y0.u }, { x1.u, y1.u }, { x0.u, y1.u } };
++		for (int k = 0; k < 6; k++) {
++			q[4 * k + 0] = vv[k][0];
++			q[4 * k + 1] = vv[k][1];
++			q[4 * k + 2] = 0x00u;   // solid colour fill
++			q[4 * k + 3] = sy;
++		}
++	}
++	const u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
++	ctx->dynamic_vertex_used += nv;
++	stage_dyn_verts(ctx, vert_base, verts, nv);
++	free(verts);
++	render_webgpu_draw_shape(ctx, vert_base, nv, transform_id, cxform_id);
++	return 1;
++}
++
+ // ---------------------------------------------------------------------------
+ // Clip-mask stencil state helpers
+ // ---------------------------------------------------------------------------
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index eebdc5dd..5361a03e 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -842,3 +842,10 @@ from_gnash/misc-ming.all/place_object_test   # two pairs at one depth, newcomer
+ # tier=1
+ from_shumway/acid/acid-stroke-0                     # 5 line styles x 11 matrices, LOW   1 cmp
+ regression/avm1_stroke_pixel_snap_matrix            # 224 snapped/AA strokes, skew rows  1 cmp
++# s29 w2-text-coverage-land: Flash HIGH's coverage rule for SKEWED AVM1 text (tag.c tf_cpu_cov_fill ->
++# render_webgpu.c render_webgpu_draw_cov_runs, one batched draw per field). No standing member saw
++# a coloured skewed field or a multi-line skewed field (the run budget). W1 = FP32 golden; the
++# paragraph has no golden yet (skip; md5 A/B only, 18068 runs in one draw).
++# tier=1
++regression/avm1_edittext_rotated_color       # rot30/shear/90deg, text 0xCC3300, grey under  1 cmp
++regression/avm1_edittext_rotated_paragraph   # 200 glyphs rotated 30deg, run-budget stress  1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/create_test_swf.py
+new file mode 100644
+index 00000000..b3bc814e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/create_test_swf.py
+@@ -0,0 +1,61 @@
++"""regression/avm1_edittext_rotated_color: the s29 W1 FLASH fixture (coordinator mkswf.py, W1 part, verbatim).
++
++The avm1_edittext_rotated_glyphs layout (90 deg, rot30, shear 0.5 fields + a 2nd 90 deg field)
++with text colour 0xCC3300 and a 0x808080 rect (90..200, 20..140 px) behind the rot30 field.
++Golden output.expected.png = FP32 LNX capture (session29-fanout-reports/w1-local-oracles/
++w1-text-pixels/W1_color/flash.png). Run: python3 create_test_swf.py  (writes test.swf here).
++"""
++import pathlib, struct, sys, math
++HERE = pathlib.Path(__file__).resolve().parent
++REG = HERE.parent
++sys.path.insert(0, str(REG / 'avm1_edittext_placed_cxform'))
++import create_test_swf as base
++def matrix(a, b, c, d, tx, ty):
++    w = base.BW(); w.u(1, 1)
++    A, D = int(round(a * 65536)), int(round(d * 65536))
++    nb = base.nbits_s(A, D); w.u(nb, 5); w.sb(A, nb); w.sb(D, nb)
++    B, C = int(round(b * 65536)), int(round(c * 65536))
++    if B or C:
++        w.u(1, 1); nb = base.nbits_s(B, C); w.u(nb, 5); w.sb(B, nb); w.sb(C, nb)
++    else: w.u(0, 1)
++    nb = base.nbits_s(tx, ty); w.u(nb, 5); w.sb(tx, nb); w.sb(ty, nb)
++    return w.bytes()
++def place(depth, cid, m):
++    return base.tag(26, bytes([0x06]) + struct.pack('<HH', depth, cid) + m)
++def shape(sid, fills, lines, paths):
++    """paths: list of (fill0_idx, line_idx, [(x,y) twips absolute...]) polylines."""
++    allp = [p for _, _, pts in paths for p in pts]
++    xs = [p[0] for p in allp]; ys = [p[1] for p in allp]
++    b = base.rect(min(xs) - 40, max(xs) + 40, min(ys) - 40, max(ys) + 40)
++    out = struct.pack('<H', sid) + b
++    out += bytes([len(fills)]) + b''.join(bytes([0]) + bytes(c) for c in fills)
++    out += bytes([len(lines)]) + b''.join(struct.pack('<H', wdt) + bytes(c) for wdt, c in lines)
++    w = base.BW(); nf, nl = 2, 2
++    w.u(nf, 4); w.u(nl, 4)
++    cx = cy = 0
++    for f0, li, pts in paths:
++        x0, y0 = pts[0]
++        w.u(0, 1); w.u(0, 1); w.u(1, 1); w.u(0, 1); w.u(1, 1); w.u(1, 1)  # lineStyle, fill0, moveTo
++        nb = base.nbits_s(x0, y0); w.u(nb, 5); w.sb(x0, nb); w.sb(y0, nb)
++        w.u(f0, nf); w.u(li, nl)
++        cx, cy = x0, y0
++        for x, y in pts[1:]:
++            dx, dy = x - cx, y - cy
++            nb = max(base.nbits_s(dx, dy), 2)
++            w.u(1, 1); w.u(1, 1); w.u(nb - 2, 4); w.u(1, 1); w.sb(dx, nb); w.sb(dy, nb)
++            cx, cy = x, y
++    w.u(0, 6)
++    return base.tag(2, out + w.bytes())
++def write(path, w_px, h_px, tags):
++    body = base.rect(0, w_px * 20, 0, h_px * 20) + struct.pack('<HH', 30 << 8, 1) + b''.join(tags + [base.tag(1, b''), base.tag(0, b'')])
++    path.write_bytes(b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(body)) + body)
++t = lambda px: int(round(px * 20))
++r = math.radians(30)
++# W1: rotated_glyphs layout, text colour CC3300, a mid-grey rect behind the rot30 field (depth 1 < 2)
++grey = shape(10, [(0x80, 0x80, 0x80)], [], [(1, 0, [(t(90), t(20)), (t(200), t(20)), (t(200), t(140)), (t(90), t(140)), (t(90), t(20))])])
++write(HERE / 'test.swf', 200, 200, [base.tag(9, b'\xff\xff\xff'), base.font2(1), base.edittext(5, 1, (0xCC, 0x33, 0x00), 'II'), grey,
++    place(1, 10, matrix(1, 0, 0, 1, 0, 0)),
++    place(2, 5, matrix(math.cos(r), math.sin(r), -math.sin(r), math.cos(r), 2200, 600)),
++    place(3, 5, matrix(1, 0, 0.5, 1, 200, 2600)),
++    place(4, 5, matrix(0, 1, -1, 0, 1400, 200))])
++print('ok')
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..e786dbef2283ddf5af27d3fec908d2c92d9ce732
+GIT binary patch
+literal 4205
+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
+EUjQZ#j{pDw
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/output.txt b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/test.swf b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..a6eaf053ffb4c192cb8a10adcfe6048520f05b67
+GIT binary patch
+literal 228
+zcmZ<@59WBnz`&5fAn(Ayeu05Oj*-Ec>Hq)#`aFyb4U9~|g^Ua=3?d8yqKT6hRS2C6
+ztvr}jbj5+eQ-S#eP}>*Ah!i7H0U(PZfs>UXfkFEKgHl4PB_jg^%Nb*a{~!qn@bqL@
+z!NA3kxkG+}SZfah(C~%^1|{7-0VB@4!VC=W7+5xx?{;9YZeY5?z|h0S#t2k=l7Ybi
+zsB$tJ8xsR7!_nOtcefm6U~FK>Qe)XLg^i6FC<s<!$iSe$AjQ)v!qCsg#sU;=0SX^r
+MkXX++!2xJH0Kqsj8UO$Q
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/test.toml b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/test.toml
+new file mode 100644
+index 00000000..c55dfe5d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_color/test.toml
+@@ -0,0 +1,19 @@
++num_ticks = 1
++
++# s29 w2-text-coverage-land. Golden: FLASH PLAYER 32 capture (s29 coordinator,
++# session29-fanout-reports/w1-local-oracles/w1-text-pixels/W1_color/flash.png;
++# draw() == --screen, 0 px). Pins Flash's coloured coverage write
++# out = floor((dst * (16 - n) + c * n) / 16) with the EXACT colour byte (tag.c
++# tf_cov_level_rgba). Budget from the measured residual at tolerance 16:
++# 72 channels with tf_cpu_cov_fill (all edge-geometry: 37 coloured px whose
++# level n differs, the rot30/shear border; every coloured px whose level
++# matches Flash's is byte-exact), 1589 with SWF_TF_CPU_COV=0 (4x MSAA).
++# The 90-degree fields stay on the MSAA path: their glyph interior is
++# 203,51,0 (Ruffle's Fixed8 colour multiply) vs Flash's 204,51,0, 1 off,
++# under this tolerance.
++[image_comparisons.output]
++tolerance = 16
++max_outliers = 144
++
++[player_options]
++with_renderer = { optional = false }
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/create_test_swf.py
+new file mode 100644
+index 00000000..68fa20fa
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/create_test_swf.py
+@@ -0,0 +1,59 @@
++"""avm1_edittext_rotated_paragraph: a 200-glyph rotated multiline EditText (coverage-run budget stress).
++
++s29 w2-text-coverage-land. Skewed AVM1 text draws through tag.c tf_cpu_cov_fill
++(Flash HIGH's 4-sub-scanline / exact-x coverage rule), which emits pixel runs.
++The w1-text-pixels prototype drew one alpha rect per run: one draw call and one
++dynamic colour slot each, against MAX_DYNAMIC_RECTS = 4096 per frame
++(render_webgpu.c), so a rotated paragraph silently lost its tail. This field has
++10 lines x 20 glyphs at 15 px, rotated 30 deg: ~2x that budget in runs. The
++landing batches a field's runs into ONE render_webgpu_draw_cov_runs draw (per-
++vertex colour slots, one per coverage level), so every glyph must be present:
++SWF_TF_CPU_COV_STATS=1 prints "runs drawn N, fallbacks 0, failed 0".
++Same square-glyph DefineFont2 as ../avm1_edittext_placed_cxform (glyph 'I').
++Golden: none yet (image comparison = skip) until a FLASH Player 32 capture is
++archived (s29 w2-text-coverage-land LOCAL ORACLE REQUEST F1).
++"""
++import pathlib, struct, sys, math
++HERE = pathlib.Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / 'avm1_edittext_placed_cxform'))
++import create_test_swf as base
++
++
++def matrix(a, b, c, d, tx, ty):
++    w = base.BW(); w.u(1, 1)
++    A, D = int(round(a * 65536)), int(round(d * 65536))
++    nb = base.nbits_s(A, D); w.u(nb, 5); w.sb(A, nb); w.sb(D, nb)
++    B, C = int(round(b * 65536)), int(round(c * 65536))
++    if B or C:
++        w.u(1, 1); nb = base.nbits_s(B, C); w.u(nb, 5); w.sb(B, nb); w.sb(C, nb)
++    else: w.u(0, 1)
++    nb = base.nbits_s(tx, ty); w.u(nb, 5); w.sb(tx, nb); w.sb(ty, nb)
++    return w.bytes()
++
++
++def place(depth, cid, m):
++    return base.tag(26, bytes([0x06]) + struct.pack('<HH', depth, cid) + m)
++
++
++def edittext_multiline(cid, fid, color, text, w_tw, h_tw, fh_tw):
++    b = struct.pack("<H", cid) + base.rect(0, w_tw, 0, h_tw)
++    b += bytes([0x80 | 0x20 | 0x04 | 0x01,      # HasText | Multiline | HasTextColor | HasFont
++                0x08 | 0x01 | 0x10 | 0x20])     # Border | UseOutlines | NoSelect | HasLayout
++    b += struct.pack("<HH", fid, fh_tw)
++    b += bytes(color) + b"\xff"
++    b += bytes([0]) + struct.pack("<HHHh", 0, 0, 0, 0)
++    b += base.s("")
++    b += base.s(text)
++    return tag_(37, b)
++
++
++tag_ = base.tag
++text = "\r".join(["I" * 20] * 10)               # 200 glyphs
++r = math.radians(30)
++tags = [base.tag(9, b'\xff\xff\xff'), base.font2(1),
++        edittext_multiline(5, 1, (0, 0, 0), text, 3100, 3100, 300),
++        place(1, 5, matrix(math.cos(r), math.sin(r), -math.sin(r), math.cos(r), 1800, 300)),
++        base.tag(1, b''), base.tag(0, b'')]
++body = base.rect(0, 4800, 0, 4800) + struct.pack('<HH', 30 << 8, 1) + b''.join(tags)
++(HERE / 'test.swf').write_bytes(b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(body)) + body)
++print('ok')
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/output.txt b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/output.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/test.swf b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..073fd6c63107e61a2541974cddd62e7605860858
+GIT binary patch
+literal 345
+zcmZ<@59WwuWMC*@;7nj(n8v^$$H?H!^#A{VeI7=J21cgfLPiD_1`!4U(ZorMDum93
+zRvyeMy5hj#sla@Kfq~%*V?>IPr~r_~P|x`RNU}0yFi2Q1u<<c0wPa+_0h-M4A0!I_
+no>%}c7BSDEBFHeAjg1lL>7%<d?ru5Cz}Uc$+`^gQ0Q4;YK$BKc
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/test.toml b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/test.toml
+new file mode 100644
+index 00000000..bcdc406d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_edittext_rotated_paragraph/test.toml
+@@ -0,0 +1,12 @@
++# s29 w2-text-coverage-land: 200-glyph rotated paragraph, the coverage-run
++# budget stress (see create_test_swf.py). No golden yet: the comparison is
++# skip until the FLASH capture (report LOCAL ORACLE REQUEST F1) is archived;
++# it still renders, so it is a render-canary member (md5 identity).
++num_ticks = 1
++
++[image_comparisons.output]
++tolerance = 128
++max_outliers = 0
++
++[player_options]
++with_renderer = { optional = false }
