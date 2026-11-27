@@ -1,0 +1,30 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 30 (dual-axis #22), slot `w2b-stroke-timeline`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2b-stroke-timeline` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session30-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Your branch is `fanout/w2b-stroke-timeline`; deliver `SWFRecompDocs/plans/session30-fanout-reports/w2b-stroke-timeline-report.md` and `SWFRecompDocs/plans/session30-fanout-reports/w2b-stroke-timeline.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Also read `CLAUDE.md`. Check `SWFRecompDocs/plans/session30-fanout-reports/SIBLING_FILE_MAP.md` (if present) for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+
+**The timeline-shape twin of the HIGH 0.01 px curve flattening (M): `swf.cpp` `addCurvedEdgeLevien`.**
+
+Base: master `a18a0e033` or newer (w2-stroke-geometry-land LANDED: AVM2 + AVM1 drawing-API flatten at HIGH).
+Read `w2-stroke-geometry-land-report.md` §2.2 and its `timeline-knob-probe-not-for-landing.patch` +
+`timeline_knob_compare.txt`.
+
+The knob probe moved 30/155 HIGH canary comparisons: 24 toward the golden, 1 away, 5 mixed. It was HELD for three
+reasons, each of which you must close:
+(a) **one FP32-golden row moved away**: `regression/avm1_stroke_pixel_snap_matrix` 11 730 → 11 856. Find why (is
+  this row's geometry better served by the coarser tolerance, or does its snap rule depend on chord ends?) and fix it
+  or scope the rule;
+(b) **the canary covers only 117 of 238 non-LOW image rows**: run every non-LOW image row in the corpus, before/after,
+  with `--recompile` (cloud box, `-P` as BRIEFS_COMMON allows). Name every move;
+(c) **the recompiler does not know a test's quality**: LOW must keep the current tolerance. Plumb the quality into
+  the emitted shape data, or emit both tolerances and select at runtime by `MSAA_SAMPLES` (cheaper; mind the size).
+  Choose by measurement (emitted-C size, build time).
+Also re-check the morph-shape and device-font-glyph flatten paths (`swf.cpp` ~3265 and the morph stepping): same
+rule or not, by FP32 (`w1-local-oracles/w1-stroke-geometry/` captures).
+Ledger: pixel axis by name; trace axis must be unchanged (hit tests read the recompiled paths: run the 35-row
+hitTest family). Recompiler change: rebuild + `--recompile` on every leg.
