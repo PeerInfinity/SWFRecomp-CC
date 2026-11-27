@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T01:51:13.595922+00:00",
+    "timestamp": "2026-11-27T16:16:11.608653+00:00",
     "suite": "avm2",
     "stem": "results_graphics",
-    "git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
+    "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45920452660",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45920452660",
-    "run_attempt": "1"
+    "run_id": "45938113471",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45938113471",
+    "run_attempt": "2"
   },
   "tests_with_comparisons": 115,
   "comparisons": 130,
@@ -35,8 +35,8 @@
       "width": 960,
       "height": 700,
       "total_channels": 2688000,
-      "diff_channels": 1990839,
-      "mean_diff": 37.4588,
+      "diff_channels": 1990896,
+      "mean_diff": 37.4593,
       "checks": [
         {
           "tolerance": 30,
@@ -60,7 +60,7 @@
       "known_failure": false,
       "ignored_upstream": "ignore = true",
       "status": "ignored",
-      "message": "Image comparison failed: 3372 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 5727 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "would_pass": false,
@@ -68,22 +68,22 @@
       "width": 350,
       "height": 500,
       "total_channels": 700000,
-      "diff_channels": 3372,
-      "mean_diff": 1.2284,
+      "diff_channels": 5727,
+      "mean_diff": 2.0863,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 0,
-          "outliers": 3372,
+          "outliers": 5727,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 3372,
+      "outliers": 5727,
       "max_outliers": 0,
       "tolerance": 0,
-      "excess_outliers": 3372
+      "excess_outliers": 5727
     },
     {
       "suite": "avm2",
@@ -2570,7 +2570,7 @@
       "trace_status": "pass",
       "known_failure": true,
       "status": "fail",
-      "message": "Image comparison failed: 293 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 296 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "ruffle_match": false,
@@ -2579,22 +2579,22 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 1306,
-      "mean_diff": 0.0686,
+      "diff_channels": 1309,
+      "mean_diff": 0.0692,
       "checks": [
         {
           "tolerance": 1,
           "max_outliers": 0,
-          "outliers": 293,
+          "outliers": 296,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 293,
+      "outliers": 296,
       "max_outliers": 0,
       "tolerance": 1,
-      "excess_outliers": 293
+      "excess_outliers": 296
     },
     {
       "suite": "avm2",
@@ -2633,7 +2633,7 @@
       "trace_status": "pass",
       "known_failure": true,
       "status": "fail",
-      "message": "Image comparison failed: 114 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 116 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "ruffle_match": false,
@@ -2642,22 +2642,22 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 114,
-      "mean_diff": 0.033,
+      "diff_channels": 116,
+      "mean_diff": 0.0336,
       "checks": [
         {
           "tolerance": 1,
           "max_outliers": 0,
-          "outliers": 114,
+          "outliers": 116,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 114,
+      "outliers": 116,
       "max_outliers": 0,
       "tolerance": 1,
-      "excess_outliers": 114
+      "excess_outliers": 116
     },
     {
       "suite": "avm2",
@@ -3776,29 +3776,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 2840 outliers exceed limit of 117, max difference 255",
+      "message": "Image comparison failed: 4042 outliers exceed limit of 117, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 42100,
-      "mean_diff": 0.7695,
+      "diff_channels": 43303,
+      "mean_diff": 1.0575,
       "checks": [
         {
           "tolerance": 8,
           "max_outliers": 117,
-          "outliers": 2840,
+          "outliers": 4042,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 2840,
+      "outliers": 4042,
       "max_outliers": 117,
       "tolerance": 8,
-      "excess_outliers": 2723
+      "excess_outliers": 3925
     },
     {
       "suite": "avm2",

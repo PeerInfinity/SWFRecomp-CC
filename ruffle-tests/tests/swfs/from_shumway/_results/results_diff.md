@@ -1,15 +1,14 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bfa47037b19e` (2026-11-26T21:04:08.202712+00:00)
-**Current:** `6ee6eded7b66` (2026-11-27T02:09:04.007171+00:00)
+**Previous:** `2d40d37996b8` (2026-11-27T07:04:59.002196+00:00)
+**Current:** `2d40d37996b8` (2026-11-27T16:08:12.424405+00:00)
+*Re-run on same commit — no comparison available.*
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 215 | 215 | 0 |
-| Total | 229 | 229 | 0 |
-| Pass rate | 93.9% | 93.9% | 0% |
+| Passing | 208 | 215 | +7 |
+| Total | 222 | 229 | +7 |
+| Pass rate | 93.7% | 93.9% | +0.2% |
 | Mismatched lines | 76 | 76 | 0 |
-
-No changes detected.

@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T21:04:08.196869+00:00",
-    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
-    "new_timestamp": "2026-11-27T02:09:04.002468+00:00",
-    "new_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
+    "old_timestamp": "2026-11-27T07:04:58.999275+00:00",
+    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
+    "new_timestamp": "2026-11-27T16:08:12.419849+00:00",
+    "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 47,
+    "old_pass": 46,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 47,
-    "old_total": 47,
+    "old_effective_pass": 46,
+    "old_total": 46,
     "old_pass_rate": 100.0,
     "new_pass": 47,
     "new_ruffle_matched": 0,
@@ -25,9 +25,22 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 47,
-    "added": 0,
+    "unchanged": 46,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "textfield/textfield-text-setters",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    }
+  ]
 }

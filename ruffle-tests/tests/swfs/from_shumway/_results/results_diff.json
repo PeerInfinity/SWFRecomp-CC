@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T21:04:08.202712+00:00",
-    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
-    "new_timestamp": "2026-11-27T02:09:04.007171+00:00",
-    "new_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
+    "old_timestamp": "2026-11-27T07:04:59.002196+00:00",
+    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
+    "new_timestamp": "2026-11-27T16:08:12.424405+00:00",
+    "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 215,
+    "old_pass": 208,
     "old_ruffle_matched": 13,
-    "old_effective_pass": 228,
-    "old_total": 229,
-    "old_pass_rate": 93.9,
+    "old_effective_pass": 221,
+    "old_total": 222,
+    "old_pass_rate": 93.7,
     "new_pass": 215,
     "new_ruffle_matched": 13,
     "new_effective_pass": 228,
@@ -25,9 +25,94 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 229,
-    "added": 0,
+    "unchanged": 222,
+    "added": 7,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "image-loading",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "invalidClipDepth",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "local2global",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "localconnection",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      }
+    },
+    {
+      "test": "lzma",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "lzma_bytes",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "mouse/mouse_coords",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    }
+  ]
 }

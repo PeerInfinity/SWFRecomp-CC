@@ -1,27 +1,14 @@
 # Ruffle Test Results Diff
 
-**Previous:** `574824001e94` (2026-11-27T01:02:33.884790+00:00)
-**Current:** `6ee6eded7b66` (2026-11-27T01:51:12.149186+00:00)
+**Previous:** `2d40d37996b8` (2026-11-27T06:45:05.523532+00:00)
+**Current:** `2d40d37996b8` (2026-11-27T16:16:08.528748+00:00)
+*Re-run on same commit — no comparison available.*
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 771 | 773 | +2 |
-| Total | 791 | 791 | 0 |
-| Pass rate | 97.5% | 97.7% | +0.2% |
-| Mismatched lines | 12145 | 12123 | -22 |
-|   Decreased | | | -22 |
-
-## Newly Passing (2)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `globals_swf5` | output_mismatch | 295/304 | 304/304 |
-| `native_objects_swf6` | output_mismatch | 114/115 | 115/115 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `global_proto_decls` | output_mismatch | 50/4562 | 62/4562 | -12 |
+| Passing | 750 | 776 | +26 |
+| Total | 764 | 791 | +27 |
+| Pass rate | 98.2% | 98.1% | -0.1% |
+| Mismatched lines | 11984 | 12119 | +135 |

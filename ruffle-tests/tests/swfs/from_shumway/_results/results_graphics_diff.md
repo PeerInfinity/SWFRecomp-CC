@@ -1,20 +1,14 @@
 # Ruffle Test Results Diff
 
-**Previous:** `574824001e94` (2026-11-27T01:02:34.055576+00:00)
-**Current:** `6ee6eded7b66` (2026-11-27T01:51:12.249383+00:00)
+**Previous:** `2d40d37996b8` (2026-11-27T06:45:05.628493+00:00)
+**Current:** `2d40d37996b8` (2026-11-27T16:16:08.667502+00:00)
+*Re-run on same commit — no comparison available.*
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 215 | 214 | -1 |
-| Total | 229 | 229 | 0 |
-| Pass rate | 93.9% | 93.4% | -0.5% |
-| Mismatched lines | 76 | 77 | +1 |
-|   Increased | | | +1 |
-
-## Newly Failing (1)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `as3-loader/bug1157243/empty` | output_mismatch | 1/1 | 0/1 |
+| Passing | 207 | 215 | +8 |
+| Total | 221 | 229 | +8 |
+| Pass rate | 93.7% | 93.9% | +0.2% |
+| Mismatched lines | 76 | 76 | 0 |

@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T21:04:08.171042+00:00",
-    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
-    "new_timestamp": "2026-11-27T02:09:03.981589+00:00",
-    "new_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
+    "old_timestamp": "2026-11-27T07:04:58.985342+00:00",
+    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
+    "new_timestamp": "2026-11-27T16:08:12.398949+00:00",
+    "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 149,
+    "old_pass": 144,
     "old_ruffle_matched": 2,
-    "old_effective_pass": 151,
-    "old_total": 151,
-    "old_pass_rate": 98.7,
+    "old_effective_pass": 146,
+    "old_total": 146,
+    "old_pass_rate": 98.6,
     "new_pass": 149,
     "new_ruffle_matched": 2,
     "new_effective_pass": 151,
@@ -25,9 +25,70 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 151,
-    "added": 0,
+    "unchanged": 146,
+    "added": 5,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "fonts/leading_device_font",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "fonts/leading_embedded_font",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "gradient_issue_9892",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "gradient_nonsequential_ratios",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "gradient_radial_same_ratios",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }
