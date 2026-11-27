@@ -29,13 +29,13 @@ Upstream: `b7ff32d93..66f9073de` (11 commits; 1 new row `avm2/xmldocument_tostri
 
 | # | slug | task | session id |
 |---|---|---|---|
-| 1 | w1-drift-smalls | `briefs/w1-drift-smalls.md` | |
-| 2 | w1-native-table | `briefs/w1-native-table.md` | |
-| 3 | w1-exec-order | `briefs/w1-exec-order.md` (IMPLEMENTATION) | |
-| 4 | w1-rm-avm1-gnash | `briefs/w1-rm-avm1-gnash.md` | |
-| 5 | w1-rm-avm2 | `briefs/w1-rm-avm2.md` | |
-| 6 | w1-lowq-residues | `briefs/w1-lowq-residues.md` | |
-| 7 | w1-stroke-geometry | `briefs/w1-stroke-geometry.md` | |
+| 1 | w1-drift-smalls | `briefs/w1-drift-smalls.md` | session_018CoDi3UKNCYNXQnaGSMtpt (launched 2026-11-27) |
+| 2 | w1-native-table | `briefs/w1-native-table.md` | session_018CoDi4Sch2FCj267pG7rvV (launched 2026-11-27) |
+| 3 | w1-exec-order | `briefs/w1-exec-order.md` (IMPLEMENTATION) | session_018CoDi3wxmmmZzx6LvZSqQy (launched 2026-11-27) |
+| 4 | w1-rm-avm1-gnash | `briefs/w1-rm-avm1-gnash.md` | session_018CoDi5SY1nuHbr85qkJ3v6 (launched 2026-11-27) |
+| 5 | w1-rm-avm2 | `briefs/w1-rm-avm2.md` | session_018CoDi826BFpNusgFJQzZLD (launched 2026-11-27) |
+| 6 | w1-lowq-residues | `briefs/w1-lowq-residues.md` | session_018CoDi5KLv9Hms3cZuawbmS (launched 2026-11-27) |
+| 7 | w1-stroke-geometry | `briefs/w1-stroke-geometry.md` | session_018CoDi3XoxSKf3YqHyc4Zjr (launched 2026-11-27) |
 
 ## Wave 2 (cloud)
 
@@ -46,3 +46,4 @@ Upstream: `b7ff32d93..66f9073de` (11 commits; 1 new row `avm2/xmldocument_tostri
 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
+| `46040854188` interim #1 (G full images) | `f4edebdce`: batch 0 (acid-large swap, layer_group re-golden) + fresh upstream | expected: new row `avm2/xmldocument_tostring` (status unknown); 0 moves | expected: acid-large fail→fail (vs FP32 ~138 478); layer_group ×2 fail→fail (~4 268 / 2 143); 0 status moves | — |
