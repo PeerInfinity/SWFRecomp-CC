@@ -1,34 +1,42 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b030ed745d4f` (2026-11-25T23:59:46.627318+00:00)
-**Current:** `bfa47037b19e` (2026-11-26T21:04:08.079586+00:00)
+**Previous:** `bfa47037b19e` (2026-11-26T21:04:08.079586+00:00)
+**Current:** `6ee6eded7b66` (2026-11-27T02:09:03.905396+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1304 | 1308 | +4 |
-| Total | 1348 | 1351 | +3 |
-| Pass rate | 96.7% | 96.8% | +0.1% |
-| Mismatched lines | 1787 | 1779 | -8 |
-|   Decreased | | | -8 |
+| Passing | 1308 | 1315 | +7 |
+| Total | 1351 | 1352 | +1 |
+| Pass rate | 96.8% | 97.3% | +0.5% |
+| Mismatched lines | 1779 | 1553 | -226 |
+|   Decreased | | | -231 |
+|   Increased | | | +5 |
 
-## Newly Passing (1)
+## Newly Passing (6)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `mouse_pick_avm1_root` | output_mismatch | 1/2 | 2/2 |
+| `dependent_strings` | output_mismatch | 46/84 | 83/83 |
+| `edittext_getcharboundaries_culling` | ruffle_matched | 125/305 | 305/305 |
+| `event_handler_exception` | ruffle_matched | 8/11 | 11/11 |
+| `freestanding_superclass` | ruffle_matched | 2/4 | 4/4 |
+| `loader_applicationDomain` | output_mismatch | 0/4 | 3/3 |
+| `weird_superinterface_properties` | ruffle_matched | 1/2 | 2/2 |
 
-## Added Tests (3)
+## Added Tests (1)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `timer_checks_per_frame` | pass | 6/6 |
-| `timer_tie_order` | pass | 64/64 |
-| `timer_timeout_ids` | pass | 11/11 |
+| `bitmapdata_palettemap_opaque` | pass | 9/9 |
 
-## Line Count Changed (1)
+## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `avm1_root` | output_mismatch | 5/58 | 12/58 | -7 |
+| `coerce_property` | ruffle_matched | 33/36 | 35/36 | -2 |
+| `swz` | output_mismatch | 0/2 | 2/3 | -1 |
+| `loader_load` | output_mismatch | 126/128 | 125/128 | +1 |
+| `slot_holes_fail` | ruffle_matched | 0/0 | 0/1 | +1 |
+| `slot_id_exceeds_trait_count` | ruffle_matched | 0/0 | 0/3 | +3 |

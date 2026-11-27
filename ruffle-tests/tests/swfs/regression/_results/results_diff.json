@@ -1,61 +1,97 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-25T23:59:46.689225+00:00",
-    "old_git_sha": "b030ed745d4f42dfa38060b3a4bdf7eb3324cec2",
-    "new_timestamp": "2026-11-26T21:04:08.187674+00:00",
-    "new_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
+    "old_timestamp": "2026-11-26T21:04:08.187674+00:00",
+    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
+    "new_timestamp": "2026-11-27T02:09:03.994806+00:00",
+    "new_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 282,
+    "old_pass": 292,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 282,
-    "old_total": 282,
+    "old_effective_pass": 292,
+    "old_total": 292,
     "old_pass_rate": 100.0,
-    "new_pass": 292,
+    "new_pass": 301,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 292,
-    "new_total": 292,
-    "new_pass_rate": 100.0,
+    "new_effective_pass": 301,
+    "new_total": 302,
+    "new_pass_rate": 99.7,
     "old_mismatched_lines": 0,
-    "new_mismatched_lines": 0,
+    "new_mismatched_lines": 2,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 282,
+    "unchanged": 292,
     "added": 10,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_attached_clip_selfgoto_trace",
+      "test": "avm1_edittext_rotated_color",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
       }
     },
     {
-      "test": "avm1_clipevent_root_goto_stopped",
+      "test": "avm1_edittext_rotated_paragraph",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
       }
     },
     {
-      "test": "avm1_drawapi_stroke_snap",
+      "test": "avm1_goto_current_frame_clip",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 23
+      }
+    },
+    {
+      "test": "avm1_goto_current_frame_root",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      }
+    },
+    {
+      "test": "avm1_nested_child_swapdepths_remove",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "avm1_stroke_hinting_caps",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -67,55 +103,7 @@
       }
     },
     {
-      "test": "avm1_drawing_stroke_scale",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "avm1_enterframe_root_goto_opcode",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "avm1_stroke_join_cap_snap",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "avm1_stroke_noscale_signed",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "avm2_drawapi_stroke_snap",
+      "test": "avm1_stroke_seam_caps",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -127,27 +115,39 @@
       }
     },
     {
-      "test": "lowq_gradient_orient_probe",
+      "test": "avm1_textfield_ctor_shadow_swf6",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
       }
     },
     {
-      "test": "lowq_sample_point_probe",
+      "test": "avm1_textfield_ctor_shadow_swf7",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "avm2_bitmapdata_palettemap_index",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
       }
     }
   ]
