@@ -1,8 +1,8 @@
 # s29 w2-text-coverage-land: 200-glyph rotated paragraph, the coverage-run
 # budget stress (see create_test_swf.py). Golden: FP32 LNX HIGH capture (s29
 # coordinator, F1; draw() == --screen), session29-fanout-reports/w1-local-oracles/
-# w2-text-coverage-land/. max_outliers is PROVISIONAL (0) until the next images CI
-# run measures our residual; then set to ~2x the measured count.
+# w2-text-coverage-land/. CI interim #2 (run 45914277386) measured 0 outliers at tol 128
+# (max diff 112): the budget stays 0.
 num_ticks = 1
 
 [image_comparisons.output]
