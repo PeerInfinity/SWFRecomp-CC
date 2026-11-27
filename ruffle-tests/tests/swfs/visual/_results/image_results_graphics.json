@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-26T23:43:09.281157+00:00",
+    "timestamp": "2026-11-27T01:02:36.971170+00:00",
     "suite": "visual",
     "stem": "results_graphics",
-    "git_sha": "4989a9dfb572fafd91b26d56c6b01d24066ba00c",
+    "git_sha": "574824001e94c8ee0199e6eef35f6fd4571c0a09",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45907020469",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45907020469",
+    "run_id": "45914277386",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45914277386",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 148,
@@ -2527,25 +2527,25 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 20), max difference 128",
-      "max_diff": 128,
+      "message": "Image check passed: 2 outliers (limit 20), max difference 191",
+      "max_diff": 191,
       "expected_source": "repo",
       "width": 100,
       "height": 100,
       "total_channels": 40000,
-      "diff_channels": 223,
-      "mean_diff": 0.1633,
+      "diff_channels": 86,
+      "mean_diff": 0.0665,
       "checks": [
         {
           "tolerance": 128,
           "max_outliers": 20,
-          "outliers": 0,
+          "outliers": 2,
           "passed": true
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 0,
-      "outliers": 0,
+      "outliers": 2,
       "max_outliers": 20,
       "tolerance": 128,
       "excess_outliers": 0
@@ -2587,25 +2587,25 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 20), max difference 128",
-      "max_diff": 128,
+      "message": "Image check passed: 2 outliers (limit 20), max difference 191",
+      "max_diff": 191,
       "expected_source": "repo",
       "width": 100,
       "height": 100,
       "total_channels": 40000,
-      "diff_channels": 256,
-      "mean_diff": 0.2016,
+      "diff_channels": 263,
+      "mean_diff": 0.1186,
       "checks": [
         {
           "tolerance": 128,
           "max_outliers": 20,
-          "outliers": 0,
+          "outliers": 2,
           "passed": true
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 0,
-      "outliers": 0,
+      "outliers": 2,
       "max_outliers": 20,
       "tolerance": 128,
       "excess_outliers": 0

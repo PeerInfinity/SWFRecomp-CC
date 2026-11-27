@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T20:41:28.577341+00:00",
-    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
-    "new_timestamp": "2026-11-26T23:43:06.163007+00:00",
-    "new_git_sha": "4989a9dfb572fafd91b26d56c6b01d24066ba00c",
+    "old_timestamp": "2026-11-26T23:43:06.163007+00:00",
+    "old_git_sha": "4989a9dfb572fafd91b26d56c6b01d24066ba00c",
+    "new_timestamp": "2026-11-27T01:02:34.036210+00:00",
+    "new_git_sha": "574824001e94c8ee0199e6eef35f6fd4571c0a09",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 292,
     "old_total": 292,
     "old_pass_rate": 100.0,
-    "new_pass": 292,
+    "new_pass": 295,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 292,
-    "new_total": 292,
+    "new_effective_pass": 295,
+    "new_total": 295,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,45 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 292,
-    "added": 0,
+    "added": 3,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_edittext_rotated_color",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1_edittext_rotated_paragraph",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm2_bitmapdata_palettemap_index",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    }
+  ]
 }
