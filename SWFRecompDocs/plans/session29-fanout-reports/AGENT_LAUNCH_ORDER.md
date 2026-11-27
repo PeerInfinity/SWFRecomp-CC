@@ -10,7 +10,7 @@ Upstream: `c2f7d24b7..31e07df77` → w1-drift. Launched from master `ee14c39f9` 
 
 ## Local one-task sessions
 
-- N ladder: `n-seam-caps` launched 2026-11-26 (brief `n-seam-caps-prompt.md`; handshake sent): closed stroke seam as two caps in builders/lyon.
+- N ladder: `n-seam-caps` launched 2026-11-26 (brief `n-seam-caps-prompt.md`; handshake sent): closed stroke seam as two caps in builders/lyon. **DONE `faeaaba4b`** (REPORT BACK verified on disk): Flash caps the seam ONLY when snapping separates its ends, else joins; N ep1 NEUTRAL (expected gain was phase luck); pixelHinting ends snap along-axis (avm1_stroke_hinting_caps 8388→7056); W3 drawing-API caps = octagon; 2 new Flash fixtures; no Flash row away. N stroke ladder at its floor → next = analytic-coverage stroke raster (waits on w1-aa-sizing) — PARKED. Grading: interim #3.
 - Browser ladder: `browser-gotoandstop-current` launched 2026-11-26 (brief `browser-gotoandstop-current-prompt.md`; handshake sent): FP32 gotoAndStop(current) fixtures, then one all-build rule.
 - Coordinator-local: Windows FP32 check of the 5 LOW swap candidates (`w1-local-oracles/swapcheck-win/`): invalidClipDepth + acid-filter WIN == LNX → flash_fixes `4989a9dfb` (64 entries); gradient, acid-gradient, acid-gradient-0 WIN ≠ LNX → kept (host-dependent, RvF).
 
