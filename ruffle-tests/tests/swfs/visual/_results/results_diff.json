@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T02:09:03.981589+00:00",
-    "old_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
-    "new_timestamp": "2026-11-27T03:57:01.482601+00:00",
-    "new_git_sha": "dbc43c157352371720c1fed7998018a150009d42",
+    "old_timestamp": "2026-11-27T03:57:01.482601+00:00",
+    "old_git_sha": "dbc43c157352371720c1fed7998018a150009d42",
+    "new_timestamp": "2026-11-27T07:04:58.985342+00:00",
+    "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 149,
@@ -13,11 +16,11 @@
     "old_effective_pass": 151,
     "old_total": 151,
     "old_pass_rate": 98.7,
-    "new_pass": 149,
+    "new_pass": 144,
     "new_ruffle_matched": 2,
-    "new_effective_pass": 151,
-    "new_total": 151,
-    "new_pass_rate": 98.7,
+    "new_effective_pass": 146,
+    "new_total": 146,
+    "new_pass_rate": 98.6,
     "old_mismatched_lines": 49,
     "new_mismatched_lines": 49,
     "increased_mismatches": 0,
@@ -25,9 +28,71 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 151,
+    "unchanged": 146,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 5
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "fonts/leading_device_font",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fonts/leading_embedded_font",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gradient_issue_9892",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gradient_nonsequential_ratios",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gradient_radial_same_ratios",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    }
+  ]
 }

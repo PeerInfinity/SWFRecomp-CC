@@ -1,30 +1,36 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6ee6eded7b66` (2026-11-27T02:09:04.019034+00:00)
-**Current:** `dbc43c157352` (2026-11-27T03:57:01.507184+00:00)
+**Previous:** `dbc43c157352` (2026-11-27T03:57:01.507184+00:00)
+**Current:** `2d40d37996b8` (2026-11-27T07:04:59.009704+00:00)
+**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 177 | 181 | +4 |
-| Total | 243 | 243 | 0 |
-| Pass rate | 72.8% | 74.5% | +1.7% |
-| Mismatched lines | 7696 | 7614 | -82 |
-|   Decreased | | | -82 |
+| Passing | 181 | 176 | -5 |
+| Total | 243 | 235 | -8 |
+| Pass rate | 74.5% | 74.9% | +0.4% |
+| Mismatched lines | 7614 | 1210 | -6404 |
 
-## Newly Passing (4)
+## Missing Tests — Shard Failure (8)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `MovieClip-v5` | ruffle_matched | 353/363 | 363/363 |
-| `MovieClip-v6` | ruffle_matched | 916/936 | 936/936 |
-| `MovieClip-v7` | ruffle_matched | 949/969 | 969/969 |
-| `MovieClip-v8` | ruffle_matched | 1062/1087 | 1087/1087 |
+These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
 
-## Line Count Changed (2)
+- 5 were previously passing
+- 3 were previously failing
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `String-v5` | ruffle_matched | 344/358 | 350/358 | -6 |
-| `ExternalInterface-v8` | ruffle_matched | 114/118 | 115/118 | -1 |
+<details><summary>Show all missing tests</summary>
+
+| Test | Previous Status | Lines |
+|------|----------------|-------|
+| `XMLSocket-v5` | pass | 35/35 |
+| `XMLSocket-v6` | pass | 35/35 |
+| `XMLSocket-v7` | pass | 35/35 |
+| `XMLSocket-v8` | pass | 35/35 |
+| `argstest-v5` | pass | 4/4 |
+| `argstest-v6` | output_mismatch | 84/2192 |
+| `argstest-v7` | output_mismatch | 78/2061 |
+| `argstest-v8` | output_mismatch | 121/2434 |
+
+</details>

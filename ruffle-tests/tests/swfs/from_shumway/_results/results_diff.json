@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T02:09:04.007171+00:00",
-    "old_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
-    "new_timestamp": "2026-11-27T03:57:01.499748+00:00",
-    "new_git_sha": "dbc43c157352371720c1fed7998018a150009d42",
+    "old_timestamp": "2026-11-27T03:57:01.499748+00:00",
+    "old_git_sha": "dbc43c157352371720c1fed7998018a150009d42",
+    "new_timestamp": "2026-11-27T07:04:59.002196+00:00",
+    "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 215,
@@ -13,11 +16,11 @@
     "old_effective_pass": 228,
     "old_total": 229,
     "old_pass_rate": 93.9,
-    "new_pass": 215,
+    "new_pass": 208,
     "new_ruffle_matched": 13,
-    "new_effective_pass": 228,
-    "new_total": 229,
-    "new_pass_rate": 93.9,
+    "new_effective_pass": 221,
+    "new_total": 222,
+    "new_pass_rate": 93.7,
     "old_mismatched_lines": 76,
     "new_mismatched_lines": 76,
     "increased_mismatches": 0,
@@ -25,9 +28,95 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 229,
+    "unchanged": 222,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 7
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "image-loading",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "invalidClipDepth",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "local2global",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "localconnection",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lzma",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lzma_bytes",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse/mouse_coords",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    }
+  ]
 }

@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T02:09:03.990522+00:00",
-    "git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
-    "duration_seconds": 86.38,
+    "timestamp": "2026-11-27T03:57:01.488520+00:00",
+    "git_sha": "dbc43c157352371720c1fed7998018a150009d42",
+    "duration_seconds": 75.88,
     "total_available": 8,
     "shards": 30,
     "expected_shards": 30
@@ -19,9 +19,9 @@
     {
       "test": "draw_to_bitmap_data_unconfigured",
       "phases": {
-        "recomp": 0.008,
-        "compile": 30.943,
-        "run": 0.006
+        "recomp": 0.007,
+        "compile": 25.192,
+        "run": 0.005
       },
       "num_frames": 1,
       "lines": {
@@ -29,14 +29,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 30.96,
+      "duration": 25.21,
       "status": "pass"
     },
     {
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.004,
-        "compile": 6.085,
+        "compile": 6.031,
         "run": 0.004
       },
       "num_frames": 126,
@@ -45,14 +45,14 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 6.1,
+      "duration": 6.04,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
         "recomp": 0.004,
-        "compile": 6.081,
+        "compile": 6.193,
         "run": 0.004
       },
       "num_frames": 12,
@@ -61,15 +61,15 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 6.09,
+      "duration": 6.21,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
         "recomp": 0.014,
-        "compile": 8.168,
-        "run": 0.019
+        "compile": 8.125,
+        "run": 0.018
       },
       "num_frames": 1,
       "lines": {
@@ -77,14 +77,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 8.21,
+      "duration": 8.16,
       "status": "pass"
     },
     {
       "test": "scissor_rectangle",
       "phases": {
         "recomp": 0.014,
-        "compile": 8.06,
+        "compile": 8.136,
         "run": 0.013
       },
       "num_frames": 1,
@@ -93,14 +93,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.09,
+      "duration": 8.17,
       "status": "pass"
     },
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
         "recomp": 0.014,
-        "compile": 8.085,
+        "compile": 8.146,
         "run": 0.019
       },
       "num_frames": 1,
@@ -109,15 +109,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 8.12,
+      "duration": 8.18,
       "status": "pass"
     },
     {
       "test": "unbound_texture",
       "phases": {
-        "recomp": 0.015,
-        "compile": 7.179,
-        "run": 0.008
+        "recomp": 0.016,
+        "compile": 4.716,
+        "run": 0.009
       },
       "num_frames": 1,
       "lines": {
@@ -125,15 +125,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.21,
+      "duration": 4.75,
       "status": "pass"
     },
     {
       "test": "unbound_texture_multiple",
       "phases": {
-        "recomp": 0.025,
-        "compile": 11.283,
-        "run": 0.013
+        "recomp": 0.021,
+        "compile": 8.86,
+        "run": 0.011
       },
       "num_frames": 1,
       "lines": {
@@ -141,7 +141,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 11.33,
+      "duration": 8.9,
       "status": "pass"
     }
   ]
