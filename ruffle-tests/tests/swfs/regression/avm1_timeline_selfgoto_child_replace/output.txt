@@ -1,0 +1,27 @@
+k f1 cf=1
+s f1
+root f1 s.cf=1 k.cf=1
+s f2
+root f2 s.cf=2 k.cf=undefined
+s f3
+root f3 s.cf=1 k.cf=1
+k f1 cf=1
+s f1
+s f2
+root f4 s.cf=2 k.cf=undefined
+s f3
+root f5 s.cf=1 k.cf=1
+k f1 cf=1
+s f1
+s f2
+root f6 s.cf=2 k.cf=undefined
+s f3
+root f7 s.cf=1 k.cf=1
+k f1 cf=1
+s f1
+s f2
+root f8 s.cf=2 k.cf=undefined
+s f3
+root f9 s.cf=1 k.cf=1
+k f1 cf=1
+s f1

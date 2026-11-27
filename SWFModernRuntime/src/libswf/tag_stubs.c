@@ -1283,9 +1283,26 @@ void ng_gotoFrameCurrentSprite(u16 frame)
 	// gotoAndStop semantics (play=0): gotoAndPlay's trailing Play opcode resumes
 	// via ng_playCurrentSprite on g_current_sprite_obj, which is restored here.
 	// Fixture: regression/avm1_attached_clip_selfgoto_trace (Flash 32 golden).
+	// A TIMELINE sprite's own GotoFrame opcode takes the same inline path (s30
+	// browser-timeline-self-goto): its frame script runs with the clip bound as
+	// g_current_context. Before, it was left to the post-drain apply pass, so
+	// the root script of the same tick read the issuing frame and the target's
+	// new children did not exist yet (Flash 32: they do). Only when
+	// ng_gotoFrameByMC's by-name lookup cannot land on a DIFFERENT entry: it
+	// searches the global (root) list by name first, so a nested clip that
+	// shares a root clip's name keeps the deferred path.
+	// Fixture: regression/avm1_timeline_selfgoto_child_replace (Flash 32 golden).
 	if (!catch_up_mode && g_ng_stub_app != NULL)
 	{
 		MovieClip* att = ng_mc_for_unnamed_holder(obj);
+		if (att == NULL && g_current_context != NULL
+		    && g_current_context->display_obj == (void*)obj
+		    && g_current_context->name != NULL)
+		{
+			size_t by_name = ng_findDisplayEntryByName(g_current_context->name);
+			if (by_name == SIZE_MAX || &display_list[by_name] == obj)
+				att = g_current_context;
+		}
 		if (att != NULL)
 		{
 			DisplayObject* saved_sprite_obj = g_current_sprite_obj;
