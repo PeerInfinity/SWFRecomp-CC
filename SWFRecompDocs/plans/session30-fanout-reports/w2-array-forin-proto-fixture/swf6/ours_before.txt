@@ -1,0 +1,14 @@
+A0: foo,1,0,
+A1: foo,1,0,
+A2: foo,1,0,
+B: bar,
+C: ap,foo,1,0,
+D: ap,foo,1,0,
+E: ap,foo,1,0,
+G: op,toString,z,
+H: 0,
+F: 
+L0: 
+L1: 
+Z: ap,foo,1,0,
+done

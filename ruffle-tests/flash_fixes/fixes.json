@@ -1032,5 +1032,49 @@
     "reason": "Flash LOW, Linux == Windows byte for byte. Golden (Ruffle-made) is 178 720 channels over tol 11 from Flash; ours (s29 FINAL, TSNAP + LOW stroke raster) 138 478. Stays fail, now graded against Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 acid-large FP32 LOW swap",
     "added": "2026-11-27"
+  },
+  {
+    "test": "from_shumway/timeline/nav/clipDepth",
+    "file": "test.toml",
+    "upstream_sha256": "944d4304b9de960378dd7ab3827e8135415482470fb930713db41441ad77cf9d",
+    "fix": "from_shumway/timeline/nav/clipDepth/test.toml",
+    "kind": "toml",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/from_shumway_timeline_nav_clipDepth.f6.lnx.txt (s30 coordinator, LNX debug projector, direct pinned, 6 frames) == the 8-line golden exactly, nothing after it",
+    "reason": "The golden (Shumway's FP capture) covers 4 ticks: frame 4's script does gotoAndStop(1), which prints the last 2 lines. Ruffle's num_ticks = 3 cuts it at 6 lines. num_ticks = 4 prints exactly the golden.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-rm-avm2-land clipDepth getObjectsUnderPoint clip layers",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "avm2/swf_9_goto_in_construct_frame",
+    "file": "output.txt",
+    "upstream_sha256": "47b3ab24ed48b61e97bfcd099600cdf7fae4423bd71a60a297ae8ffe177311ce",
+    "fix": "avm2/swf_9_goto_in_construct_frame/output.txt",
+    "kind": "trace",
+    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/avm2_swf_9_goto_in_construct_frame.f6.lnx.txt and .f6r2.lnx.txt (s30 coordinator, LNX, direct pinned, 6 frames; both captures identical over the first 19 lines)",
+    "reason": "The 20-line golden ends mid-tick: its last line 'MyContainer enterFrame' opens a third tick whose next line in FP32 is 'MyOtherChild onEnterFrame' (FP's steady state is a 6-line cycle that starts at enterFrame). The fix is the FP32 capture cut at the clean tick boundary after line 19 (= the golden's first 19 lines), which is what num_ticks = 3 covers (Ruffle's own output.ruffle.txt also stops before that enterFrame). num_ticks unchanged.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-rm-avm2-land SWF<=9 goto-placed children constructed in the frame-script walk",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "from_shumway/acid/acid-scale",
+    "file": "output.expected.png",
+    "upstream_sha256": "d0e85fedbc37983ca8956ac3083557f42d8e93760465eeaebfceca09dc896e30",
+    "fix": "from_shumway/acid/acid-scale/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/from_shumway_acid_acid-scale.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, wrapper draw(); --screen capture within 3 channels); Windows FP32 from_shumway_acid_acid-scale.win.low.png identical (0 channels)",
+    "reason": "Flash LOW, Linux == Windows. golden (Ruffle) 11 240 ch (t0) from Flash; ours s30 before 1 690, after w2-lowq-land 1 850. Stays fail (limit 0), now graded against Flash.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-lowq-land FP32 LOW grading",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "visual/simple_shapes/overlaps",
+    "file": "output.expected.png",
+    "upstream_sha256": "fc2a3c1a1a1f60ea37c559c82bd888164f2bd7c6e201738a680c3663a28d62ea",
+    "fix": "visual/simple_shapes/overlaps/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/visual_simple_shapes_overlaps.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, wrapper draw(); --screen capture within 3 channels); Windows FP32 visual_simple_shapes_overlaps.win.low.png identical (0 channels)",
+    "reason": "Flash LOW, Linux == Windows. golden (Ruffle) 1 795 ch (t0) from Flash; ours s30 before 1 091, after w2-lowq-land 747. Stays fail (limit 0), now graded against Flash.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-lowq-land FP32 LOW grading",
+    "added": "2026-11-27"
   }
 ]

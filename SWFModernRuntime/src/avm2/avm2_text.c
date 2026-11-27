@@ -1346,10 +1346,33 @@ static void html_apply_class_style(Avm2Context* ctx, const Avm2EditTextExt* et,
 }
 
 // from_html: parse html into et->text/spans.
+// s30 w2-drift-smalls-land: an htmlText <img src> starts its Loader fetch
+// only when some character FOLLOWS the image in the parsed text. FP32
+// (w1-local-oracles/w1-drift-smalls html_img_loadcount, 2 identical runs):
+// one load per <img src> (adjacent identical images NOT merged, empty src
+// still loads) EXCEPT `<img src='a.jpg'><img src='b.jpg'>` with no text
+// around it, which starts 1. A trailing image (nothing after it) starts
+// none: that reproduces the probe AND the corpus count (avm2/
+// html_text_img_parsing: 98 <img src> parses, 3 trailing (`<img a><img b>`,
+// `<img src='m.jpg'>`, `A<img src='m.jpg'>`) -> 95 #2044 lines = golden).
+// Matches the golden TEXT too: a trailing image keeps no placeholder char.
+static void html_img_flush_pending_load(Avm2Context* ctx, uint16_t* pending,
+                                        uint32_t pending_len, uint32_t text_len)
+{
+	if (*pending == 0) return;
+	const HtmlImg* im = html_img_get(*pending);
+	*pending = 0;
+	if (im == NULL || text_len <= pending_len) return;
+	extern void avm2_html_img_load_started(Avm2Context*, const char*);
+	avm2_html_img_load_started(ctx, im->src);
+}
+
 static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
                             const Avm2String* html, int is_multiline,
                             int condense_white)
 {
+	uint16_t pending_img = 0;     // last <img> whose load waits for a following char
+	uint32_t pending_img_len = 0; // text.len right after its placeholder
 	uint8_t swf_version = ctx->swf_version;
 	Avm2TextFormatFields default_format = et->default_format;
 	if (swf_version <= 6) is_multiline = 1;
@@ -1611,6 +1634,12 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 					img_format.present |= TFP_SIZE;
 					PUSH_TEXT_SPAN(" ", 1, &img_format);
 					et->spans[et->span_count - 1].img = html_img_intern(&img);
+					// This placeholder is a char that follows any pending image.
+					html_img_flush_pending_load(ctx, &pending_img, pending_img_len, text.len);
+					// s30 w2-drift-smalls-land: the load starts only once a
+					// character follows the image (see html_img_flush_pending_load).
+					pending_img = et->spans[et->span_count - 1].img;
+					pending_img_len = text.len;
 				}
 				skip_push = 1;
 				handle_end = 0;
@@ -1929,6 +1958,7 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 #undef ATTR
 	}
 
+	html_img_flush_pending_load(ctx, &pending_img, pending_img_len, text.len);
 	et->text = sb_take(ctx, &text);
 	et->original_html = NULL;
 	if (condense_white && ctx->swf_version >= 8)
@@ -6661,14 +6691,32 @@ static const Avm2String* group_text_of(Avm2Context* ctx, Avm2Object* o)
 	return sb_take(ctx, &sb);
 }
 
+// s30 w1-rm-avm2 (FP32 golden avm2/textline_atom_index_at_char_index): in a
+// TextLine's RAW text a GraphicElement occupies one character (FTE's object
+// replacement char U+FDEF), though `GroupElement.text` omits it. Set only
+// while a TextBlock builds or reads its line text (line_text_of).
+static int g_fte_line_text = 0;
+
 static const Avm2String* ce_text_of(Avm2Context* ctx, Avm2Object* o)
 {
 	if (obj_is_class(o, g_groupelement_class)) return group_text_of(ctx, o);
 	// A GraphicElement's text is the EMPTY STRING, never null — and the
 	// difference is load-bearing for the fold above.
-	if (obj_is_class(o, g_graphicelement_class)) return empty_string(ctx);
+	if (obj_is_class(o, g_graphicelement_class))
+	{
+		return g_fte_line_text ? avm2_string_new(ctx, "\xEF\xB7\xAF", 3)
+		                       : empty_string(ctx);
+	}
 	Avm2ContentElementExt* ce = ce_ext(o);
 	return ce != NULL ? ce->text : NULL;
+}
+
+static const Avm2String* line_text_of(Avm2Context* ctx, Avm2Object* o)
+{
+	g_fte_line_text = 1;
+	const Avm2String* t = ce_text_of(ctx, o);
+	g_fte_line_text = 0;
+	return t;
 }
 
 // One entry serves the whole family: ce_text_of dispatches GroupElement to
@@ -7363,6 +7411,9 @@ static Avm2Value tl_get_text_block_begin_index(Avm2Activation* act)
 // getAtomIndexAtCharIndex(charIndex:int):int — Ruffle TextLine.as: one atom
 // per UTF-16 code unit of this line, so the atom index is the char index
 // relative to the line's start, and -1 outside [0, rawTextLength).
+static int32_t tl_atom_index_of(Avm2Context* ctx, Avm2TextLineExt* tl,
+                                int32_t ci, int64_t idx);
+
 static Avm2Value tl_get_atom_index_at_char_index(Avm2Activation* act)
 {
 	Avm2TextLineExt* tl = this_tl(act);
@@ -7370,7 +7421,7 @@ static Avm2Value tl_get_atom_index_at_char_index(Avm2Activation* act)
 	if (tl == NULL) return avm2_integer(-1);
 	int64_t idx = (int64_t) ci - (int64_t) tl->begin_index;
 	if (idx < 0 || idx >= (int64_t) tl->raw_text_length) return avm2_integer(-1);
-	return avm2_integer((int32_t) idx);
+	return avm2_integer(tl_atom_index_of(act->ctx, tl, ci, idx));
 }
 
 static Avm2Value tl_get_specified_width(Avm2Activation* act)
@@ -7649,6 +7700,33 @@ static Avm2TextBlockExt* textblock_ext_of(Avm2Object* o)
 {
 	return obj_is_class(o, g_textblock_class) ? (Avm2TextBlockExt*) o->native_ext
 	                                          : NULL;
+}
+
+static int32_t tl_atom_index_of(Avm2Context* ctx, Avm2TextLineExt* tl,
+                                int32_t ci, int64_t idx)
+{
+	// s30 w1-rm-avm2 (FP32 golden avm2/textline_atom_index_at_char_index): a
+	// surrogate pair is ONE atom, so both of its code units map to it and
+	// every later atom index drops by one per preceding pair.
+	Avm2TextBlockExt* tb = tl->text_block != NULL
+		? textblock_ext_of(tl->text_block) : NULL;
+	const Avm2String* text = (tb != NULL && tb->content != NULL)
+		? line_text_of(ctx, tb->content) : NULL;
+	if (text == NULL) return (int32_t) idx;
+	uint32_t b = u16_to_byte(text, tl->begin_index);
+	uint32_t u = tl->begin_index;
+	int32_t atom = 0;
+	while (u < (uint32_t) ci && b < text->len)
+	{
+		unsigned char c = (unsigned char) text->utf8[b];
+		uint32_t nb = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+		uint32_t nu = nb == 4 ? 2 : 1;
+		if (u + nu > (uint32_t) ci) break;
+		atom++;
+		u += nu;
+		b += nb;
+	}
+	return atom;
 }
 
 static Avm2Value tb_get_apply_nlfs(Avm2Activation* act)
@@ -8045,7 +8123,7 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
 		tb_trace_2175(ctx);
 		return avm2_null();
 	}
-	const Avm2String* text = ce_text_of(ctx, tb->content);
+	const Avm2String* text = line_text_of(ctx, tb->content);
 	if (text == NULL) text = empty_string(ctx);
 	// Every index below is a UTF-16 code-unit offset (what textBlockBeginIndex
 	// and rawTextLength report), NOT a byte offset into the UTF-8 storage.
@@ -8078,6 +8156,22 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
 	tl->line_index = pl != NULL ? pl->line_index + 1 : 0;
 	if (pl != NULL)
 	{
+		// s30 w1-rm-avm2 (FP32 golden avm2/textblock_releaselines): a new
+		// line created after a line that already had a successor cuts the
+		// old tail off: each old successor reads validity "invalid" with
+		// null previousLine/nextLine (its textBlock stays). Ruffle keeps
+		// the old successor linked and valid.
+		Avm2Object* old = pl->next_line;
+		for (int guard = 0; old != NULL && guard < 1000000; guard++)
+		{
+			Avm2TextLineExt* oe = textline_ext_of(old);
+			if (oe == NULL) break;
+			Avm2Object* nx = oe->next_line;
+			oe->validity = fte_lit(ctx, "invalid");
+			oe->previous_line = NULL;
+			oe->next_line = NULL;
+			old = nx;
+		}
 		tl->previous_line = prev;
 		pl->next_line = line;
 	}
@@ -8166,7 +8260,7 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 	// block returns null without touching the line.
 	Avm2TextBlockExt* tbx = this_tb(act);
 	const Avm2String* text = (tbx != NULL && tbx->content != NULL)
-		? ce_text_of(ctx, tbx->content) : NULL;
+		? line_text_of(ctx, tbx->content) : NULL;
 	if (text == NULL) text = empty_string(ctx);
 	uint32_t text_u16 = u16_length(text);
 	uint32_t pos = pl != NULL ? pl->end_index : 0;
@@ -8311,7 +8405,7 @@ static Avm2Value tl_get_has_tabs(Avm2Activation* act)
 	if (tl == NULL || tl->text_block == NULL) return avm2_bool(false);
 	Avm2TextBlockExt* tb = textblock_ext_of(tl->text_block);
 	if (tb == NULL || tb->content == NULL) return avm2_bool(false);
-	const Avm2String* text = ce_text_of(act->ctx, tb->content);
+	const Avm2String* text = line_text_of(act->ctx, tb->content);
 	if (text == NULL) return avm2_bool(false);
 	uint32_t b0 = u16_to_byte(text, tl->begin_index);
 	uint32_t b1 = u16_to_byte(text, tl->begin_index + tl->raw_text_length);

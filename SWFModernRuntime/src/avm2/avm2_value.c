@@ -358,6 +358,97 @@ static int digit_value(char c, int radix)
 	return d < radix ? d : -1;
 }
 
+// avmplus core/MathUtils.cpp parseInt, the `result >= 0x20000000000000`
+// power-of-two-radix block (s30 w1-rm-avm2). `s`..`lim` is the string from
+// the first digit to its END (avmplus indexes s->length(), not the digit
+// run). Out-of-range reads give -1, as an invalid digit.
+static int pow2_digit(const char* s, const char* lim, int32_t radix)
+{
+	if (s >= lim) return -1;
+	return digit_value(*s, radix);
+}
+
+static double avmplus_pow2_parse(const char* s, const char* lim, int32_t radix)
+{
+	double result = 0;
+	int32_t powOf2 = 1;
+	for (int32_t x = radix; x != 1; x >>= 1) powOf2++;
+	powOf2--;
+	const char* end = s;
+	int32_t v = 0;
+	while (end < lim && *end == '0') end++;
+	if (end >= lim) return 0;
+	int32_t next;
+	for (next = 0; next * powOf2 <= 52; next++)
+	{
+		v = pow2_digit(end++, lim, radix);
+		if (v == -1)
+		{
+			v = 0;
+			break;
+		}
+		result = result * radix + v;
+		if (end >= lim) break;
+	}
+	if (next * powOf2 > 52)
+	{
+		int roundUp = 0, bit53 = 0, bit54 = 0;
+		double factor = 1;
+		switch (radix)
+		{
+		case 32:
+			bit53 = v & (1 << 2);
+			bit54 = v & (1 << 1);
+			roundUp = (v & 1);
+			break;
+		case 16:
+			bit53 = v & (1 << 0);
+			v = pow2_digit(end, lim, radix);
+			if (v != -1)
+			{
+				factor *= radix;
+				bit54 = v & (1 << 3);
+				roundUp = (v & 0x3) != 0;
+			}
+			else
+			{
+				roundUp = bit53 != 0;
+			}
+			break;
+		case 8:
+		case 4:
+			v = pow2_digit(end, lim, radix);
+			if (v == -1) v = 0;
+			factor *= radix;
+			bit53 = v & (1 << 1);
+			bit54 = v & (1 << 0);
+			break;
+		case 2:
+			bit53 = v & (1 << 0);
+			v = pow2_digit(end, lim, radix);
+			if (v != -1)
+			{
+				factor *= radix;
+				bit54 = v & (1 << 0);
+			}
+			break;
+		}
+		bit53 = !!bit53;
+		bit54 = !!bit54;
+		while (++end < lim)
+		{
+			v = digit_value(*end, radix);
+			if (v == -1) break;
+			roundUp |= (v != 0);
+			factor *= radix;
+		}
+		roundUp = bit54 && (bit53 || roundUp);
+		result += (roundUp ? 1.0 : 0.0);
+		result *= factor;
+	}
+	return result;
+}
+
 double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool strict)
 {
 	const char* p = s;
@@ -413,6 +504,17 @@ double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool stric
 	}
 	if (p == start) return NAN;
 	if (exact_ok) result = (double) exact;
+	// s30 w1-rm-avm2: avmplus MathUtils::parseInt re-reads a power-of-two
+	// radix string once the chain reaches 2^53, and that re-read is what FP
+	// prints, bugs included (FP32 golden from_avmplus/as3/Math/e15_1_2_2:
+	// parseInt("1234567890123", 32) is 38390726480134180, not ...293600; the
+	// `while (++end < len)` tail skips the digit after the rounding digit, so
+	// the result is short one radix factor). Ported line for line; an index
+	// past the string reads as "no digit".
+	if (result >= 9007199254740992.0 && (radix & (radix - 1)) == 0)
+	{
+		result = avmplus_pow2_parse(start, end, radix);
+	}
 
 	if (strict)
 	{

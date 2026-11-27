@@ -1,0 +1,31 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 1dbe417b6..39f583ddc 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -488,6 +488,17 @@ namespace SWFRecomp
+ 	// ---------------------------------------------------------------------
+ 
+ 	static const float LEVIEN_TOL_TWIPS = 2.0f;   // = lyon 0.1 px at 1:1
++	// s30 w2 PROBE (not for landing): SWFRECOMP_LEVIEN_TOL_TWIPS overrides.
++	static float levienTolTwipsProbe()
++	{
++		static float tol = -1.0f;
++		if (tol < 0.0f)
++		{
++			const char* e = getenv("SWFRECOMP_LEVIEN_TOL_TWIPS");
++			tol = (e != NULL && atof(e) > 0.0) ? (float) atof(e) : LEVIEN_TOL_TWIPS;
++		}
++		return tol;
++	}
+ 
+ 	struct LevienParams
+ 	{
+@@ -9969,7 +9980,7 @@ namespace SWFRecomp
+ 							levien_params = levienInit((float) current.x, (float) current.y,
+ 							                           (float) control.x, (float) control.y,
+ 							                           (float) anchor.x, (float) anchor.y,
+-							                           LEVIEN_TOL_TWIPS);
++							                           levienTolTwipsProbe());
+ 							levien_active = true;
+ 							num_passes = (levien_params.count < 1) ? 1 : levien_params.count;
+ 						}

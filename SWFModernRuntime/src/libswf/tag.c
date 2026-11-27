@@ -3755,6 +3755,31 @@ static inline int cab_snaps(const DisplayObject* obj)
 	return obj->cache_as_bitmap || obj_filter_routed(obj);
 }
 
+// s30 w2-lowq-land: an UNFILTERED cacheAsBitmap entry whose blit snap MOVED
+// its subtree (cab_snap_delta != 0) carries the LOW vertex-tie exemption in
+// its matrix's z scale, m[10] = 2 (it multiplies z = 0: no position change;
+// m[8] / m[9] are taken by the TSNAP accumulator; children composed from the
+// matrix inherit m[10] >= 2). The tie bias
+// (render_webgpu.c LOWQ_VS_POSITION) is a rule on Flash's own cache-space
+// geometry; our snap shifts that geometry by the blit remainder, which
+// manufactures exact-centre ties Flash never sees (visual/cache_as_bitmap/
+// scroll_rect, FP32 exact: the -0.5 px stroke bounds snap the subtree +0.5 px
+// and put the cyan fill's right edge on 229.5). Kill switch
+// SWF_LOWQ_TIE_CAB_EXEMPT=0.
+static inline void cab_tie_exempt(const DisplayObject* obj, float m[16])
+{
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	static int on = -1;
+	if (on < 0) {
+		const char* e = getenv("SWF_LOWQ_TIE_CAB_EXEMPT");
+		on = !(e != NULL && e[0] == '0');
+	}
+	if (on && obj != NULL && obj->filter_type == 0) m[10] = 2.0f;
+#else
+	(void)obj; (void)m;
+#endif
+}
+
 // World-space AABB minimum of `obj`'s local bounds under `world`, in twips.
 static int cab_world_bounds_min(DisplayObject* obj, const float world[16],
                                 float* out_x, float* out_y)
@@ -3901,6 +3926,7 @@ static void cab_snap_in_place(DisplayObject* obj, float world[16])
 	if (!snapped) return;
 	world[12] += dx;
 	world[13] += dy;
+	cab_tie_exempt(obj, world);
 }
 
 // Snap a ROOT sprite/button's placement matrix before it is handed to
@@ -3926,6 +3952,7 @@ static const float* cab_snap_world(DisplayObject* obj, const float* in,
 	memcpy(out, in, 16 * sizeof(float));
 	out[12] += dx;
 	out[13] += dy;
+	cab_tie_exempt(obj, out);
 	if (g_next_dynamic_xform_slot < g_xform_slot_capacity)
 	{
 		u32 slot = g_next_dynamic_xform_slot++;
@@ -3954,6 +3981,7 @@ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
 	memcpy(snapped, src, sizeof(snapped));
 	snapped[12] += dx;
 	snapped[13] += dy;
+	cab_tie_exempt(obj, snapped);
 	u32 slot = g_next_dynamic_xform_slot++;
 	xform_overrides_push(obj, obj->transform_id);
 	obj->transform_id = slot;
@@ -4007,6 +4035,40 @@ double lowq_tsnap_round(double t)
 	return half_down ? ceil(q - 0.5) : nearbyint(q);
 }
 
+// s30 w1-lowq-residues prototype: the tie is decided on the object's device
+// offset from its (already snapped, whole-px) PARENT origin, not on the
+// composed world value. Same result except at .5 ties under an ODD snapped
+// parent: visual/blend_modes/layer_alpha (FP32): sprite 5 at local y -90.5
+// under a parent at 140.95 -> 141: Flash rows 51..95 (rhe(-90.5) = -90), the
+// world rule put it at rhe(50.5) = 50. Kill switch SWF_LOWQ_TSNAP_LOCAL=0.
+int lowq_tsnap_local_on(void)
+{
+	static int on = -1;
+	if (on < 0)
+	{
+		const char* e = getenv("SWF_LOWQ_TSNAP_LOCAL");
+		on = !(e != NULL && e[0] == '0');
+	}
+	return on;
+}
+static float g_tsnap_origin[2];   // parent composed translation (twips), per call
+static int g_tsnap_have_origin;
+// Shared with avm2_display.c: delta (px) that snaps device translation t whose
+// parent origin is o (px); falls back to the world rule when o is fractional.
+double lowq_tsnap_delta_px(double t, double o, int have_o)
+{
+	if (have_o && lowq_tsnap_local_on())
+	{
+		double oq = nearbyint(o * 20.0) / 20.0;
+		if (oq == nearbyint(oq))
+		{
+			double off = t - oq;
+			return lowq_tsnap_round(off) - off;
+		}
+	}
+	return lowq_tsnap_round(t) - t;
+}
+
 static int lowq_tsnap_delta(const DisplayObject* obj, const float world[16],
                             float* dx, float* dy)
 {
@@ -4019,8 +4081,10 @@ static int lowq_tsnap_delta(const DisplayObject* obj, const float world[16],
 	double tx = (double) world[12] / 20.0 * vs;
 	double ty = (double) world[13] / 20.0 * vs;
 	if (!isfinite(tx) || !isfinite(ty) || fabs(tx) > 1e8 || fabs(ty) > 1e8) return 0;
-	*dx = (float) ((lowq_tsnap_round(tx) - tx) * 20.0 / vs);
-	*dy = (float) ((lowq_tsnap_round(ty) - ty) * 20.0 / vs);
+	double ox = (double) g_tsnap_origin[0] / 20.0 * vs;
+	double oy = (double) g_tsnap_origin[1] / 20.0 * vs;
+	*dx = (float) (lowq_tsnap_delta_px(tx, ox, g_tsnap_have_origin) * 20.0 / vs);
+	*dy = (float) (lowq_tsnap_delta_px(ty, oy, g_tsnap_have_origin) * 20.0 / vs);
 	return (*dx != 0.0f) || (*dy != 0.0f);
 }
 
@@ -4451,7 +4515,15 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		}
 		// s29 w2-lowq-tsnap: quality=LOW per-level translation snap (before
 		// the scrollRect translate: the crop and the content both ride it).
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+		g_tsnap_origin[0] = parent_composed[12];
+		g_tsnap_origin[1] = parent_composed[13];
+		g_tsnap_have_origin = 1;
+#endif
 		LOWQ_TSNAP_IN_PLACE(obj, composed);
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+		g_tsnap_have_origin = 0;
+#endif
 
 		// MovieClip.scrollRect, the TRANSLATE half (Ruffle
 		// display_object.rs:1189 `transform_stack.push(translate(-x_min,
@@ -8567,10 +8639,23 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 // each advance rounded to a whole pixel (`round_to_pixel`, f64::round = half
 // away from zero, which roundf matches): visual/cache_as_bitmap/edittext_scroll
 // and the device-font labels of visual/filters/bevel* need it.
+// s30 w2-lowq-land: > 0 (one device px, in twips) while
+// textfield_glyph_render_cb lays out a LOW, plain, embedded DefineFont/
+// DefineFont2 (em 1024) field: Flash Player 32 then advances each glyph by
+// its advance rounded UP to a whole device px (regression/lowq_glyph_probe_df2,
+// FP32 LOW: 12 px "aceosgb@&S 2369" steps 8,7,8,8,7,8,8,12,10,8,4,8,8,8 =
+// ceil(7.35, 6.60, 7.38, ...)). DefineFont3 (em 20480) keeps the fractional
+// advance (lowq_glyph_probe_df3: 'W' 59.5 px). HOLD, default OFF
+// (SWF_TF_LOW_ADV_CEIL=1 enables): FP32's from_gnash morph_test1 xtrace field
+// (same DF2 font, 12 px, but WordWrap + selectable + variable-bound) keeps the
+// fractional advance, so the field property that switches the rule is unknown
+// (w2-lowq-land report, LOCAL ORACLE REQUEST 1).
+static float g_tf_low_adv_ceil_q = 0.0f;
 static inline float tf_glyph_advance_twips(s32 adv, float scale, int device_font)
 {
 	float t = (float)(s32)((float)adv * scale);
 	if (device_font) t = roundf(t / 20.0f) * 20.0f;
+	else if (g_tf_low_adv_ceil_q > 0.0f) t = ceilf(t / g_tf_low_adv_ceil_q) * g_tf_low_adv_ceil_q;
 	return t;
 }
 
@@ -8965,8 +9050,26 @@ static void tf_glyph_quarter_snap(float* xy, const TextFieldGlyphInfo* info,
 	const float dscale = (context != NULL && context->stage_scale > 0.0f)
 	                   ? context->stage_scale : 1.0f;
 	const float q = 20.0f / dscale;   // 1 device px, in stage twips
-	const float dx = rintf(x_pos / q) * q - x_pos;
-	const float dy = rintf(y_pos / q) * q - y_pos;
+	float dx = rintf(x_pos / q) * q - x_pos;
+	float dy = rintf(y_pos / q) * q - y_pos;
+	// s30 w2-lowq-land: the field's own translation snaps first (half-even),
+	// then the pen rounds half-even on its FIELD-LOCAL offset (the TSNAP
+	// local-tie rule, one level down). regression/lowq_glyph_probe_df3 (FP32
+	// LOW): fields at x 2 / 2.25 / 2.5 draw identically, 2.75 as 3; 'W' pens
+	// at local 61.5 / 180.5 / 299.5 / 418.5 go to 62 / 180 / 300 / 418 under
+	// either origin (the world rule put 64.5 -> 64 and 183.5 -> 184 at 2.75).
+	// Kill switch SWF_TF_LOW_PEN_LOCAL=0.
+	static int pen_local_on = -1;
+	if (pen_local_on < 0) {
+		const char* e = getenv("SWF_TF_LOW_PEN_LOCAL");
+		pen_local_on = !(e != NULL && e[0] == '0');
+	}
+	if (pen_local_on && !info->has_matrix) {
+		const float ox = info->x * 20.0f, oy = info->y * 20.0f;
+		const float sox = rintf(ox / q) * q, soy = rintf(oy / q) * q;
+		dx = sox + rintf((x_pos - ox) / q) * q - x_pos;
+		dy = soy + rintf((y_pos - oy) / q) * q - y_pos;
+	}
 	for (size_t v = 0; v < g_size; v++) {
 		xy[2 * v]     += dx;
 		xy[2 * v + 1] += dy;
@@ -8977,7 +9080,7 @@ static void tf_glyph_quarter_snap(float* xy, const TextFieldGlyphInfo* info,
 #endif
 }
 
-static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
+static void textfield_glyph_render_cb_impl(const TextFieldGlyphInfo* info, void* user_data)
 {
 	GEN_EXTERN_SHAPE_DATA;
 	GEN_EXTERN_GLYPH_DATA;
@@ -9007,6 +9110,19 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	int em_square = 1024;
 	if (!ng_font_get_metrics(font_idx, &ascent, &descent, &em_square)) return;
 	if (em_square == 0) return;
+#if !defined(TF_GLYPH_NO_LOW_PEN) && defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	{   // s30 w2-lowq-land: LOW DefineFont/DefineFont2 whole-px advance (see g_tf_low_adv_ceil_q)
+		static int adv_ceil_on = -1;
+		if (adv_ceil_on < 0) {
+			const char* e = getenv("SWF_TF_LOW_ADV_CEIL");
+			adv_ceil_on = (e != NULL && e[0] == '1');   // HOLD: default OFF
+		}
+		if (adv_ceil_on && em_square == 1024 && !info->device_font && !info->csm_advanced) {
+			const float dsc = (context != NULL && context->stage_scale > 0.0f) ? context->stage_scale : 1.0f;
+			g_tf_low_adv_ceil_q = 20.0f / dsc;
+		}
+	}
+#endif
 
 	size_t glyph_base = ng_font_get_glyph_base(font_idx);
 	// s24 w2-text-pitch: per-run EMBEDDED face (runs[].font_id, 0 = the
@@ -9740,7 +9856,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 #endif
 			}
 			tf_cov_flush();   // keep draw order: pending coverage runs first
-			renderer_draw_tris(context, xy_buf, (u32)g_size, r, g, b, 1.0f, 0, 0);
+			renderer_draw_text_tris(context, xy_buf, (u32)g_size, r, g, b, 1.0f, 0, 0);
 #if MSAA_SAMPLES > 1
 			tf_glyph_drawn:;
 #endif
@@ -9818,6 +9934,14 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	if (pars != pars_inline) free(pars);
 	if (par_x_offset != par_x_inline) free(par_x_offset);
 	free(sb);
+}
+
+// s30 w2-lowq-land: g_tf_low_adv_ceil_q lives for one field's layout only.
+static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
+{
+	g_tf_low_adv_ceil_q = 0.0f;
+	textfield_glyph_render_cb_impl(info, user_data);
+	g_tf_low_adv_ceil_q = 0.0f;
 }
 
 // Helper: render a single drawing path (fill + stroke), handling gradients

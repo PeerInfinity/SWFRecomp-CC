@@ -134,11 +134,25 @@ EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, d
 #ifndef LOWQ_VS_COND
 #define LOWQ_VS_COND "(out.v_style_type & 0xF0u) != 0x40u && (in.style.x & 0x1000u) == 0u && transform[2].w == 0.0"
 #endif
+// s30 w2-lowq-land (w1-lowq-residues prototype C + the x half): Flash LOW
+// resolves an exact pixel-centre tie of a VERTEX (geometry, not translation)
+// as exclusive at the top / left edge and inclusive at the bottom / right
+// edge (regression/lowq_tsnap_tie_probe row 5 c6 / c7: rect 5.5..25.5 covers
+// rows 6..25 in Flash, 6..24 under the GPU rule; from_gnash morph_test1's
+// 1-twip outline). = vertex biased by +eps (1/256 px, the lavapipe subpixel
+// step) before the LOW snap. eps rides the stage matrix's free m[10]
+// (lowq_put_target; a negative m[10] also biases x). Kill switches
+// SWF_LOWQ_TIE_EPS=0 (off), SWF_LOWQ_TIE_EPS_X=0 (y only). Glyph / text soups
+// (render_webgpu_draw_text_tris, style bit 16) are exempt: text rows moved
+// away from their FP32 goldens under the bias (visual/edittext/edittext_underline).
+// So is a bitmap-cached subtree whose blit snap moved it (transform m[10] = 2,
+// tag.c cab_tie_exempt): that snap shifts Flash's cache-space geometry onto
+// manufactured ties (visual/cache_as_bitmap/scroll_rect).
 #ifndef LOWQ_SNAP_X
-#define LOWQ_SNAP_X "d.x"
+#define LOWQ_SNAP_X "d.x + lq_ex"
 #endif
 #ifndef LOWQ_SNAP_Y
-#define LOWQ_SNAP_Y "min(d.y, ceil(d.y - 0.5)) + 0.5"
+#define LOWQ_SNAP_Y "min(d.y + lq_ey, ceil(d.y + lq_ey - 0.5)) + 0.5"
 #endif
 #define LOWQ_POS_DECL "var"
 // s28 lowq-corner-rule: gradient paint (lowq_gradient_orient_probe, Flash 32
@@ -164,6 +178,9 @@ EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, d
 "  var lq_stage = stage_transform.matrix;\n" \
 "  let lq_wh = lq_stage[2].xy;\n" \
 "  let lq_snap_t = lq_stage[2].w;\n" \
+"  let lq_eps = lq_stage[2].z;\n" \
+"  let lq_ey = select(abs(lq_eps), 0.0, (in.style.x & 0x10000u) != 0u || transform[2].z > 1.5);\n" \
+"  let lq_ex = select(0.0, lq_ey, lq_eps < 0.0 && (in.style.x & 0x20000u) == 0u);\n" \
 "  lq_stage[2] = vec4f(0.0, 0.0, 1.0, 0.0);\n" \
 "  out.position = lq_stage * transform * pos;\n" \
 "  var lq_paint = pos;\n" \
@@ -3419,6 +3436,18 @@ static void lowq_put_target(float* t, int w, int h, int snap_translation)
 	// s28 lowq-corner-rule: m[11] = 1 enables the gradient paint's translation
 	// snap (see LOWQ_VS_POSITION); 0 inside blend / filter layers.
 	t[11] = snap_translation ? 1.0f : 0.0f;
+	// s30 w2-lowq-land: m[10] = the LOW vertex tie bias (LOWQ_VS_POSITION):
+	// |m[10]| = 1/256 px on y; a NEGATIVE m[10] biases x too. Kill switches
+	// SWF_LOWQ_TIE_EPS=0 (both axes off), SWF_LOWQ_TIE_EPS_X=0 (y only).
+	static int eps_on = -1, eps_x = -1;
+	if (eps_on < 0)
+	{
+		const char* e = getenv("SWF_LOWQ_TIE_EPS");
+		eps_on = !(e != NULL && e[0] == '0');
+		const char* ex = getenv("SWF_LOWQ_TIE_EPS_X");
+		eps_x = !(ex != NULL && ex[0] == '0');
+	}
+	t[10] = !eps_on ? 0.0f : eps_x ? -(1.0f / 256.0f) : (1.0f / 256.0f);
 }
 #endif
 
@@ -3944,6 +3973,7 @@ typedef struct {
 	double key[7];
 	float* xy;        // NULL = empty
 	unsigned n;
+	int lq;           // s30 w2-lowq-land: restaged under the LOW stroke rule
 } StrokeSnapCacheEntry;
 #define STROKE_SNAP_CACHE_SLOTS 1024u
 static StrokeSnapCacheEntry* stroke_snap_cache = NULL;
@@ -3959,6 +3989,27 @@ static void stroke_snap_cache_clear(void)
 	}
 }
 
+// s30 w2-lowq-land: style bit 17 marks a stroke vertex placed by the LOW
+// stroke rule (lowq_stroke_place); the LOW vertex tie bias skips its x
+// (LOWQ_VS_POSITION). That rule's pens were fitted on the GPU centre rule:
+// the x bias moved from_shumway/acid/acid-stroke-0's 1-px "\" diagonals 1 px
+// right of Flash (+101 channels) and left "/" unchanged. y keeps the bias.
+// Kill switch SWF_LOWQ_TIE_X_STROKE=1 (bias stroke x too).
+#if MSAA_SAMPLES == 1
+static u32 lowq_stroke_tie_bit(void)
+{
+	static int on = -1;
+	if (on < 0) {
+		const char* e = getenv("SWF_LOWQ_TIE_X_STROKE");
+		on = !(e != NULL && e[0] == '1');
+	}
+	return on ? 0x20000u : 0u;
+}
+#endif
+// The next render_webgpu_draw_tris soup is a LOW-rule stroke restaged by
+// render_webgpu_stroke_snap (consumed by that draw; cleared by the gradient /
+// bitmap tris draws, which carry no such bit).
+static int g_lowq_stroke_soup_next = 0;
 static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
                                size_t num_verts, u32 transform_id)
 {
@@ -4163,6 +4214,7 @@ static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
 				const LowqDirSlot* ce = lowq_dir_find(cen[0], cen[1], lq_mask, 0);
 				lowq_stroke_place(&cdx, &cdy, &odx, &ody, lq_n, W, axis != 0, fx, fy, sf,
 				                  lowq_vdir[2 * v], lowq_vdir[2 * v + 1], ce);
+				dst[2] |= lowq_stroke_tie_bit();
 			}
 			else
 #endif
@@ -4257,6 +4309,7 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 			if (ce->xy != NULL && ce->gen == src->gen && memcmp(ce->key, key, sizeof(key)) == 0)
 			{
 				*out_n = ce->n;
+				g_lowq_stroke_soup_next = ce->lq;
 				return ce->xy;
 			}
 		}
@@ -4380,12 +4433,21 @@ const float* render_webgpu_stroke_snap(WebGPURenderContext* ctx, const StrokeSna
 		memcpy(ce->key, key, sizeof(key));
 		ce->xy = out;
 		ce->n = n;
+#if MSAA_SAMPLES == 1
+		ce->lq = lq_on;
+#endif
 		*out_n = n;
+#if MSAA_SAMPLES == 1
+		g_lowq_stroke_soup_next = lq_on;
+#endif
 		return out;
 	}
 	free(stroke_snap_scratch);
 	stroke_snap_scratch = out;
 	*out_n = n;
+#if MSAA_SAMPLES == 1
+	g_lowq_stroke_soup_next = lq_on;
+#endif
 	return out;
 }
 
@@ -4736,6 +4798,8 @@ static void pop_mask_level(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 // render_webgpu_draw_tris — arbitrary solid-color triangles (for Drawing API)
 // ---------------------------------------------------------------------------
+// s30 w2-lowq-land: OR-ed into the soup's style.x by render_webgpu_draw_text_tris.
+static u32 g_draw_tris_style_or = 0;
 void render_webgpu_draw_tris(WebGPURenderContext* ctx,
 	const float* xy_pairs, u32 vertex_count,   // pre-tessellated triangle verts in twips
 	float r, float g, float b, float a,        // fill color (0-1)
@@ -4758,7 +4822,14 @@ void render_webgpu_draw_tris(WebGPURenderContext* ctx,
 	ctx->dynamic_vertex_used += vertex_count;
 
 	// Build vertex data: { float x, float y, u32 style_x, u32 style_y } per vertex
-	u32 sx = 0x00;   // solid color fill
+	// s30 w2-lowq-land: style bit 16 (LOW only, set by render_webgpu_draw_text_tris)
+	// marks a pre-tessellated glyph / text soup; the LOW vertex tie bias
+	// (LOWQ_SNAP_X / LOWQ_SNAP_Y) skips it. Drawing-API soups take the bias.
+	u32 sx = g_draw_tris_style_or;   // solid color fill
+#if MSAA_SAMPLES == 1
+	if (g_lowq_stroke_soup_next) sx |= lowq_stroke_tie_bit();
+#endif
+	g_lowq_stroke_soup_next = 0;
 	u32 sy = color_idx;
 	u32* verts = (u32*)malloc(vertex_count * 4 * sizeof(u32));
 	for (u32 i = 0; i < vertex_count; i++) {
@@ -4777,6 +4848,21 @@ void render_webgpu_draw_tris(WebGPURenderContext* ctx,
 
 	// Issue draw call
 	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
+}
+
+// s30 w2-lowq-land: render_webgpu_draw_tris for glyph / text-furniture soups.
+// At LOW it tags the soup with style bit 16, which exempts it from the LOW
+// vertex tie bias (text keeps the GPU centre rule; text rows moved away from
+// their FP32 goldens under the bias). Identical to render_webgpu_draw_tris at HIGH.
+void render_webgpu_draw_text_tris(WebGPURenderContext* ctx,
+	const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a,
+	u32 transform_id, u32 cxform_id)
+{
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	g_draw_tris_style_or = 0x10000u;
+#endif
+	render_webgpu_draw_tris(ctx, xy_pairs, vertex_count, r, g, b, a, transform_id, cxform_id);
+	g_draw_tris_style_or = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -4813,6 +4899,7 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 	const u8* gradient_ramp, const float* gradient_matrix,
 	u32 transform_id, u32 cxform_id)
 {
+	g_lowq_stroke_soup_next = 0;   // s30 w2-lowq-land
 	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
 	if (ctx->dynamic_gradient_used >= ctx->dynamic_gradient_capacity) return;
 	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
@@ -5074,6 +5161,7 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 	const float* user_matrix6, int repeat, int smooth,
 	u32 transform_id, u32 cxform_id)
 {
+	g_lowq_stroke_soup_next = 0;   // s30 w2-lowq-land
 	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
 	if (argb_pixels == NULL || src_w == 0 || src_h == 0) return;
 	if (!render_webgpu_fit_dynamic_bitmap(ctx, src_w, src_h)) return;

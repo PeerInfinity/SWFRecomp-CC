@@ -1,0 +1,39 @@
+CASE 0 A<img src='missing.jpg'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 1 A<img src=''>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 2 A<img src='one.jpg'>B<img src='two.jpg'>C
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 3 A<img src='a.jpg'><img src='a.jpg'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 4 A<img src='a.jpg' id='x'><img src='a.jpg'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 5 A<img src='a.jpg' width='7'><img src='a.jpg'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 6 A<img src='a.jpg' height='7'><img src='a.jpg' height='7'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 7 A<img src='a.jpg' hspace='7'><img src='a.jpg' hspace='7'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 8 A<img src='a.jpg' vspace='7'><img src='a.jpg' vspace='7'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 9 A<img src='a.jpg' checkPolicyFile='true'><img src='a.jpg' checkPolicyFile='true'>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 10 <img src='a.jpg'><img src='b.jpg'>
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 11 A<img src='missing.jpg'>X</img>B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 12 A<img src='missing.jpg' />B
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+CASE 13 REPARSE first
+CASE 13 REPARSE second
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+Error #2044: Unhandled IOErrorEvent:. text=Error #2035: URL Not Found.
+END

@@ -1334,9 +1334,13 @@ static ASFunction g_native_toString_func;
 static int g_native_toString_init = 0;
 
 // Install a toString method that always returns "[object Object]" on a native ASObject.
-// This bypasses Object.prototype.toString's SWF version check.
+// This bypasses Object.prototype.toString's SWF version check (SWF4 "[type Object]").
+// SWF5+: no own slot at all. FP32 gives Key/Mouse/Stage/Selection/Accessibility/Math and
+// Sound.prototype NO own toString (they inherit Object.prototype.toString, which already
+// prints "[object Object]" at SWF5+): avm1/global_proto_decls, s30 W2-c.
 void installNativeToString(SWFAppContext* app_context, ASObject* obj)
 {
+	if (g_swf_version >= 5) return;
 	if (!g_native_toString_init) {
 		memset(&g_native_toString_func, 0, sizeof(ASFunction));
 		strncpy(g_native_toString_func.name, "toString", 255);
@@ -16982,6 +16986,7 @@ static ASFunction* g_function_constructor = NULL; // Pointer to Function constru
 // so actionGetVariable("Number"/"Boolean") returns the same object that
 // _global.Number/_global.Boolean and the primitive __proto__ chain use.
 static ASFunction* g_number_ctor_ref = NULL;
+static ASFunction* g_string_ctor_ref = NULL; // _global.String (g_ctors[2]); s30 W2-d
 static ASFunction* g_boolean_ctor_ref = NULL;
 // Per-version-group MovieClip constructor and prototype
 static ASFunction* g_mc_ctor_legacy = NULL;  // SWF 1-6
@@ -34283,6 +34288,29 @@ static int drawingWindingLine(double tx, double ty,
 	return 0;
 }
 
+// s30 w2-stroke-geometry-land: AVM1 drawing-API curve flattening tolerance,
+// the twin of avm2_display.c gfx_curve_tol_scale. Flash rasterises quadratic
+// edges natively (no chords); lyon's 0.1 px chords pull a curved fill and a
+// thick curved stroke's convex edge inside Flash's. HIGH: 0.01 px. LOW
+// (MSAA_SAMPLES == 1) keeps 0.1 px, like the AVM2 path. Shared by
+// drawingFinalizePath and drawingCmdWindingHitTest so hit tests stay in
+// lockstep with the fill. Kill switch SWF_AVM1_CURVE_FINE=0.
+static float drawingCurveFlattenTol(void)
+{
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	return CURVE_FLATTEN_TOLERANCE;
+#else
+	static float tol = -1.0f;
+	if (tol < 0.0f)
+	{
+		const char* e = getenv("SWF_AVM1_CURVE_FINE");
+		tol = (e != NULL && e[0] == '0') ? CURVE_FLATTEN_TOLERANCE
+		                                 : CURVE_FLATTEN_TOLERANCE * 0.1f;
+	}
+	return tol;
+#endif
+}
+
 // Winding number test on a command list (un-triangulated). Test point in
 // pixels (matches DrawCmd coords). Bezier curves are flattened with the
 // same adaptive segment count used by drawingFinalizePath. Returns true if
@@ -34317,7 +34345,7 @@ static int drawingCmdWindingHitTest(const DrawingState* ds,
 			// Levien/lyon flattening — MUST stay identical to
 			// drawingFinalizePath's, or hit tests disagree with the fill.
 			CurveFlatten cf_ = curve_flatten_init((float)sx, (float)sy,
-				c->cx, c->cy, c->x, c->y, CURVE_FLATTEN_TOLERANCE);
+				c->cx, c->cy, c->x, c->y, drawingCurveFlattenTol());
 			double prev_x = sx, prev_y = sy;
 			for (int s = 1; s <= cf_.count; s++) {
 				double t = (s < cf_.count) ? (double) curve_flatten_t(&cf_, s) : 1.0;
@@ -35436,7 +35464,7 @@ static void drawingFinalizePath(DrawingState* ds)
 			// include/curve_flatten.h. Kept in lockstep with
 			// drawingCmdWindingHitTest above.
 			CurveFlatten cf_ = curve_flatten_init(sx, sy, c->cx, c->cy,
-			                                      c->x, c->y, CURVE_FLATTEN_TOLERANCE);
+			                                      c->x, c->y, drawingCurveFlattenTol());
 			int segs = curve_flatten_segs(&cf_);
 			for (int seg = 1; seg <= segs; seg++) {
 				float t = (seg < cf_.count) ? curve_flatten_t(&cf_, seg) : 1.0f;
@@ -39284,6 +39312,8 @@ static int enum_varmap_callback(const void *key, size_t ksize, uintptr_t value, 
 	return 0;
 }
 
+static void arrayForinPushInherited(SWFAppContext* app_context, ASArray* arr); // s30 w2-array-forin-proto
+
 void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 {
 	// Step 1: Pop value from stack — must check type before reading as string
@@ -39538,6 +39568,14 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 						continue;
 					PUSH_STR(pn, pn_len);
 				}
+			}
+			// Inherited enumerable names, as actionEnumerate2's ARRAY arm
+			// (s30 w2-array-forin-proto; SWF_ARRAY_FORIN_PROTO=0 disables
+			// both arms, SWF_ARRAY_FORIN_PROTO_LEGACY=0 only this one).
+			{
+				static int _leg = -1;
+				if (_leg < 0) { const char* e = getenv("SWF_ARRAY_FORIN_PROTO_LEGACY"); _leg = !(e && e[0] == '0'); }
+				if (_leg) arrayForinPushInherited(app_context, arr);
 			}
 		}
 		return;
@@ -43824,9 +43862,8 @@ static void installAccessibilityMethods(SWFAppContext* app_context, ASObject* ac
 static ASObject* g_accessibility_obj;
 static void ensureAccessibilityMethods(SWFAppContext* app_context)
 {
-	// Lazy init: install methods the first time Accessibility is accessed at SWF6+.
-	// This avoids the Gnash Dejagnu.swf SWF5 init poison where ensureGlobalInit
-	// runs during the child SWF import with g_swf_version temporarily set to 5.
+	// s30 W2-d: the methods are installed eagerly by ensureGlobalInit (SWF6+ flash_flags
+	// gate); this stays as a safety net for an Accessibility object built without it.
 	if (g_accessibility_obj != NULL && !g_accessibility_methods_init && g_swf_version >= 6)
 		installAccessibilityMethods(app_context, g_accessibility_obj);
 }
@@ -50216,6 +50253,118 @@ static void initFlashPackage(SWFAppContext* app_context)
 	#undef MAKE_PKG
 }
 
+static void avm1NativeTableApply(SWFAppContext* app_context);
+static void ensureArrayConstructorStatic(SWFAppContext* app_context);
+
+// The one Array constructor object (s30 W2-d): GetVariable("Array"), `_global.Array`,
+// `Array.prototype.constructor` and every array's virtual `constructor` are this object.
+// Builds it once with the FP32 statics (NUMERIC, RETURNINDEXEDARRAY, UNIQUESORT,
+// DESCENDING, CASEINSENSITIVE).
+static void ensureArrayConstructorStatic(SWFAppContext* app_context)
+{
+	if (!g_array_constructor_static_init)
+	{
+		memset(&g_array_constructor_static, 0, sizeof(ASFunction));
+		strncpy(g_array_constructor_static.name, "Array", 255);
+		g_array_constructor_static.function_type = 1;
+		g_array_constructor_static.param_count = 0;
+		g_array_constructor_static_init = 1;
+		// Initialize Array.prototype (shared singleton used by instanceof and arguments.__proto__)
+		if (g_array_prototype == NULL)
+		{
+			g_array_prototype = allocObject(app_context, 16);
+			retainObject(g_array_prototype);
+			setObjectProto(app_context, g_array_prototype);
+		}
+		initArrayPrototypeMethods(app_context);
+		g_array_constructor_static.prototype_obj = g_array_prototype;
+		// Register Array sort-flag constants on own_props
+		g_array_constructor_static.own_props = allocObject(app_context, 8);
+		if (g_array_constructor_static.own_props != NULL) {
+			retainObject(g_array_constructor_static.own_props);
+			static const char* const_names[] = {
+				"CASEINSENSITIVE", "DESCENDING", "UNIQUESORT",
+				"RETURNINDEXEDARRAY", "NUMERIC"
+			};
+			static const int const_values[] = { 1, 2, 4, 8, 16 };
+			for (int _ci = 0; _ci < 5; _ci++) {
+				ActionVar _cv = {0};
+				_cv.type = ACTION_STACK_VALUE_F64;
+				double _cvd = (double) const_values[_ci];
+				VAL(double, &_cv.data.numeric_value) = _cvd;
+				setProperty(app_context, g_array_constructor_static.own_props,
+				            const_names[_ci], strlen(const_names[_ci]), &_cv);
+			}
+		}
+	}
+}
+
+// s30 W2-c: inert FP32 natives we do not implement, so presence / typeof / for..in match
+// avm1/global_proto_decls. Each is a no-op native. Version gate = the lowest FP32 dump that
+// lists it (session30-fanout-reports/w1-local-oracles/w1-native-table: present at SWF 6, 7, 8
+// and the SWF15 golden; SWF5 is unmeasured and `_global` is unreachable there anyway).
+static ASFunction g_avm1stub_getDiskUsage, g_avm1stub_purge, g_avm1stub_getURLPageSupport;
+static void avm1StubFn(SWFAppContext* app_context, ASObject* holder, ASFunction* f,
+                       const char* name, int with_prototype)
+{
+	if (holder == NULL || findPropertyRaw(holder, name, (u32) strlen(name)) != NULL) return;
+	memset(f, 0, sizeof(ASFunction));
+	strncpy(f->name, name, 255);
+	f->function_type = 2;
+	f->advanced_func = (Function2Ptr) builtin_noop_func;
+	setupNativeFuncOwnProps(app_context, f);
+	if (with_prototype) addNativeFuncPrototype(app_context, f);
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) f;
+	setPropertyWithFlags(app_context, holder, name, (u32) strlen(name), &fv, PROPERTY_FLAGS_DONTENUM);
+}
+
+static void avm1NativeStubsInstall(SWFAppContext* app_context)
+{
+	extern ASObject* global_object;
+	// Native singletons are `new Object()`s in FP32: an own `constructor` = Object
+	// (avm1/global_proto_decls: Key/Mouse/Selection/Stage/Accessibility/Math/SoundCodec/
+	// System.capabilities, `constructor, own, READ_ONLY`). DONT_ENUM like every
+	// constructor slot (the golden cannot observe DONT_ENUM for it); the table sets READ_ONLY.
+	{
+		ASObject* singletons[8] = { g_key_obj, g_mouse_obj, g_selection_obj, g_stage_obj,
+		                            g_accessibility_obj, actionMathGetObject(app_context),
+		                            g_soundcodec_obj, NULL };
+		if (g_system_object != NULL) {
+			ActionVar* cv = getProperty(g_system_object, "capabilities", 12);
+			if (cv != NULL && cv->type == ACTION_STACK_VALUE_OBJECT)
+				singletons[7] = (ASObject*) cv->data.numeric_value;
+		}
+		ActionVar ov = {0};
+		ov.type = ACTION_STACK_VALUE_FUNCTION;
+		ov.data.numeric_value = (u64) ensureObjectConstructor(app_context);
+		for (int i = 0; i < 8; i++) {
+			if (singletons[i] != NULL && findPropertyRaw(singletons[i], "constructor", 11) == NULL)
+				setPropertyWithFlags(app_context, singletons[i], "constructor", 11, &ov, PROPERTY_FLAGS_DONTENUM);
+		}
+	}
+	if (g_swf_version < 6 || global_object == NULL) return;
+	// _global.o: Flash's init-time temporary, left as null (DONT_ENUM). GetVariable("o")
+	// already answers null; this makes the slot itself visible (hasOwnProperty / for..in).
+	if (findPropertyRaw(global_object, "o", 1) == NULL) {
+		ActionVar nv = {0};
+		nv.type = ACTION_STACK_VALUE_NULL;
+		setPropertyWithFlags(app_context, global_object, "o", 1, &nv, PROPERTY_FLAGS_DONTENUM);
+	}
+	// AssetCache / RemoteLSOUsage / AsSetupError are `function with prototype` in FP32.
+	{
+		ASFunction* pc[3] = { &g_assetCache_ctor, &g_remoteLSOUsage_ctor, &g_asSetupError_ctor };
+		for (int i = 0; i < 3; i++) {
+			if (pc[i]->own_props == NULL) setupNativeFuncOwnProps(app_context, pc[i]);
+			if (pc[i]->prototype_obj == NULL) addNativeFuncPrototype(app_context, pc[i]);
+		}
+	}
+	avm1StubFn(app_context, g_assetCache_ctor.own_props, &g_avm1stub_getDiskUsage, "getDiskUsage", 0);
+	avm1StubFn(app_context, g_assetCache_ctor.own_props, &g_avm1stub_purge, "purge", 0);
+	avm1StubFn(app_context, g_remoteLSOUsage_ctor.own_props, &g_avm1stub_getURLPageSupport, "getURLPageSupport", 1);
+}
+
 static void ensureGlobalInit(SWFAppContext* app_context)
 {
 	// Belt-and-braces for the actionNewObject hole above: every opcode that can
@@ -50438,9 +50587,20 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	installAsBroadcaster(app_context, g_key_obj);
 	markAsBroadcasterSWF6(g_key_obj);
 	installKeyMethods(app_context, g_key_obj);
-	// Accessibility methods (isActive, updateProperties, sendEvent) are installed lazily
-	// because ensureGlobalInit may run during a SWF5 child import (Gnash Dejagnu.swf).
-	// See ensureAccessibilityMethods() — called when Accessibility is first accessed at SWF6+.
+	// Accessibility methods (isActive, updateProperties, sendEvent): installed eagerly and
+	// gated by SWF version through the SWF6+ flash_flags bit (0x0080), like AsBroadcaster's
+	// methods on Key/Mouse/Stage, instead of the old lazy first-access install (s30 W2-d).
+	// ensureGlobalInit may run during a SWF5 child import (Gnash Dejagnu.swf), so the gate
+	// must be the per-access version check, not g_swf_version at init time. FP32
+	// avm1/global_proto_decls lists them at SWF 6/7/8/15 (own, READ_ONLY, enumerable).
+	installAccessibilityMethods(app_context, g_accessibility_obj);
+	for (u32 _ai = 0; _ai < g_accessibility_obj->num_used; _ai++) {
+		ASProperty* _ap = &g_accessibility_obj->properties[_ai];
+		if ((_ap->name_length == 8 && strncmp(_ap->name, "isActive", 8) == 0) ||
+		    (_ap->name_length == 16 && strncmp(_ap->name, "updateProperties", 16) == 0) ||
+		    (_ap->name_length == 9 && strncmp(_ap->name, "sendEvent", 9) == 0))
+			_ap->flash_flags = 0x0080;
+	}
 	installAsBroadcaster(app_context, g_stage_obj);
 	markAsBroadcasterSWF6(g_stage_obj);
 	// Stage default properties (READ_ONLY)
@@ -50712,7 +50872,10 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// Set up own_props on global stub functions (prevents lazy prototype, adds __proto__/constructor)
 	{
 		ASFunction* global_funcs[] = {
-			actionMathGetIsNaN(), actionMathGetIsFinite(), &g_aspf_func, &g_asnative_func,
+			// s30 W2-c: FP32 gives ASSetNative / ASSetNativeAccessor own __proto__ + constructor
+			// and ASnative none (avm1/global_proto_decls: `Testing _global.ASnative` is empty).
+			actionMathGetIsNaN(), actionMathGetIsFinite(), &g_aspf_func,
+			&g_ASSetNative_func, &g_ASSetNativeAccessor_func,
 			&g_escape_func, &g_unescape_func, &g_parseInt_func, &g_parseFloat_func,
 			&g_trace_func, &g_updateAfterEvent_func, actionTimerGetSetInterval(),
 			actionTimerGetClearTimeout(), actionTimerGetClearInterval(), actionTimerGetSetTimeout(),
@@ -50722,6 +50885,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		for (int i = 0; i < (int)(sizeof(global_funcs)/sizeof(global_funcs[0])); i++) {
 			if (global_funcs[i]->own_props == NULL)
 				setupNativeFuncOwnProps(app_context, global_funcs[i]);
+		}
+		// ASnative: an own-property bag with no __proto__ / constructor at all.
+		if (g_asnative_func.own_props == NULL) {
+			g_asnative_func.no_lazy_prototype = 1;
+			g_asnative_func.own_props = allocObject(app_context, 2);
+			retainObject(g_asnative_func.own_props);
 		}
 	}
 
@@ -50794,8 +50963,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("Rando", 5, actionRandoGetConstructor(app_context));
 #endif
 	REG_FUNC("String", 6, &g_ctors[2]);
-	REG_FUNC("Array", 5, &g_ctors[1]);
-	g_array_ctor_registered = &g_ctors[1];
+	// s30 W2-d: `_global.Array` IS the builtin Array (g_array_constructor_static), the
+	// object scripts already observe as `Array` and `[].constructor`. g_ctors[1] stays
+	// as an unregistered husk (Phase 8b still writes its prototype_obj).
+	ensureArrayConstructorStatic(app_context);
+	REG_FUNC("Array", 5, &g_array_constructor_static);
+	g_array_ctor_registered = &g_array_constructor_static;
 	REG_OBJ("Math", 4, actionMathGetObject(app_context));
 	REG_FUNC("Sound", 5, &g_stub_ctors[14]);
 	REG_FUNC("XMLNode", 7, &g_xmlnode_constructor);
@@ -51057,7 +51230,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		// Collect ALL constructor functions that should have own_props populated
 		ASFunction* all_ctors[] = {
 			&g_ctors[0], // Object
-			&g_ctors[1], // Array
+			&g_array_constructor_static, // Array (= _global.Array, s30 W2-d)
 			&g_ctors[2], // String
 			&g_ctors[3], // Number
 			&g_ctors[4], // Boolean
@@ -51184,6 +51357,22 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		// so a lazy init in actionGetVariable would be too late.
 		g_number_ctor_ref = &g_ctors[3];
 		g_boolean_ctor_ref = &g_ctors[4];
+		// String: same unification (s30 W2-d). String.fromCharCode lives on _global.String.
+		g_string_ctor_ref = &g_ctors[2];
+		if (g_ctors[2].own_props != NULL && findPropertyRaw(g_ctors[2].own_props, "fromCharCode", 12) == NULL) {
+			memset(&g_string_fromCharCode_func, 0, sizeof(ASFunction));
+			strncpy(g_string_fromCharCode_func.name, "fromCharCode", 255);
+			g_string_fromCharCode_func.function_type = 2;
+			g_string_fromCharCode_func.param_count = 0;
+			g_string_fromCharCode_func.advanced_func = (Function2Ptr) builtin_string_fromCharCode;
+			setupNativeFuncOwnProps(app_context, &g_string_fromCharCode_func);
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_string_fromCharCode_func;
+			ActionVar fcc_val = {0};
+			fcc_val.type = ACTION_STACK_VALUE_FUNCTION;
+			fcc_val.data.numeric_value = (u64) &g_string_fromCharCode_func;
+			setPropertyWithFlags(app_context, g_ctors[2].own_props, "fromCharCode", 12, &fcc_val, PROPERTY_FLAGS_DONTENUM);
+		}
 		{
 			// Number static constants on g_ctors[3].own_props
 			if (g_ctors[3].own_props != NULL && getProperty(g_ctors[3].own_props, "MAX_VALUE", 9) == NULL) {
@@ -51407,7 +51596,158 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		releaseObject(app_context, old);
 		g_ctors[0].own_props = new_props;
 	}
+	avm1NativeStubsInstall(app_context);
+	// FP32-golden native-object reconcile (s30 W2-a): attributes, for..in order and
+	// `.prototype` presence of every native member. Must stay the last step.
+	avm1NativeTableApply(app_context);
 }
+
+// ---- AVM1 native-object table (s30 w1-native-table / W2-a): FP32-golden-driven reconcile ----
+// Table generated by scripts/gen_avm1_native_table.py from the FP32 decls golden.
+// For each object row (golden order; first visit wins, objects reached twice are skipped):
+//   flags  : DONT_ENUM / READ_ONLY of every own member we have (accessor props untouched)
+//   proto  : a native function member gains / loses `.prototype` per the golden type
+//   order  : own props re-inserted in reverse FP32 for..in order (LIFO enumeration);
+//            members the table does not list keep their relative order and enumerate last.
+// Members we lack are NOT created (no stubs). Kill switch: SWF_NATIVE_TABLE=0.
+#include <actionmodern/avm1_native_table.inc>
+
+static ASObject* avm1ntTargetOf(ActionVar* v, int* is_fn)
+{
+	*is_fn = 0;
+	if (v == NULL) return NULL;
+	if (v->type == ACTION_STACK_VALUE_OBJECT) return (ASObject*) v->data.numeric_value;
+	if (v->type == ACTION_STACK_VALUE_FUNCTION) {
+		*is_fn = 1;
+		return ((ASFunction*) v->data.numeric_value)->own_props;
+	}
+	return NULL;
+}
+
+// Resolve "_global.A.B.prototype" to the ASObject that holds its own members.
+static ASObject* avm1ntResolve(const char* path)
+{
+	extern ASObject* global_object;
+	if (strncmp(path, "_global", 7) != 0) return NULL;
+	ASObject* cur = global_object;
+	ASFunction* cur_fn = NULL;
+	const char* p = path + 7;
+	while (*p == '.') {
+		p++;
+		const char* e = strchr(p, '.');
+		u32 n = e ? (u32)(e - p) : (u32) strlen(p);
+		ActionVar* v = NULL;
+		ActionVar tmp = {0};
+		if (cur_fn != NULL && n == 9 && strncmp(p, "prototype", 9) == 0) {
+			if (cur_fn->prototype_obj == NULL) return NULL;
+			tmp.type = ACTION_STACK_VALUE_OBJECT;
+			tmp.data.numeric_value = (u64) cur_fn->prototype_obj;
+			v = &tmp;
+		} else {
+			if (cur == NULL) return NULL;
+			char seg[256];
+			if (n >= sizeof(seg)) return NULL;
+			memcpy(seg, p, n); seg[n] = 0;
+			// inherited segments resolve through the __proto__ chain (X.watch IS Object.prototype.watch)
+			ASProperty* pr = findPropertyStructWithPrototype(cur, seg, n);
+			if (pr == NULL || pr->getter != NULL) return NULL;
+			v = &pr->value;
+		}
+		int is_fn = 0;
+		ASObject* t = avm1ntTargetOf(v, &is_fn);
+		cur_fn = is_fn ? (ASFunction*) v->data.numeric_value : NULL;
+		cur = t;
+		if (cur == NULL && cur_fn == NULL) return NULL;
+		p += n;
+	}
+	return cur;
+}
+
+static void avm1NativeTableApply(SWFAppContext* app_context)
+{
+	const char* ks = getenv("SWF_NATIVE_TABLE");
+	if (ks != NULL && ks[0] == '0') return;
+	static ASObject* visited[AVM1NT_NUM_OBJECTS];
+	int nvisited = 0;
+	for (int oi = 0; oi < AVM1NT_NUM_OBJECTS; oi++) {
+		const Avm1NtObject* ob = &g_avm1nt_objects[oi];
+		ASObject* o = avm1ntResolve(ob->path);
+		if (o == NULL) continue;  // primitive leaf, or an object we do not build
+		int seen = 0;
+		for (int k = 0; k < nvisited; k++) if (visited[k] == o) { seen = 1; break; }
+		if (seen) continue;
+		visited[nvisited++] = o;
+		const Avm1NtMember* m = &g_avm1nt_members[ob->first];
+		// 1. flags + prototype presence
+		for (int mi = 0; mi < ob->count; mi++) {
+			ASProperty* pr = findPropertyRaw(o, m[mi].name, (u32) strlen(m[mi].name));
+			if (pr == NULL) continue;  // a member we do not implement: never created here
+			if (pr->getter == NULL && pr->setter == NULL) {
+				u8 f = pr->flags;
+				if (m[mi].attrs & 4) { /* unobservable: keep ours */ }
+				else if (m[mi].attrs & 1) f &= ~PROPERTY_FLAG_ENUMERABLE; else f |= PROPERTY_FLAG_ENUMERABLE;
+				if (!(pr->flags & PROPERTY_FLAG_PERM_READONLY) && !(m[mi].attrs & 32)) {
+					if (m[mi].attrs & 2) f &= ~PROPERTY_FLAG_WRITABLE; else f |= PROPERTY_FLAG_WRITABLE;
+				}
+				if (m[mi].attrs & 8) {
+					if (m[mi].attrs & 16) f &= ~PROPERTY_FLAG_CONFIGURABLE; else f |= PROPERTY_FLAG_CONFIGURABLE;
+				}
+				pr->flags = f;
+			}
+			// setupNativeFuncOwnProps' self placeholder in `constructor` is only rewritten for the
+			// functions built before g_function_constructor; lazily-built natives keep it (f.constructor
+			// === f). FP32: every function's constructor is Function.
+			if ((m[mi].attrs & 4) && pr->value.type == ACTION_STACK_VALUE_FUNCTION && g_function_constructor != NULL &&
+			    strcmp(m[mi].name, "constructor") == 0 &&
+			    ((ASFunction*) pr->value.data.numeric_value)->own_props == o) {
+				pr->value.data.numeric_value = (u64) g_function_constructor;
+			}
+			// constructor / __proto__ may hold a self placeholder (setupNativeFuncOwnProps): never
+			// edit prototype presence through them.
+			if (pr->value.type == ACTION_STACK_VALUE_FUNCTION && strcmp(m[mi].name, "constructor") != 0 &&
+			    strcmp(m[mi].name, "__proto__") != 0) {
+				ASFunction* fn = (ASFunction*) pr->value.data.numeric_value;
+				if (fn == NULL) continue;
+				if (m[mi].type == AVM1NT_T_FUNCTION_WITH_PROTOTYPE) {
+					if (fn->prototype_obj == NULL && fn->no_lazy_prototype) {
+						if (fn->own_props == NULL) setupNativeFuncOwnProps(app_context, fn);
+						addNativeFuncPrototype(app_context, fn);
+					}
+				} else if (m[mi].type == AVM1NT_T_FUNCTION) {
+					if (fn->prototype_obj != NULL || !fn->no_lazy_prototype) {
+						fn->prototype_obj = NULL;      // prototype object leaked on purpose (may be shared)
+						fn->no_lazy_prototype = 1;
+						if (fn->own_props != NULL) {
+							ASProperty* pp = findPropertyRaw(fn->own_props, "prototype", 9);
+							if (pp != NULL) { pp->flags |= PROPERTY_FLAG_CONFIGURABLE; deleteProperty(app_context, fn->own_props, "prototype", 9); }
+						}
+					}
+				}
+			}
+		}
+		// 2. order: unlisted props first (keep relative order), then listed in reverse FP32 order
+		if (o->num_used > 1) {
+			u32 nu = o->num_used;
+			ASProperty* np = (ASProperty*) malloc(sizeof(ASProperty) * nu);
+			u8* listed = (u8*) calloc(nu, 1);
+			int* slot = (int*) malloc(sizeof(int) * (ob->count + 1));
+			for (int mi = 0; mi < ob->count; mi++) {
+				ASProperty* pr = findPropertyRaw(o, m[mi].name, (u32) strlen(m[mi].name));
+				int s = pr ? (int)(pr - o->properties) : -1;
+				if (s >= 0 && listed[s]) s = -1;
+				if (s >= 0) listed[s] = 1;
+				slot[mi] = s;
+			}
+			u32 w = 0;
+			for (u32 i = 0; i < nu; i++) if (!listed[i]) np[w++] = o->properties[i];
+			for (int mi = ob->count - 1; mi >= 0; mi--) if (slot[mi] >= 0) np[w++] = o->properties[slot[mi]];
+			memcpy(o->properties, np, sizeof(ASProperty) * nu);
+			objectRehashIndex(o);
+			free(np); free(listed); free(slot);
+		}
+	}
+}
+
 
 // Copy all properties from src to dst, preserving flags
 static void copyObjectProperties(SWFAppContext* app_context, ASObject* dst, ASObject* src)
@@ -53070,42 +53410,9 @@ check_special_vars:
 		}
 		else if (var_name_len == 5 && _CMP_BUILTIN_NAME(var_name, "Array", 5))
 		{
-			// Return the built-in Array constructor as a function (file-scope static)
-			if (!g_array_constructor_static_init)
-			{
-				memset(&g_array_constructor_static, 0, sizeof(ASFunction));
-				strncpy(g_array_constructor_static.name, "Array", 255);
-				g_array_constructor_static.function_type = 1;
-				g_array_constructor_static.param_count = 0;
-				g_array_constructor_static_init = 1;
-				// Initialize Array.prototype (shared singleton used by instanceof and arguments.__proto__)
-				if (g_array_prototype == NULL)
-				{
-					g_array_prototype = allocObject(app_context, 16);
-					retainObject(g_array_prototype);
-					setObjectProto(app_context, g_array_prototype);
-				}
-				initArrayPrototypeMethods(app_context);
-				g_array_constructor_static.prototype_obj = g_array_prototype;
-				// Register Array sort-flag constants on own_props
-				g_array_constructor_static.own_props = allocObject(app_context, 8);
-				if (g_array_constructor_static.own_props != NULL) {
-					retainObject(g_array_constructor_static.own_props);
-					static const char* const_names[] = {
-						"CASEINSENSITIVE", "DESCENDING", "UNIQUESORT",
-						"RETURNINDEXEDARRAY", "NUMERIC"
-					};
-					static const int const_values[] = { 1, 2, 4, 8, 16 };
-					for (int _ci = 0; _ci < 5; _ci++) {
-						ActionVar _cv = {0};
-						_cv.type = ACTION_STACK_VALUE_F64;
-						double _cvd = (double) const_values[_ci];
-						VAL(double, &_cv.data.numeric_value) = _cvd;
-						setProperty(app_context, g_array_constructor_static.own_props,
-						            const_names[_ci], strlen(const_names[_ci]), &_cv);
-					}
-				}
-			}
+			// The built-in Array constructor; ensureGlobalInit registers this same object as
+			// `_global.Array` (s30 W2-d), so `Array === _global.Array`.
+			ensureArrayConstructorStatic(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_array_constructor_static);
 			return;
 		}
@@ -53138,74 +53445,14 @@ check_special_vars:
 		}
 		else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "String", 6))
 		{
-			// Return the built-in String constructor as a function
-			static ASFunction g_string_constructor;
+			// The built-in String constructor IS `_global.String` (g_ctors[2], s30 W2-d): one
+			// identity, so `String === _global.String` and `_global.String.fromCharCode` hold
+			// (FP32 avm1/global_proto_decls). fromCharCode is installed in ensureGlobalInit.
+			ensureGlobalInit(app_context);
+			ASFunction* _sc = g_string_ctor_ref;
 			static int g_string_constructor_init = 0;
-			if (!g_string_constructor_init)
+			if (_sc != NULL && !g_string_constructor_init)
 			{
-				memset(&g_string_constructor, 0, sizeof(ASFunction));
-				strncpy(g_string_constructor.name, "String", 255);
-				g_string_constructor.function_type = 1;
-				g_string_constructor.param_count = 0;
-
-				// Register String.fromCharCode as a static method
-				g_string_constructor.own_props = allocObject(app_context, 4);
-				retainObject(g_string_constructor.own_props);
-				memset(&g_string_fromCharCode_func, 0, sizeof(ASFunction));
-				strncpy(g_string_fromCharCode_func.name, "fromCharCode", 255);
-				g_string_fromCharCode_func.function_type = 2;
-				g_string_fromCharCode_func.param_count = 0;
-				g_string_fromCharCode_func.advanced_func = (Function2Ptr) builtin_string_fromCharCode;
-				setupNativeFuncOwnProps(app_context, &g_string_fromCharCode_func);
-				if (function_count < MAX_FUNCTIONS)
-					function_registry[function_count++] = &g_string_fromCharCode_func;
-				ActionVar fcc_val = {0};
-				fcc_val.type = ACTION_STACK_VALUE_FUNCTION;
-				VAL(u64, &fcc_val.data.numeric_value) = (u64) &g_string_fromCharCode_func;
-				// DONT_ENUM: fromCharCode shouldn't appear in for-in on String
-				// (Flash/Ruffle match; without this, our for-in yields
-				// "fromCharCode" instead of "toString").
-				setPropertyWithFlags(app_context, g_string_constructor.own_props, "fromCharCode", 12, &fcc_val, PROPERTY_FLAGS_DONTENUM);
-				// Set own_props.__proto__ = Function.prototype so for-in on
-				// String walks up the chain and finds Function.prototype.toString.
-				// Phase 8c-2 does this for g_ctors[2] but not the lazy
-				// g_string_constructor returned by actionGetVariable("String")
-				// at root context.
-				{
-					ensureGlobalInit(app_context);
-					ASObject* _fn_proto = getFunctionProto(g_swf_version);
-					if (_fn_proto != NULL) {
-						ActionVar _fpv = {0};
-						_fpv.type = ACTION_STACK_VALUE_OBJECT;
-						_fpv.data.numeric_value = (u64) _fn_proto;
-						setPropertyWithFlags(app_context, g_string_constructor.own_props, "__proto__", 9, &_fpv, PROPERTY_FLAGS_DONTENUM);
-						b6FlagFnProto(g_string_constructor.own_props);
-					}
-				}
-
-				// Share prototype_obj with the primary String constructor
-				// (registered on global_object as "String" via REG_FUNC) so
-				// that user modifications via either path are visible to both.
-				// This is critical for primitive-string method dispatch, where
-				// my STRING-type handler in actionCallMethod looks up method on
-				// String.prototype via getPrimitiveWrapperProto (global path).
-				ensureGlobalInit(app_context);
-				ASObject* _shared_proto = NULL;
-				if (global_object != NULL) {
-					ActionVar* _sv = getPropertyWithPrototype(global_object, "String", 6);
-					if (_sv != NULL && _sv->type == ACTION_STACK_VALUE_FUNCTION) {
-						ASFunction* _sf = (ASFunction*)(uintptr_t) _sv->data.numeric_value;
-						if (_sf != NULL) _shared_proto = _sf->prototype_obj;
-					}
-				}
-				if (_shared_proto != NULL) {
-					g_string_constructor.prototype_obj = _shared_proto;
-					retainObject(g_string_constructor.prototype_obj);
-				} else {
-					g_string_constructor.prototype_obj = allocObject(app_context, 8);
-					retainObject(g_string_constructor.prototype_obj);
-					setObjectProto(app_context, g_string_constructor.prototype_obj);
-				}
 				if (!g_wrapper_funcs_init) {
 					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
 					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
@@ -53222,40 +53469,41 @@ check_special_vars:
 				{
 					ActionVar _vo = {0}; _vo.type = ACTION_STACK_VALUE_FUNCTION;
 					_vo.data.numeric_value = (u64) stringValueOfFunc();
-					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "valueOf", 7, &_vo, PROPERTY_FLAG_WRITABLE);
-					registerStringProtoValueOfSelf(g_string_constructor.prototype_obj);
+					setPropertyWithFlags(app_context, _sc->prototype_obj, "valueOf", 7, &_vo, PROPERTY_FLAG_WRITABLE);
+					registerStringProtoValueOfSelf(_sc->prototype_obj);
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
-					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
-					// String.prototype.constructor = String (identity match with
-					// GetVariable("String") at root context, which returns the
-					// lazy g_string_constructor static). Note: g_string_constructor
-					// and the primary g_ctors[2] share prototype_obj, so writing
-					// constructor here is the single source of truth.
+					setPropertyWithFlags(app_context, _sc->prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+					// String.prototype.constructor = String (= _global.String, the
+					// object GetVariable("String") returns).
 					ActionVar _ctor = {0}; _ctor.type = ACTION_STACK_VALUE_FUNCTION;
-					_ctor.data.numeric_value = (u64)&g_string_constructor;
-					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "constructor", 11, &_ctor, PROPERTY_FLAG_WRITABLE);
-					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "__constructor__", 15, &_ctor, PROPERTY_FLAG_WRITABLE);
+					_ctor.data.numeric_value = (u64)_sc;
+					setPropertyWithFlags(app_context, _sc->prototype_obj, "constructor", 11, &_ctor, PROPERTY_FLAG_WRITABLE);
+					setPropertyWithFlags(app_context, _sc->prototype_obj, "__constructor__", 15, &_ctor, PROPERTY_FLAG_WRITABLE);
 				}
 				// Core String methods on prototype (for typeof/hasOwnProperty checks)
 				{
 					const u8 sf = PROPERTY_FLAG_WRITABLE;
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "toUpperCase", 11, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "toLowerCase", 11, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "charAt", 6, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "charCodeAt", 10, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "concat", 6, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "indexOf", 7, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "lastIndexOf", 11, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "slice", 5, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "substring", 9, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "split", 5, sf);
-					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "substr", 6, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "toUpperCase", 11, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "toLowerCase", 11, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "charAt", 6, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "charCodeAt", 10, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "concat", 6, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "indexOf", 7, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "lastIndexOf", 11, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "slice", 5, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "substring", 9, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "split", 5, sf);
+					addStubMethodToProto(app_context, _sc->prototype_obj, "substr", 6, sf);
 				}
 
 				g_string_constructor_init = 1;
 			}
-			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_string_constructor);
+			if (_sc != NULL) {
+				PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)_sc);
+			} else {
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			}
 			return;
 		}
 		else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "Number", 6))
@@ -56716,6 +56964,129 @@ void actionInstanceOf(SWFAppContext* app_context)
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result ? 1 : 0);
 }
 
+// s30 w2-array-forin-proto: `for (k in <array>)` also lists the ENUMERABLE
+// names inherited through the array's `__proto__` chain (FP32: the AS2
+// `Array.prototype.foo` gotcha; avm1/global_proto_decls `X._listeners`
+// sections list the then-unhidden Object.prototype names before the own
+// `constructor`). Same walk and order as actionEnumerate2's OBJECT arm: each
+// level pushed in insertion order after the own keys, so LIFO pops the
+// deepest level first; inherited `constructor` skipped; a name the array owns
+// (any flags, or a live index) shadows the inherited one. Kill switch
+// SWF_ARRAY_FORIN_PROTO=0.
+static int arrayForinProtoEnabled(void)
+{
+	static int s = -1;
+	if (s < 0) { const char* e = getenv("SWF_ARRAY_FORIN_PROTO"); s = !(e && e[0] == '0'); }
+	return s;
+}
+
+static int arrayForinOwnsName(ASArray* arr, const char* name, u32 len)
+{
+	if (arr->props != NULL && findPropertyRaw(arr->props, name, len) != NULL)
+		return 1;
+	if (len == 0 || len > 10) return 0;
+	u64 idx = 0;
+	for (u32 j = 0; j < len; j++)
+	{
+		if (name[j] < '0' || name[j] > '9') return 0;
+		idx = idx * 10 + (u64)(name[j] - '0');
+	}
+	if (len > 1 && name[0] == '0') return 0;
+	return (int32_t)arr->length > 0 && idx < arr->length && idx < arr->capacity &&
+	       arr->elements[(u32)idx].type != ACTION_STACK_VALUE_HOLE;
+}
+
+// s30 w2-array-forin-proto: with enum_keys present, the ARRAY arm used to list
+// ONLY tracked keys, so `b = [10, 20]; b.bar = 1; for (k in b)` gave just
+// `bar` (the literal's indices were never tracked). Push every live, untracked
+// index in ascending order BEFORE the tracked keys. Kill switch
+// SWF_ARRAY_FORIN_UNTRACKED=0 (independent of SWF_ARRAY_FORIN_PROTO).
+static void arrayForinPushUntrackedIndices(SWFAppContext* app_context, ASArray* arr)
+{
+	static int s = -1;
+	if (s < 0) { const char* e = getenv("SWF_ARRAY_FORIN_UNTRACKED"); s = !(e && e[0] == '0'); }
+	if (!s || arr == NULL || (int32_t)arr->length <= 0) return;
+	u32 lim = arr->length < arr->capacity ? arr->length : arr->capacity;
+	if (lim == 0) return;
+	u8* tracked = (u8*) calloc(lim, 1);
+	if (tracked == NULL) return;
+	for (u32 k = 0; k < arr->enum_count; k++)
+	{
+		const char* key = arr->enum_keys[k];
+		u32 kl = (u32) strlen(key);
+		if (kl == 0 || kl > 10 || (kl > 1 && key[0] == '0')) continue;
+		u64 idx = 0; int ok = 1;
+		for (u32 j = 0; j < kl; j++)
+		{
+			if (key[j] < '0' || key[j] > '9') { ok = 0; break; }
+			idx = idx * 10 + (u64)(key[j] - '0');
+		}
+		if (ok && idx < lim) tracked[idx] = 1;
+	}
+	for (u32 i = 0; i < lim; i++)
+	{
+		if (tracked[i] || arr->elements[i].type == ACTION_STACK_VALUE_HOLE) continue;
+		char b[16];
+		int n = snprintf(b, sizeof(b), "%u", i);
+		if (arr->props != NULL)
+		{
+			ASProperty* ps = findPropertyRaw(arr->props, b, (u32) n);
+			if (ps != NULL && !(ps->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
+		}
+		PUSH_STR(b, (u32) n);
+	}
+	free(tracked);
+}
+
+static void arrayForinPushInherited(SWFAppContext* app_context, ASArray* arr)
+{
+	if (arr == NULL || !arrayForinProtoEnabled()) return;
+	// Resolve without side effects: an own `__proto__` (object, or an array's
+	// property bag), else the version's Array.prototype if it already exists.
+	// (actionArrayProtoForAmf's fallback would lazily build Array.prototype.)
+	ASObject* current_obj = NULL;
+	ASProperty* pp = (arr->props != NULL) ? findPropertyRaw(arr->props, "__proto__", 9) : NULL;
+	if (pp != NULL)
+	{
+		if (pp->value.type == ACTION_STACK_VALUE_OBJECT)
+			current_obj = (ASObject*)(uintptr_t) pp->value.data.numeric_value;
+		else if (pp->value.type == ACTION_STACK_VALUE_ARRAY && pp->value.data.numeric_value != 0)
+			current_obj = ((ASArray*)(uintptr_t) pp->value.data.numeric_value)->props;
+	}
+	else
+	{
+		int vg = versionGroup(g_swf_version);
+		current_obj = (vg == 0) ? g_array_proto_legacy : g_array_proto_modern;
+		if (current_obj == NULL) current_obj = g_array_prototype;
+	}
+	EnumeratedName* enumerated_head = NULL;
+	int chain_depth = 0;
+	while (current_obj != NULL && chain_depth < 100)
+	{
+		chain_depth++;
+		for (u32 i = 0; i < current_obj->num_used; i++)
+		{
+			const char* pn = current_obj->properties[i].name;
+			u32 pnl = current_obj->properties[i].name_length;
+			if (pn == NULL || (uintptr_t)pn < 4096) continue;
+			if (!(current_obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE)) continue;
+			if (current_obj->properties[i].flags & PROPERTY_FLAG_PERM_DONTENUM) continue;
+			if (pnl == 11 && memcmp(pn, "constructor", 11) == 0) continue;
+			if (pnl == 9 && memcmp(pn, "__proto__", 9) == 0) continue;
+			if (isPropertyEnumerated(enumerated_head, pn, pnl)) continue;
+			addEnumeratedName(&enumerated_head, pn, pnl);
+			if (arrayForinOwnsName(arr, pn, pnl)) continue;
+			PUSH_STR((char*)pn, pnl);
+		}
+		ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+		if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+			current_obj = (ASObject*) proto_var->data.numeric_value;
+		else
+			current_obj = NULL;
+	}
+	freeEnumeratedNames(enumerated_head);
+}
+
 void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 {
 	// Pop object reference from stack
@@ -56792,6 +57163,10 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 		{
 			if (arr->enum_keys != NULL && arr->enum_count > 0)
 			{
+				// Live indices the tracking never saw (literal / InitArray
+				// elements predate the first SetMember) enumerate as the
+				// OLDEST keys: pushed first = popped last.
+				arrayForinPushUntrackedIndices(app_context, arr);
 				// Use tracked insertion order
 				for (u32 i = 0; i < arr->enum_count; i++)
 				{
@@ -56912,6 +57287,9 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
+			// Inherited enumerable names (pushed last = popped first, as in
+			// the OBJECT arm). s30 w2-array-forin-proto.
+			arrayForinPushInherited(app_context, arr);
 		}
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
@@ -62185,23 +62563,43 @@ void actionSetMember(SWFAppContext* app_context)
 				// (FP32 w2b-tabindex.t_child_numstr_null: `m.tabIndex = null`
 				// reads undefined, not 0; Ruffle agrees). Text fields keep the
 				// coercion: no capture covers them.
-				if (value_var.type == ACTION_STACK_VALUE_NULL && !MC_IS_TEXTFIELD(mc))
+				// s30 w1-drift-smalls: FP32 tf_tabindex_null covers them now:
+				// `t.tabIndex = null` reads undefined on a text field too.
+				// (s30 w2: the u32/i32 -1 sentinel below also unsets, all targets.)
+				if (value_var.type == ACTION_STACK_VALUE_NULL)
 					value_var.type = ACTION_STACK_VALUE_UNDEFINED;
 				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
 				{
 					double dval = varToDoubleSimple(&value_var);
 					if (MC_IS_TEXTFIELD(mc)) {
 						// Text fields: unsigned 32-bit coercion, NaN → 0
-						value_var.type = ACTION_STACK_VALUE_F64;
-						VAL(double, &value_var.data.numeric_value) =
-							isnan(dval) ? 0.0 : (double)(uint32_t)ecmaToInt32(dval);
+						// s30 w1-drift-smalls: the coerced value 0xFFFFFFFF
+						// (i32 -1) is the "unset" sentinel (FP32
+						// tf_tabindex_null: `-1` reads undefined while
+						// `-2147483648` reads 2147483648, so it is -1 only,
+						// not "any negative"; Ruffle interactive.rs agrees).
+						uint32_t u = isnan(dval) ? 0u : (uint32_t)ecmaToInt32(dval);
+						if (u == 0xFFFFFFFFu) {
+							value_var.type = ACTION_STACK_VALUE_UNDEFINED;
+						} else {
+							value_var.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &value_var.data.numeric_value) = (double)u;
+						}
 					} else {
 						// Buttons / MovieClips: signed 32-bit coercion, NaN → INT_MIN
 						// (FP32 L3b_tabindex*: `m.tabIndex = 0; m.tabIndex = "t"`
 						// reads -2147483648, not the previous 0; s29 w2b-tabindex).
-						value_var.type = ACTION_STACK_VALUE_F64;
-						VAL(double, &value_var.data.numeric_value) =
-							isnan(dval) ? (double)INT_MIN : (double)ecmaToInt32(dval);
+						// s30 w2-drift-smalls-land: -1 is the same "unset"
+						// sentinel as on text fields (FP32 tabindex_clip_button
+						// v6/v8: -1 reads undefined on a timeline clip, a script
+						// clip and a Button; -2 and -2147483648 stay).
+						int32_t iv = isnan(dval) ? INT_MIN : ecmaToInt32(dval);
+						if (iv == -1) {
+							value_var.type = ACTION_STACK_VALUE_UNDEFINED;
+						} else {
+							value_var.type = ACTION_STACK_VALUE_F64;
+							VAL(double, &value_var.data.numeric_value) = (double)iv;
+						}
 					}
 				}
 				// Regular MCs (not textfield, not button): tabIndex is non-enumerable
@@ -62533,6 +62931,22 @@ void actionDelete(SWFAppContext* app_context)
 	{
 		// Delete from MovieClip's dynamic_props
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+		// s30 w2-drift-smalls-land: tabIndex is a native prototype accessor
+		// on text fields, clips AND buttons, so `delete x.tabIndex` returns
+		// false and keeps the value (FP32 tf_tabindex_null +
+		// tabindex_clip_button v6/v8: still 4 after delete). On clips the
+		// value sits in dynamic_props as DONTENUM; skip it there too. The
+		// untouched root's plain own tabIndex (g_tab_root_raw, s29
+		// w2b-tabindex) is a real own property: it stays deletable.
+		{
+			extern MovieClip root_movieclip;
+			if (mc != NULL && prop_name != NULL &&
+			    prop_name_len == 8 && memcmp(prop_name, "tabIndex", 8) == 0 &&
+			    !(mc == &root_movieclip && g_tab_root_raw)) {
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+				return;
+			}
+		}
 		if (mc != NULL && mc->dynamic_props != NULL) {
 			bool success = deleteProperty(app_context, (ASObject*)mc->dynamic_props, prop_name, prop_name_len);
 			// For root MC, also clear from variable map (SetMember on root

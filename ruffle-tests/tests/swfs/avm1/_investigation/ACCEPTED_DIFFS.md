@@ -441,7 +441,8 @@ missing/invalid args match.
 
 Tests where shape-accurate `hitTest(x, y, true)` results differ due to inherent
 differences in font glyph outlines, morph boundary precision, and Drawing API
-stroke tessellation accuracy. 332/338 lines pass; the remaining **6** (71 'layers' shape
+stroke tessellation accuracy. 334/338 lines pass (s30 w2-drift-smalls-land fixed lines 71 and 296); the remaining **4**
+(171–177 Noto glyph boundaries) are ACCEPTED. Before s30: **6** (71 'layers' shape
 geometry, 171–177 Noto glyph boundaries, 296 morph boundary; was 9 — corrected s26 `w1-trace-tail-audit` §5, first flagged s24
 `w1-avm1-tail` lead 3) are at exact geometric boundaries where our implementation
 disagrees with Ruffle's golden AND with real Flash: the s28 FP32 capture
@@ -472,27 +473,26 @@ Not fixable without Flash's actual glyph outlines, which are proprietary.
 
 **Decision:** Accept; font metric incompatibility between Noto Sans and Flash device fonts.
 
-### `movieclip_hittest_shapeflag` — Morph fill boundary precision (1 diff line)
+### `movieclip_hittest_shapeflag` — FIXED s30: stroke minimum width ignored scale (line 296) + lost shape layers (line 71) (0 diff lines; was 2)
 
-**Example diff (morph shape boundary):**
-```
-// _level0.clip.hitTest(400, 300, true)
-- false
-+ true
-```
+**Was (line 296, morph complex shape, `_level0.clip.hitTest(400, 300, true)`):** FP32 `false`, ours `true`.
+The old title ("Morph fill boundary precision": float quadratic winding vs Ruffle's `lerp_twips` + i64 cross product)
+named the wrong mechanism, and the pre-s30 FP32 run refuted "both are correct". s30 `w1-drift-smalls` §E measured it:
+char 41 at **ratio 0** (the lerp is the identity), clip scale ×7.85, fill windings sum to 0 (outside); the `true` came
+from the STROKE test, which clamped a hairline to a flat 20 LOCAL twips (7.85 px on screen here). Flash/Ruffle
+(`stroke_minimum_width`) use 20 × the max column scale of the global→local matrix. A measured `lerp_twips` port changed
+nothing. Fix (s30 `w2-drift-smalls-land`): `shape_hit_test.c` `ht_set_min_stroke` (set by `ng_hitTestShapeChar`), used
+by `ng_hitTestPathStroke` and `ng_hitTestMorphPath` in place of the flat 20.0.
 
-Line 296: Morph shape 41 at interpolated position (400, 300) with fill0=1. Our
-floating-point quadratic curve winding solver says the point is inside the fill, but
-Ruffle's integer-arithmetic approach (via `lerp_twips` rounding + i64 cross-product)
-says outside. The point is at the exact fill boundary where both implementations are
-technically correct within their precision domains.
+**Was (line 71, `// layers`, `hitTest(300, 400, true)`):** FP32 `true`, ours `false`. Our recompiler emitted no layer
+marker into `path_data`, so `ng_hitTestPathFill` summed layer 2's fill 1 into layer 1's fill 1 and two overlapping
+layers cancelled under even-odd. Ruffle's `shape_hit_test` tests and resets the winding at every StyleChange with
+new styles. Fix: `SWF::interpretShape` (`swf.cpp`) emits `{6, 0, 0}` on StateNewStyles; `ng_hitTestPathFill` flushes
+(tests, then zeroes the windings) on cmd 6. Needs a recompile (CI recompiles every run).
 
-**Decision:** Accept; inherent floating-point vs integer precision difference at exact boundary.
+The row stays `output_mismatch` on the 4 ACCEPTED device-font lines (171, 173, 175, 177) above.
 
-**2026-11-27 (pre-s30 FP32 run, `SWFRecompDocs/plans/session30-fanout-reports/pre-launch-oracles/README.md` §1): the
-"both are correct" premise is REFUTED.** The golden is byte-identical to FP32, and FP32 prints `false` here, like
-Ruffle's integer-twip path. This line is a real Flash gap (integer-twip morph interpolation / winding for shape-flag
-hitTest), not an acceptable precision difference. Kept listed until it is fixed; do not cite it as ACCEPTED.
+**Decision:** fixed; nothing left ACCEPTED under this heading.
 
 ### `movieclip_hittest_shapeflag` — Drawing API stroke tessellation (0 diff lines as of s26; was 1)
 
@@ -1163,6 +1163,34 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 
 ---
 
+## Category 15: Host-Dependent FP32 Member Order (`System.capabilities` host strings)
+
+### `global_proto_decls_delete`, gnash `argstest-v6` / `argstest-v7` — `System.capabilities.manufacturer` position (2 diff lines each)
+
+<!-- image-axis: none -->
+
+```diff
+ Testing _global.System.capabilities.language
++Testing _global.System.capabilities.manufacturer
+ ...
+ Testing _global.System.capabilities.os
+-Testing _global.System.capabilities.manufacturer
+```
+
+The golden (an older FP32 capture) puts `Testing _global.System.capabilities.manufacturer` after `os`
+(line 582). Every fresh FP32 32,0,0,465 **LNX** capture puts it after `language` (line 579): the s30
+pre-launch capture plus two more runs, `session30-fanout-reports/w1-local-oracles/w1-native-table/
+global_proto_decls_delete.v15.lnx.r{2,3}.txt`, 3/3 byte-identical. So it is not run-to-run noise on one
+host: it is the host. `manufacturer` is a host string ("Adobe Linux" / "Adobe Windows"), the WIN and LNX
+players disagree on this row, and the `global_proto_decls` capabilities section (both captures) agrees
+with the LNX order. Since s30 W2-a (the generated native-object table) our order IS the LNX order
+(`avm1NativeTableApply`, generated from `global_proto_decls`), deterministically.
+
+**Decision: accept (host-dependent FP32 order); keep the golden, no flash_fixes swap** (the flash_fixes
+rule keeps a Flash golden whose host is unknown). These 2 lines per row are the ceiling once every
+other mechanism of these rows is fixed. The rows stay in `ruffle-tests/ignored_tests.txt` /
+`from_gnash/actionscript.all/ignored_tests.txt` for their other (real) gaps.
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
@@ -1184,8 +1212,8 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | ~~`string_paths_reference_launder`~~ | ~~Ruffle known failure (stack_push)~~ | ~~2~~ | **RESOLVED 2026-08-01** — now PASS; we match Flash where Ruffle does not. De-listed from `ruffle-tests/ignored_tests.txt` |
 | ~~`tab_ordering_properties_tab_index_edge_case`~~ | ~~FP32 raw-vs-coerce discriminator unknown (Category 7; s29 HOLD)~~ | ~~3 of 4~~ | **RESOLVED s29** (`w2b-tabindex`): now PASS 4/4 (root raw-property rule, see the entry) — | Accept pending the FP32 fixture run (`w2-disposition-land-oracle/tabindex/`); corpus golden == FP32, MTASC L3b fixtures coerce in FP32 |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 4 (171–177; was 7; s29 recount) | Accept; proprietary Flash font metrics |
-| `movieclip_hittest_shapeflag` | Hit test accuracy ('layers' shape geometry, line 71: FP32 true, ours false) | 1 | open lead (s29 w1-disposition-audit L4), not a font issue |
-| `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary, line 296: FP32 false = Ruffle, ours true) | 1 | **REAL GAP** (pre-s30 FP32 run refuted "both correct"); open lead |
+| `movieclip_hittest_shapeflag` | Hit test accuracy ('layers' shape geometry, line 71: FP32 true) | 0 (was 1) | **FIXED s30** w2-drift-smalls-land (recompiler layer marker) |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (line 296: stroke minimum width ignored scale; FP32 false) | 0 (was 1) | **FIXED s30** w2-drift-smalls-land (scale-aware min stroke) |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 0 (was 1; line 137 no longer differs, s26) | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash's dissolve permutation is not Ruffle's Feistel (corrected s26) | 20 (trace lines; **no image comparison exists**; was ~38) | Accept; 98.5% match, no Ruffle oracle for `ruffle_matched` |
 | `visual/video/colorconversion/h263` | Spark IDCT precision, FAAN IDCT landed (Category 9) | 3 image outlier channels, max 1 | Accept (image axis only; trace passes). The single pixel (447,289) the FAAN arm predicted; tolerance 0 / max_outliers 0 upstream |
@@ -1201,3 +1229,4 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
 | ~~`avm2/swz`~~ | ~~FP32 #2046 path landed; [file:line] stack suffixes missing (Category 13)~~ | ~~2 of 3~~ | **RESOLVED s29**: PASS at FINAL (URLLoader-ctor stack, `2d40d3799`) |
 | `avm2/number_tostring` | Corrupt upstream oracle: 31 impossible base-N digits in the Flash capture; upstream `ignore = true` (Category 14) | 168 of 1050 | **RESOLVED s28** (w2b-avm2-d2a): the "impossible digits" ARE Flash's base-N printer, and the exact avmplus D2A port reproduces them: passes (168 → 0). Ignore entry pruned |
+| `global_proto_decls_delete`, gnash `argstest-v6/v7` | Host-dependent FP32 member order: `System.capabilities.manufacturer` (Category 15) | 2 each | Accept; WIN golden ≠ LNX (3/3 fresh LNX captures agree with ours); no swap |

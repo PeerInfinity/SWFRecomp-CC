@@ -3009,6 +3009,12 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 break;
             if (opcode == REOP_line_start)
                 goto no_match;
+            /* avmplus is PCRE: a multiline '^' never matches after a
+               newline that ends the subject (s30 w1-rm-avm2, FP32 golden
+               from_avmplus/regress/bug_479786: "a\n".replace(/^ * /gm, x)
+               adds no trailing x). */
+            if (cptr == cbuf_end)
+                goto no_match;
             PEEK_PREV_CHAR(c, cptr, s->cbuf, cbuf_type);
             if (!is_line_terminator(c))
                 goto no_match;

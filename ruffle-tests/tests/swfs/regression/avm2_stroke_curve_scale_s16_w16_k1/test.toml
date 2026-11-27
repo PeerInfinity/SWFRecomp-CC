@@ -1,0 +1,24 @@
+# s30 w2-stroke-geometry-land: FP32 HIGH golden (output.expected.png = fp32.lnx.high.png
+# == fp32.win.high.png). Budgets = OUR outliers after gfx_curve_tol_scale
+# (HIGH 0.01 px drawing-API flattening), so the rows GUARD that rule: master
+# (0.1 px) exceeds every check. See regression/README.md.
+num_ticks = 1
+
+[[image_comparisons.output.checks]]
+tolerance = 0
+max_outliers = 19494
+
+[[image_comparisons.output.checks]]
+tolerance = 16
+max_outliers = 18421
+
+[[image_comparisons.output.checks]]
+tolerance = 64
+max_outliers = 14313
+
+[[image_comparisons.output.checks]]
+tolerance = 128
+max_outliers = 8658
+
+[player_options]
+with_renderer = { optional = false, quality = "high" }

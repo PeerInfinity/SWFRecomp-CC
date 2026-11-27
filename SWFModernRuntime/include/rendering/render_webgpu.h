@@ -450,6 +450,8 @@ void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, flo
 // y rule; 0x8000u = Flash LOW outward rect fill (render_webgpu.c LOWQ notes).
 void render_webgpu_draw_rect_ex(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id, u32 style_flags);
 void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
+// s30 w2-lowq-land: glyph / text soups (LOW: exempt from the vertex tie bias).
+void render_webgpu_draw_text_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
 // s29 w2-text-coverage-land: one draw of pixel-aligned coverage runs with
 // per-run colour slots (tag.c tf_cpu_cov_fill); 0 = pools full, nothing drawn.
 int render_webgpu_draw_cov_runs(WebGPURenderContext* context, const float* xywh, const u16* pal_idx, u32 n_runs, const float* pal_rgba, u32 n_pal, u32 transform_id, u32 cxform_id);

@@ -209,6 +209,21 @@ static int winding_number_curve(double px, double py,
 // Stroke distance testing: closest-point-to-path for stroke hit detection
 // ---------------------------------------------------------------------------
 
+// s30 w1-drift-smalls: the 1-px minimum stroke width, in LOCAL twips, for
+// the current ng_hitTestShapeChar call. Ruffle shape_utils.rs
+// stroke_minimum_width: 20 * max column scale of the GLOBAL->LOCAL matrix
+// (a flat 20 local twips over-widened every up-scaled clip's hairlines:
+// movieclip_hittest_shapeflag line 296, morph at x7.85, FP32 false).
+static double g_ht_min_stroke = 20.0;
+static void ht_set_min_stroke(double ma, double mb, double mc_m, double md)
+{
+	double det = ma * md - mb * mc_m;
+	if (det == 0.0) { g_ht_min_stroke = 20.0; return; }
+	double ia = md / det, ib = -mb / det, ic = -mc_m / det, id = ma / det;
+	double sx = sqrt(ia * ia + ib * ib), sy = sqrt(ic * ic + id * id);
+	g_ht_min_stroke = 20.0 * (sx > sy ? sx : sy);
+}
+
 // Squared distance from point P to line segment A→B.
 static double dist_sq_point_to_segment(double px, double py,
     double ax, double ay, double bx, double by)
@@ -353,7 +368,7 @@ static int ng_hitTestPathStroke(size_t path_offset, size_t path_size,
 				line_width = (double)PD[i][2];
 				has_line = (line_style > 0 && line_width > 0.0);
 				// Minimum stroke width: 1 pixel = 20 twips
-				if (has_line && line_width < 20.0) line_width = 20.0;
+				if (has_line && line_width < g_ht_min_stroke) line_width = g_ht_min_stroke;
 			}
 		}
 		else if (cmd == 5.0f) {
@@ -401,6 +416,18 @@ static int ng_hitTestPathFill(size_t char_id, size_t path_offset, size_t path_si
 	for (size_t i = path_offset; i < end; i++) {
 		float cmd = PD[i][0];
 
+		if (cmd == 6.0f) {
+			// s30 w1-drift-smalls: StateNewStyles layer boundary (recompiler
+			// marker). Fill indices restart in the new layer, so test the
+			// finished layer and reset, as Ruffle's shape_hit_test does.
+			int nz = ng_uses_nonzero_winding(char_id);
+			for (int f = 1; f <= max_fill && f < 64; f++) {
+				if (nz ? (fill_winding[f] != 0) : ((fill_winding[f] & 1) != 0)) return 1;
+				fill_winding[f] = 0;
+			}
+			max_fill = 0;
+			continue;
+		}
 		if (cmd == 1.0f) {
 			// StyleChange: {1, fill0, fill1}
 			cur_fill0 = (int)PD[i][1];
@@ -517,7 +544,7 @@ static int ng_hitTestMorphPath(size_t char_id, size_t path_offset, size_t path_s
 			}
 			line_width = ot * start_w + t * end_w;
 			has_line = (line_style > 0);
-			if (has_line && line_width < 20.0) line_width = 20.0;
+			if (has_line && line_width < g_ht_min_stroke) line_width = g_ht_min_stroke;
 			continue;
 		}
 
@@ -796,6 +823,7 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 			double bsy = test_y - mty;
 			double local_x = ( md * bsx - mc_m * bsy) * inv_det;
 			double local_y = (-mb * bsx + ma  * bsy) * inv_det;
+			ht_set_min_stroke(ma, mb, mc_m, md);
 			return ng_hitTestMorphPath(char_id, mp_offset, mp_size, local_x, local_y, ratio);
 		}
 		// Fallback: interpolated bounds-based hit testing
@@ -827,6 +855,7 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 			double local_y = (-mb * sx + ma  * sy) * inv_det;
 			if (ng_hitTestPathFill(char_id, p_offset, p_size, local_x, local_y))
 				return 1;
+			ht_set_min_stroke(ma, mb, mc_m, md);
 			if (ng_hitTestPathStroke(p_offset, p_size, local_x, local_y))
 				return 1;
 			// Path test is authoritative when available — skip triangle fallback

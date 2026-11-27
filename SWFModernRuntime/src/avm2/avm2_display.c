@@ -261,6 +261,28 @@ static void fs_cleanup_push(Avm2Context* ctx, Avm2Object* obj)
 	g_fs_cleanup[g_fs_cleanup_count++] = obj;
 }
 
+// s30 w1-rm-avm2 (FP32 golden timeline/swf_9_frame_script_dynamic_goto):
+// in SWF<=9 a goto that RUNS (not queued) during the frame-script phase
+// has no nested frame (run_inner_goto_frame returns early), and Ruffle
+// leaves the target frame's script for the next tick's pass. Flash runs it
+// at the tail of the CURRENT pass: the clip joins the frame-script cleanup
+// queue, behind the entries already on it. A clip already queued (a
+// queued self-goto being flushed) is not pushed twice.
+static void swf9_goto_cleanup_push(Avm2Context* ctx, Avm2Object* obj,
+                                   Avm2DisplayObjectExt* ext)
+{
+	if (ctx->frame_phase != PHASE_FRAME_SCRIPTS) return;
+	uint32_t f = ext->current_frame;
+	if (f >= ext->frame_script_cap
+	    || ext->frame_scripts[f].kind != AVM2_VALUE_OBJECT) return;
+	for (uint32_t i = 0; i < g_fs_cleanup_count; i++)
+	{
+		if (g_fs_cleanup[i] == obj) return;
+	}
+	fs_cleanup_push(ctx, obj);
+	avm2_display_mark_frame_work(ctx, obj);
+}
+
 // Class -> SymbolClass char binding (built at stage build).
 typedef struct SymbolClassMap
 {
@@ -2184,6 +2206,15 @@ static void run_remove_op(Avm2Context* ctx, Avm2Object* parent, const Avm2Timeli
 	}
 	else
 	{
+		// s30 w1-rm-avm2 (FP32 golden from_shumway/MaskTest-3): a RemoveObject
+		// tag that removes an object serving as an AS3 mask breaks the pair,
+		// so the maskee's `mask` reads null afterwards (Ruffle keeps it).
+		if (cext != NULL && cext->maskee != NULL)
+		{
+			Avm2DisplayObjectExt* mee = avm2_display_ext_of(ctx, cext->maskee);
+			if (mee != NULL && mee->mask == child) mee->mask = NULL;
+			cext->maskee = NULL;
+		}
 		full_remove_child(ctx, pext, child);
 	}
 }
@@ -2633,10 +2664,38 @@ static void mc_goto_frame_now(Avm2Context* ctx, Avm2Object* obj,
 	}
 }
 
+// s30 w1-rm-avm2 R2 (FP32 goldens timeline/swf_9_event_goto_frame_script,
+// avm2/swf_9_goto_in_construct_frame): a SWF<=9 goto has no nested frame,
+// so the children it places stay unconstructed until the next Construct
+// phase in Ruffle. Flash constructs them in the frame-script pass, right
+// before the parent's own frame script runs (the goto in a frameConstructed
+// or addedToStage handler: the child's constructor traces precede the
+// parent's target-frame script). A child constructed here gets its pending
+// frame script like a Construct-phase child.
+static void swf9_construct_goto_children(Avm2Context* ctx,
+                                         Avm2DisplayObjectExt* ext)
+{
+	if (ctx->swf_version > 9 || ctx->frame_phase != PHASE_FRAME_SCRIPTS) return;
+	if (ext->running_construct_frame) return;
+	for (uint32_t i = 0; i < ext->render_len; i++)
+	{
+		Avm2Object* child = ext->render_list[i];
+		Avm2DisplayObjectExt* cext = display_ext_fast(child);
+		if (cext == NULL || cext->constructed || cext->manual_frame_construct)
+		{
+			continue;
+		}
+		construct_frame_obj(ctx, child);
+		cext = display_ext_fast(child);
+		if (cext != NULL && cext->constructed) check_has_pending_script(cext);
+	}
+}
+
 static void run_local_frame_scripts(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL || !ext->constructed) return;
+	swf9_construct_goto_children(ctx, ext);
 	if (ext->has_pending_script && !ext->executing_frame_script)
 	{
 		uint32_t frame_id = ext->queued_script_frame;
@@ -3306,6 +3365,7 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 		if (ctx->swf_version <= 9)
 		{
 			ext->skip_next_enter_frame = 1;
+			swf9_goto_cleanup_push(ctx, obj, ext);
 		}
 		else
 		{
@@ -6840,6 +6900,32 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
 static void avm2_url_loader_run_pending(Avm2Context* ctx);
 static uint32_t g_pending_url_load_count;
 
+// s30 w1-drift-smalls / w2-drift-smalls-land: an htmlText <img src> starts a
+// Loader fetch (Flash's TextField makes one Loader child per image; which
+// images start one: avm2_text.c html_img_flush_pending_load). One whose URL
+// resolves to nothing fails asynchronously with IOErrorEvent #2035 on a
+// LoaderInfo nobody listens to, so the debug player prints the unhandled
+// ErrorEvent #2044 report, once per image, with no stack tail
+// (avm2/html_text_img_parsing: 95 lines after the frame's traces). `src=''`
+// prints #2035 too: the WINDOWS FP32 side, the corpus golden's (LNX FP32
+// prints #2124 there). No Loader/LoaderInfo objects are created: nothing in
+// the corpus listens on them (getImageReference is not implemented).
+static uint32_t g_html_img_failed_loads;
+
+void avm2_html_img_load_started(Avm2Context* ctx, const char* src);
+
+static void avm2_html_img_flush_failed(void)
+{
+	uint32_t n = g_html_img_failed_loads;
+	g_html_img_failed_loads = 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		printf("Error #2044: Unhandled IOErrorEvent:. "
+		       "text=Error #2035: URL Not Found.\n");
+	}
+	if (n != 0) fflush(stdout);
+}
+
 static void avm2_loader_drain(Avm2Context* ctx)
 {
 	avm2_loader_run_exit_frame(ctx);
@@ -6857,8 +6943,10 @@ static void avm2_loader_resolve_fetches(Avm2Context* ctx)
 		// that load's events. A URL that resolves to nothing queues a log but
 		// no load, so it has to keep the loop alive on its own.
 		if (g_pending_load_count == 0 && g_pending_url_load_count == 0
+		    && g_html_img_failed_loads == 0
 		    && !swf_log_fetch_pending() && !swf_dialog_pending()) break;
 		swf_log_fetch_flush();
+		avm2_html_img_flush_failed();
 		avm2_loader_run_pending(ctx);
 		avm2_url_loader_run_pending(ctx);
 		// File dialogs are futures on the same executor: one opened during the
@@ -7323,6 +7411,16 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request,
 	}
 	if (g_pending_url_load_count < AVM2_MAX_PENDING_URL_LOADS)
 		g_pending_url_loads[g_pending_url_load_count++] = pl;
+}
+
+void avm2_html_img_load_started(Avm2Context* ctx, const char* src)
+{
+	Avm2PendingLoad probe;
+	memset(&probe, 0, sizeof(probe));
+	const Avm2String* url = avm2_string_new(ctx, src, (uint32_t) strlen(src));
+	// A bundled image would load (no image decode path yet: stay silent).
+	if (src[0] != '\0' && loader_resolve_url(url, &probe)) return;
+	g_html_img_failed_loads++;
 }
 
 static Avm2Value url_loader_init(Avm2Activation* act)
@@ -9323,6 +9421,31 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 	#undef _GNEEDCLOSE
 }
 
+// s30 w2-stroke-geometry-land: drawing-API curve flattening tolerance scale.
+// Flash (FP32) rasterises quadratic edges natively: there are no chords. At
+// lyon's 0.1 px our chords sit inside every curve, so a thick curved stroke's
+// convex edge (and a curved fill's outline) lands ~0.16 px inside Flash's at
+// 1:1 (acid-shapes t128 residue). HIGH: 0.1 (0.1 px -> 0.01 px). LOW
+// (MSAA_SAMPLES == 1) keeps lyon's 0.1 px: there exact curves move Flash-golden
+// rows both ways (graphics_gradients away, acid-shapes-testing toward), so
+// Flash's LOW curve rule is a separate fit. No-graphics builds have no
+// MSAA_SAMPLES and take the HIGH arm (A/B trace-identical on every LOW curve
+// row). Kill switch SWF_AVM2_CURVE_FINE=0 restores 0.1 px everywhere.
+static float gfx_curve_tol_scale(void)
+{
+#if defined(MSAA_SAMPLES) && MSAA_SAMPLES == 1
+	return 1.0f;
+#else
+	static float sc = -1.0f;
+	if (sc < 0.0f)
+	{
+		const char* e = getenv("SWF_AVM2_CURVE_FINE");
+		sc = (e != NULL && e[0] == '0') ? 1.0f : 0.1f;
+	}
+	return sc;
+#endif
+}
+
 // Flatten cmds[from, to) into contours (pixels). `seed` prepends a MoveTo at
 // (sx, sy): Ruffle's set_line_style seeds the freshly-opened DrawingLine with
 // MoveTo(cursor), so a stroke run that starts in the MIDDLE of a subpath still
@@ -9362,6 +9485,8 @@ static void gfx_flatten_cmds(const Avm2GraphicsExt* g, uint32_t from, uint32_t t
 			// tolerance, 0.8 * tol.
 			float ftol = c->type == 3 ? CURVE_FLATTEN_TOLERANCE * 0.8f
 			                          : CURVE_FLATTEN_TOLERANCE;
+			// 0.01 px at HIGH, see gfx_curve_tol_scale.
+			ftol *= gfx_curve_tol_scale();
 			CurveFlatten cf_ = curve_flatten_init(sx, sy, c->cx, c->cy,
 			                                      c->x, c->y, ftol);
 			for (int s = 1; s < cf_.count; s++)
@@ -13413,9 +13538,15 @@ static Avm2Value transform_get_pixel_bounds(Avm2Activation* act)
 	bounds_with_transform(ctx, text->target, &m, &r);
 	avm2_text_lazy_restore(ctx, text->target, saved);
 	if (!r.valid) return avm2_text_new_rectangle(ctx, 0, 0, 0, 0);
-	return avm2_text_new_rectangle(ctx, r.xmin / 20.0, r.ymin / 20.0,
-	                               (r.xmax - r.xmin) / 20.0,
-	                               (r.ymax - r.ymin) / 20.0);
+	// s30 w2-rm-avm2-land (FP32 fixture regression/avm2_pixelbounds_offlist,
+	// corpus from_shumway/.../transform/pixelBounds): an object that is not
+	// on the stage reports its transformed bounds x 5 on every component
+	// (x=5,y=7 rect (0,0,100,100) -> (25,35,500,500)); empty stays 0.
+	// Ruffle reports the plain bounds.
+	double k = is_on_stage(ctx, text->target) ? 1.0 / 20.0 : 5.0 / 20.0;
+	return avm2_text_new_rectangle(ctx, r.xmin * k, r.ymin * k,
+	                               (r.xmax - r.xmin) * k,
+	                               (r.ymax - r.ymin) * k);
 }
 
 static Avm2Value do_get_transform(Avm2Activation* act)
@@ -16057,6 +16188,31 @@ static Avm2Object* run_mouse_pick(Avm2Context* ctx)
 	return NULL;
 }
 
+// s30 w2-rm-avm2-land (FP32 golden from_shumway/timeline/nav/clipDepth, 4
+// ticks): getObjectsUnderPoint never reports a timeline clip layer
+// (clipDepth > 0) or anything it masks (depth in (clip.depth,
+// clip.clipDepth]), with their subtrees, wherever the point lies: FP returns
+// [] both with the point outside the clip shape (frame 1) and inside it
+// (frame 2). Ruffle reports the masked shape.
+static int goup_clip_layer_hidden(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
+                                  uint32_t idx)
+{
+	Avm2DisplayObjectExt* cext =
+		avm2_display_ext_of(ctx, pext->render_list[idx]);
+	if (cext == NULL) return 0;
+	if (cext->clip_depth > 0) return 1;
+	for (uint32_t j = 0; j < idx; j++)
+	{
+		Avm2DisplayObjectExt* clext =
+			avm2_display_ext_of(ctx, pext->render_list[j]);
+		if (clext != NULL && clext->clip_depth > 0
+		    && clext->depth < cext->depth
+		    && cext->depth <= clext->clip_depth)
+			return 1;
+	}
+	return 0;
+}
+
 // DisplayObjectContainer.getObjectsUnderPoint (Ruffle
 // display_object_container.rs). A depth-first pre-order walk from the receiver:
 // children are pushed in REVERSE render order so they pop front-to-back, and
@@ -16110,6 +16266,7 @@ static Avm2Value doc_get_objects_under_point(Avm2Activation* act)
 		}
 		for (uint32_t i = next->render_len; i > 0; i--)
 		{
+			if (goup_clip_layer_hidden(ctx, next, i - 1)) continue;
 			GOUP_PUSH(stack, stack_n, stack_cap, next->render_list[i - 1],
 			          Avm2Object*);
 		}
@@ -19946,7 +20103,7 @@ static void avm2_draw_quad(const double p[8], uint32_t rgb, double alpha)
 		v[i * 2]     = (float) p[idx[i] * 2];
 		v[i * 2 + 1] = (float) p[idx[i] * 2 + 1];
 	}
-	renderer_draw_tris(context, v, 6,
+	renderer_draw_text_tris(context, v, 6,
 	                   (float) ((rgb >> 16) & 0xFF) / 255.0f,
 	                   (float) ((rgb >> 8) & 0xFF) / 255.0f,
 	                   (float) (rgb & 0xFF) / 255.0f,
@@ -20336,7 +20493,7 @@ static void avm2_flush_glyph_batch(const float* v, uint32_t nfloats,
                                    uint32_t color, uint32_t xid, uint32_t cxid)
 {
 	if (v == NULL || nfloats < 6) return;
-	renderer_draw_tris(context, v, nfloats / 2,
+	renderer_draw_text_tris(context, v, nfloats / 2,
 	                   (float) ((color >> 16) & 0xFF) / 255.0f,
 	                   (float) ((color >> 8) & 0xFF) / 255.0f,
 	                   (float) (color & 0xFF) / 255.0f,
@@ -21843,6 +22000,7 @@ static float avm2_render_layer_group(Avm2Context* ctx, Avm2Object* obj,
 static int g_avm2_tsnap_off;          // > 0 inside a cached / filtered subtree
 static double g_avm2_tsnap_acc[2];    // ancestors' snap shift (twips)
 #endif
+static double g_avm2_tsnap_origin[2]; // s30 prototype: parent world translation (twips)
 static void avm2_lowq_tsnap(Avm2Object* obj, const Avm2DisplayObjectExt* ext,
                             Mat* world)
 {
@@ -21866,9 +22024,9 @@ static void avm2_lowq_tsnap(Avm2Object* obj, const Avm2DisplayObjectExt* ext,
 	          ? (double) context->stage_scale : 1.0;
 	double tx = world->tx / 20.0 * vs, ty = world->ty / 20.0 * vs;
 	if (!isfinite(tx) || !isfinite(ty) || fabs(tx) > 1e8 || fabs(ty) > 1e8) return;
-	extern double lowq_tsnap_round(double t);   // tag.c (ties to even)
-	double dx = (lowq_tsnap_round(tx) - tx) * 20.0 / vs;
-	double dy = (lowq_tsnap_round(ty) - ty) * 20.0 / vs;
+	extern double lowq_tsnap_delta_px(double t, double o, int have_o);   // tag.c
+	double dx = lowq_tsnap_delta_px(tx, g_avm2_tsnap_origin[0] / 20.0 * vs, 1) * 20.0 / vs;
+	double dy = lowq_tsnap_delta_px(ty, g_avm2_tsnap_origin[1] / 20.0 * vs, 1) * 20.0 / vs;
 	world->tx += dx;
 	world->ty += dy;
 	g_avm2_tsnap_acc[0] += dx;
@@ -22045,6 +22203,8 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	int tsnap_saved_off = g_avm2_tsnap_off;
 	double tsnap_saved_acc[2] = { g_avm2_tsnap_acc[0], g_avm2_tsnap_acc[1] };
 #endif
+	g_avm2_tsnap_origin[0] = parent_world->tx;   // s30 w1-lowq-residues prototype
+	g_avm2_tsnap_origin[1] = parent_world->ty;
 	avm2_lowq_tsnap(obj, ext, &world);   // s29 w2-lowq-tsnap
 	// s27: a LAYER group's own alpha is applied at its composite instead.
 	int lga_own = (obj == g_avm2_lga_strip);

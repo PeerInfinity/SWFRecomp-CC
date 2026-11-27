@@ -871,3 +871,10 @@ regression/lowq_stroke_probe                        # LOW width / thin pen / ban
 #   drawing_seam_join_wanted). FP32-golden seam / hinted-end fixtures of n-seam-caps.
 regression/avm1_stroke_seam_caps                    # closed seams, W 1..3, round/round  1 cmp
 regression/avm1_stroke_hinting_caps                 # pixelHinting seams + ends          1 cmp
+# s30 w2-rm-avm2-land: a timeline RemoveObject of an AS3 mask breaks the mask
+#   pair (avm2_display.c run_remove_op). Trace + 1 image cmp (CI pass).
+from_shumway/MaskTest-3                             # AS3 mask removed by RemoveObject2  1 cmp
+# s30 w2-lowq-land: LOW EditText field-local pen rule (tag.c tf_glyph_quarter_snap
+#   LOW arm) + LOW vertex tie bias. FP32 LOW glyph probe (DefineFont3, x phases).
+# tier=1
+regression/lowq_glyph_probe_df3                     # LOW pen local / origin snap        1 cmp

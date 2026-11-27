@@ -1539,3 +1539,100 @@ Ruffle's exporter render (the old golden) is 13 763 / 11 979 channels (tol 2) fr
 82 531 channels), so the "~80 k layer-group compositing gap at LOW" read off them was an artifact.
 
 **Decision:** match Flash. Prune criterion: none (our own fixtures).
+
+## s30 w2-rm-avm2-land: eight AVM2 rules from `w1-rm-avm2`, plus pixelBounds, clip layers, two golden fixes (2026-11-27)
+
+All goldens below are FP32 (s28 trace-provenance or the s30 coordinator captures in
+`SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/`). Every row is `known_failure` upstream: Ruffle
+prints `output.ruffle.txt`, we now print Flash. Decision for each: **match Flash** (landed, s30
+`w2-rm-avm2-land`). Prune criterion for each: Ruffle adopts the rule, or a Flash capture contradicts it.
+
+1. **SWF ≤ 9 goto during the frame-script phase** (`timeline/swf_9_frame_script_dynamic_goto`). FP runs the target
+   frame's script at the tail of the SAME frame-script cleanup drain (`LeafChild 2 frame2` right after `LeafChild 3
+   frame1`); Ruffle's `run_inner_goto_frame` returns early for SWF ≤ 9, so it runs next tick after `Main frame2`.
+   Ours: `avm2_display.c` `swf9_goto_cleanup_push` from `run_goto`.
+2. **SWF ≤ 9 goto-placed children are constructed in the frame-script walk, before the parent's script**
+   (`timeline/swf_9_event_goto_frame_script`, `avm2/swf_9_goto_in_construct_frame`). `MyChild Constructor` precedes
+   `Main frame3`; `Calling/Called MyChild super` come after `Stopping Test at frame 2` and before `MyContainer
+   framescript 1`, and `MyChild framescript 0` runs twice. Ruffle constructs them at the next Construct phase. Ours:
+   `swf9_construct_goto_children` from `run_local_frame_scripts`.
+3. **A timeline RemoveObject of an AS3 mask nulls the maskee's `mask`** (`from_shumway/MaskTest-3`); Ruffle keeps it.
+   Scope (FP32 fixture `regression/avm2_mask_removal_script`): a SCRIPT `removeChild` of the mask, directly or via its
+   ancestor, does NOT null it, and hiding / re-adding keeps it (Ruffle agrees there). Goto-driven removal: no capture.
+   Ours: `run_remove_op`, timeline arm only.
+4. **avmplus bugzilla 558863: SWF ≤ 10 `name in byteArray` throws ReferenceError #1069 for a non-index name it lacks**
+   (`from_avmplus/regress/bug_558863_swf10`); Ruffle answers false (Ruffle issue 21224). Ours: `avm2_ops.c` `avm2_op_in`.
+5. **PCRE multiline `^` never matches after a newline that ends the subject** (`from_avmplus/regress/bug_479786`,
+   `"foo\n     bar\n\n    baz\n".replace(/^ */gm, " * ")` has no trailing ` * `). Ruffle's regex follows ECMAScript.
+   Ours: `third_party/quickjs-libregexp/libregexp.c` `lre_exec_backtrack` (`REOP_line_start_m`).
+6. **avmplus `MathUtils::parseInt` power-of-two re-read past 2^53, bug for bug** (`from_avmplus/as3/Math/e15_1_2_2`:
+   `parseInt("1234567890123", 32)` = `38390726480134180`, the true value / 32). Ours: `avm2_value.c`
+   `pow2_digit` / `avmplus_pow2_parse` from `avm2_string_to_int`.
+7. **FTE: `createTextLine(prev)` on a line that already has a successor invalidates and unlinks the old tail**
+   (`avm2/textblock_releaselines`: `line5` reads `invalid`, prev/next null). Ours: `avm2_text.c` `tb_do_create_text_line`.
+8. **FTE: a surrogate pair is one atom; a GraphicElement is one U+FDEF char of a TextLine's raw text**
+   (`avm2/textline_atom_index_at_char_index`). `GroupElement.text` still omits it. Ours: `avm2_text.c`
+   `line_text_of` / `tl_atom_index_of` (+ `ce_text_of`, `tb_do_create_text_line`, `tb_recreate_text_line`,
+   `tl_get_has_tabs`, `tl_get_atom_index_at_char_index`).
+9. **Off-stage `transform.pixelBounds` = the transformed bounds × 5 on every component**
+   (`from_shumway/avm2/flash/geom/transform/pixelBounds` line 2 `(x=0, y=0, w=500, h=500)`; FP32 fixture
+   `regression/avm2_pixelbounds_offlist`: rect (0,0,100,100) at x=5,y=7 → `(x=25, y=35, w=500, h=500)`, scaleX 2 →
+   w 1000, on stage the normal `(x=5, y=7, w=100, h=100)`, after `removeChild` the ×5 form again, empty → 0). Ruffle
+   prints the plain bounds. Untested: an object inside an off-stage parent (we apply ×5 to the full concat). Ours:
+   `avm2_display.c` `transform_get_pixel_bounds`.
+10. **`getObjectsUnderPoint` never reports a timeline clip layer or anything it masks**
+    (`from_shumway/timeline/nav/clipDepth`, FP32 6-frame capture == golden): `Masked: true` (empty result) both with
+    the point outside the clip shape (frame 1) AND inside it (frame 2); after the clip layer is replaced by one that
+    no longer covers the bar's depth, the bar is reported (frame 3, and frame 4's goto back to frame 1, which keeps
+    the depth-1 clip with clipDepth 2). Ruffle reports the masked shape. Ours: `goup_clip_layer_hidden` from
+    `doc_get_objects_under_point`. The golden covers 4 ticks (frame 4's script prints the last 2 lines), so a
+    `flash_fixes` `kind: "toml"` entry raises `num_ticks` 3 → 4.
+11. **`avm2/swf_9_goto_in_construct_frame` golden ends mid-tick.** FP32 (2 captures) prints the 20-line golden as an
+    exact prefix, then a 6-line steady-state cycle that starts at `MyContainer enterFrame`; the golden's line 20 is the
+    first line of a third tick (FP's next line is `MyOtherChild onEnterFrame`). `flash_fixes` `output.txt` = the FP32
+    capture cut at the clean tick boundary after line 19, which `num_ticks = 3` covers (Ruffle's own file also stops
+    before that `enterFrame`).
+
+## s30 `avm2/array_sort_swf10_32bit` / `_64bit`: both goldens are Flash; the split is the HOST projector's bitness (2026-11-27)
+
+**Tests:** `avm2/array_sort_swf10_32bit` (pass), `avm2/array_sort_swf10_64bit` (`ruffle_matched`). The two `test.swf`
+are byte-identical (md5 `92e259984ee6…`).
+
+FP32 (`session30-fanout-reports/w1-local-oracles/w1-rm-avm2/avm2_array_sort_swf10_32bit.r1.{lnx,win}.txt`): the Linux
+x86_64 projector prints the `_64bit` golden, the Windows projector prints the `_32bit` golden. The numeric sort compare
+of a SWF10 Array depends on avmplus's atom width, so the result is a property of the player build, not a Ruffle≠Flash
+difference. Ruffle fakes the 32-bit form and marks `_64bit` known_failure.
+
+**Decision:** no golden swap (flash_fixes rule 1: LNX ≠ WIN; rule 4: host-dependent). We keep the 32-bit behaviour
+(`_32bit` pass, `_64bit` rm). The +1/0 option, if ever wanted: a project-only toml host-emulation key on `_32bit`
+(e.g. `mock_avm2_atom_bits = 32`) with 64-bit compare as the default (s28 `w1b-rm-avm2-sort64.patch`). Prune
+criterion: none (a genuine Flash host split).
+
+## s30 w2-lowq-land FP32 LOW grading (coordinator, 2026-11-27)
+
+The LOW vertex-tie bias + field-local pen rule (`w2-lowq-land`) move six already-failing rows away from their
+Ruffle goldens. Graded against FP32 LOW captures (`SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/
+w2-lowq-land/README.md` §2):
+- `visual/filters/bevel`, `glow`, `drop_shadow_angles`: our render moves TOWARD Flash (LNX). Flash's own filter
+  output is host-dependent (WIN ≠ LNX by 176–46 243 channels), so the goldens are kept (no swap).
+- `visual/simple_shapes/overlaps`, `from_shumway/acid/acid-scale`: WIN == LNX; the Ruffle goldens are 1 795 /
+  11 240 channels from Flash. Swapped to the FP32 LOW captures (`flash_fixes`). Both stay failing.
+- `text/style_changes_in_html`: moves AWAY from Flash too (+904 channels at t16). A real priced loss of the pen rule;
+  golden kept.
+Decision: match Flash; land the rule (net Flash-ward), price acid-scale (+160) and style_changes_in_html by name.
+
+## s30 ALPHA blend: a PAINTED alpha-0 child pixel erases the layer (w1-lowq-residues → w2-lowq-land, 2026-11-27)
+
+**Tests:** `visual/blend_modes/layer_alpha` (flash_fixes FP32 LOW `--screen`), `regression/avm2_layer_group_alpha` (twin).
+
+The ALPHA child (shape 19: linear gradient alpha 0 → 1, padded, at world x 116..363) paints alpha 0 over world
+x 116..124. FP32 multiplies the LAYER group by that 0 and erases the first "r" of all three logo rows. Ruffle's
+`shaders/blend/alpha.wgsl` discards src.a == 0 (it cannot tell painted-0 from unpainted in its child surface), so the
+upstream golden keeps the glyph; ours copies that (`render_webgpu.c` `fs_alpha_erase` / `fs_alpha_layer`). 2186 of
+layer_alpha's 4268 channels vs FP32 at s30 launch (3772 after w2-lowq-land A + C; the 2186 is untouched). ERASE is
+unaffected (a = 0 is a no-op there).
+
+**Decision:** match Flash, NOT YET IMPLEMENTED. Completion mechanism: a coverage channel for the child layer (a stencil
+bit written by the child's own draws; the ALPHA / ERASE composite tests the stencil instead of `discard`ing
+src.a == 0), so a painted 0 erases and an unpainted texel keeps the group. Prune criterion: Ruffle's alpha blend
+stops discarding painted alpha-0 texels.

@@ -10233,6 +10233,12 @@ namespace SWFRecomp
 						// Emit path style change + moveto
 						if (path_recording && (fill_style_0_change || fill_style_1_change || state_new_styles || state_move_to))
 						{
+							// s30 w1-drift-smalls: StateNewStyles starts a new
+							// LAYER whose fill indices restart at 1. The CPU hit
+							// tester (shape_hit_test.c, the only path_data reader)
+							// must test and reset its winding here, like Ruffle's
+							// shape_hit_test; marker {6, 0, 0}.
+							if (state_new_styles && !is_morph) emitPath(6.0f, 0.0f, 0.0f);
 							emitPath(1.0f, (float)fill_style_0, (float)fill_style_1);
 							// Line style with width
 							float line_width = 0.0f;

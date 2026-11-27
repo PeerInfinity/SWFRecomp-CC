@@ -4255,7 +4255,25 @@ Avm2Value avm2_op_in(Avm2Activation* act, Avm2Value name, Avm2Value obj)
 	{
 		return avm2_bool(avm2_xml_has_property_via_in(ctx, obj, ns) != 0);
 	}
-	return avm2_bool(avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0);
+	int has = avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0;
+	// s30 w1-rm-avm2: avmplus bugzilla 558863 compat (SWF<=10, FP32 golden
+	// from_avmplus/regress/bug_558863_swf10): ByteArray hasAtomProperty
+	// falls back to a GET of a non-index name, so `name in ba` for a name
+	// the sealed ByteArray does not have throws #1069 instead of answering
+	// false (`true`, "xy", {}, 5.5 and -5 all throw; an index still answers
+	// index < length). SWF11+ answers false (bug_558863_swf11).
+	uint32_t ba_idx;
+	if (!has && ctx->swf_version < 11 && obj.kind == AVM2_VALUE_OBJECT
+	    && avm2_bytearray_ext_of(obj) != NULL
+	    && !name_as_index(ns->utf8, ns->len, &ba_idx))
+	{
+		char cn[160];
+		class_name_of(ctx, obj, cn, sizeof(cn));
+		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+		                 "Error #1069: Property %.*s not found on %s and there "
+		                 "is no default value.", (int) ns->len, ns->utf8, cn);
+	}
+	return avm2_bool(has);
 }
 
 Avm2Value avm2_op_instanceof(Avm2Activation* act, Avm2Value value, Avm2Value type)

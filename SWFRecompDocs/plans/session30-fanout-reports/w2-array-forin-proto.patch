@@ -1,0 +1,179 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index a84cbf25..945a790a 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -39284,6 +39284,8 @@ static int enum_varmap_callback(const void *key, size_t ksize, uintptr_t value,
+ 	return 0;
+ }
+ 
++static void arrayForinPushInherited(SWFAppContext* app_context, ASArray* arr); // s30 w2-array-forin-proto
++
+ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
+ {
+ 	// Step 1: Pop value from stack — must check type before reading as string
+@@ -39539,6 +39541,14 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
+ 					PUSH_STR(pn, pn_len);
+ 				}
+ 			}
++			// Inherited enumerable names, as actionEnumerate2's ARRAY arm
++			// (s30 w2-array-forin-proto; SWF_ARRAY_FORIN_PROTO=0 disables
++			// both arms, SWF_ARRAY_FORIN_PROTO_LEGACY=0 only this one).
++			{
++				static int _leg = -1;
++				if (_leg < 0) { const char* e = getenv("SWF_ARRAY_FORIN_PROTO_LEGACY"); _leg = !(e && e[0] == '0'); }
++				if (_leg) arrayForinPushInherited(app_context, arr);
++			}
+ 		}
+ 		return;
+ 	}
+@@ -56643,6 +56653,129 @@ void actionInstanceOf(SWFAppContext* app_context)
+ 	PUSH(ACTION_STACK_VALUE_BOOLEAN, result ? 1 : 0);
+ }
+ 
++// s30 w2-array-forin-proto: `for (k in <array>)` also lists the ENUMERABLE
++// names inherited through the array's `__proto__` chain (FP32: the AS2
++// `Array.prototype.foo` gotcha; avm1/global_proto_decls `X._listeners`
++// sections list the then-unhidden Object.prototype names before the own
++// `constructor`). Same walk and order as actionEnumerate2's OBJECT arm: each
++// level pushed in insertion order after the own keys, so LIFO pops the
++// deepest level first; inherited `constructor` skipped; a name the array owns
++// (any flags, or a live index) shadows the inherited one. Kill switch
++// SWF_ARRAY_FORIN_PROTO=0.
++static int arrayForinProtoEnabled(void)
++{
++	static int s = -1;
++	if (s < 0) { const char* e = getenv("SWF_ARRAY_FORIN_PROTO"); s = !(e && e[0] == '0'); }
++	return s;
++}
++
++static int arrayForinOwnsName(ASArray* arr, const char* name, u32 len)
++{
++	if (arr->props != NULL && findPropertyRaw(arr->props, name, len) != NULL)
++		return 1;
++	if (len == 0 || len > 10) return 0;
++	u64 idx = 0;
++	for (u32 j = 0; j < len; j++)
++	{
++		if (name[j] < '0' || name[j] > '9') return 0;
++		idx = idx * 10 + (u64)(name[j] - '0');
++	}
++	if (len > 1 && name[0] == '0') return 0;
++	return (int32_t)arr->length > 0 && idx < arr->length && idx < arr->capacity &&
++	       arr->elements[(u32)idx].type != ACTION_STACK_VALUE_HOLE;
++}
++
++// s30 w2-array-forin-proto: with enum_keys present, the ARRAY arm used to list
++// ONLY tracked keys, so `b = [10, 20]; b.bar = 1; for (k in b)` gave just
++// `bar` (the literal's indices were never tracked). Push every live, untracked
++// index in ascending order BEFORE the tracked keys. Kill switch
++// SWF_ARRAY_FORIN_UNTRACKED=0 (independent of SWF_ARRAY_FORIN_PROTO).
++static void arrayForinPushUntrackedIndices(SWFAppContext* app_context, ASArray* arr)
++{
++	static int s = -1;
++	if (s < 0) { const char* e = getenv("SWF_ARRAY_FORIN_UNTRACKED"); s = !(e && e[0] == '0'); }
++	if (!s || arr == NULL || (int32_t)arr->length <= 0) return;
++	u32 lim = arr->length < arr->capacity ? arr->length : arr->capacity;
++	if (lim == 0) return;
++	u8* tracked = (u8*) calloc(lim, 1);
++	if (tracked == NULL) return;
++	for (u32 k = 0; k < arr->enum_count; k++)
++	{
++		const char* key = arr->enum_keys[k];
++		u32 kl = (u32) strlen(key);
++		if (kl == 0 || kl > 10 || (kl > 1 && key[0] == '0')) continue;
++		u64 idx = 0; int ok = 1;
++		for (u32 j = 0; j < kl; j++)
++		{
++			if (key[j] < '0' || key[j] > '9') { ok = 0; break; }
++			idx = idx * 10 + (u64)(key[j] - '0');
++		}
++		if (ok && idx < lim) tracked[idx] = 1;
++	}
++	for (u32 i = 0; i < lim; i++)
++	{
++		if (tracked[i] || arr->elements[i].type == ACTION_STACK_VALUE_HOLE) continue;
++		char b[16];
++		int n = snprintf(b, sizeof(b), "%u", i);
++		if (arr->props != NULL)
++		{
++			ASProperty* ps = findPropertyRaw(arr->props, b, (u32) n);
++			if (ps != NULL && !(ps->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
++		}
++		PUSH_STR(b, (u32) n);
++	}
++	free(tracked);
++}
++
++static void arrayForinPushInherited(SWFAppContext* app_context, ASArray* arr)
++{
++	if (arr == NULL || !arrayForinProtoEnabled()) return;
++	// Resolve without side effects: an own `__proto__` (object, or an array's
++	// property bag), else the version's Array.prototype if it already exists.
++	// (actionArrayProtoForAmf's fallback would lazily build Array.prototype.)
++	ASObject* current_obj = NULL;
++	ASProperty* pp = (arr->props != NULL) ? findPropertyRaw(arr->props, "__proto__", 9) : NULL;
++	if (pp != NULL)
++	{
++		if (pp->value.type == ACTION_STACK_VALUE_OBJECT)
++			current_obj = (ASObject*)(uintptr_t) pp->value.data.numeric_value;
++		else if (pp->value.type == ACTION_STACK_VALUE_ARRAY && pp->value.data.numeric_value != 0)
++			current_obj = ((ASArray*)(uintptr_t) pp->value.data.numeric_value)->props;
++	}
++	else
++	{
++		int vg = versionGroup(g_swf_version);
++		current_obj = (vg == 0) ? g_array_proto_legacy : g_array_proto_modern;
++		if (current_obj == NULL) current_obj = g_array_prototype;
++	}
++	EnumeratedName* enumerated_head = NULL;
++	int chain_depth = 0;
++	while (current_obj != NULL && chain_depth < 100)
++	{
++		chain_depth++;
++		for (u32 i = 0; i < current_obj->num_used; i++)
++		{
++			const char* pn = current_obj->properties[i].name;
++			u32 pnl = current_obj->properties[i].name_length;
++			if (pn == NULL || (uintptr_t)pn < 4096) continue;
++			if (!(current_obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE)) continue;
++			if (current_obj->properties[i].flags & PROPERTY_FLAG_PERM_DONTENUM) continue;
++			if (pnl == 11 && memcmp(pn, "constructor", 11) == 0) continue;
++			if (pnl == 9 && memcmp(pn, "__proto__", 9) == 0) continue;
++			if (isPropertyEnumerated(enumerated_head, pn, pnl)) continue;
++			addEnumeratedName(&enumerated_head, pn, pnl);
++			if (arrayForinOwnsName(arr, pn, pnl)) continue;
++			PUSH_STR((char*)pn, pnl);
++		}
++		ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
++		if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
++			current_obj = (ASObject*) proto_var->data.numeric_value;
++		else
++			current_obj = NULL;
++	}
++	freeEnumeratedNames(enumerated_head);
++}
++
+ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
+ {
+ 	// Pop object reference from stack
+@@ -56719,6 +56852,10 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
+ 		{
+ 			if (arr->enum_keys != NULL && arr->enum_count > 0)
+ 			{
++				// Live indices the tracking never saw (literal / InitArray
++				// elements predate the first SetMember) enumerate as the
++				// OLDEST keys: pushed first = popped last.
++				arrayForinPushUntrackedIndices(app_context, arr);
+ 				// Use tracked insertion order
+ 				for (u32 i = 0; i < arr->enum_count; i++)
+ 				{
+@@ -56839,6 +56976,9 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
+ 					}
+ 				}
+ 			}
++			// Inherited enumerable names (pushed last = popped first, as in
++			// the OBJECT arm). s30 w2-array-forin-proto.
++			arrayForinPushInherited(app_context, arr);
+ 		}
+ 	}
+ 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)

@@ -198,6 +198,10 @@ sandbox_type_remote
 # per-native-function `.prototype` presence (~470 lines), READ_ONLY flags (~90), missing native
 # members (~700). (_global builtins are DONT_ENUM since s29 w2-disposition-land.) Reopen: build the
 # native-object table from the FP32 golden (s29 w1-disposition-audit §1 item 1).
+# s30 w1-native-table + w2-native-table-land: the table landed (avm1NativeTableApply), plus the
+# singleton / identity cleanups: 2593 -> 678 / 2215 -> 557 / 1073 -> 767 diff lines. Residue owners:
+# ARRAY for..in proto walk (_listeners, ~500), instance layout, Error/TextField/Button prototype
+# members; the manufacturer position is ACCEPTED Category 15.
 global_proto_decls
 global_proto_decls_delete
 global_instance_decls

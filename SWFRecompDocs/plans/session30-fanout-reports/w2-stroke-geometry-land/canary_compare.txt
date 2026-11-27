@@ -1,0 +1,35 @@
+RENDER CANARY  before=before  after=after   203 tests / 268 comparisons
+
+  IDENTICAL   261
+  DIFFERS       7
+  APPEARED      0   VANISHED 0   NO_RENDER 0
+
+  DIFFERS:
+    avm2/bitmapdata_drawwithquality  high__output.high   [DIFFERS]
+        diff_channels 598/1320000  mean 0.0172  max 128   bbox (26,10)-(200,400)
+        image status: pass -> pass    trace: pass -> pass
+    avm2/blend_shader_luma_lighten  output   [DIFFERS]
+        diff_channels 282/880000  mean 0.0107  max 204   bbox (0,0)-(400,200)
+        image status: pass -> pass    trace: pass -> pass
+    avm2/displayobject_getbounds_shape  output   [DIFFERS]
+        diff_channels 2207/400000  mean 0.6032  max 255   bbox (30,30)-(204,370)
+        image status: pass -> pass    trace: pass -> pass
+    avm2/graphics_bitmaps  output   [DIFFERS]
+        diff_channels 150/880000  mean 0.0052  max 63   bbox (28,5)-(85,130)
+        image status: pass -> pass    trace: pass -> pass
+    avm2/graphics_direct_commands  output   [DIFFERS]
+        diff_channels 354/880000  mean 0.0229  max 64   bbox (1,0)-(400,324)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-bitmapData-draw  output   [DIFFERS]
+        diff_channels 122/880000  mean 0.0096  max 128   bbox (0,0)-(100,100)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-shapes  output   [DIFFERS]
+        diff_channels 14700/4227136  mean 0.1184  max 127   bbox (0,262)-(1028,668)
+        image status: fail -> pass    trace: pass -> pass
+
+  TRACE STATUS CHANGES: (none)
+  IMAGE STATUS CHANGES:
+    from_shumway/acid/acid-shapes  output   fail -> pass        <-- REVIEW
+
+  before/after PNGs + difference PNGs: /home/user/SWFRecomp-CC/.render_canary/_compare/before__after
+  json: /tmp/claude-0/canary_cmp.json

@@ -43,12 +43,12 @@ Upstream: `b7ff32d93..66f9073de` (11 commits; 1 new row `avm2/xmldocument_tostri
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
-| w2-drift-smalls-land | w1-drift-smalls + FP32 req 1/2 | +4 regression rows; xmldocument_tostring mm (23/32+); html_text_img_parsing rm→pass or HOLD; hittest_shapeflag 6→4 lines | session_018CoDi4C9JHcd8ig5dPBV6B |
-| w2-native-table-land | w1-native-table W2-a/c/d + per-version FP32 | 0 flips (W2-a), 6 rows Flash-ward; W2-c/d priced | session_018CoDi6z94o4EXoVajXQPSF |
-| w2-array-forin-proto | w1-native-table W2-b | proto_decls −~524 lines; array rows priced | session_018CoDi6z9pU14k8efCNVaqu |
-| w2-stroke-geometry-land | w1-stroke-geometry + FP32 probes | acid-shapes fail→pass; HIGH curve rows Flash-ward; timeline/AVM1 twins priced | session_018CoDi6oYbShZiTwxVTK8j3 |
-| w2-rm-avm2-land | w1-rm-avm2 + FP32 0–5 | +8 rm→pass; L1′ HELD; clipDepth toml; pixelBounds; +2 regression rows | session_018CoDi3ZD3QFF5z4H83uq7b |
-| w2-lowq-land | w1-lowq-residues + FP32 glyph probe | A + C: `gradients` fail→pass, 6+ rows Flash-ward, priced blend cost; glyph rule only if Flash-ward | session_018CoDi5vBAjwfeqdDXBD3t3 |
+| w2-drift-smalls-land | w1-drift-smalls + FP32 req 1/2 | +4 regression rows; xmldocument_tostring mm (23/32+); html_text_img_parsing rm→pass or HOLD; hittest_shapeflag 6→4 lines | session_018CoDi4C9JHcd8ig5dPBV6B — LANDED batch 2: xmldocument_tostring mm→pass, html_text_img_parsing rm→pass, hittest_shapeflag 6→4, +5 regression rows |
+| w2-native-table-land | w1-native-table W2-a/c/d + per-version FP32 | 0 flips (W2-a), 6 rows Flash-ward; W2-c/d priced | session_018CoDi6z94o4EXoVajXQPSF — LANDED batch 2: 0 flips, decls/argstest Flash-ward, canary 268/268 identical; FP32 identity probe confirms, residues ASnative __proto__ (v6+), SWF5 hasOwnProperty hidden, v5 getURLPageSupport |
+| w2-array-forin-proto | w1-native-table W2-b | proto_decls −~524 lines; array rows priced | session_018CoDi6z9pU14k8efCNVaqu — LANDED batch 2: 0 flips; FP32 fixture == patched output (v5/6/8) → regression avm1_array_forin_proto_swf5/6/8 |
+| w2-stroke-geometry-land | w1-stroke-geometry + FP32 probes | acid-shapes fail→pass; HIGH curve rows Flash-ward; timeline/AVM1 twins priced | session_018CoDi6oYbShZiTwxVTK8j3 — LANDED batch 2 (AVM2+AVM1 HIGH 0.01 px flatten): acid-shapes img fail→PASS, +6 FP32 image rows; timeline twin HELD (24 toward / 1 FP32 away, needs quality plumbing); convex excess NO-GO |
+| w2-rm-avm2-land | w1-rm-avm2 + FP32 0–5 | +8 rm→pass; L1′ HELD; clipDepth toml; pixelBounds; +2 regression rows | session_018CoDi3ZD3QFF5z4H83uq7b — LANDED batch 2: +11 rm→pass, +2 regression, 2 flash_fixes; L1′ HELD |
+| w2-lowq-land | w1-lowq-residues + FP32 glyph probe | A + C: `gradients` fail→pass, 6+ rows Flash-ward, priced blend cost; glyph rule only if Flash-ward | session_018CoDi5vBAjwfeqdDXBD3t3 — LANDED batch 2: gradients fail→PASS, morph_test1 f1 PASS, +2 FP32 LOW rows; coordinator FP32: filters Flash-ward (host-dep.), acid-scale +160 & style_changes +904 away (priced), acid-scale+overlaps swapped; adv ceil not EditText-flag gated (8/8 ceil) |
 | w2-rm-avm1-gnash-land | w1-rm-avm1-gnash + FP32 req 1–2 | +11 rm→pass (R1–R6); riders Sound-v5, EmbeddedFontTest (SmallText), ASnative identity, Function-v5 | session_018CoDi6aiRRKKasJuuqQimW |
 | w2-native-instance | w1-native-table W2-e | ExternalInterface-v8 rm→pass; instance_decls Flash-ward | session_018CoDi3bJoV7MPov8DtZfAQ |
 

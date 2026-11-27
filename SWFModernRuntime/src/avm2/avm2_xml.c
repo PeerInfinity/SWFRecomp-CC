@@ -2978,14 +2978,77 @@ static Avm2XmlNodeExt* xmlnode_ext(Avm2Context* ctx, Avm2Value v)
 	return NULL;
 }
 
+// s30 w2-drift-smalls-land: XMLNode's eight and XMLDocument's four public
+// vars are REAL instance slot traits (playerglobal `public var`), not dynamic
+// properties. A sealed user subclass method reads a bare `nodeName` through
+// findpropstrict's trait-only scope walk (avm2/xmldocument_tostring
+// CustomXMLNode.toString: #1065 when they were dynamic), and for..in over a
+// node no longer lists them (traits do not enumerate; Flash/Ruffle).
+// describeType keeps reporting them as <variable> (vtable SLOT pass).
+static const char* const k_xn_slot_names[] = {
+	"nodeType", "nodeName", "nodeValue", "parentNode", "firstChild",
+	"lastChild", "previousSibling", "nextSibling",
+	// XMLDocument only (slots appended after XMLNode's):
+	"docTypeDecl", "idMap", "ignoreWhite", "xmlDecl",
+};
+#define XN_SLOT_COUNT_NODE 8u
+#define XN_SLOT_COUNT_ALL 12u
+static uint32_t g_xn_slot_index[XN_SLOT_COUNT_ALL];
+
+static int xn_slot_of(Avm2Value node, const char* name, uint32_t* out)
+{
+	if (node.kind != AVM2_VALUE_OBJECT || node.u.obj == NULL) return 0;
+	int is_node = 0, is_doc = 0;
+	for (Avm2Class* c = node.u.obj->cls; c != NULL; c = c->super_class)
+	{
+		if (c == g_xmldocument_class) is_doc = 1;
+		if (c == g_xmlnode_class) { is_node = 1; break; }
+	}
+	if (!is_node) return 0;
+	uint32_t n = is_doc ? XN_SLOT_COUNT_ALL : XN_SLOT_COUNT_NODE;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		if (strcmp(k_xn_slot_names[i], name) == 0)
+		{
+			uint32_t idx = g_xn_slot_index[i];
+			if (idx == 0 || idx >= node.u.obj->slot_count) return 0;
+			*out = idx;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void xn_set(Avm2Context* ctx, Avm2Value node, const char* name, Avm2Value v)
 {
+	uint32_t idx;
+	if (xn_slot_of(node, name, &idx)) { node.u.obj->slots[idx] = v; return; }
 	avm2_object_set_dynamic(ctx, node.u.obj, name, (uint32_t) strlen(name), v);
 }
 
 static Avm2Value xn_get(Avm2Context* ctx, Avm2Value node, const char* name)
 {
+	uint32_t idx;
+	if (xn_slot_of(node, name, &idx)) return node.u.obj->slots[idx];
 	return avm2_get_public_property(ctx, node, name, (uint32_t) strlen(name), NULL);
+}
+
+static void xn_add_slot_traits(Avm2Context* ctx, Avm2Class* cls,
+                               uint32_t first, uint32_t count)
+{
+	for (uint32_t i = first; i < first + count; i++)
+	{
+		Avm2PropEntry e;
+		memset(&e, 0, sizeof(e));
+		e.key = avm2_public_key(k_xn_slot_names[i],
+		                        (uint32_t) strlen(k_xn_slot_names[i]));
+		e.kind = AVM2_PROP_SLOT;
+		e.slot_index = cls->ivtable.slot_count + 1;
+		e.defining_class = cls;
+		cls->ivtable.slot_count++;
+		avm2_vtable_append(ctx, &cls->ivtable, &e);
+		g_xn_slot_index[i] = e.slot_index;
+	}
 }
 
 static Avm2XmlNodeExt* xn_ensure_ext(Avm2Context* ctx, Avm2Object* obj)
@@ -3077,8 +3140,11 @@ static Avm2Value n_xn_has_child_nodes(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2XmlNodeExt* ext = xn_ensure_ext(ctx, act->this_val.u.obj);
-	return avm2_bool(ext->children != NULL
-	                 && avm2_array_ext(ext->children)->length > 0);
+	(void) ext;
+	// Ruffle ac8da3724 (FP-verified, avm2/xmldocument_tostring):
+	// hasChildNodes() is `firstChild != null`, not `_children.length > 0`.
+	Avm2Value fc = xn_get(ctx, act->this_val, "firstChild");
+	return avm2_bool(fc.kind != AVM2_VALUE_NULL && fc.kind != AVM2_VALUE_UNDEFINED);
 }
 
 static void xmlnode_append(Avm2Context* ctx, Avm2Value parent, Avm2Value node)
@@ -3622,6 +3688,35 @@ static Avm2Value n_xdoc_parse_xml(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// XMLDocument.toString() (Ruffle 7e4f86f48, FP-verified by
+// avm2/xmldocument_tostring): xmlDecl + docTypeDecl when non-null, then "<>"
+// when the VIRTUAL hasChildNodes() is false, else each child's VIRTUAL
+// toString() walking firstChild / nextSibling (re-read after each call).
+// nodeName is ignored.
+static Avm2Value n_xdoc_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value self = act->this_val;
+	const Avm2String* out = avm2_string_from_literal(ctx, "");
+	Avm2Value xd = xn_get(ctx, self, "xmlDecl");
+	if (xd.kind != AVM2_VALUE_NULL && xd.kind != AVM2_VALUE_UNDEFINED)
+		out = avm2_string_concat(ctx, out, avm2_coerce_to_string(ctx, xd));
+	Avm2Value dt = xn_get(ctx, self, "docTypeDecl");
+	if (dt.kind != AVM2_VALUE_NULL && dt.kind != AVM2_VALUE_UNDEFINED)
+		out = avm2_string_concat(ctx, out, avm2_coerce_to_string(ctx, dt));
+	Avm2Value has = avm2_call_public_property(ctx, self, "hasChildNodes", 13, NULL, 0);
+	if (!avm2_coerce_to_boolean(has))
+		return avm2_string(avm2_string_concat(ctx, out, avm2_string_from_literal(ctx, "<>")));
+	Avm2Value child = xn_get(ctx, self, "firstChild");
+	while (child.kind == AVM2_VALUE_OBJECT && child.u.obj != NULL)
+	{
+		Avm2Value cs = avm2_call_public_property(ctx, child, "toString", 8, NULL, 0);
+		out = avm2_string_concat(ctx, out, avm2_coerce_to_string(ctx, cs));
+		child = xn_get(ctx, child, "nextSibling");
+	}
+	return avm2_string(out);
+}
+
 static Avm2Value n_xdoc_create_element(Avm2Activation* act)
 {
 	Avm2Value args[2] = { avm2_uint_value(XN_ELEMENT), arg_or_undef(act, 0) };
@@ -3644,6 +3739,7 @@ void avm2_register_xml_legacy(Avm2Context* ctx)
 	node->native_ext_size = sizeof(Avm2XmlNodeExt);
 	node->instance_init.fn = xmlnode_ctor;
 	node->instance_init.debug_name = "XMLNode";
+	xn_add_slot_traits(ctx, node, 0, XN_SLOT_COUNT_NODE);
 	avm2_builtin_add_getter(ctx, node, "attributes", n_xn_get_attributes);
 	{
 		// attributes is get/set: upgrade the entry to GETSET.
@@ -3679,6 +3775,8 @@ void avm2_register_xml_legacy(Avm2Context* ctx)
 	g_xmldocument_class = doc;
 	doc->instance_init.fn = xmldocument_ctor;
 	doc->instance_init.debug_name = "XMLDocument";
+	xn_add_slot_traits(ctx, doc, XN_SLOT_COUNT_NODE,
+	                   XN_SLOT_COUNT_ALL - XN_SLOT_COUNT_NODE);
 	avm2_builtin_add_method(ctx, doc, "parseXML", n_xdoc_parse_xml);
 	avm2_builtin_add_method(ctx, doc, "createElement", n_xdoc_create_element);
 	avm2_builtin_add_method(ctx, doc, "createTextNode", n_xdoc_create_text_node);
@@ -3697,6 +3795,7 @@ void avm2_register_xml_legacy(Avm2Context* ctx)
 			    && memcmp(vt->entries[i].key.name, "toString", 8) == 0)
 			{
 				vt->entries[i].defining_class = doc;
+				vt->entries[i].method.fn = n_xdoc_to_string;
 			}
 		}
 	}

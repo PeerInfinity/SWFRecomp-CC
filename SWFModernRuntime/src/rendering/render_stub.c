@@ -62,6 +62,7 @@ void render_webgpu_upload_cxform(WebGPURenderContext* c, float* cx) { (void)c; (
 void render_webgpu_draw_shape(WebGPURenderContext* c, size_t o, size_t n, u32 t, u32 cx) { (void)c; (void)o; (void)n; (void)t; (void)cx; }
 void render_webgpu_draw_rect(WebGPURenderContext* c, float x, float y, float w, float h, float r, float g, float b, float a, u32 t, u32 cx) { (void)c; (void)x; (void)y; (void)w; (void)h; (void)r; (void)g; (void)b; (void)a; (void)t; (void)cx; }
 void render_webgpu_draw_tris(WebGPURenderContext* c, const float* v, u32 n, float r, float g, float b, float a, u32 t, u32 cx) { (void)c; (void)v; (void)n; (void)r; (void)g; (void)b; (void)a; (void)t; (void)cx; }
+void render_webgpu_draw_text_tris(WebGPURenderContext* c, const float* v, u32 n, float r, float g, float b, float a, u32 t, u32 cx) { (void)c; (void)v; (void)n; (void)r; (void)g; (void)b; (void)a; (void)t; (void)cx; }
 int render_webgpu_draw_cov_runs(WebGPURenderContext* c, const float* r, const u16* pi, u32 n, const float* pal, u32 np, u32 t, u32 cx) { (void)c; (void)r; (void)pi; (void)n; (void)pal; (void)np; (void)t; (void)cx; return 0; }
 void render_webgpu_dyn_room(WebGPURenderContext* c, u32* v, u32* cl) { (void)c; if (v) *v = 0; if (cl) *cl = 0; }
 void render_webgpu_draw_gradient_tris(WebGPURenderContext* c, const float* v, u32 n, u8 gt, u8 sm, u8 in, float fr, const u8* ramp, const float* mat, u32 t, u32 cx) { (void)c; (void)v; (void)n; (void)gt; (void)sm; (void)in; (void)fr; (void)ramp; (void)mat; (void)t; (void)cx; }

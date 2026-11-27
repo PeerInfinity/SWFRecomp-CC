@@ -1,0 +1,715 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 8caf2193..6f2c0c3a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -261,6 +261,28 @@ static void fs_cleanup_push(Avm2Context* ctx, Avm2Object* obj)
+ 	g_fs_cleanup[g_fs_cleanup_count++] = obj;
+ }
+ 
++// s30 w1-rm-avm2 (FP32 golden timeline/swf_9_frame_script_dynamic_goto):
++// in SWF<=9 a goto that RUNS (not queued) during the frame-script phase
++// has no nested frame (run_inner_goto_frame returns early), and Ruffle
++// leaves the target frame's script for the next tick's pass. Flash runs it
++// at the tail of the CURRENT pass: the clip joins the frame-script cleanup
++// queue, behind the entries already on it. A clip already queued (a
++// queued self-goto being flushed) is not pushed twice.
++static void swf9_goto_cleanup_push(Avm2Context* ctx, Avm2Object* obj,
++                                   Avm2DisplayObjectExt* ext)
++{
++	if (ctx->frame_phase != PHASE_FRAME_SCRIPTS) return;
++	uint32_t f = ext->current_frame;
++	if (f >= ext->frame_script_cap
++	    || ext->frame_scripts[f].kind != AVM2_VALUE_OBJECT) return;
++	for (uint32_t i = 0; i < g_fs_cleanup_count; i++)
++	{
++		if (g_fs_cleanup[i] == obj) return;
++	}
++	fs_cleanup_push(ctx, obj);
++	avm2_display_mark_frame_work(ctx, obj);
++}
++
+ // Class -> SymbolClass char binding (built at stage build).
+ typedef struct SymbolClassMap
+ {
+@@ -2184,6 +2206,15 @@ static void run_remove_op(Avm2Context* ctx, Avm2Object* parent, const Avm2Timeli
+ 	}
+ 	else
+ 	{
++		// s30 w1-rm-avm2 (FP32 golden from_shumway/MaskTest-3): a RemoveObject
++		// tag that removes an object serving as an AS3 mask breaks the pair,
++		// so the maskee's `mask` reads null afterwards (Ruffle keeps it).
++		if (cext != NULL && cext->maskee != NULL)
++		{
++			Avm2DisplayObjectExt* mee = avm2_display_ext_of(ctx, cext->maskee);
++			if (mee != NULL && mee->mask == child) mee->mask = NULL;
++			cext->maskee = NULL;
++		}
+ 		full_remove_child(ctx, pext, child);
+ 	}
+ }
+@@ -2633,10 +2664,38 @@ static void mc_goto_frame_now(Avm2Context* ctx, Avm2Object* obj,
+ 	}
+ }
+ 
++// s30 w1-rm-avm2 R2 (FP32 goldens timeline/swf_9_event_goto_frame_script,
++// avm2/swf_9_goto_in_construct_frame): a SWF<=9 goto has no nested frame,
++// so the children it places stay unconstructed until the next Construct
++// phase in Ruffle. Flash constructs them in the frame-script pass, right
++// before the parent's own frame script runs (the goto in a frameConstructed
++// or addedToStage handler: the child's constructor traces precede the
++// parent's target-frame script). A child constructed here gets its pending
++// frame script like a Construct-phase child.
++static void swf9_construct_goto_children(Avm2Context* ctx,
++                                         Avm2DisplayObjectExt* ext)
++{
++	if (ctx->swf_version > 9 || ctx->frame_phase != PHASE_FRAME_SCRIPTS) return;
++	if (ext->running_construct_frame) return;
++	for (uint32_t i = 0; i < ext->render_len; i++)
++	{
++		Avm2Object* child = ext->render_list[i];
++		Avm2DisplayObjectExt* cext = display_ext_fast(child);
++		if (cext == NULL || cext->constructed || cext->manual_frame_construct)
++		{
++			continue;
++		}
++		construct_frame_obj(ctx, child);
++		cext = display_ext_fast(child);
++		if (cext != NULL && cext->constructed) check_has_pending_script(cext);
++	}
++}
++
+ static void run_local_frame_scripts(Avm2Context* ctx, Avm2Object* obj)
+ {
+ 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+ 	if (ext == NULL || !ext->constructed) return;
++	swf9_construct_goto_children(ctx, ext);
+ 	if (ext->has_pending_script && !ext->executing_frame_script)
+ 	{
+ 		uint32_t frame_id = ext->queued_script_frame;
+@@ -3306,6 +3365,7 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
+ 		if (ctx->swf_version <= 9)
+ 		{
+ 			ext->skip_next_enter_frame = 1;
++			swf9_goto_cleanup_push(ctx, obj, ext);
+ 		}
+ 		else
+ 		{
+@@ -13413,9 +13473,15 @@ static Avm2Value transform_get_pixel_bounds(Avm2Activation* act)
+ 	bounds_with_transform(ctx, text->target, &m, &r);
+ 	avm2_text_lazy_restore(ctx, text->target, saved);
+ 	if (!r.valid) return avm2_text_new_rectangle(ctx, 0, 0, 0, 0);
+-	return avm2_text_new_rectangle(ctx, r.xmin / 20.0, r.ymin / 20.0,
+-	                               (r.xmax - r.xmin) / 20.0,
+-	                               (r.ymax - r.ymin) / 20.0);
++	// s30 w2-rm-avm2-land (FP32 fixture regression/avm2_pixelbounds_offlist,
++	// corpus from_shumway/.../transform/pixelBounds): an object that is not
++	// on the stage reports its transformed bounds x 5 on every component
++	// (x=5,y=7 rect (0,0,100,100) -> (25,35,500,500)); empty stays 0.
++	// Ruffle reports the plain bounds.
++	double k = is_on_stage(ctx, text->target) ? 1.0 / 20.0 : 5.0 / 20.0;
++	return avm2_text_new_rectangle(ctx, r.xmin * k, r.ymin * k,
++	                               (r.xmax - r.xmin) * k,
++	                               (r.ymax - r.ymin) * k);
+ }
+ 
+ static Avm2Value do_get_transform(Avm2Activation* act)
+@@ -16057,6 +16123,31 @@ static Avm2Object* run_mouse_pick(Avm2Context* ctx)
+ 	return NULL;
+ }
+ 
++// s30 w2-rm-avm2-land (FP32 golden from_shumway/timeline/nav/clipDepth, 4
++// ticks): getObjectsUnderPoint never reports a timeline clip layer
++// (clipDepth > 0) or anything it masks (depth in (clip.depth,
++// clip.clipDepth]), with their subtrees, wherever the point lies: FP returns
++// [] both with the point outside the clip shape (frame 1) and inside it
++// (frame 2). Ruffle reports the masked shape.
++static int goup_clip_layer_hidden(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
++                                  uint32_t idx)
++{
++	Avm2DisplayObjectExt* cext =
++		avm2_display_ext_of(ctx, pext->render_list[idx]);
++	if (cext == NULL) return 0;
++	if (cext->clip_depth > 0) return 1;
++	for (uint32_t j = 0; j < idx; j++)
++	{
++		Avm2DisplayObjectExt* clext =
++			avm2_display_ext_of(ctx, pext->render_list[j]);
++		if (clext != NULL && clext->clip_depth > 0
++		    && clext->depth < cext->depth
++		    && cext->depth <= clext->clip_depth)
++			return 1;
++	}
++	return 0;
++}
++
+ // DisplayObjectContainer.getObjectsUnderPoint (Ruffle
+ // display_object_container.rs). A depth-first pre-order walk from the receiver:
+ // children are pushed in REVERSE render order so they pop front-to-back, and
+@@ -16110,6 +16201,7 @@ static Avm2Value doc_get_objects_under_point(Avm2Activation* act)
+ 		}
+ 		for (uint32_t i = next->render_len; i > 0; i--)
+ 		{
++			if (goup_clip_layer_hidden(ctx, next, i - 1)) continue;
+ 			GOUP_PUSH(stack, stack_n, stack_cap, next->render_list[i - 1],
+ 			          Avm2Object*);
+ 		}
+diff --git a/SWFModernRuntime/src/avm2/avm2_ops.c b/SWFModernRuntime/src/avm2/avm2_ops.c
+index 848fe0f6..7f274fc6 100644
+--- a/SWFModernRuntime/src/avm2/avm2_ops.c
++++ b/SWFModernRuntime/src/avm2/avm2_ops.c
+@@ -4255,7 +4255,25 @@ Avm2Value avm2_op_in(Avm2Activation* act, Avm2Value name, Avm2Value obj)
+ 	{
+ 		return avm2_bool(avm2_xml_has_property_via_in(ctx, obj, ns) != 0);
+ 	}
+-	return avm2_bool(avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0);
++	int has = avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0;
++	// s30 w1-rm-avm2: avmplus bugzilla 558863 compat (SWF<=10, FP32 golden
++	// from_avmplus/regress/bug_558863_swf10): ByteArray hasAtomProperty
++	// falls back to a GET of a non-index name, so `name in ba` for a name
++	// the sealed ByteArray does not have throws #1069 instead of answering
++	// false (`true`, "xy", {}, 5.5 and -5 all throw; an index still answers
++	// index < length). SWF11+ answers false (bug_558863_swf11).
++	uint32_t ba_idx;
++	if (!has && ctx->swf_version < 11 && obj.kind == AVM2_VALUE_OBJECT
++	    && avm2_bytearray_ext_of(obj) != NULL
++	    && !name_as_index(ns->utf8, ns->len, &ba_idx))
++	{
++		char cn[160];
++		class_name_of(ctx, obj, cn, sizeof(cn));
++		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
++		                 "Error #1069: Property %.*s not found on %s and there "
++		                 "is no default value.", (int) ns->len, ns->utf8, cn);
++	}
++	return avm2_bool(has);
+ }
+ 
+ Avm2Value avm2_op_instanceof(Avm2Activation* act, Avm2Value value, Avm2Value type)
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index f93a3d69..a33267e3 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -6661,16 +6661,34 @@ static const Avm2String* group_text_of(Avm2Context* ctx, Avm2Object* o)
+ 	return sb_take(ctx, &sb);
+ }
+ 
++// s30 w1-rm-avm2 (FP32 golden avm2/textline_atom_index_at_char_index): in a
++// TextLine's RAW text a GraphicElement occupies one character (FTE's object
++// replacement char U+FDEF), though `GroupElement.text` omits it. Set only
++// while a TextBlock builds or reads its line text (line_text_of).
++static int g_fte_line_text = 0;
++
+ static const Avm2String* ce_text_of(Avm2Context* ctx, Avm2Object* o)
+ {
+ 	if (obj_is_class(o, g_groupelement_class)) return group_text_of(ctx, o);
+ 	// A GraphicElement's text is the EMPTY STRING, never null — and the
+ 	// difference is load-bearing for the fold above.
+-	if (obj_is_class(o, g_graphicelement_class)) return empty_string(ctx);
++	if (obj_is_class(o, g_graphicelement_class))
++	{
++		return g_fte_line_text ? avm2_string_new(ctx, "\xEF\xB7\xAF", 3)
++		                       : empty_string(ctx);
++	}
+ 	Avm2ContentElementExt* ce = ce_ext(o);
+ 	return ce != NULL ? ce->text : NULL;
+ }
+ 
++static const Avm2String* line_text_of(Avm2Context* ctx, Avm2Object* o)
++{
++	g_fte_line_text = 1;
++	const Avm2String* t = ce_text_of(ctx, o);
++	g_fte_line_text = 0;
++	return t;
++}
++
+ // One entry serves the whole family: ce_text_of dispatches GroupElement to
+ // the concatenating form, so GroupElement needs no vtable override.
+ static Avm2Value ce_get_text(Avm2Activation* act)
+@@ -7363,6 +7381,9 @@ static Avm2Value tl_get_text_block_begin_index(Avm2Activation* act)
+ // getAtomIndexAtCharIndex(charIndex:int):int — Ruffle TextLine.as: one atom
+ // per UTF-16 code unit of this line, so the atom index is the char index
+ // relative to the line's start, and -1 outside [0, rawTextLength).
++static int32_t tl_atom_index_of(Avm2Context* ctx, Avm2TextLineExt* tl,
++                                int32_t ci, int64_t idx);
++
+ static Avm2Value tl_get_atom_index_at_char_index(Avm2Activation* act)
+ {
+ 	Avm2TextLineExt* tl = this_tl(act);
+@@ -7370,7 +7391,7 @@ static Avm2Value tl_get_atom_index_at_char_index(Avm2Activation* act)
+ 	if (tl == NULL) return avm2_integer(-1);
+ 	int64_t idx = (int64_t) ci - (int64_t) tl->begin_index;
+ 	if (idx < 0 || idx >= (int64_t) tl->raw_text_length) return avm2_integer(-1);
+-	return avm2_integer((int32_t) idx);
++	return avm2_integer(tl_atom_index_of(act->ctx, tl, ci, idx));
+ }
+ 
+ static Avm2Value tl_get_specified_width(Avm2Activation* act)
+@@ -7651,6 +7672,33 @@ static Avm2TextBlockExt* textblock_ext_of(Avm2Object* o)
+ 	                                          : NULL;
+ }
+ 
++static int32_t tl_atom_index_of(Avm2Context* ctx, Avm2TextLineExt* tl,
++                                int32_t ci, int64_t idx)
++{
++	// s30 w1-rm-avm2 (FP32 golden avm2/textline_atom_index_at_char_index): a
++	// surrogate pair is ONE atom, so both of its code units map to it and
++	// every later atom index drops by one per preceding pair.
++	Avm2TextBlockExt* tb = tl->text_block != NULL
++		? textblock_ext_of(tl->text_block) : NULL;
++	const Avm2String* text = (tb != NULL && tb->content != NULL)
++		? line_text_of(ctx, tb->content) : NULL;
++	if (text == NULL) return (int32_t) idx;
++	uint32_t b = u16_to_byte(text, tl->begin_index);
++	uint32_t u = tl->begin_index;
++	int32_t atom = 0;
++	while (u < (uint32_t) ci && b < text->len)
++	{
++		unsigned char c = (unsigned char) text->utf8[b];
++		uint32_t nb = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
++		uint32_t nu = nb == 4 ? 2 : 1;
++		if (u + nu > (uint32_t) ci) break;
++		atom++;
++		u += nu;
++		b += nb;
++	}
++	return atom;
++}
++
+ static Avm2Value tb_get_apply_nlfs(Avm2Activation* act)
+ {
+ 	Avm2TextBlockExt* tb = this_tb(act);
+@@ -8045,7 +8093,7 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
+ 		tb_trace_2175(ctx);
+ 		return avm2_null();
+ 	}
+-	const Avm2String* text = ce_text_of(ctx, tb->content);
++	const Avm2String* text = line_text_of(ctx, tb->content);
+ 	if (text == NULL) text = empty_string(ctx);
+ 	// Every index below is a UTF-16 code-unit offset (what textBlockBeginIndex
+ 	// and rawTextLength report), NOT a byte offset into the UTF-8 storage.
+@@ -8078,6 +8126,22 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
+ 	tl->line_index = pl != NULL ? pl->line_index + 1 : 0;
+ 	if (pl != NULL)
+ 	{
++		// s30 w1-rm-avm2 (FP32 golden avm2/textblock_releaselines): a new
++		// line created after a line that already had a successor cuts the
++		// old tail off: each old successor reads validity "invalid" with
++		// null previousLine/nextLine (its textBlock stays). Ruffle keeps
++		// the old successor linked and valid.
++		Avm2Object* old = pl->next_line;
++		for (int guard = 0; old != NULL && guard < 1000000; guard++)
++		{
++			Avm2TextLineExt* oe = textline_ext_of(old);
++			if (oe == NULL) break;
++			Avm2Object* nx = oe->next_line;
++			oe->validity = fte_lit(ctx, "invalid");
++			oe->previous_line = NULL;
++			oe->next_line = NULL;
++			old = nx;
++		}
+ 		tl->previous_line = prev;
+ 		pl->next_line = line;
+ 	}
+@@ -8166,7 +8230,7 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
+ 	// block returns null without touching the line.
+ 	Avm2TextBlockExt* tbx = this_tb(act);
+ 	const Avm2String* text = (tbx != NULL && tbx->content != NULL)
+-		? ce_text_of(ctx, tbx->content) : NULL;
++		? line_text_of(ctx, tbx->content) : NULL;
+ 	if (text == NULL) text = empty_string(ctx);
+ 	uint32_t text_u16 = u16_length(text);
+ 	uint32_t pos = pl != NULL ? pl->end_index : 0;
+@@ -8311,7 +8375,7 @@ static Avm2Value tl_get_has_tabs(Avm2Activation* act)
+ 	if (tl == NULL || tl->text_block == NULL) return avm2_bool(false);
+ 	Avm2TextBlockExt* tb = textblock_ext_of(tl->text_block);
+ 	if (tb == NULL || tb->content == NULL) return avm2_bool(false);
+-	const Avm2String* text = ce_text_of(act->ctx, tb->content);
++	const Avm2String* text = line_text_of(act->ctx, tb->content);
+ 	if (text == NULL) return avm2_bool(false);
+ 	uint32_t b0 = u16_to_byte(text, tl->begin_index);
+ 	uint32_t b1 = u16_to_byte(text, tl->begin_index + tl->raw_text_length);
+diff --git a/SWFModernRuntime/src/avm2/avm2_value.c b/SWFModernRuntime/src/avm2/avm2_value.c
+index 14b2df7b..edecfcba 100644
+--- a/SWFModernRuntime/src/avm2/avm2_value.c
++++ b/SWFModernRuntime/src/avm2/avm2_value.c
+@@ -358,6 +358,97 @@ static int digit_value(char c, int radix)
+ 	return d < radix ? d : -1;
+ }
+ 
++// avmplus core/MathUtils.cpp parseInt, the `result >= 0x20000000000000`
++// power-of-two-radix block (s30 w1-rm-avm2). `s`..`lim` is the string from
++// the first digit to its END (avmplus indexes s->length(), not the digit
++// run). Out-of-range reads give -1, as an invalid digit.
++static int pow2_digit(const char* s, const char* lim, int32_t radix)
++{
++	if (s >= lim) return -1;
++	return digit_value(*s, radix);
++}
++
++static double avmplus_pow2_parse(const char* s, const char* lim, int32_t radix)
++{
++	double result = 0;
++	int32_t powOf2 = 1;
++	for (int32_t x = radix; x != 1; x >>= 1) powOf2++;
++	powOf2--;
++	const char* end = s;
++	int32_t v = 0;
++	while (end < lim && *end == '0') end++;
++	if (end >= lim) return 0;
++	int32_t next;
++	for (next = 0; next * powOf2 <= 52; next++)
++	{
++		v = pow2_digit(end++, lim, radix);
++		if (v == -1)
++		{
++			v = 0;
++			break;
++		}
++		result = result * radix + v;
++		if (end >= lim) break;
++	}
++	if (next * powOf2 > 52)
++	{
++		int roundUp = 0, bit53 = 0, bit54 = 0;
++		double factor = 1;
++		switch (radix)
++		{
++		case 32:
++			bit53 = v & (1 << 2);
++			bit54 = v & (1 << 1);
++			roundUp = (v & 1);
++			break;
++		case 16:
++			bit53 = v & (1 << 0);
++			v = pow2_digit(end, lim, radix);
++			if (v != -1)
++			{
++				factor *= radix;
++				bit54 = v & (1 << 3);
++				roundUp = (v & 0x3) != 0;
++			}
++			else
++			{
++				roundUp = bit53 != 0;
++			}
++			break;
++		case 8:
++		case 4:
++			v = pow2_digit(end, lim, radix);
++			if (v == -1) v = 0;
++			factor *= radix;
++			bit53 = v & (1 << 1);
++			bit54 = v & (1 << 0);
++			break;
++		case 2:
++			bit53 = v & (1 << 0);
++			v = pow2_digit(end, lim, radix);
++			if (v != -1)
++			{
++				factor *= radix;
++				bit54 = v & (1 << 0);
++			}
++			break;
++		}
++		bit53 = !!bit53;
++		bit54 = !!bit54;
++		while (++end < lim)
++		{
++			v = digit_value(*end, radix);
++			if (v == -1) break;
++			roundUp |= (v != 0);
++			factor *= radix;
++		}
++		roundUp = bit54 && (bit53 || roundUp);
++		result += (roundUp ? 1.0 : 0.0);
++		result *= factor;
++	}
++	return result;
++}
++
+ double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool strict)
+ {
+ 	const char* p = s;
+@@ -413,6 +504,17 @@ double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool stric
+ 	}
+ 	if (p == start) return NAN;
+ 	if (exact_ok) result = (double) exact;
++	// s30 w1-rm-avm2: avmplus MathUtils::parseInt re-reads a power-of-two
++	// radix string once the chain reaches 2^53, and that re-read is what FP
++	// prints, bugs included (FP32 golden from_avmplus/as3/Math/e15_1_2_2:
++	// parseInt("1234567890123", 32) is 38390726480134180, not ...293600; the
++	// `while (++end < len)` tail skips the digit after the rounding digit, so
++	// the result is short one radix factor). Ported line for line; an index
++	// past the string reads as "no digit".
++	if (result >= 9007199254740992.0 && (radix & (radix - 1)) == 0)
++	{
++		result = avmplus_pow2_parse(start, end, radix);
++	}
+ 
+ 	if (strict)
+ 	{
+diff --git a/SWFModernRuntime/third_party/quickjs-libregexp/libregexp.c b/SWFModernRuntime/third_party/quickjs-libregexp/libregexp.c
+index bea6c6d6..6c1871d1 100644
+--- a/SWFModernRuntime/third_party/quickjs-libregexp/libregexp.c
++++ b/SWFModernRuntime/third_party/quickjs-libregexp/libregexp.c
+@@ -3009,6 +3009,12 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
+                 break;
+             if (opcode == REOP_line_start)
+                 goto no_match;
++            /* avmplus is PCRE: a multiline '^' never matches after a
++               newline that ends the subject (s30 w1-rm-avm2, FP32 golden
++               from_avmplus/regress/bug_479786: "a\n".replace(/^ * /gm, x)
++               adds no trailing x). */
++            if (cptr == cbuf_end)
++                goto no_match;
+             PEEK_PREV_CHAR(c, cptr, s->cbuf, cbuf_type);
+             if (!is_line_terminator(c))
+                 goto no_match;
+diff --git a/ruffle-tests/flash_fixes/README.md b/ruffle-tests/flash_fixes/README.md
+index fad2db88..cb708673 100644
+--- a/ruffle-tests/flash_fixes/README.md
++++ b/ruffle-tests/flash_fixes/README.md
+@@ -52,6 +52,8 @@ download.
+ | `avm2/try_catch_typed` | `output.txt` | 2026-11-26 | s29 coordinator FP32 (`w1-local-oracles/w1-rm-avm2/try_catch_typed.fp32.txt`) | `[file:line]` suffixes; stays pass with the s29 debug-line info (fails without it) |
+ | `avm2/slot_holes_fail`, `avm2/slot_id_exceeds_trait_count` | `output.txt` | 2026-11-26 | s28 trace-provenance `avm2__slot_*.r1.txt` | empty golden → FP32 VerifyError #1107 (+ #1065); stay `ruffle_matched` (O3 not implemented) |
+ | `from_shumway/acid/acid-large` | `output.expected.png` | 2026-11-27 | s29 coordinator pre-s30 FP32 LOW (LNX == WIN byte for byte; `session30-fanout-reports/pre-launch-oracles/`) | stays fail; golden (Ruffle) 178 720 ch from Flash, ours 138 478 |
++| `from_shumway/timeline/nav/clipDepth` | `test.toml` (`kind: "toml"`) | 2026-11-27 | s30 coordinator FP32 LNX direct 6 frames (`session30-fanout-reports/w1-local-oracles/w1-rm-avm2/from_shumway_timeline_nav_clipDepth.f6.lnx.txt`) == the 8-line golden | `num_ticks` 3 → 4 (the golden covers frame 4's goto). **Land with s30 w2-rm-avm2-land** (getObjectsUnderPoint skips clip layers + their maskees): `ruffle_matched` → pass; without it the row stays rm/mismatch |
++| `avm2/swf_9_goto_in_construct_frame` | `output.txt` | 2026-11-27 | s30 coordinator FP32 LNX direct 6 frames ×2 (`…/w1-rm-avm2/avm2_swf_9_goto_in_construct_frame.f6{,r2}.lnx.txt`) | golden ended mid-tick (line 20 opens tick 3); fix = FP32 cut at the tick boundary after line 19. **Land with s30 w2-rm-avm2-land** (R2): `ruffle_matched` → pass |
+ 
+ **Graded** in run `45547012629` at `7c3cfdcb7` (results `e1425f417`) vs `cb14cd063`: 0 status moves in either axis.
+ Excess channels vs the new Flash goldens:
+diff --git a/ruffle-tests/flash_fixes/avm2/swf_9_goto_in_construct_frame/output.txt b/ruffle-tests/flash_fixes/avm2/swf_9_goto_in_construct_frame/output.txt
+new file mode 100644
+index 00000000..62b14de1
+--- /dev/null
++++ b/ruffle-tests/flash_fixes/avm2/swf_9_goto_in_construct_frame/output.txt
+@@ -0,0 +1,19 @@
++Constructing Test
++Calling MyOtherChild super()
++Called MyOtherChild super()
++MyContainer frameConstructed
++Before MyContainer.gotoAndStop(2)
++After MyContainer.gotoAndStop(2)
++MyOtherChild onFrameConstructed
++Stopping Test at frame 2
++Calling MyChild super
++Called MyChild super
++MyContainer framescript 1
++MyChild framescript 0
++MyChild framescript 0
++MyContainer enterFrame
++MyOtherChild onEnterFrame
++MyContainer frameConstructed
++Before MyContainer.gotoAndStop(2)
++After MyContainer.gotoAndStop(2)
++MyOtherChild onFrameConstructed
+diff --git a/ruffle-tests/flash_fixes/fixes.json b/ruffle-tests/flash_fixes/fixes.json
+index c9876ead..f72ca71f 100644
+--- a/ruffle-tests/flash_fixes/fixes.json
++++ b/ruffle-tests/flash_fixes/fixes.json
+@@ -1032,5 +1032,27 @@
+     "reason": "Flash LOW, Linux == Windows byte for byte. Golden (Ruffle-made) is 178 720 channels over tol 11 from Flash; ours (s29 FINAL, TSNAP + LOW stroke raster) 138 478. Stays fail, now graded against Flash.",
+     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 acid-large FP32 LOW swap",
+     "added": "2026-11-27"
++  },
++  {
++    "test": "from_shumway/timeline/nav/clipDepth",
++    "file": "test.toml",
++    "upstream_sha256": "944d4304b9de960378dd7ab3827e8135415482470fb930713db41441ad77cf9d",
++    "fix": "from_shumway/timeline/nav/clipDepth/test.toml",
++    "kind": "toml",
++    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/from_shumway_timeline_nav_clipDepth.f6.lnx.txt (s30 coordinator, LNX debug projector, direct pinned, 6 frames) == the 8-line golden exactly, nothing after it",
++    "reason": "The golden (Shumway's FP capture) covers 4 ticks: frame 4's script does gotoAndStop(1), which prints the last 2 lines. Ruffle's num_ticks = 3 cuts it at 6 lines. num_ticks = 4 prints exactly the golden.",
++    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-rm-avm2-land clipDepth getObjectsUnderPoint clip layers",
++    "added": "2026-11-27"
++  },
++  {
++    "test": "avm2/swf_9_goto_in_construct_frame",
++    "file": "output.txt",
++    "upstream_sha256": "47b3ab24ed48b61e97bfcd099600cdf7fae4423bd71a60a297ae8ffe177311ce",
++    "fix": "avm2/swf_9_goto_in_construct_frame/output.txt",
++    "kind": "trace",
++    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/avm2_swf_9_goto_in_construct_frame.f6.lnx.txt and .f6r2.lnx.txt (s30 coordinator, LNX, direct pinned, 6 frames; both captures identical over the first 19 lines)",
++    "reason": "The 20-line golden ends mid-tick: its last line 'MyContainer enterFrame' opens a third tick whose next line in FP32 is 'MyOtherChild onEnterFrame' (FP's steady state is a 6-line cycle that starts at enterFrame). The fix is the FP32 capture cut at the clean tick boundary after line 19 (= the golden's first 19 lines), which is what num_ticks = 3 covers (Ruffle's own output.ruffle.txt also stops before that enterFrame). num_ticks unchanged.",
++    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-rm-avm2-land SWF<=9 goto-placed children constructed in the frame-script walk",
++    "added": "2026-11-27"
+   }
+ ]
+diff --git a/ruffle-tests/flash_fixes/from_shumway/timeline/nav/clipDepth/test.toml b/ruffle-tests/flash_fixes/from_shumway/timeline/nav/clipDepth/test.toml
+new file mode 100644
+index 00000000..4bd699c7
+--- /dev/null
++++ b/ruffle-tests/flash_fixes/from_shumway/timeline/nav/clipDepth/test.toml
+@@ -0,0 +1,4 @@
++# Test adapted from Shumway at https://github.com/mozilla/shumway/tree/master/test/swfs/timeline/nav
++
++num_ticks = 4
++known_failure = true # https://github.com/ruffle-rs/ruffle/issues/12142
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 794cd5b1..099a4f41 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -871,3 +871,6 @@ regression/lowq_stroke_probe                        # LOW width / thin pen / ban
+ #   drawing_seam_join_wanted). FP32-golden seam / hinted-end fixtures of n-seam-caps.
+ regression/avm1_stroke_seam_caps                    # closed seams, W 1..3, round/round  1 cmp
+ regression/avm1_stroke_hinting_caps                 # pixelHinting seams + ends          1 cmp
++# s30 w2-rm-avm2-land: a timeline RemoveObject of an AS3 mask breaks the mask
++#   pair (avm2_display.c run_remove_op). Trace + 1 image cmp (CI pass).
++from_shumway/MaskTest-3                             # AS3 mask removed by RemoveObject2  1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/Test.as b/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/Test.as
+new file mode 100644
+index 00000000..29f7e4cd
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/Test.as
+@@ -0,0 +1,24 @@
++package {
++  import flash.display.*; import flash.events.*;
++  [SWF(width="400", height="300", frameRate="30")]
++  public class Test extends Sprite {
++    private var f:int = 0; private var s:Sprite, s2:Sprite, s3:Sprite, m1:Shape, m2:Shape, m3:Shape, holder:Sprite;
++    private function box(c:uint):Sprite { var x:Sprite = new Sprite(); x.graphics.beginFill(c); x.graphics.drawRect(0,0,50,50); addChild(x); return x; }
++    private function msk():Shape { var m:Shape = new Shape(); m.graphics.beginFill(0); m.graphics.drawRect(10,10,20,20); return m; }
++    public function Test() {
++      s = box(0xFF0000); s2 = box(0x00FF00); s3 = box(0x0000FF);
++      m1 = msk(); addChild(m1); s.mask = m1;
++      holder = new Sprite(); addChild(holder); m2 = msk(); holder.addChild(m2); s2.mask = m2;
++      m3 = msk(); addChild(m3); s3.mask = m3;
++      trace("f0 " + (s.mask == m1) + " " + (s2.mask == m2) + " " + (s3.mask == m3));
++      addEventListener(Event.ENTER_FRAME, tick);
++    }
++    private function tick(e:Event):void {
++      f++;
++      if (f == 1) { removeChild(m1); trace("removeChild direct: s.mask=" + s.mask + " m1.parent=" + m1.parent); }
++      if (f == 2) { removeChild(holder); trace("removeChild ancestor: s2.mask=" + s2.mask); }
++      if (f == 3) { m3.visible = false; trace("hidden: " + (s3.mask == m3)); addChild(m1); trace("re-add m1: s.mask=" + s.mask); }
++      if (f == 4) { removeEventListener(Event.ENTER_FRAME, tick); trace("done"); }
++    }
++  }
++}
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/output.txt b/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/output.txt
+new file mode 100644
+index 00000000..c6b33980
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/output.txt
+@@ -0,0 +1,6 @@
++f0 true true true
++removeChild direct: s.mask=[object Shape] m1.parent=null
++removeChild ancestor: s2.mask=[object Shape]
++hidden: true
++re-add m1: s.mask=[object Shape]
++done
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/test.swf b/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..2499a5396af3be1dc30f4c5379fda1104ecc00d0
+GIT binary patch
+literal 1158
+zcmV;11bO>IS5qd`1^@tf+J#h2Pvb@yo*CPjI3XlJ2(T<!?*gTz<bxn>1%jxEk9Jq>
+zMuM$WRYIG=9%C2BwrrEIr*iGTKs{C3L+|aOz4XwVq3ZT8?2lNLzT<?iUK%Ac@5l2z
+z@9UX2_EG*Ep<m8W8KdoyDTL5>WA89R>w#ge?QQRBrya))*TCCYu%gIctJQkFUbVMU
+z^@5|?^6Khpt=_0L8WliP!q;xZPAhIWyU<Jowt1)rwjbG^s|lYSdMDAw!oon+&~HTj
+zlfX$N4ZX%4-r;T()|RWwAY|xkrWbTr)MUQz*g6w(wbM#ydHQjWb$P{fSZJ-+Zh?Xm
+z*^$GWn?BPmuI)PfRNK6zC*VFpV2#^8n}dc-U{qPcPWnn1cX5K}pBy@NXz}2>&c0_x
+zJr+Pg@5D83OWgtmO%FJWy#FO#!vw`)?$HT5;!W<p`f5K(--MDUU=eS=@VZ*#lO?TD
+zZ#?byE28VQ|6Ii&0=L^l+l6=1I@%&vS6AO;B)I+*{N%#%A1g2f2>mQQE&l-4@0pi8
+zjL@&e?`4EU#tc}8FQWpgA{m{Xy{BjY0K1k;uA*w#q3^KQseM1NBaY+~+l`cci}_sc
+zdbTmtNAa$>Wo1Wfve3t-1V9{;utCBV(pe^*2I;J%EYC4`ART(AQYSo?BU?XC9|g>}
+zY&}#D`H}7J+K!Vp0@mB(dX#2{v1QqgA$M4KtV99Rxn$NgtQ8=Wl>5RCBkuAbyYu4Z
+z&fcrtz0EIovH|aSU7j$f@7S7Q2cWv9g;k-qk<~iORUhuljW$yKy?htWTpgap3xLq*
+zGicWi?L&vBE!!}-yQYl>yaKI&(2eR?U*cYOvf;Tr)jIqZ%IA~JHXJOAU}%EecK?j~
+z*^y^%#Njz3yUY8L(!Kna2meePBvU0^l1g+^RS=q^m{1~9tWc7oQkoK#Dj7<$R2ia5
+zjw-`c$y233l@Y3pQe})PMXHQbQleynl1WOYD0x81G$mz99#NuEGE2!kB_C3<NTrV{
+zUZS`{aa9Zz!kEA+W=uG;f(BL!t1^<Z6rnVhR54x|v1G+EBnUaN42vZ%Vg-!w2u5TS
+zBQcB$PRSU?7UQ%k#r4lbNK!NNas2>4$LI{dy)?%zT15=o99o=fEVjnwgVJTIgfBlw
+zh$uwOXaJU;OXy7c>q4LaE%wafTv4De04K><&HRMpdi)H<afR#_u%&__2_qB7^H*3{
+z**M-ELDtYgDK>|oL~N>Hu!%Tn#>$I$Uc?hv4xHG`CAbV2fJ@@T0ydn4vtY1^gUO|b
+zAZ1Q~*qigEnRCDkCpU1i!Wn*Z-kQV*Q*Fh35Syc|DFTNf%d(pJQS`m|)}+7vefcM&
+zX(>%&lg{B{8KHw|(djgX5|5J-=SxpOamaiq)C7za$NR8+A2yd1zs^d<C4`{(0-J%{
+z2lsm!oB|{k`q~4MTpR<*@^z<W0*H?w2MsF(ZgMuRbJTuRZ)^4T<9ho^y**oRWB7iJ
+YW|EJU0;oDBUPZ~9=~FQN1t|pJulrp;YybcN
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/test.toml b/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/test.toml
+new file mode 100644
+index 00000000..e75c5525
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_mask_removal_script/test.toml
+@@ -0,0 +1 @@
++num_ticks = 6
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/Test.as b/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/Test.as
+new file mode 100644
+index 00000000..420dd4d7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/Test.as
+@@ -0,0 +1,16 @@
++package {
++  import flash.display.*; import flash.geom.*;
++  [SWF(width="400", height="300", frameRate="30")]
++  public class Test extends Sprite {
++    public function Test() {
++      var r:Array = [[0,0,100,100],[10,20,30,40]];
++      for each (var a:Array in r) for each (var sx:Number in [1, 2]) {
++        var s:Sprite = new Sprite(); s.graphics.beginFill(0xFF0000); s.graphics.drawRect(a[0],a[1],a[2],a[3]); s.graphics.endFill();
++        s.scaleX = sx; s.x = 5; s.y = 7;
++        trace("rect " + a + " sx=" + sx + " off: " + s.transform.pixelBounds + " getBounds(s)=" + s.getBounds(s));
++        addChild(s); trace("  on: " + s.transform.pixelBounds); removeChild(s); trace("  removed: " + s.transform.pixelBounds);
++      }
++      var n:Sprite = new Sprite(); trace("empty off: " + n.transform.pixelBounds);
++    }
++  }
++}
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/output.txt b/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/output.txt
+new file mode 100644
+index 00000000..463353fc
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/output.txt
+@@ -0,0 +1,13 @@
++rect 0,0,100,100 sx=1 off: (x=25, y=35, w=500, h=500) getBounds(s)=(x=0, y=0, w=100, h=100)
++  on: (x=5, y=7, w=100, h=100)
++  removed: (x=25, y=35, w=500, h=500)
++rect 0,0,100,100 sx=2 off: (x=25, y=35, w=1000, h=500) getBounds(s)=(x=0, y=0, w=100, h=100)
++  on: (x=5, y=7, w=200, h=100)
++  removed: (x=25, y=35, w=1000, h=500)
++rect 10,20,30,40 sx=1 off: (x=75, y=135, w=150, h=200) getBounds(s)=(x=10, y=20, w=30, h=40)
++  on: (x=15, y=27, w=30, h=40)
++  removed: (x=75, y=135, w=150, h=200)
++rect 10,20,30,40 sx=2 off: (x=125, y=135, w=300, h=200) getBounds(s)=(x=10, y=20, w=30, h=40)
++  on: (x=25, y=27, w=60, h=40)
++  removed: (x=125, y=135, w=300, h=200)
++empty off: (x=0, y=0, w=0, h=0)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/test.swf b/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..804f9688671f9a294d5a557311be0412f05025bb
+GIT binary patch
+literal 1024
+zcmV+b1poU(S5qc41^@tf+J#e5Z`)K9zW2uVwUf3<)-K)Bt@Eg%WolwK6`LBh5v8SQ
+zJP>JxYC=@x+P+S_IksgxP5MN%zk!e<{ss?7NIdXXieP`CzX2hYd!4jd2Lda(_uTJ%
+z=ex(}9ETu30^o-sScYJ~cozWh&HM!fU^}v%`m_B5b<p+vxXw;HtDPhX>$=|W_pANQ
+zY7n*cjjgRM-KgocT7@wx@u{DXLB)?(RvW3nK8>x&4HGx;RemOB&`Wk!S0}2rbuAk9
+zA}^J+EuDI_OZ_C)H>w*<$hPWE5Oqn?AYtga7U6RGpb~ci>t&yu(2C=cxU;QKi99B8
+z6OT4_Lt=HPdf?H4x;qU|$zulR+S5E6lY|@=Q6*_~npYa}CXdI3J=1gJ4vntvISibn
+zPa<|<(DUu-RZ}7lvm#28;D3XzXgtIte!EB7v_bu^zc@_Y*HHQfB%zJZf)lm&WL>Qp
+zwa4RpIl8UC)rtwiy4wKzg^SEK*h80>mtSTxto;)E3x$`zY_cH$;KiRGEPv0epR=FS
+zH~~K{TrdvzI1%a64Nw48fQG}rFaWDS;GEgC8CBbjLyw$FhhgL<RNRdsaw@kY5_ViG
+zR!rJ<{R7wY9!{!F?7*Z|E9mOGhnsrMFdpk>&-D`5&yMxlH0UnekgkuVwVUAncyF37
+zsFmymY#v>oMh|Y1p85%mh?Te}bWB|O50QIgA3fnCS^t=C+)onLx=6Mo(tpNSnEEz<
+zAt|<qN1ww1JQWjm2NfgcRRuL3>_}?hICWKFxF7RL&4uoOdLQww$8&0%CS!9get$=~
+zKFP$k_d2d;OR5_9bu|~!Zg4_VD5t99lg)724U^OH71B8MnKx6<zm@vzjkhfRqb8+)
+zFJ++wOPM=J1R_|3vRqQisGKe5$}{EJ@?7a1G$%kLN?6V)+1$+R+#-euBLPDZLkUB?
+z1ToBGSirD|;Vlg3F<ij#4u*FzT*B}khRYZ}#Q7DBG>qQG=siA^(+5JNWYP(Q2tok@
+zc7U>yIWs<Ckd#%j-=Z@^9cKPehv@a1C9usB&z=GeJksn(M}n5s7PMt;?MOI6!_4m*
+zu%usKS-9{M0E&rCX@!L{P}ZP^j?gPhDSXF0iYc%3Ea4b^iU3zMMMtQ>rU<!lt^r3n
+z*C1aIUowu=!~%CUWnhY?KonEdM3QAICb{F8_1ov8_0q@`M(c|s#+!BKM(br}nc_hn
+zj+!&@xL}IS0%X+t6F&!w3@mc+!4#}1a`CInOIeZS8kUMrn2BX+lId&4Re!spvKk>)
+uHhJaDprCcjXw4g~1*3J_XqAi>V!!9$e)@DcRhj2?PCxt)nejI%&%vuS!ud@A
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/test.toml b/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/test.toml
+new file mode 100644
+index 00000000..cf612396
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_pixelbounds_offlist/test.toml
+@@ -0,0 +1 @@
++num_ticks = 1
