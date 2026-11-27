@@ -1,0 +1,228 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index d276e995..3ae6cb50 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -735,6 +735,10 @@ typedef struct {
+ 	u32 stroke_soup_n;
+ 	unsigned long long stroke_soup_gen;
+ 	u8 line_flags;             // STROKE_FLAG_* (pixelHinting, noHScale, noVScale)
++	// s29 w3-interim3-residuals: build closed seams as the old JOIN, not two
++	// caps: the device width is too wide for any seam-splitting snap
++	// (action.c drawing_seam_join_wanted). 0 (memset) = seam caps.
++	u8 stroke_seam_join;
+ } DrawPath;
+ 
+ typedef struct {
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 57283788..b5144f67 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -34958,6 +34958,27 @@ static int drawing_stroke_seam_caps_on(void)
+ 	return on;
+ }
+ 
++// s29 w3-interim3-residuals: the seam caps only matter when the renderer's
++// snap can split the two seam ends (render_webgpu_stroke_snap: W in 1..3,
++// placed as caps at W <= stroke_seam_caps). A wider stroke never snaps
++// (non-hinted u = round(4 w_px) > 12 -> W = 0) or is placed as the corner
++// (hinted W > 3), so Flash draws its seam as a join; the two cap fans are then
++// only extra near-coincident triangles, and for a translucent stroke the
++// non-zero union left a one-pixel-per-row double-blended sliver from the seam
++// (avm1/movieclip_line_gradient_style, LOW: 70 px, 15 357 -> 15 468 channels
++// off FP32). Such strokes build the old join. `min_scale` is the clip's
++// smaller axis scale (<= the renderer's rms scale, so this errs toward caps);
++// noScale strokes keep the caps.
++static int drawing_seam_join_wanted(const DrawPath* path, float min_scale)
++{
++	if (path->line_flags & (STROKE_FLAG_NO_HSCALE | STROKE_FLAG_NO_VSCALE)) return 0;
++	float lw = path->line_width;
++	if (!(lw > 0.0f)) return 0;
++	const float w_px = floorf(lw) * min_scale;  // AVM1 declares whole pixels
++	const float limit = (path->line_flags & STROKE_FLAG_PIXEL_HINTING) ? 3.875f : 3.125f;
++	return w_px >= limit;
++}
++
+ static void drawingBuildStroke(DrawPath* path, float half_w)
+ {
+ 	const u8 joints = path->line_joints;
+@@ -35069,7 +35090,8 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
+ 				poly[(_ke)*2], poly[(_ke)*2+1], half_w, caps); \
+ 			_DR_CEN_RANGE(_w0, (_ke)); \
+ 		} while (0)
+-		const int seam_caps = joints == 0 && caps == 0 && drawing_stroke_seam_caps_on() && vown != NULL;
++		const int seam_caps = joints == 0 && caps == 0 && drawing_stroke_seam_caps_on() && vown != NULL
++			&& !path->stroke_seam_join;  // s29 w3: drawing_seam_join_wanted
+ 		// Axis of segment a->b as STROKE_SNAP_OWN_* bits.
+ 		#define _DR_SEG_OWN(_ka, _kb) ( \
+ 			(poly[(_kb)*2] == poly[(_ka)*2] && poly[(_kb)*2+1] != poly[(_ka)*2+1]) ? STROKE_SNAP_OWN_V : \
+@@ -35407,6 +35429,7 @@ static void drawingFinalizePath(DrawingState* ds)
+ 		path->stroke_contour_count = contour_count;
+ 		path->stroke_filled = path->has_fill;
+ 		path->stroke_built_half_w = -1.0f;
++		path->stroke_seam_join = (u8) drawing_seam_join_wanted(path, 1.0f);  // s29 w3
+ 		drawingBuildStroke(path, path->line_width * 0.5f * 20.0f);
+ 		poly = NULL; contour_starts = NULL;  // ownership transferred to path
+ 	}
+@@ -35738,7 +35761,11 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
+ 			float min_w_px = (s > 1e-6f) ? (1.0f / s) : 1.0f;
+ 			float eff_w_px = (path->line_width > min_w_px) ? path->line_width : min_w_px;
+ 			float want_half_w = eff_w_px * 0.5f * 20.0f;
+-			if (fabsf(want_half_w - path->stroke_built_half_w) > 0.01f) {
++			// s29 w3: the seam join/caps choice follows the on-screen width.
++			const u8 want_join = (u8) drawing_seam_join_wanted(path, (sx < sy) ? sx : sy);
++			if (fabsf(want_half_w - path->stroke_built_half_w) > 0.01f ||
++			    want_join != path->stroke_seam_join) {
++				path->stroke_seam_join = want_join;
+ 				drawingBuildStroke(path, want_half_w);
+ 			}
+ 			info->line_verts = path->line_verts;
+@@ -61897,6 +61924,12 @@ void actionSetMember(SWFAppContext* app_context)
+ 					setGlobalVariableByName(prop_name, &value_var);
+ 					return;
+ 				}
++				// s29 w3: `null` unsets a clip's tabIndex like `undefined`
++				// (FP32 w2b-tabindex.t_child_numstr_null: `m.tabIndex = null`
++				// reads undefined, not 0; Ruffle agrees). Text fields keep the
++				// coercion: no capture covers them.
++				if (value_var.type == ACTION_STACK_VALUE_NULL && !MC_IS_TEXTFIELD(mc))
++					value_var.type = ACTION_STACK_VALUE_UNDEFINED;
+ 				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
+ 				{
+ 					double dval = varToDoubleSimple(&value_var);
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 746e99c0..50aed631 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -7094,6 +7094,10 @@ typedef struct Avm2UrlLoaderExt
+ 	const Avm2String* data_format;      // NULL == "text"
+ 	uint32_t bytes_loaded;
+ 	uint32_t bytes_total;
++	// s29 w3: the stack at `new URLLoader()`. FP32 reports an unhandled
++	// ErrorEvent with the stack captured when the DISPATCHER was built
++	// (avm2/swz: Test.as:12, the ctor line, not :16, the load() line).
++	const Avm2String* ctor_stack;
+ } Avm2UrlLoaderExt;
+ 
+ static Avm2Class* g_url_loader_class;
+@@ -7248,6 +7252,24 @@ static void avm2_url_loader_run_pending(Avm2Context* ctx)
+ 	for (uint32_t i = 0; i < n; i++) ul_deliver(ctx, &batch[i]);
+ }
+ 
++// The "\n\tat X()" stack tail for an unhandled-ErrorEvent report. FP's
++// report starts at the script frame: drop our own native
++// "\n\tat flash.net::URLLoader..." frame on top.
++static const Avm2String* ul_script_stack_tail(Avm2Context* ctx)
++{
++	extern const Avm2String* avm2_error_callstack_tail(Avm2Context*);
++	const Avm2String* t = avm2_error_callstack_tail(ctx);
++	static const char k_ul[] = "\n\tat flash.net::URLLoader";
++	if (t != NULL && t->len > sizeof(k_ul) - 1
++	    && memcmp(t->utf8, k_ul, sizeof(k_ul) - 1) == 0)
++	{
++		const char* nl = memchr(t->utf8 + 1, '\n', t->len - 1);
++		uint32_t off = nl != NULL ? (uint32_t) (nl - t->utf8) : t->len;
++		t = avm2_string_new(ctx, t->utf8 + off, t->len - off);
++	}
++	return t;
++}
++
+ // Queue a fetch. Like Loader.load it never resolves inside the calling frame.
+ // `is_stream` picks the delivery half: URLStream borrows this whole pipeline
+ // (Ruffle's URLStream.as is literally a URLLoader wrapper) and differs only in
+@@ -7268,20 +7290,10 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request,
+ 		Avm2Value dg = avm2_get_public_property(ctx, request, "digest", 6, &dfound);
+ 		if (dfound && dg.kind == AVM2_VALUE_STRING && dg.u.str != NULL)
+ 		{
+-			extern const Avm2String* avm2_error_callstack_tail(Avm2Context*);
+ 			pl.sig_error = 1;
+-			pl.stack_tail = avm2_error_callstack_tail(ctx);
+-			// FP's report starts at the script frame: drop our own native
+-			// "\n\tat flash.net::URLLoader/..." frame on top.
+-			const Avm2String* t = pl.stack_tail;
+-			static const char k_ul[] = "\n\tat flash.net::URLLoader";
+-			if (t != NULL && t->len > sizeof(k_ul) - 1
+-			    && memcmp(t->utf8, k_ul, sizeof(k_ul) - 1) == 0)
+-			{
+-				const char* nl = memchr(t->utf8 + 1, '\n', t->len - 1);
+-				uint32_t off = nl != NULL ? (uint32_t) (nl - t->utf8) : t->len;
+-				pl.stack_tail = avm2_string_new(ctx, t->utf8 + off, t->len - off);
+-			}
++			Avm2UrlLoaderExt* uext = url_loader_ext_of(self);
++			pl.stack_tail = (uext != NULL && uext->ctor_stack != NULL)
++			              ? uext->ctor_stack : ul_script_stack_tail(ctx);
+ 		}
+ 	}
+ 	Avm2PendingLoad probe;
+@@ -7315,6 +7327,8 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request,
+ 
+ static Avm2Value url_loader_init(Avm2Activation* act)
+ {
++	Avm2UrlLoaderExt* cext = url_loader_ext_of(this_obj(act));
++	if (cext != NULL) cext->ctor_stack = ul_script_stack_tail(act->ctx);
+ 	// `new URLLoader(request)` starts the load immediately (URLLoader.as).
+ 	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
+ 	    && url_loader_ext_of(this_obj(act)) != NULL)
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 2365a5ee..0db7d9a1 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -863,3 +863,7 @@ from_shumway/acid/acid-shapes                       # thick curved drawing-API s
+ regression/lowq_tsnap_tie_probe                     # placement / tie / nesting rows, LOW  1 cmp
+ # tier=2
+ visual/blend_modes/add                              # per-level vs world snap, LOW       1 cmp
++# s29 w3-interim3-residuals: drawing-API closed-seam caps vs join (action.c
++#   drawing_seam_join_wanted). FP32-golden seam / hinted-end fixtures of n-seam-caps.
++regression/avm1_stroke_seam_caps                    # closed seams, W 1..3, round/round  1 cmp
++regression/avm1_stroke_hinting_caps                 # pixelHinting seams + ends          1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 1e012631..e7c79c3d 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -200,3 +200,4 @@ arms cannot be reached any other way.
+ | `avm1_tabindex_fresh_child_coerce` | A `createEmptyMovieClip` child COERCES from its first set (`"asdf"` → `-2147483648`), and a non-numeric value yields INT_MIN, not the previous value. Golden = **FP32** (`t08_fresh_child_frame.txt`); SWF = `make_fixtures.py` `t08` |
+ | `avm1_tabindex_read_first_coerce` | A READ of `this.tabIndex` before the first set materialises the root's native accessor, so the later sets COERCE (`undefined`, then `-2147483648 -2147483648 5 -2147483648`). Golden = **FP32** (`t11_read_first.txt`); SWF = `make_fixtures.py` `t11` |
+ | `avm1_tabindex_mtasc_class_main` | MTASC class bootstrap: the DoInitAction's unresolved `GetVariable "Test"` (a scope lookup that misses the root's own properties) materialises the accessor, so `main`'s `_root.tabIndex = "s"` COERCES; also `m.tabIndex = 0; m.tabIndex = "t"` → INT_MIN on a fresh child. Golden = **FP32** (`w1-disposition-audit/L3b_tabindex_v8/flash.txt`); source `Test.as` (MTASC `-version 8`) |
++| `avm1_tabindex_child_null` | Numeric-string and `null` coercion on clips (s29 `w3-interim3-residuals`): timeline sprite `c.tabIndex = "x"` → `-2147483648`; script-created `m.tabIndex = "5"` → `5`; `m.tabIndex = null` → **`undefined`** (null unsets like undefined; we used to print `0`). Golden = **FP32** (`w1-local-oracles/w2b-tabindex.t_child_numstr_null.txt`); SWF = `w2b-tabindex-oracle/make_fixture.py`. Owner: `action.c` `actionSetMember` tabIndex block |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/README.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/README.txt
+new file mode 100644
+index 00000000..ddc52099
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/README.txt
+@@ -0,0 +1,8 @@
++s29 w3-interim3-residuals: AVM1 MovieClip tabIndex numeric-string / null coercion.
++SWF built by SWFRecompDocs/plans/session29-fanout-reports/w2b-tabindex-oracle/make_fixture.py
++(c = timeline-placed sprite, m = script-created clip):
++  c.tabIndex = "x"   -> trace  -2147483648   (non-numeric -> INT_MIN)
++  m.tabIndex = "5"   -> trace  5             (numeric string coerces)
++  m.tabIndex = null  -> trace  undefined     (null unsets, like undefined)
++output.txt = REAL Flash Player 32 (LNX debug projector, direct mode), archived as
++session29-fanout-reports/w1-local-oracles/w2b-tabindex.t_child_numstr_null.txt.
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/output.txt b/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/output.txt
+new file mode 100644
+index 00000000..fced8484
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/output.txt
+@@ -0,0 +1,3 @@
++-2147483648
++5
++undefined
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/test.swf b/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..da45947460342aabfe282d5c0e2d570f82f64a54
+GIT binary patch
+literal 254
+zcmZ<@59avCz`#(!z#7lMz`uZjfrpX7MGz>$;LP;@|Nj%5j0}tn4nS@@n-Ykb%wW%a
+z5Xhaz%m8G|Oygx>C`nB6%u7kF0GZ+s6X!w__fwlD#=wxvz|IQP2%?!lbV){LG0*^@
+zOmb0bVo9oNZb3<<Z+=;3s&h_e0Yi{1$f#U&D@-9)fW*<PfT~6ooyN$(1a=Xoa<HEO
+D>Jd0h
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/test.toml b/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/test.toml
+new file mode 100644
+index 00000000..568cadba
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_tabindex_child_null/test.toml
+@@ -0,0 +1 @@
++num_ticks = 2

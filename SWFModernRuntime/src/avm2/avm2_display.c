@@ -7094,6 +7094,10 @@ typedef struct Avm2UrlLoaderExt
 	const Avm2String* data_format;      // NULL == "text"
 	uint32_t bytes_loaded;
 	uint32_t bytes_total;
+	// s29 w3: the stack at `new URLLoader()`. FP32 reports an unhandled
+	// ErrorEvent with the stack captured when the DISPATCHER was built
+	// (avm2/swz: Test.as:12, the ctor line, not :16, the load() line).
+	const Avm2String* ctor_stack;
 } Avm2UrlLoaderExt;
 
 static Avm2Class* g_url_loader_class;
@@ -7248,6 +7252,24 @@ static void avm2_url_loader_run_pending(Avm2Context* ctx)
 	for (uint32_t i = 0; i < n; i++) ul_deliver(ctx, &batch[i]);
 }
 
+// The "\n\tat X()" stack tail for an unhandled-ErrorEvent report. FP's
+// report starts at the script frame: drop our own native
+// "\n\tat flash.net::URLLoader..." frame on top.
+static const Avm2String* ul_script_stack_tail(Avm2Context* ctx)
+{
+	extern const Avm2String* avm2_error_callstack_tail(Avm2Context*);
+	const Avm2String* t = avm2_error_callstack_tail(ctx);
+	static const char k_ul[] = "\n\tat flash.net::URLLoader";
+	if (t != NULL && t->len > sizeof(k_ul) - 1
+	    && memcmp(t->utf8, k_ul, sizeof(k_ul) - 1) == 0)
+	{
+		const char* nl = memchr(t->utf8 + 1, '\n', t->len - 1);
+		uint32_t off = nl != NULL ? (uint32_t) (nl - t->utf8) : t->len;
+		t = avm2_string_new(ctx, t->utf8 + off, t->len - off);
+	}
+	return t;
+}
+
 // Queue a fetch. Like Loader.load it never resolves inside the calling frame.
 // `is_stream` picks the delivery half: URLStream borrows this whole pipeline
 // (Ruffle's URLStream.as is literally a URLLoader wrapper) and differs only in
@@ -7268,20 +7290,10 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request,
 		Avm2Value dg = avm2_get_public_property(ctx, request, "digest", 6, &dfound);
 		if (dfound && dg.kind == AVM2_VALUE_STRING && dg.u.str != NULL)
 		{
-			extern const Avm2String* avm2_error_callstack_tail(Avm2Context*);
 			pl.sig_error = 1;
-			pl.stack_tail = avm2_error_callstack_tail(ctx);
-			// FP's report starts at the script frame: drop our own native
-			// "\n\tat flash.net::URLLoader/..." frame on top.
-			const Avm2String* t = pl.stack_tail;
-			static const char k_ul[] = "\n\tat flash.net::URLLoader";
-			if (t != NULL && t->len > sizeof(k_ul) - 1
-			    && memcmp(t->utf8, k_ul, sizeof(k_ul) - 1) == 0)
-			{
-				const char* nl = memchr(t->utf8 + 1, '\n', t->len - 1);
-				uint32_t off = nl != NULL ? (uint32_t) (nl - t->utf8) : t->len;
-				pl.stack_tail = avm2_string_new(ctx, t->utf8 + off, t->len - off);
-			}
+			Avm2UrlLoaderExt* uext = url_loader_ext_of(self);
+			pl.stack_tail = (uext != NULL && uext->ctor_stack != NULL)
+			              ? uext->ctor_stack : ul_script_stack_tail(ctx);
 		}
 	}
 	Avm2PendingLoad probe;
@@ -7315,6 +7327,8 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request,
 
 static Avm2Value url_loader_init(Avm2Activation* act)
 {
+	Avm2UrlLoaderExt* cext = url_loader_ext_of(this_obj(act));
+	if (cext != NULL) cext->ctor_stack = ul_script_stack_tail(act->ctx);
 	// `new URLLoader(request)` starts the load immediately (URLLoader.as).
 	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
 	    && url_loader_ext_of(this_obj(act)) != NULL)

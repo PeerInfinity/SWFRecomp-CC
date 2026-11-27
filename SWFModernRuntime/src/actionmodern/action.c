@@ -35117,6 +35117,27 @@ static int drawing_stroke_seam_caps_on(void)
 	return on;
 }
 
+// s29 w3-interim3-residuals: the seam caps only matter when the renderer's
+// snap can split the two seam ends (render_webgpu_stroke_snap: W in 1..3,
+// placed as caps at W <= stroke_seam_caps). A wider stroke never snaps
+// (non-hinted u = round(4 w_px) > 12 -> W = 0) or is placed as the corner
+// (hinted W > 3), so Flash draws its seam as a join; the two cap fans are then
+// only extra near-coincident triangles, and for a translucent stroke the
+// non-zero union left a one-pixel-per-row double-blended sliver from the seam
+// (avm1/movieclip_line_gradient_style, LOW: 70 px, 15 357 -> 15 468 channels
+// off FP32). Such strokes build the old join. `min_scale` is the clip's
+// smaller axis scale (<= the renderer's rms scale, so this errs toward caps);
+// noScale strokes keep the caps.
+static int drawing_seam_join_wanted(const DrawPath* path, float min_scale)
+{
+	if (path->line_flags & (STROKE_FLAG_NO_HSCALE | STROKE_FLAG_NO_VSCALE)) return 0;
+	float lw = path->line_width;
+	if (!(lw > 0.0f)) return 0;
+	const float w_px = floorf(lw) * min_scale;  // AVM1 declares whole pixels
+	const float limit = (path->line_flags & STROKE_FLAG_PIXEL_HINTING) ? 3.875f : 3.125f;
+	return w_px >= limit;
+}
+
 static void drawingBuildStroke(DrawPath* path, float half_w)
 {
 	const u8 joints = path->line_joints;
@@ -35228,7 +35249,8 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 				poly[(_ke)*2], poly[(_ke)*2+1], half_w, caps); \
 			_DR_CEN_RANGE(_w0, (_ke)); \
 		} while (0)
-		const int seam_caps = joints == 0 && caps == 0 && drawing_stroke_seam_caps_on() && vown != NULL;
+		const int seam_caps = joints == 0 && caps == 0 && drawing_stroke_seam_caps_on() && vown != NULL
+			&& !path->stroke_seam_join;  // s29 w3: drawing_seam_join_wanted
 		// Axis of segment a->b as STROKE_SNAP_OWN_* bits.
 		#define _DR_SEG_OWN(_ka, _kb) ( \
 			(poly[(_kb)*2] == poly[(_ka)*2] && poly[(_kb)*2+1] != poly[(_ka)*2+1]) ? STROKE_SNAP_OWN_V : \
@@ -35566,6 +35588,7 @@ static void drawingFinalizePath(DrawingState* ds)
 		path->stroke_contour_count = contour_count;
 		path->stroke_filled = path->has_fill;
 		path->stroke_built_half_w = -1.0f;
+		path->stroke_seam_join = (u8) drawing_seam_join_wanted(path, 1.0f);  // s29 w3
 		drawingBuildStroke(path, path->line_width * 0.5f * 20.0f);
 		poly = NULL; contour_starts = NULL;  // ownership transferred to path
 	}
@@ -35897,7 +35920,11 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 			float min_w_px = (s > 1e-6f) ? (1.0f / s) : 1.0f;
 			float eff_w_px = (path->line_width > min_w_px) ? path->line_width : min_w_px;
 			float want_half_w = eff_w_px * 0.5f * 20.0f;
-			if (fabsf(want_half_w - path->stroke_built_half_w) > 0.01f) {
+			// s29 w3: the seam join/caps choice follows the on-screen width.
+			const u8 want_join = (u8) drawing_seam_join_wanted(path, (sx < sy) ? sx : sy);
+			if (fabsf(want_half_w - path->stroke_built_half_w) > 0.01f ||
+			    want_join != path->stroke_seam_join) {
+				path->stroke_seam_join = want_join;
 				drawingBuildStroke(path, want_half_w);
 			}
 			info->line_verts = path->line_verts;
@@ -62081,6 +62108,12 @@ void actionSetMember(SWFAppContext* app_context)
 					setGlobalVariableByName(prop_name, &value_var);
 					return;
 				}
+				// s29 w3: `null` unsets a clip's tabIndex like `undefined`
+				// (FP32 w2b-tabindex.t_child_numstr_null: `m.tabIndex = null`
+				// reads undefined, not 0; Ruffle agrees). Text fields keep the
+				// coercion: no capture covers them.
+				if (value_var.type == ACTION_STACK_VALUE_NULL && !MC_IS_TEXTFIELD(mc))
+					value_var.type = ACTION_STACK_VALUE_UNDEFINED;
 				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
 				{
 					double dval = varToDoubleSimple(&value_var);

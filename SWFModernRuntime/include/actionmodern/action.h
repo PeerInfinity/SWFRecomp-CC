@@ -735,6 +735,10 @@ typedef struct {
 	u32 stroke_soup_n;
 	unsigned long long stroke_soup_gen;
 	u8 line_flags;             // STROKE_FLAG_* (pixelHinting, noHScale, noVScale)
+	// s29 w3-interim3-residuals: build closed seams as the old JOIN, not two
+	// caps: the device width is too wide for any seam-splitting snap
+	// (action.c drawing_seam_join_wanted). 0 (memset) = seam caps.
+	u8 stroke_seam_join;
 } DrawPath;
 
 typedef struct {
