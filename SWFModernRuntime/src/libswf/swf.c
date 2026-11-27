@@ -1097,6 +1097,11 @@ void tagMain(SWFAppContext* app_context)
 		// unless processTimers deferred one.
 		{ extern void timerRunLatePass(SWFAppContext*); timerRunLatePass(app_context); }
 		{ extern void actionSnapshotEnterFrameCandidates(void); actionSnapshotEnterFrameCandidates(); }  // s28 w2-test12-land
+		// s29 browser-attach-order: the nested / timeline / attached passes
+		// below queue their frame scripts as one exec list (place_seq desc;
+		// action_queue.c actionAQOrderSortSince).
+		ActionQueueOrderMark exec_mark;
+		actionAQOrderMark(&exec_mark);
 		const int nested_early = exec_order_nested_early();
 		if (nested_early)
 		{
@@ -1122,6 +1127,7 @@ void tagMain(SWFAppContext* app_context)
 			extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
 			ng_advance_attached_clip_playheads(app_context);
 		}
+		actionAQOrderSortSince(&exec_mark);
 
 		// Pre-sync the AS-visible _currentframe of deferred nested sprites
 		// (advanced in Phase 3 below) so a clip whose onEnterFrame fires in the

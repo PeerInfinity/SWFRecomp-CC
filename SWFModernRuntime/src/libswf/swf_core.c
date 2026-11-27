@@ -1219,6 +1219,9 @@ void swfStart(SWFAppContext* app_context)
 			// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
 			// nested sprites first, then their root-level parents (Phase 1).
 			{ extern void actionSnapshotEnterFrameCandidates(void); actionSnapshotEnterFrameCandidates(); }  // s28 w2-test12-land
+			// s29 browser-attach-order: one exec list for the three passes (swf.c).
+			ActionQueueOrderMark exec_mark;
+			actionAQOrderMark(&exec_mark);
 			const int nested_early = exec_order_nested_early();
 			if (nested_early)
 				advance_nested_sprite_frames(app_context);
@@ -1235,6 +1238,7 @@ void swfStart(SWFAppContext* app_context)
 				extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
 				ng_advance_attached_clip_playheads(app_context);
 			}
+			actionAQOrderSortSince(&exec_mark);
 
 			// Pre-sync the AS-visible _currentframe of deferred nested sprites
 			// (advanced in Phase 3 below) so a clip created this/last tick whose
@@ -1369,6 +1373,8 @@ void swfStart(SWFAppContext* app_context)
 				    && !actionHasPendingLoadInits()
 				    && g_pending_direct_load_count == 0) break;
 			}
+			ActionQueueOrderMark exec_mark_end;  // s29 browser-attach-order
+			actionAQOrderMark(&exec_mark_end);
 			{
 				extern int g_advance_defer_nested;
 				g_advance_defer_nested = 1;
@@ -1381,6 +1387,7 @@ void swfStart(SWFAppContext* app_context)
 				extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
 				ng_advance_attached_clip_playheads(app_context);
 			}
+			actionAQOrderSortSince(&exec_mark_end);
 			// Pre-sync deferred nested sprites' _currentframe before the enterFrame
 			// dispatch below (mirror of the playing branch; #10a).
 			{

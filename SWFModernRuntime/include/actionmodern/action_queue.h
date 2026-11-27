@@ -102,6 +102,14 @@ void actionDrainOnloadAndScriptOne(SWFAppContext* app_context);
 // snapshot value for actionDrainOnloadScriptAbove.
 size_t actionAQCount(void);
 
+// s29 browser-attach-order: natural-advance exec-list order (see action_queue.c).
+typedef struct { size_t count; size_t pops; size_t key; } ActionQueueOrderMark;
+size_t actionAQSetOrderKey(size_t key);   // returns the previous key
+size_t actionAQGetOrderKey(void);
+int actionAQOrderMergedEnabled(void);   // SWF_EXEC_ORDER_MERGED (default 1)
+void actionAQOrderMark(ActionQueueOrderMark* m);
+void actionAQOrderSortSince(const ActionQueueOrderMark* m);
+
 // Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by
 // actionCall to isolate a called frame's drain from the outer drain's
 // pending entries. Without this isolation, calling a frame from inside an

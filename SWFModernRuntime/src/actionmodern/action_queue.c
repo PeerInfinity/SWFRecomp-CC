@@ -19,6 +19,7 @@ typedef struct {
 	int is_unload;
 	int queued_in_catchup;  // captured catch_up_mode at queue time
 	ActionQueueKind kind;
+	size_t order_key;       // s29 browser-attach-order: advancing clip's place_seq (0 = none)
 } ActionQueueEntry;
 
 // Read from libswf — global goto-catchup flag set during ng_executeGotoCatchUp.
@@ -27,6 +28,10 @@ extern int catch_up_mode;
 static ActionQueueEntry* g_aq = NULL;
 static size_t g_aq_count = 0;
 static size_t g_aq_cap = 0;
+// s29 browser-attach-order: pops since start (a mark is valid only while no
+// entry was removed) and the order key stamped on every new entry.
+static size_t g_aq_pops = 0;
+static size_t g_aq_order_key = 0;
 
 // Drain-suppress depth (Path A foundation for GOTO_FIFO_UNIFICATION).
 // Counter, not flag — see action_queue.h's docstring on
@@ -105,6 +110,7 @@ void actionQueueCallbackEx(SWFAppContext* app_context,
 	e->is_unload = is_unload ? 1 : 0;
 	e->queued_in_catchup = catch_up_mode ? 1 : 0;
 	e->kind = kind;
+	e->order_key = g_aq_order_key;
 }
 
 void actionQueueCallback(SWFAppContext* app_context,
@@ -166,7 +172,7 @@ static void aq_drain(SWFAppContext* app_context, const DrainFilter* f)
 			memmove(&g_aq[idx], &g_aq[idx + 1],
 			        (g_aq_count - (size_t)idx - 1) * sizeof(*g_aq));
 		}
-		g_aq_count--;
+		g_aq_count--; g_aq_pops++;
 
 		// is_unload gating: skip if clip was removed before this entry ran,
 		// unless this entry is itself an unload event.
@@ -340,7 +346,7 @@ static int aq_drain_one_onload_or_script(SWFAppContext* app_context)
 		memmove(&g_aq[best], &g_aq[best + 1],
 		        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
 	}
-	g_aq_count--;
+	g_aq_count--; g_aq_pops++;
 	if (!entry.is_unload && entry.clip) {
 		if (entry.clip->avm1_removed || entry.clip->pending_removal) {
 			return 1;
@@ -376,6 +382,72 @@ size_t actionAQCount(void)
 	return g_aq_count;
 }
 
+// ---------------------------------------------------------------------------
+// s29 browser-attach-order: one AVM1 exec list for the natural advance.
+// Flash (FP32 fixture regression/avm1_attach_timeline_frame_order) and Ruffle
+// (avm1/runtime.rs run_frame: clip_exec_list, newest-instantiated first, _root
+// last) run every child clip's natural-advance frame script in ONE order:
+// newest instantiation (place_seq) first, whether the clip is timeline-placed,
+// nested or attachMovie'd. Our per-tick advance runs three passes (nested
+// early, timeline sprites, the attached pump), each sorted by place_seq on its
+// own, so their scripts landed as three blocks (timeline before attached).
+// The advance loops stamp every entry they queue with the advancing clip's
+// place_seq (actionAQSetOrderKey); the frame loop marks the queue before the
+// pre-frame-func advance block and stable-sorts the block's entries by that key
+// (desc) after it. Entries queued while a clip advances (its own frame script,
+// a newly placed child's init script) keep that clip's slot, as in Ruffle,
+// where run_frame_avm1 queues them at the clip's position in the walk.
+// Kill switch SWF_EXEC_ORDER_MERGED=0 (A/B only).
+// ---------------------------------------------------------------------------
+size_t actionAQSetOrderKey(size_t key)
+{
+	size_t prev = g_aq_order_key;
+	g_aq_order_key = key;
+	return prev;
+}
+
+size_t actionAQGetOrderKey(void) { return g_aq_order_key; }
+
+int actionAQOrderMergedEnabled(void)
+{
+	static int s = -1;
+#ifdef SWF_EXEC_ORDER_MERGED_OFF
+	s = 0;  // browser A/B build (no env there): EMCC_CFLAGS=-DSWF_EXEC_ORDER_MERGED_OFF
+#endif
+	if (s < 0) { const char* e = getenv("SWF_EXEC_ORDER_MERGED"); s = !(e && e[0] == '0'); }
+	return s;
+}
+
+void actionAQOrderMark(ActionQueueOrderMark* m)
+{
+	m->count = g_aq_count;
+	m->pops = g_aq_pops;
+	m->key = actionAQSetOrderKey(0);
+}
+
+void actionAQOrderSortSince(const ActionQueueOrderMark* m)
+{
+	g_aq_order_key = m->key;
+	if (!actionAQOrderMergedEnabled()) return;
+	// Something drained (or reset) the queue inside the block: the mark's
+	// index no longer names the block's first entry. Leave the order alone.
+	if (g_aq_pops != m->pops || g_aq_count < m->count) return;
+	size_t n = g_aq_count - m->count;
+	if (n < 2) return;
+	ActionQueueEntry* b = &g_aq[m->count];
+	// An entry queued with no advancing clip (key 0) rides with the entry before it.
+	for (size_t i = 1; i < n; i++)
+		if (b[i].order_key == 0) b[i].order_key = b[i - 1].order_key;
+	// Stable insertion sort, key DESC (blocks are tens of entries).
+	for (size_t i = 1; i < n; i++) {
+		ActionQueueEntry t = b[i];
+		size_t j = i;
+		while (j > 0 && b[j - 1].order_key < t.order_key) { b[j] = b[j - 1]; j--; }
+		b[j] = t;
+	}
+	for (size_t i = 0; i < n; i++) b[i].order_key = 0;
+}
+
 // Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by
 // actionCall's CALL_FRAME_FUNC to drain only the entries newly queued by the
 // invoked frame's tags, leaving the outer drain's pre-existing pending entries
@@ -408,7 +480,7 @@ void actionDrainOnloadScriptAbove(SWFAppContext* app_context, size_t floor)
 			memmove(&g_aq[best], &g_aq[best + 1],
 			        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
 		}
-		g_aq_count--;
+		g_aq_count--; g_aq_pops++;
 		if (!entry.is_unload && entry.clip) {
 			if (entry.clip->avm1_removed || entry.clip->pending_removal) {
 				continue;
@@ -482,7 +554,7 @@ void actionDrainOnloadAndScript(SWFAppContext* app_context)
 			memmove(&g_aq[best], &g_aq[best + 1],
 			        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
 		}
-		g_aq_count--;
+		g_aq_count--; g_aq_pops++;
 		if (!entry.is_unload && entry.clip) {
 			if (entry.clip->avm1_removed || entry.clip->pending_removal) {
 				continue;
@@ -544,14 +616,14 @@ void* actionQueuePopMatching(ActionQueueKind kind_filter,
 		memmove(&g_aq[best], &g_aq[best + 1],
 		        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
 	}
-	g_aq_count--;
+	g_aq_count--; g_aq_pops++;
 	return user;
 }
 
 void actionResetActionQueue(SWFAppContext* app_context)
 {
 	(void)app_context;
-	g_aq_count = 0;
+	g_aq_count = 0; g_aq_pops++;
 }
 
 size_t actionActionQueuePending(void)

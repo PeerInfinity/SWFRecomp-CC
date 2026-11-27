@@ -578,6 +578,12 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 
 		// Use the MC's own sprite display list for placement tags
 		DisplayObject* dobj = (DisplayObject*)new_mc->display_obj;
+		// s29 browser-attach-order: an attach is a new instantiation, stamped
+		// BEFORE frame 0 places its timeline children, so they are newer than it
+		// (Ruffle post_instantiation adds the clip to the exec list before its
+		// first frame runs; FP32 regression/avm1_attach_timeline_frame_order:
+		// ap60.pt runs before ap60). A re-attach is a new instance too.
+		if (actionAQOrderMergedEnabled()) { extern size_t g_place_seq; dobj->place_seq = ++g_place_seq; }
 		display_list = dobj->sprite_display_list;
 		max_depth = dobj->sprite_max_depth;
 		display_list_capacity = dobj->sprite_dl_capacity;
