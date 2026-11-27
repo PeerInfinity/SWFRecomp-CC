@@ -1,0 +1,43 @@
+# worktree build (master + eps variant + pen half-up); legs penoff = SWF_TF_LOW_PEN_HALFUP=0, penon = default
+avm1/movieclip_create_text_field output penoff=P0 penon=P0 same
+avm2/edittext_always_show_selection output penoff=P0 penon=P0 same
+fonts/embed_matching/fallback_preferences MISSING
+fonts/embed_matching/match_style MISSING
+fonts/embed_matching/no_font_found MISSING
+from_gnash/misc-ming.all/BeginBitmapFill output penoff=F894 penon=F888 MOVED
+from_gnash/misc-ming.all/loop/simple_loop_test frame1 penoff=P0 penon=P0 same
+from_gnash/misc-ming.all/loop/simple_loop_test frame2 penoff=P0 penon=P0 same
+from_gnash/misc-ming.all/loop/simple_loop_test frame3 penoff=P0 penon=P0 same
+from_gnash/misc-ming.all/loop/simple_loop_test frame4 penoff=P0 penon=P0 same
+from_gnash/misc-ming.all/loop/simple_loop_test frame5 penoff=P0 penon=P0 same
+from_gnash/misc-ming.all/loop/simple_loop_test frame6 penoff=P0 penon=P0 same
+from_gnash/misc-ming.all/loop/simple_loop_test frame7 penoff=P0 penon=P0 same
+from_gnash/misc-ming.all/morph_test1 frame1 penoff=F193 penon=F193 same
+from_gnash/misc-ming.all/morph_test1 frame2 penoff=F804 penon=F756 MOVED
+from_gnash/misc-ming.all/morph_test1 frame3 penoff=F804 penon=F756 MOVED
+from_gnash/misc-ming.all/morph_test1 frame4 penoff=F804 penon=F756 MOVED
+from_gnash/misc-ming.all/morph_test1 frame5 penoff=F804 penon=F756 MOVED
+from_gnash/misc-ming.all/morph_test1 frame6 penoff=F398 penon=F350 MOVED
+from_gnash/misc-ming.all/place_object_test output penoff=F2589 penon=F2427 MOVED
+from_gnash/misc-ming.all/shape_test output penoff=F9709 penon=F9661 MOVED
+from_gnash/misc-swfmill.all/background output penoff=P0 penon=P0 same
+from_gnash/misc-swfmill.all/missing_bitmap output penoff=P0 penon=P0 same
+from_shumway/acid/acid-text output penoff=F312 penon=F312 same
+from_shumway/acid/acid-text-3 output penoff=P0 penon=P0 same
+from_shumway/acid/acid-text-4 output penoff=F51801 penon=F51801 same
+from_shumway/acid/acid-text-5 output penoff=F422901 penon=F422901 same
+from_shumway/acid/acid-text-6 output penoff=F186 penon=F186 same
+from_shumway/acid/acid-text-6 frame5 penoff=F21 penon=F21 same
+from_shumway/acid/acid-text-escape output penoff=F476 penon=F476 same
+from_shumway/acid/acid-text-x output penoff=F597 penon=F597 same
+from_shumway/acid/acid-textfield output penoff=F15840 penon=F15840 same
+from_shumway/flash_text_TextField output penoff=F966 penon=F966 same
+text/auto_size/height MISSING
+text/auto_size/return MISSING
+text/auto_size/width MISSING
+text/style_changes_in_html MISSING
+visual/cache_as_bitmap/edittext_scroll output.01 penoff=F290 penon=F290 same
+visual/cache_as_bitmap/edittext_scroll output.02 penoff=F292 penon=F292 same
+visual/definefont4 output penoff=F15975 penon=F15975 same
+visual/edittext/edittext_bounds_vs_position output penoff=P0 penon=P0 same
+visual/edittext/edittext_underline output penoff=P0 penon=P0 same
