@@ -3877,3 +3877,116 @@ Pages REAL deploy: `45898148485` (Deploy step ran). Two earlier attempts built a
 - **Unchanged NO-GOs:** the action_order family, `global_proto_decls(_delete)`, `global_instance_decls`, `native_objects_swf6`, `globals_monkeypatch`, `GradientFillTest`, `external_interface_monkeypatch`, shumway `esc`, and the avm2 ACCEPTED/RvF set.
 
 **Pixels.** See `graphics-fanout-playbook.md` §27 (lowq next slice, n-join-disc next slice, text AA, the swap candidates).
+
+## 30. Session 29 (2026-11-26 → 27) — dual-axis fan-out #21, CLOUD-FIRST, FLASH OVER RUFFLE: trace 4827 → 4860 eff (4864 → 4893 rows; +34 by name, 0 regressions; 29 new rows, 28 pass + 1 booked expected-fail), pixels 548 → 552 pass (+1 / −1 priced on the baseline intersection, 6 new comparisons pass), flash_fixes 62 → 93, 0 unexplained regressions in either mode
+
+Commits `ee14c39f9..535412159` on master: 65 non-results commits. 20 cloud slots, Opus, env "SWFRecomp fan-out": 9 wave-1
+(diagnosis), 10 wave-2/2b (implementation), 1 wave-3 (`w3-interim3-residuals`). All 20 delivered, none lost. 4 local
+one-task sessions ran too: the N ladder `n-seam-caps`, and the browser ladder `browser-gotoandstop-current` →
+`browser-dj-freeze` → `browser-attach-order`. Every report, patch and local Flash capture is under
+`session29-fanout-reports/` (captures in `w1-local-oracles/<slot>/`); the slot table and every grading run are in its
+`AGENT_LAUNCH_ORDER.md`. The 20 `fanout/*` branches were pruned at closeout after a full blob check against master
+(no report/patch/log differed; 2 w1-drift fixture sources were missing and were archived first, `7c190b744`).
+
+**Baselines read fresh** (2026-11-26): graphics `45878805896` at `bfa47037b` (results `014124ed5`): 4827 eff / 4864
+(4642 pass + 185 rm, 37 failing); pixels 548 pass / 140 fail / 6 ignored / 3 skip by status sum. No-graphics `336b83183`: 4825 eff.
+
+**Grading runs** (detail: `session29-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+
+| run | code | trace | pixels | no-graphics |
+|---|---|---|---|---|
+| `45907020469` interim #1 | `4989a9dfb` 2 flash_fixes + fresh upstream | exact: 2 new paletteMap rows | `invalidClipDepth` fail→pass; `acid-filter` 432 → 104 | — |
+| `45914277386` interim #2 | `574824001` palettemap, text coverage | exact: paletteMap mm→pass, +3 new | 0 flips; `rotated_paragraph` new pass | — |
+| `45920452660` / `45920462741` interim #3 | `6ee6eded7` n-seam-caps, goto(current), disposition, pixel gaps, rm-avm2 | exact: +4 mm→pass, +19 rm→pass, +7 new; 1 booked expected-fail | 17 bands Flash-ward; **`text_field_mask` open_failed = an empty flash_fix PNG from my binary merge (fixed `92908280c`)**; **`movieclip_line_gradient_style` 614 → 773 unledgered → w3** | same moves |
+| `45928279588` / `45928290530` interim #4 | `dbc43c157` TSNAP + 4 swaps, tabIndex, timers-goto, DJ freeze, rm-avm1-gnash | exact: +10 rm→pass, +14 new | = TSNAP ledger; 4 swapped acid rows pass; `acid-large` priced pass→fail; tie probe 12 ch over (explained) | same moves |
+| **`45938113471` / `45938116102` FINAL** at `2d40d3799` | + LOW stroke raster, drawing_order/cursor swaps, attach-order, w3 | **exact**: `swz` mm→pass + 3 new pass. **4860 eff / 4893**: 4704 pass + 156 rm, 33 failing. Results `51ab63688` | **552 pass / 140 fail** (+6 ignored, 3 skip; 701). vs interim #4: tie probe → pass, `lowq_stroke_probe` new pass, 0 regressions, bands = w2b-lowq-stroke §5 + w3 | **4858 eff** (mode diffs only `audio/aac`, `audio_computespectrum`). Results `63bcc2dd8` |
+
+Both FINAL runs lost one shard each to an apt "Install system dependencies" failure; `gh run rerun --failed` recovered
+them (partial results were published first and then replaced). Pages: dry run `45938119068` green, REAL deploy
+`46032563406` (see §30.3).
+
+**Final vs baseline, by name** (both modes identical):
+- Trace: **+29 rm → pass**, **+5 fail → pass** (`globals_swf5`, `native_objects_swf6`, `dependent_strings`,
+  `loader_applicationDomain`, `swz`), **0 regressions**. 29 new rows: 28 pass (FP32-golden regression fixtures plus 2
+  upstream paletteMap rows) and 1 booked expected-fail (`regression/avm1_nested_child_swapdepths_remove`, a real Flash gap, M).
+- Pixels on the 696-row intersection: +1 (`invalidClipDepth`, FP32 swap) / −1 (`acid-large`, priced: our LOW render
+  moved toward its FP32 capture, golden is Ruffle-made). 46 bands improved, 21 worsened, every one on a landing ledger.
+  6 new comparisons, all pass (2 rotated-text, 2 seam-cap, 2 LOW probes).
+
+### 30.1 Ledger
+
+| patch | trace | pixels | notes |
+|---|---:|---:|---|
+| `4989a9dfb` coordinator swap check | | +1 | `invalidClipDepth`, `acid-filter` WIN == LNX → flash_fixes; `gradient`, `acid-gradient(-0)` WIN ≠ LNX → kept |
+| `ab49742e5` w2-palettemap-land | +1 upstream, +1 new | | AVM2 `paletteMap` implemented; FP32 reads arr[i] (Ruffle arr[i−1], RvF) |
+| `9c9be05ef`, `574824001` w2-text-coverage-land | +3 new | bands | Flash HIGH text coverage: 4 sub-scanlines × exact x, 1/16, `floor((dst(16−n)+cn)/16)`; CPU coverage for skewed text |
+| `faeaaba4b` n-seam-caps | +2 fixtures | bands | a seam is capped only when snapping separates its ends; hinted ends snap along-axis |
+| `c91637b7a` (+`bbb0fc120`) browser-gotoandstop-current | +2 fixtures, +1 booked fail | | goto(current) = stop/play only in every build (CI was wrong) |
+| `883d02f35` w2-disposition-land | **+4 mm→pass** | | `native_objects_swf6`, `globals_swf5`, `loader_applicationDomain` (#2046 path), `dependent_strings` (swap); L5 DONT_ENUM |
+| `5c0f4f56f` (+`92908280c`) w2-pixel-gaps-land | | bands | LOW glyph pen → whole px (place_object_test 5073 → 2604); acid-shapes 243 → 88; cab snaps LOW only (avm1_color 1200 → 230); 2 swaps |
+| `73d80aea1` w2-rm-avm2-land | **+19 rm→pass** | | per-timestamp DST + `mock_timezone` (15 avmplus Date rows), debug line info, verifier smalls, scrollV; 18 flash_fixes |
+| `1fcf2b1c1` (+`7a3d9213c` swaps) w2-lowq-tsnap | +1 fixture | 14 blend_modes Flash-ward; −1 priced | LOW translation snap per display-list level, ties-to-even (not in cached/filtered subtrees or text) |
+| `ab56ff360` w2b-tabindex | +1 rm→pass, +4 fixtures | | root's native tabIndex accessor materialises on the first root lookup miss (17/17 FP32 captures) |
+| `1574ea5a0` w2-timers-goto-land | +2 rm→pass, +6 fixtures | | goto target runs children's frame-1 scripts in TAG order; clock model → bound check; late-timer `_currentframe` |
+| `3fd694def` browser-dj-freeze | +1 fixture | | same-frame self-goto requeue loop (DJ PLAY freeze) fixed in every build |
+| `a9d92d3cf` w2-rm-avm1-gnash-land | **+7 rm→pass** | | 9 small rules (MC super context, rotation matrix 16.16, export-not-yet-run, unloadClip cancel, MovieClip-v5..v8) |
+| `6a27fc2e0` (+`fec84dcea`) w2b-lowq-stroke | +1 fixture | probe → pass; acid-stroke-0 7426 → 3413 | LOW stroke raster: width on the ¼ grid, thin pen n = min(W,4) below 5.5 px, axis-band rule, 1-px noScale hairline at the unsnapped translation |
+| `758475172` drawing_order + cursor swaps | | bands | FP32 LOW (WIN == LNX); cursor 2 outliers vs FP32 |
+| `078350610` browser-attach-order | +1 fixture | | natural-advance frame scripts = ONE exec list, newest place_seq first, `_root` last (action_order SCRIPT half) |
+| `2d40d3799` w3-interim3-residuals | +1 mm→pass (`swz`), +1 fixture | line_gradient 773 → 614 | wide seams build a join; URLLoader ctor stack; tabIndex = null unsets |
+
+### 30.2 Standing verdicts that fell
+
+- **"Flash HIGH = 4×4 SSAA"** (s28 w1-avm2-vector-flash): it is 4 sub-scanlines at y + j/4 × exact x coverage, quantised
+  to 1/16 (w1-text-pixels). And the Flash-exact AA is still **NO-GO**, now MEASURED: 0 flips, −11 passes (w1-aa-sizing).
+- **"The LOW stroke y rule"** (s28 board): refuted. The rows were TSNAP plus the LOW stroke raster, both landed.
+- **"goto(current frame) re-runs the frame"** (CI arm): Flash is stop/play only, = Ruffle `no_op_goto`.
+- **"gotoFrameFromInterval needs an AVM1 timer check after enterFrame"**: refuted by FP32; the rule is TAG-order frame-1 scripts.
+- **"Attach-tick order = TAG order" vs exec list**: both hold; TAG order is a clip's FIRST script, later ticks are one exec list.
+- **All 12 s28 NO_GO §4 UNSURE items** were resolved except `movieclip_hittest_shapeflag` (register §4). Among them:
+  `swz`/`loader_applicationDomain` "AOT ceiling" (both pass), `native_objects_swf6` "we match Flash" (it was a 1-line gap,
+  pass), `globals_swf5` "costs 3 gnash passes" (void; pass), `dependent_strings` RvF (pass), the tabIndex edge case
+  ACCEPTED (pass), `avm1_color` no-snap NO-GO (cab snaps LOW only), the s24 zero-headroom rows (obsolete).
+- **"`avm2/bom` is a real Flash gap"** (TP): FP32 AVM2 for-in order is hash-scattered AND differs between runs → NO-GO
+  as Flash-nondeterministic.
+- **"from_avmplus Date TZ rows are harness-only"**: `mock_timezone` + per-timestamp DST made all 15 pass, including the
+  "Windows-only" ones.
+- **"The s26 wordwrap golden is not Flash"**: it is FP32 already.
+- **"A world-space LOW translation snap"** (w1-lowq-next first cut): fails the Flash LOW gate; Flash snaps per level.
+
+### 30.3 Method notes (deltas vs s28)
+
+- **Shared-tree commits sweep peers' work, two ways.** A bare `git commit` took a ladder's STAGED hunks
+  (`c91637b7a`); `git commit -- <paths>` took a ladder's UNSTAGED `tag.c` lines (`6a27fc2e0`, HEAD would not build;
+  fixed `fec84dcea`). Recipe: stage exact content (`git apply --cached` / `hash-object` + `update-index --cacheinfo`
+  for peer-dirty files), check `git diff --cached --name-only`, plain `git commit` (memory `shared-index-commit-sweeps-peer-hunks`).
+- **Binary files never go through `git merge-file`.** It emptied a flash_fix PNG (`text_field_mask`, open_failed at
+  interim #3). `coord-tools/land_branch.sh` now copies binaries (`grep -qI`) and unions `fixes.json` as JSON.
+- **Interim #3 caught an unledgered LOW band** (`movieclip_line_gradient_style`) and the w3 slot's kill-switch sweep
+  found its owner in one pass (n-seam-caps' builder arm). Ledger-first grading is what made it visible.
+- **CI outlier counts can be below a worker's local prediction** (stage3d_texture, acid-blend, acid-scale; one report
+  typo `displacement_map` 91822 vs 11285). Same direction, same names: grade direction + name, not the exact count.
+- **Two FINAL shards lost to apt.** Partial results publish first; grade only after the rerun republishes (the partial
+  diff shows hundreds of `pass → None` rows, which are missing shards, not regressions).
+- **Coordinator FP32 runs were the cheapest slots.** 13 tabIndex captures, the for-in nondeterminism, 10 timer
+  captures and the LOW recaptures each settled a wave-2 brief before it was written.
+
+### 30.4 Left on the board (session 30)
+
+**Trace**
+- **ruffle_matched with Flash goldens (156 rm left):** the w1b "priced, not worked" buckets (register §1a). The
+  native-object table generated from the FP32 golden (L; owns `global_*_decls` ×3, `argstest-v6/7/8`, the
+  ExternalInterface-v8 rest).
+- **Exec order:** the action_order family's remaining halves (enterFrame-before-own-script, clip-event merge) now that
+  the script half is one list (`078350610`). `action_execution_order_test11` moved Flash-ward, the cheapest probe.
+- **Browser ladder:** `browser-attach-child-early` (S): the browser-only force-nested-build advance in
+  `ng_attachMovie` (`tag_stubs.c`) runs an already-built child one frame ahead; grade with
+  `avm1_attach_timeline_frame_order` in child_probe + Minesweeper radio bounds. Also the spurious "Failed to place
+  object at depth 1" on same-char loop-back re-place.
+- **`regression/avm1_nested_child_swapdepths_remove`** (booked fail, M): a timeline child's swapDepths + remove survives.
+- **TextField `tabIndex = null`** needs an FP32 capture (clips/buttons landed).
+- `movieclip_hittest_shapeflag`: one Flash run of the 3 FP32-`false` lines (the last UNSURE item).
+- L2 unhandled ErrorEvent #2044 path for `html_text_img_parsing`.
+- **Unchanged NO-GOs:** register §1a.
+
+**Pixels.** See `graphics-fanout-playbook.md` §28.

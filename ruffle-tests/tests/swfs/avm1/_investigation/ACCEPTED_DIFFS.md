@@ -1052,7 +1052,8 @@ and would still leave Ruffle unmatched. Added to
 FP32 refuses both loads before any SWZ ABC is needed (URLRequest.digest set → securityError #2046,
 unhandled → #2044 + stack; captures s28 trace-provenance). The AOT-ceiling framing applies only to
 Ruffle's goldens. loader_applicationDomain now matches FP32 byte-exact (s29 patch + flash_fix);
-swz misses only the [file:line] stack suffixes.
+swz misses only the [file:line] stack suffixes. **s29 FINAL: both PASS** (swz: avmplus debug-line info +
+URLLoader-ctor stack, w2-rm-avm2-land + w3-interim3-residuals; CI run 45938113471, both modes).
 
 (History: until s29 both rows were filed here as a permanent AOT ceiling: the Ruffle goldens list
 `mx.*` classes from the 325 305-byte Flex `framework_4.5.0.20967.swz`, which only an AVM2 interpreter
@@ -1060,7 +1061,7 @@ could define at runtime. FP32 never gets that far: the test sets a SHA-256 `URLR
 the player rejects the unsigned file. The `avm2/loader_applicationDomain` subsection is deleted; it
 passes 3/3 against its flash_fixes golden.)
 
-### `avm2/swz` — FP32 #2046 report without `[file:line]` stack suffixes (2 diff lines of 3)
+### ~~`avm2/swz` — FP32 #2046 report without `[file:line]` stack suffixes (2 diff lines of 3)~~ — **RESOLVED s29: PASS** (entry kept for history)
 
 <!-- image-axis: none -->
 
@@ -1193,5 +1194,5 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | `avm2/loader_load` | FP32 for-in order nondeterministic between runs (Category 12) | 2 of 128 | Accept; same mechanism as `bom` |
 | `from_avmplus/ecma3/Statements/eforin_001` | Implementation-defined `for...in` order (Category 12) | 4 of 16 | Accept; every line is `PASSED!` on both sides, only the sequence differs; avmplus, Ruffle and we produce three different orders; ours is `newobject` insertion order (last pair first), not source order |
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
-| `avm2/swz` | FP32 #2046 path landed; [file:line] stack suffixes missing (Category 13) | 2 of 3 | open (ABC debug lines) |
+| ~~`avm2/swz`~~ | ~~FP32 #2046 path landed; [file:line] stack suffixes missing (Category 13)~~ | ~~2 of 3~~ | **RESOLVED s29**: PASS at FINAL (URLLoader-ctor stack, `2d40d3799`) |
 | `avm2/number_tostring` | Corrupt upstream oracle: 31 impossible base-N digits in the Flash capture; upstream `ignore = true` (Category 14) | 168 of 1050 | **RESOLVED s28** (w2b-avm2-d2a): the "impossible digits" ARE Flash's base-N printer, and the exact avmplus D2A port reproduces them: passes (168 → 0). Ignore entry pruned |

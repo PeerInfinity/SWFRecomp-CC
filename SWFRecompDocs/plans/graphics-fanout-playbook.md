@@ -1685,3 +1685,65 @@ any STALE entry against Flash before re-applying it, and delete any UPSTREAMED e
 - **A swap is a `fixes.json` entry, never a hand edit of a downloaded golden.** Run `--check` in the main tree: a worktree without
   upstream downloads reads MISSING.
 - **The old-stub trap:** pinned AVM1 "low" captures from before 2026-11-25 are HIGH. Re-capture before trusting one as a LOW golden.
+
+## 28. Session-29 state of the board (2026-11-27)
+
+**Baseline:** s28 FINAL `45878805896` at `bfa47037b` (results `014124ed5`): 548 pass / 140 fail / 6 ignored / 3 skip by status sum.
+
+**Images runs** (graphics full, `images=true`): interim #1 `45907020469`, #2 `45914277386`, #3 `45920452660`,
+#4 `45928279588`; **FINAL `45938113471` at `2d40d3799` (results `51ab63688`)**.
+
+**Result: 552 pass / 140 fail** (+6 ignored, 3 skip; 701 comparisons). On the 696-row baseline intersection:
+**+1 (`invalidClipDepth`, FP32 swap) / −1 (`acid-large`, priced: toward its FP32 LOW capture; Ruffle-made golden)**;
+46 bands better, 21 worse, every move on a landing ledger. 6 new comparisons, all pass. Trace side: arc §30.
+
+**Models landed** (each priced by name before landing, each interim graded against that list):
+
+| model (commit) | status moves | bands | graded against |
+|---|---|---|---|
+| Flash HIGH text coverage `9c9be05ef` (4 sub-scanlines × exact x, 1/16) | 0 | rotated_glyphs 1034 → 198 px vs FP32; border bands | FP32 W1/W2 captures (`w1-local-oracles/w1-text-pixels/`) |
+| n-seam-caps `faeaaba4b` (seam capped only when snapping separates ends) | 0 | hinting caps 8388 → 7056 | 2 FP32 fixtures |
+| pixel gaps `5c0f4f56f` (LOW glyph pen whole px; cab snaps LOW only; acid-shapes geometry) | 0 | place_object_test 5073 → 2604, acid-shapes 243 → 88, avm1_color 1200 → 230 | FP32 LOW captures |
+| TSNAP `1fcf2b1c1` (translation snapped per display-list level at LOW, ties to even) | tie probe → pass; `acid-large` −1 priced | 14 `blend_modes` ~85% closer, button_scroll_rect 234 → 45 | FP32 tie probe + flash_fixes goldens |
+| LOW stroke raster `6a27fc2e0` (¼-grid width, thin pen n = min(W,4) < 5.5 px, axis-band, hairline unsnapped) | `lowq_stroke_probe` new pass | acid-stroke-0 7426 → 3413, reflect/repeat 5628 → 2382, `blur_size_grows` 2988 → 35098 (FP32 LOW 133827 → 130473: Flash-ward) | FP32 stroke probe; Flash LOW gate 0 status moves |
+| w3 seam join `2d40d3799` (wide seams that cannot snap build a join) | 0 | `movieclip_line_gradient_style` 773 → 614 (FP32 −111) | FP32 LOW LNX + WIN |
+
+**Measured NO-GO:** Flash-exact HIGH AA as a renderer change (w1-aa-sizing): 0 of 10 failing HIGH rows flip, −7
+Flash-golden −4 regression passes; 130/140 failing rows are LOW. Reopen criterion: register §1b.
+
+### Flash fixes at closeout (`ruffle-tests/flash_fixes/fixes.json`, 93 entries; +31 in s29)
+
+`python3 ruffle-tests/apply_flash_fixes.py --check` (main tree): **ALREADY 22, APPLIED 71, 0 STALE, 0 UPSTREAMED**.
+
+| source (RvF section) | kind | n | rows |
+|---|---|---:|---|
+| s29 coordinator Windows check of s28 LOW candidates (WIN == LNX) | image | 2 | `from_shumway/invalidClipDepth`, `from_shumway/acid/acid-filter` |
+| s29 w2-disposition-land (s28 TP captures) | trace | 3 | `avm2/dependent_strings`, `avm2/loader_applicationDomain`, `avm2/swz` |
+| s29 w2-pixel-gaps-land (coordinator FP32) | image | 2 | `visual/simple_shapes/text_field_mask`, `from_shumway/gradientTransform` |
+| s29 w2-rm-avm2-land | toml | 15 | `from_avmplus/ecma3/Date/e15_9_5_{4,10,10_1,10_10,10_11,11,12,12_1,13,15_1,17_1,22_1,28_1,29_1,35_1}` (`mock_timezone`) |
+| s29 w2-rm-avm2-land | trace | 3 | `avm2/try_catch_typed`, `avm2/slot_holes_fail`, `avm2/slot_id_exceeds_trait_count` |
+| s29 LOW recapture after TSNAP (WIN == LNX) | image | 4 | `from_shumway/acid/acid-color` (output, frame1), `acid-gc`, `acid-gradient-1` |
+| s29 LOW stroke raster golden swaps (WIN == LNX) | image | 2 | `visual/drawing_api/drawing_order`, `visual/drawing_api/cursor` |
+
+Kept as Ruffle goldens (FP32 WIN ≠ LNX, host-dependent; RvF): `from_shumway/gradient`, `acid-gradient`,
+`acid-gradient-0`, `visual/drawing_api/fills_and_lines`. **STALE / UPSTREAMED: none.** After the next upstream refresh
+run `--check`; re-derive any STALE entry against Flash before re-applying it, delete any UPSTREAMED one.
+
+### Left on the board (session 30)
+
+- **LOW model:** the LOW fill .5-vertex tie (`lowq_tsnap_tie_probe` rows 4–5 budget: 45° stroke width, 3-px rect band,
+  drawRect .5 tie); `acid-large` (priced loss; an FP32 swap candidate after a WIN == LNX check);
+  `avm2_layer_group_alpha` / `_erase` (exporter HIGH goldens; FP32 LOW captures taken in s29, NOT graded).
+- **Strokes:** the AVM2 twin of the w3 seam-join gate (`avm2_display.c` `gfx_build_stroke`, needs an on-screen scale at
+  build time); translucent-union slivers in `drawingUnionTris` (vertex weld before `tessAddContour`). N stroke ladder is at
+  its floor; the next N step is gated on the AA reopen criterion.
+- **Real Flash gaps with Flash goldens:** `acid-shapes` (88, structural thick curved strokes: take an FP32 HIGH capture of
+  the residue first; it is also the aa-sizing reopen criterion), `place_object_test` (2604), `shape_test` (9709, open-fill
+  parity NO-GO L), `acid-stroke-0` (3413), `sprite_with_frames` (re-grade vs FP32 LOW now the stroke raster is in).
+- **Text:** `morph_test1` ×6 LOW glyph rule (the only real Flash losses of the glyph snap); TextFlow/FlashType stays NO-GO.
+
+### Process notes added in session 29
+
+- **Never route binaries through `git merge-file`** (it emptied a flash_fix PNG). Copy binaries; union `fixes.json` as JSON.
+- **CI outlier counts ≤ the worker's local prediction is normal** on some rows; grade the name and the direction.
+- **A grading run with a lost shard publishes partial results.** Rerun the failed jobs and grade the republished commit.

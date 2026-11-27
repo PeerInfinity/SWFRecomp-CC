@@ -1,13 +1,13 @@
 # Project state: SWFRecomp-CC
 
-**As of:** 2026-11-26, after fan-out session 28 (code `bfa47037b`). **Maintained by:** each fan-out coordinator at
+**As of:** 2026-11-27, after fan-out session 29 (code `2d40d3799`). **Maintained by:** each fan-out coordinator at
 closeout (update §1–§3), plus any one-task session that changes a track's status (update §4).
 **Companion:** [`NO_GO_REGISTER.md`](NO_GO_REGISTER.md) lists everything ruled not worth doing, each entry with a
 reopen criterion.
 
 This page replaces the stale headline numbers in `ruffle-tests/tests/swfs/_investigation/OVERVIEW.md` (2026-07)
-and `feature-priority-map.md` (2026-07). Per-session detail lives in `polish-sweep-arc.md` (trace, §29 = s28) and
-`graphics-fanout-playbook.md` (pixels, §27 = s28).
+and `feature-priority-map.md` (2026-07). Per-session detail lives in `polish-sweep-arc.md` (trace, §30 = s29) and
+`graphics-fanout-playbook.md` (pixels, §28 = s29).
 
 **The goal** (Robert's ruling, 2026-11-24): match **Flash Player 32**, not Ruffle. Ruffle's test corpus is the
 instrument. A Ruffle golden that FP32 proves wrong gets corrected in `ruffle-tests/flash_fixes/`, never chased. The
@@ -15,23 +15,23 @@ oracle is a real FP32 projector, scripted locally (`tools/flash-oracle/`).
 
 ## 1. Corpus state (Ruffle test suites)
 
-Source: the s28 FINAL runs. Graphics `45878805896` (results `014124ed5`); no-graphics `45878818309`
-(`336b83183`, 4825 eff). Mode differences are only `audio/aac` and `avm2/audio_computespectrum`. Never quote these
+Source: the s29 FINAL runs. Graphics `45938113471` (results `51ab63688`); no-graphics `45938116102`
+(`63bcc2dd8`, 4858 eff). Mode differences are only `audio/aac` and `avm2/audio_computespectrum`. Never quote these
 forward: re-read the newest results (memory `ci-baseline-must-be-read-fresh`).
 
 ### Trace (graphics mode)
 
 | suite | rows | pass | ruffle_matched | failing | effective |
 |---|---:|---:|---:|---:|---:|
-| from_avmplus | 1574 | 1549 | 23 | 2 | 99.9% |
-| avm2 | 1351 | 1309 | 34 | 8 | 99.4% |
-| avm1 | 790 | 770 | 8 | 12 | 98.5% |
-| regression | 292 | 292 | 0 | 0 | 100.0% |
-| from_gnash/actionscript.all | 243 | 177 | 63 | 3 | 98.8% |
+| from_avmplus | 1574 | 1564 | 8 | 2 | 99.9% |
+| avm2 | 1352 | 1317 | 30 | 5 | 99.6% |
+| avm1 | 791 | 776 | 5 | 10 | 98.7% |
+| regression | 319 | 318 | 0 | 1 | 99.7% |
+| from_gnash/actionscript.all | 243 | 181 | 59 | 3 | 98.8% |
 | from_shumway | 229 | 215 | 13 | 1 | 99.6% |
 | visual | 151 | 149 | 2 | 0 | 100.0% |
-| from_gnash/misc-ming.all | 111 | 73 | 29 | 9 | 91.9% |
-| from_gnash/misc-swfc.all | 21 | 15 | 5 | 1 | 95.2% |
+| from_gnash/misc-ming.all | 111 | 74 | 28 | 9 | 91.9% |
+| from_gnash/misc-swfc.all | 21 | 17 | 3 | 1 | 95.2% |
 | from_gnash/misc-swfmill.all | 20 | 19 | 1 | 0 | 100.0% |
 | timeline | 17 | 14 | 3 | 0 | 100.0% |
 | mixed_avm | 12 | 10 | 1 | 1 | 91.7% |
@@ -42,31 +42,32 @@ forward: re-read the newest results (memory `ci-baseline-must-be-read-fresh`).
 | swf | 7 | 7 | 0 | 0 | 100.0% |
 | audio | 5 | 5 | 0 | 0 | 100.0% |
 | import_assets | 3 | 3 | 0 | 0 | 100.0% |
-| **total** | **4864** | **4642** | **185** | **37** | **99.2%** |
+| **total** | **4893** | **4704** | **156** | **33** | **99.3%** |
 
 **Read "effective" with care.** `ruffle_matched` (rm) means "our diffs are a subset of Ruffle's diffs". It is not a
-Flash pass. s28's `trace-provenance` checked every rm row against FP32: **139 of the 185 rm rows have FLASH goldens,
-so they are real gaps.** The other 46 have non-Flash or untestable goldens.
-- Honest Flash-correct count: 4642 pass, plus at most 46 rm rows.
-- Hidden work: about **176 rows** (139 rm + 37 failing).
-- `regression/` (292 rows) is our own fixture suite, with goldens mostly from FP32 captures.
+Flash pass. s28's `trace-provenance` found 139 of the then-185 rm rows have FLASH goldens; s29 closed 29 of them, so
+**about 110 of the 156 rm rows are real Flash gaps** (re-derive per row from TP before citing).
+- Honest Flash-correct count: 4704 pass, plus at most ~46 rm rows.
+- Hidden work: about **143 rows** (~110 rm + 33 failing).
+- `regression/` (319 rows) is our own fixture suite, with goldens mostly from FP32 captures. Its one failing row,
+  `avm1_nested_child_swapdepths_remove`, is a booked expected-fail (a real Flash gap, M).
 
-**The 37 failing rows**, all dispositioned in `NO_GO_REGISTER.md` §1a: the gnash action_order family ×7, the AVM1
-native-object enumeration rows (`global_*_decls` ×3, `argstest-v6/7/8`, `native_objects_swf6`), `globals_monkeypatch`,
-`external_interface_monkeypatch`, `globals_swf5`, `set_property_values/swf4`, `date`, `pixelDissolve`,
-`movieclip_hittest_shapeflag`, `sandbox_type_remote` ×2, `avm2/avm1_root`, `bom`, `dependent_strings`, `loader_load`,
-`loader_applicationDomain`, `swz`, `verify_method_info_duplicate`, `eforin_001/002`, `GradientFillTest`,
-`RegisterClassTest4`, `matrix_accuracy_test1`, shumway `esc`, and `mixed_avm/avm1_loads_avm2`.
+**The 33 failing rows**, all dispositioned in `NO_GO_REGISTER.md` §1a: the gnash action_order family ×7, the AVM1
+native-object enumeration rows (`global_*_decls` ×3, `argstest-v6/7/8`), `globals_monkeypatch`,
+`external_interface_monkeypatch`, `set_property_values/swf4`, `date`, `pixelDissolve`, `movieclip_hittest_shapeflag`,
+`sandbox_type_remote` ×2, `avm2/avm1_root`, `bom`, `loader_load`, `verify_method_info_duplicate`, `eforin_001/002`,
+`GradientFillTest`, `RegisterClassTest4`, `matrix_accuracy_test1`, shumway `esc`, `mixed_avm/avm1_loads_avm2`, and
+the booked regression fixture above. s29 moved `globals_swf5`, `native_objects_swf6`, `dependent_strings`,
+`loader_applicationDomain` and `swz` to pass.
 
 ### Pixels (graphics `images=true`)
 
-- **545 pass / 140 fail** (+6 ignored, 3 skip; 694 comparisons).
-- The count fell in s28 on purpose, from 629 to 528 on the baseline intersection. Three Flash-correct models landed: the
-  thin-stroke snap, the drawing-API snap and the Flash LOW quality model. They lost **101 comparisons whose goldens are
-  Ruffle-made**, every one priced by name before landing (playbook §27).
-- 62 goldens are FP32-corrected through `ruffle-tests/flash_fixes/fixes.json`.
-- Biggest structural residual: Flash HIGH = 4×4 supersampling, ours = MSAA. It is unmeasured; the s29 board sizes it
-  first.
+- **552 pass / 140 fail** (+6 ignored, 3 skip; 701 comparisons). s29 on the baseline intersection: +1 / −1 (the loss,
+  `acid-large`, is priced: toward its FP32 capture, golden Ruffle-made); 6 new comparisons pass.
+- s29 Flash models: HIGH text coverage (4 sub-scanlines × exact x, 1/16), LOW translation snap per display-list level
+  (TSNAP), the LOW stroke raster, seam caps/joins. s28 had already traded 101 Ruffle-golden passes for Flash models.
+- 93 goldens are FP32-corrected through `ruffle-tests/flash_fixes/fixes.json` (+31 in s29).
+- 130 of the 140 failing pixel rows are quality=LOW. Flash-exact HIGH AA was built and MEASURED NO-GO in s29 (0 flips).
 
 ### Trajectory
 
@@ -76,30 +77,23 @@ native-object enumeration rows (`global_*_decls` ×3, `argstest-v6/7/8`, `native
 | 2026-07-31 | 3999 / 4421 (90.5%) | n/a | feature-priority arcs |
 | s25 (2026-11-22) | 4622 / 4662 | 561 / 613 | |
 | s27 (2026-11-24) | 4781 / 4819 | 626 / 665 | real Flash oracle arrives |
-| **s28 (2026-11-26)** | **4827 / 4864** | **545 / 685** | Flash over Ruffle: +75 trace by name, −101 priced pixels |
+| s28 (2026-11-26) | 4827 / 4864 | 545 / 685 | Flash over Ruffle: +75 trace by name, −101 priced pixels |
+| **s29 (2026-11-27)** | **4860 / 4893** | **552 / 692** | +34 trace by name, 0 regressions; flash_fixes 62 → 93 |
 
-## 2. Worth doing: corpus (ranked; detail in arc §29.4 and playbook §27)
+## 2. Worth doing: corpus (ranked; detail in arc §30.4 and playbook §28)
 
-The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`) turns this list into slots.
-
-1. **Disposition audit (S, cheap, high information).** The 12 UNSURE items in `NO_GO_REGISTER.md` §4 are dispositions
-   that s28's own FP32 evidence contradicts. One looks like a cheap Flash target: `swz` / `loader_applicationDomain`,
-   where FP32 throws a securityError and the "AOT ceiling" disposition is wrong. Others may be RvF passes
-   (`dependent_strings`) or real gaps wrongly ACCEPTED (`native_objects_swf6`, `tab_ordering_…_edge_case`, `bom`).
-   Re-pricing them is mostly local FP32 runs.
-2. **The 139 Flash-golden rm rows.** These are the w1b "priced, not worked" buckets, ~20 mechanisms with a completion
-   cell each. Cheapest named: gnash `ExternalInterface-v8` (S) and `loadVariables` method (S). Larger: the native-object
-   enumeration model (shared with 6 failing rows), AVM2 frame/event lifecycle, the device-font metrics family, typed
-   nulls, `avm1movie`, the FTE line model.
-3. **Timers tail:** `avm1_timer_clock_model` (Flash is nondeterministic, so use a bound check), an AVM1 timer check after
-   enterFrame, gnash `gotoFrameFromInterval{,2}`.
-4. **Goto/nav:** a stale `actionNextFrame` enterframe arm? (The gotoAndStop(current) fixture belongs to the browser ladder, §4.)
-5. **Pixels: the LOW model next slice.** The .5-tie rule, the LOW stroke y rule (3 class-c rows), and a Windows FP32
-   check of the 4 swap candidates.
-6. **Pixels: size the AA mode** (Flash 4×4 SSAA vs our MSAA) before anyone builds it.
-7. **Pixels: real Flash gaps** with Flash goldens: `place_object_test` (5073), `shape_test` (10300), `acid-shapes`
-   (+0.25%), `rotated_glyphs` (1111 px vs Flash), the bevel probe, `shadow_shape_a50`.
-8. **Harness (S):** a per-test timezone override, which unblocks the avmplus Date TZ rows and exposes one real DST bug.
+1. **The ~110 Flash-golden rm rows.** The w1b "priced, not worked" buckets (register §1a), ~20 mechanisms each with a
+   completion cell. The biggest shared one is a **native-object table generated from the FP32 golden** (L; owns the 3
+   `global_*_decls` rows, `argstest-v6/7/8` and the ExternalInterface-v8 rest). Others: AVM2 frame/event lifecycle,
+   device-font metrics, typed nulls, `avm1movie`, the FTE line model.
+2. **Exec order, next halves.** The script half of the flat exec list landed (`078350610`). Remaining: enterFrame before
+   own script and the clip-event merge. `action_execution_order_test11` already moved Flash-ward, so it is the probe.
+3. **Pixels: LOW residues.** The LOW fill .5-vertex tie, `acid-large` (swap candidate after a WIN == LNX check), the
+   ungraded `avm2_layer_group_alpha/_erase` LOW captures, `sprite_with_frames` re-grade.
+4. **Pixels: real Flash gaps.** `acid-shapes` (88; FP32 HIGH capture of the residue first), `place_object_test` (2604),
+   `acid-stroke-0` (3413), `morph_test1` ×6 LOW glyph rule, the AVM2 twin of the w3 seam-join gate.
+5. **Small trace leads:** TextField `tabIndex = null` (needs FP32), `movieclip_hittest_shapeflag` (one Flash run),
+   `avm1_nested_child_swapdepths_remove` (M), the #2044 ErrorEvent path for `html_text_img_parsing`.
 
 ## 3. Not worth doing (summary; full register in `NO_GO_REGISTER.md`)
 
@@ -116,7 +110,7 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
   - FlashType `acid-textfield`;
   - GPU display-filter growth;
   - the device-text rows from an unreproducible Windows host;
-  - 16-level glyph AA, unless the AA sizing says otherwise.
+  - Flash-exact HIGH AA as a renderer change (MEASURED s29: 0 flips, −11 passes).
 - **Infra/perf:**
   - the AVM2 nursery/generational allocator (ceiling <1.10x), inline slots, quadtree pooling;
   - GC mid-method (use-after-free);
@@ -124,7 +118,7 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
   - linking Ruffle's render crates (user decision 2026-07-29);
   - WSL Chrome perf numbers;
   - frame-rate A/Bs for sub-ms effects.
-- **Overturned verdicts:** about 37 standing verdicts fell in s26–s28 alone (register §2). Treat every NO-GO as a
+- **Overturned verdicts:** about 50 standing verdicts fell in s26–s29 alone (register §2). Treat every NO-GO as a
   claim to re-test, not an instruction.
 
 ## 4. Beyond the corpus: games, browser, perf, tooling
@@ -133,8 +127,8 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
 ### 1. N (Metanet ninja): playable in the browser, pixel parity vs Flash
 
 - **State:** The game is playable natively and in the browser. Level completion and death/retry work. Episodes 0–2 (levels 0–4) have routes that are byte-identical across Ruffle exporter, native and browser (s26–s27). Since s28 the work is pixel parity against **Flash 32**: the thin-stroke snap rule (`09b2c9130`), the drawing-API stroke snap (`e81d27317`), and the cap/corner rule for snapped strokes plus signed noScale width (`03527a3f8`, 2026-11-26). N's ep1 pixel diff improves on every tick.
-- **Status:** ACTIVE. It runs as a local one-task ladder alongside each fan-out session and is between sessions right now. The s27 memory index line "N + browser ladders PARKED" is stale, because s28 ran three N slices.
-- **Next step (worth doing):** Make the closed seam into geometry. The builders and lyon should emit a closed contour's seam as two caps, not a join. Price it on the n-join-disc ledger; the expected gain is tick 880 going from 215 to about 145 px, without the holes the first cut opened (`SWFRecompDocs/plans/n-join-disc-report.md` §5, item 1; no size given). The second item is the LOW stroke raster, which goes with the lowq slots (playbook §27, "Left on the board (session 29)").
+- **Status:** PARKED at its stroke floor (s29). `n-seam-caps` (`faeaaba4b`, 2026-11-26) landed the seam rule — Flash caps a closed seam only when snapping separates its ends, else joins — and it was N-NEUTRAL on ep1 (the expected gain was phase luck). w3 (`2d40d3799`) made wide un-snappable drawing-API seams joins again.
+- **Next step:** none funded. The remaining N stroke residue is AA granularity; Flash-exact HIGH AA was measured NO-GO in s29 (`NO_GO_REGISTER.md` §1b), so the ladder reopens only on that criterion or a new N-specific measurement.
 - **Ruled out:**
   - "A closed stroke seam is a join." Flash caps it (arc `polish-sweep-arc.md` §29.2; n-join-disc).
   - Moving the quad ends to place snapped corners. It cracked corners, and the ledger caught it (n-join-disc §3.1).
@@ -160,7 +154,7 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
   - Minesweeper interactivity is DONE.
   - The newest evidence is a Tetris wasm build break. It turned out to be stale RecompiledScripts, and `build_test.sh` now regenerates stale C (`60877dc63`, 2026-11-25).
 - **Status:** PARKED.
-- **Next step:** The DJ browser busy-loop after PLAY is pre-existing. It is on the s29 board (arc §29.4, "Gotos and the browser ladder"), with no size given. Two DJ render bugs are also still open: the blue bitmap is invisible, and the brown platform has no break animation (memory `dj-platform-rendering`; UNCONFIRMED whether they still reproduce).
+- **Next step:** The DJ PLAY freeze is FIXED (s29 `3fd694def`: an infinite same-frame self-goto requeue on 1-frame clips, in every build); DJ plays 3/3 seeds in the browser. The blue bitmap now draws. Still UNCONFIRMED: the brown platform break animation (memory `dj-platform-rendering`).
 - **Ruled out:**
   - "The Tetris wasm break is attached-goto code." It was stale generated C (arc §29.2).
   - Wall-clock browser screenshots for fast game moments. Use exact-tick native PNGs or event-driven shots instead (dj-level-loader, 2026-06-12).
@@ -170,16 +164,13 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
 - **State:**
   - s27 local ladder ported CI's eager placement init, per-tick advance order, and parked-root frame behaviour into the browser. It also made every browser link fail on any wasm-ld warning (`c8ed0e679`).
   - s28 sent root gotos and attached-clip gotos through the CI arms and deleted `advance_attached_clip_frames` (`dc6c75a64`, `a9fb68b42`, 2026-11-26). Browser audio is now an AudioWorklet (`0cb5464e5`, 2026-10-19).
+- **s29 (local ladder, 3 slices):** goto(current frame) = stop/play only in EVERY build, CI was the wrong side (`c91637b7a`); the DJ freeze (`3fd694def`); natural-advance frame scripts as ONE exec list by place_seq across nested/timeline/attached clips, all builds (`078350610`, kill switch `SWF_EXEC_ORDER_MERGED=0`).
 - **Status:** ACTIVE. It is a local ladder between sessions.
-- **Next steps (worth doing), in order** (from `browser-attached-goto-report.md` §3.4–§5):
-  1. A gotoAndStop(current) FP32 fixture (S, plus a corpus run). It settles the browser-only `stop` guard vs CI's
-     same-frame branch, which Doodle Jump's `attachBlocks` and N's `tileMC` depend on.
-  2. The Doodle Jump browser freeze after PLAY: a busy loop, level-dependent because browser `Math.random` is
-     unseeded. Seed the build and take a wasm stack sample.
-  3. The timeline-sprite self-goto port §5a (**M**; it breaks nested gotos on the new HEAD), plus deleting the dead
-     `pending_remove` code.
-  - Separately, on the corpus side: check whether `actionNextFrame`'s `g_inside_enterframe_dispatch` arm is stale.
-  - The gate inventory's triage column is still empty. It had 157 browser-none sites in July, and s27 deleted 18 action.c gates. The current count is UNCONFIRMED; regenerate it with `tools/gate_inventory.py`.
+- **Next steps (worth doing), in order:**
+  1. `browser-attach-child-early` (S): the browser-only force-nested-build advance in `ng_attachMovie` (`tag_stubs.c`) advances an already-built child on the attach tick (one frame ahead). Gate it to unbuilt holders; grade with `avm1_attach_timeline_frame_order` in child_probe + Minesweeper radio bounds. Also the spurious "Failed to place object at depth 1" on same-char loop-back re-place.
+  2. `avm1_nested_child_swapdepths_remove` (M): a timeline child's swapDepths + remove survives (booked expected-fail fixture, all builds).
+  3. The timeline-sprite self-goto port §5a (M) and the dead `pending_remove` code.
+  - The gate inventory's triage column is still empty; regenerate it with `tools/gate_inventory.py` (count UNCONFIRMED).
 - **Ruled out:**
   - "Browser gaps are action.c arms." The eager-init, advance-order and parked-frame gaps were in `tag.c`/`swf.c` (arc §28 standing verdicts).
   - The action.c-only `SWF_BROWSER_ARMS_TU` harness as a verdict. Confirm in the real browser via child_probe (memory `browser-wasm-gate-inventory`, s27).
@@ -307,10 +298,10 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
 
 | track | status | last evidence | next step |
 |---|---|---|---|
-| N: play + Flash pixel parity | ACTIVE (ladder, between sessions) | 2026-11-26 (`03527a3f8`) | closed seam as two caps in builders/lyon; then LOW stroke raster |
+| N: play + Flash pixel parity | PARKED (stroke floor) | 2026-11-26 (`faeaaba4b`) | none funded; reopens on the AA criterion (register §1b) |
 | N procgen substrate / portals / physics-js | **CANCELLED** (Robert, 2026-11-26) | 2026-06-30 | none |
-| Other AVM1 games (DJ, Pacman, Tetris, Minesweeper) | PARKED | 2026-11-25 (Tetris build fix) | DJ browser busy-loop after PLAY (s29 board) |
-| Browser/WASM parity ladder | ACTIVE (ladder, between sessions) | 2026-11-26 (`a9fb68b42`) | gotoAndStop(current) FP32 fixture (S), then the DJ freeze, then self-goto port §5a (M) |
+| Other AVM1 games (DJ, Pacman, Tetris, Minesweeper) | PARKED | 2026-11-26 (`3fd694def` DJ freeze fixed) | DJ brown-platform break anim UNCONFIRMED |
+| Browser/WASM parity ladder | ACTIVE (ladder, between sessions) | 2026-11-27 (`078350610`) | `browser-attach-child-early` (S), then nested swapDepths+remove (M), then self-goto port §5a (M) |
 | AVM1 perf | PARKED | 2026-11-21 (`10b5dff69`) | string-ID interning (planned, not started) |
 | AVM2 perf | DONE (30 fps met); levers PARKED | 2026-10-16 (`5367e2b33`) | optional: `add` Number+int, `coerce Entity` |
 | AVM2 browser memory | DONE | 2026-10-19 (`c1fa89bc2`) | none (Snailiad 603 MB flag) |
@@ -320,5 +311,5 @@ The s29 coordinator brief (`session29-fanout-reports/s29-coordinator-prompt.md`)
 | Snailiad | PARKED | 2026-09-02 | regression gate; browser demo needs arena fix |
 | In-browser recompiler | DONE (maintained) | 2026-11-22 (live verify); code 2026-10-14 | none (payload blob weak); DYNAMIC_HOST repeat-trace lead UNCONFIRMED |
 | Archipelago integration | ACTIVE in Archipelago-CC; this repo DONE / on demand | 2026-11-22 here; 2026-11-15 in Archipelago-CC | Slice 3 status UNCONFIRMED (Archipelago-CC) |
-| Docs site / Pages | ACTIVE (maintenance) | 2026-11-26 (`45898148485`) | deploy after `docs/` changes |
+| Docs site / Pages | ACTIVE (maintenance) | 2026-11-27 (`46032563406`) | deploy after `docs/` changes |
 | Upstream relationship | PARKED | 2026-09 | 2 unfiled issue candidates |
