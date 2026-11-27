@@ -687,8 +687,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		// The globals are still swapped to this clip's list and g_current_context is
 		// the attached MC, so advance_sprite_frames runs each child's just_allocated
 		// frame-0. Done before the content-bounds computation below so nested
-		// content is included in _width/_height. (Only builds unbuilt 1-frame-style
-		// holders; already-built/playing clips are advanced as usual.)
+		// content is included in _width/_height. Build-only: unbuilt holders are
+		// built, already-built clips are NOT advanced (see below).
 		{
 			extern void advance_sprite_frames(SWFAppContext*);
 			extern int g_advance_defer_nested;
@@ -705,9 +705,23 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			// = 0 → FRadioButton.setLabelPlacement puts the label on top of the
 			// circle). Clear the flag locally so the recursion fully builds the
 			// subtree, then restore.
+			//
+			// BUILD ONLY (s30 browser-attach-child-early): since s27 ported eager
+			// placement init to the browser, funcs[0] already built most timeline
+			// children (sprite_display_list != NULL), so a plain advance here
+			// STEPPED them on the attach tick — the child ran frame 2 on the tick
+			// it was created and stayed one frame ahead of Flash (fixture
+			// regression/avm1_attach_timeline_frame_order, `pt` under ap60).
+			// g_build_only (same as ng_gotoFrameByMC's replay build) builds only
+			// still-unbuilt holders and recurses through built ones without
+			// moving any playhead.
+			extern int g_build_only;
 			int _am_saved_defer = g_advance_defer_nested;
+			int _am_saved_bo = g_build_only;
 			g_advance_defer_nested = 0;
+			g_build_only = 1;
 			advance_sprite_frames(app_context);
+			g_build_only = _am_saved_bo;
 			g_advance_defer_nested = _am_saved_defer;
 		}
 #endif

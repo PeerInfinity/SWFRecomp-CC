@@ -13642,6 +13642,20 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	    && !g_loopback_replay
 	    && !catch_up_backward)
 	{
+		// Browser-WASM natural sprite wrap (advance_sprite_frames raises
+		// g_nested_loopback_quiet around the frame-0 replay; the CI builds use
+		// g_loopback_replay, which skips this gate): refusing frame 0's same-char
+		// re-place of a surviving child IS the survives_rewind outcome, not
+		// Ruffle's/Flash's occupied-depth warning — refuse silently, and never
+		// keep-both (that would stack a duplicate every loop). The guard was
+		// lost in 613c0f100's restructure (s30 browser-attach-child-early).
+		if (g_nested_loopback_quiet)
+		{
+			g_pending_clip_actions = NULL;
+			g_pending_clip_action_count = 0;
+			g_pending_instance_name = NULL;
+			return;
+		}
 		// SWF <= 5: Flash keeps both (newcomer behind). See
 		// ng_place_under_restore.
 		if (ng_keep_both_applies())
@@ -14501,6 +14515,14 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	    && display_list[depth].placed_at_frame <= current_frame
 	    && !ng_depth_has_pending_finalize(depth))
 	{
+		// Browser-WASM natural sprite wrap: silent refusal, see tagPlaceObject2.
+		if (g_nested_loopback_quiet)
+		{
+			g_pending_clip_actions = NULL;
+			g_pending_clip_action_count = 0;
+			g_pending_instance_name = NULL;
+			return;
+		}
 		// SWF <= 5 keep-both (see ng_place_under_restore). This gate lacks
 		// tagPlaceObject2's replay guards, so keep-both additionally requires
 		// a forward (non-replay) execution; a replay keeps the old refusal.
