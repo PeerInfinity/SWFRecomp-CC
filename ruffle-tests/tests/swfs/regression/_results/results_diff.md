@@ -1,28 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b030ed745d4f` (2026-11-25T23:59:46.689225+00:00)
-**Current:** `bfa47037b19e` (2026-11-26T21:04:08.187674+00:00)
+**Previous:** `bfa47037b19e` (2026-11-26T21:04:08.187674+00:00)
+**Current:** `6ee6eded7b66` (2026-11-27T02:09:03.994806+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 282 | 292 | +10 |
-| Total | 282 | 292 | +10 |
-| Pass rate | 100.0% | 100.0% | 0% |
-| Mismatched lines | 0 | 0 | 0 |
+| Passing | 292 | 301 | +9 |
+| Total | 292 | 302 | +10 |
+| Pass rate | 100.0% | 99.7% | -0.3% |
+| Mismatched lines | 0 | 2 | +2 |
 
 ## Added Tests (10)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm1_attached_clip_selfgoto_trace` | pass | 14/14 |
-| `avm1_clipevent_root_goto_stopped` | pass | 3/3 |
-| `avm1_drawapi_stroke_snap` | pass | 1/1 |
-| `avm1_drawing_stroke_scale` | pass | 0/0 |
-| `avm1_enterframe_root_goto_opcode` | pass | 7/7 |
-| `avm1_stroke_join_cap_snap` | pass | 0/0 |
-| `avm1_stroke_noscale_signed` | pass | 0/0 |
-| `avm2_drawapi_stroke_snap` | pass | 1/1 |
-| `lowq_gradient_orient_probe` | pass | 0/0 |
-| `lowq_sample_point_probe` | pass | 0/0 |
+| `avm1_edittext_rotated_color` | pass | 0/0 |
+| `avm1_edittext_rotated_paragraph` | pass | 0/0 |
+| `avm1_goto_current_frame_clip` | pass | 23/23 |
+| `avm1_goto_current_frame_root` | pass | 22/22 |
+| `avm1_nested_child_swapdepths_remove` | output_mismatch | 6/8 |
+| `avm1_stroke_hinting_caps` | pass | 1/1 |
+| `avm1_stroke_seam_caps` | pass | 1/1 |
+| `avm1_textfield_ctor_shadow_swf6` | pass | 2/2 |
+| `avm1_textfield_ctor_shadow_swf7` | pass | 2/2 |
+| `avm2_bitmapdata_palettemap_index` | pass | 5/5 |
