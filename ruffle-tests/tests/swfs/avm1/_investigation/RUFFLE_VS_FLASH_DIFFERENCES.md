@@ -1517,3 +1517,25 @@ translation snapping. Ruffle's LOW goldens use its GPU stroker. Ours with the ru
 
 **Decision:** match Flash; both goldens swapped through `flash_fixes`. Prune criterion: Ruffle's LOW stroker adopts
 these rules, or upstream re-bakes the goldens from Flash.
+
+## s30 acid-large FP32 LOW swap (s30 coordinator, 2026-11-27)
+
+**Test:** `from_shumway/acid/acid-large` (quality LOW, 500 ticks, tolerance 11).
+
+FP32 LOW (wrapper `draw()`, LAYER-only content) on Linux and Windows is byte-identical
+(`session30-fanout-reports/pre-launch-oracles/from_shumway__acid__acid-large.{lnx,win}.low.png`). The upstream golden is
+Ruffle-made and is 178 720 channels over tolerance from Flash; ours at `2d40d3799` (TSNAP + LOW stroke raster) is
+138 478. The row went pass → fail in s29 when TSNAP moved us toward Flash (priced).
+
+**Decision:** match Flash; golden swapped through `flash_fixes`. The row stays fail, now graded against Flash. Prune
+criterion: upstream re-bakes the golden from Flash, or a later model makes ours match.
+
+## s30 AVM2 layer-group fixtures: Ruffle golden → FP32 `--screen` (s30 coordinator, 2026-11-27)
+
+**Tests:** `regression/avm2_layer_group_alpha`, `regression/avm2_layer_group_erase` (our fixtures; re-goldened in place).
+
+Ruffle's exporter render (the old golden) is 13 763 / 11 979 channels (tol 2) from FP32 LOW `--screen`; ours is 4 268 /
+2 143. The pre-launch `draw()` captures of these rows are invalid (ALPHA/ERASE are non-LAYER blends; draw vs screen =
+82 531 channels), so the "~80 k layer-group compositing gap at LOW" read off them was an artifact.
+
+**Decision:** match Flash. Prune criterion: none (our own fixtures).

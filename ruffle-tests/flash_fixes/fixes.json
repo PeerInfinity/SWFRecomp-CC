@@ -1021,5 +1021,16 @@
     "reason": "ours (s29 LOW stroke raster) 2 ch vs this capture; golden is 399 px off Flash. Golden is a Ruffle LOW render.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW stroke raster golden swaps",
     "added": "2026-11-27"
+  },
+  {
+    "test": "from_shumway/acid/acid-large",
+    "file": "output.expected.png",
+    "upstream_sha256": "86ea6d0357486bba508e8c58efc2ae5041c272dfb0db3331f3474e83f1499a53",
+    "fix": "from_shumway/acid/acid-large/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/pre-launch-oracles/from_shumway__acid__acid-large.lnx.low.png (s29 coordinator pre-s30 pass, Linux, quality=low, 500 ticks, wrapper draw()); Windows FP32 from_shumway__acid__acid-large.win.low.png byte-identical",
+    "reason": "Flash LOW, Linux == Windows byte for byte. Golden (Ruffle-made) is 178 720 channels over tol 11 from Flash; ours (s29 FINAL, TSNAP + LOW stroke raster) 138 478. Stays fail, now graded against Flash.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 acid-large FP32 LOW swap",
+    "added": "2026-11-27"
   }
 ]

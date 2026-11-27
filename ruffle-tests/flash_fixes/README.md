@@ -51,6 +51,7 @@ download.
 | 15 `from_avmplus/ecma3/Date/e15_9_5_*` (`4`, `10`, `10_1`, `10_10`, `10_11`, `11`, `12`, `12_1`, `13`, `15_1`, `17_1`, `22_1`, `28_1`, `29_1`, `35_1`) | `test.toml` (`kind: "toml"`) | 2026-11-26 | s28 trace-provenance (goldens are FP32, US-Pacific host) + s29 coordinator Linux FP32 of `35_1` under `TZ=PST8PDT,M3.2.0,M11.1.0` == golden | adds `mock_timezone` (+ `mock_date_time` = printed capture instant). With s29 per-timestamp DST: 15 × `ruffle_matched` → pass (6 of them pass on `mock_date_time` alone) |
 | `avm2/try_catch_typed` | `output.txt` | 2026-11-26 | s29 coordinator FP32 (`w1-local-oracles/w1-rm-avm2/try_catch_typed.fp32.txt`) | `[file:line]` suffixes; stays pass with the s29 debug-line info (fails without it) |
 | `avm2/slot_holes_fail`, `avm2/slot_id_exceeds_trait_count` | `output.txt` | 2026-11-26 | s28 trace-provenance `avm2__slot_*.r1.txt` | empty golden → FP32 VerifyError #1107 (+ #1065); stay `ruffle_matched` (O3 not implemented) |
+| `from_shumway/acid/acid-large` | `output.expected.png` | 2026-11-27 | s29 coordinator pre-s30 FP32 LOW (LNX == WIN byte for byte; `session30-fanout-reports/pre-launch-oracles/`) | stays fail; golden (Ruffle) 178 720 ch from Flash, ours 138 478 |
 
 **Graded** in run `45547012629` at `7c3cfdcb7` (results `e1425f417`) vs `cb14cd063`: 0 status moves in either axis.
 Excess channels vs the new Flash goldens:
