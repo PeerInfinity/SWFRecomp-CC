@@ -1,0 +1,1 @@
+# flash trace: mode=direct frames=2 rate=30.0 stop=max_duration pin=settled 400x352
