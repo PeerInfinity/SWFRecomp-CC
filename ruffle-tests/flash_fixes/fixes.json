@@ -999,5 +999,27 @@
     "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
     "added": "2026-11-27"
+  },
+  {
+    "test": "visual/drawing_api/drawing_order",
+    "file": "output.expected.png",
+    "upstream_sha256": "22c1e56f57c0d1d32fdccef95bce46947a07a7dd2e853dc22ab1fb00bf4800d4",
+    "fix": "visual/drawing_api/drawing_order/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__drawing_api__drawing_order__output.low.png (s28 lowq-recapture LNX LOW == WIN LOW (0 px, re-checked s29))",
+    "reason": "ours (s29 TSNAP + LOW stroke raster) 3016 ch vs this capture; was 12784. Golden is a Ruffle LOW render.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW stroke raster golden swaps",
+    "added": "2026-11-27"
+  },
+  {
+    "test": "visual/drawing_api/cursor",
+    "file": "output.expected.png",
+    "upstream_sha256": "91a1d1a5edf4cb11dae0b79c08770f80b676e875bbf9be4660ee28324ff7525c",
+    "fix": "visual/drawing_api/cursor/output.expected.png",
+    "kind": "image",
+    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2b-lowq-stroke/cursor.low.png (s29 coordinator LNX LOW == WIN LOW == s27 golden-provenance capture (0 px))",
+    "reason": "ours (s29 LOW stroke raster) 2 ch vs this capture; golden is 399 px off Flash. Golden is a Ruffle LOW render.",
+    "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW stroke raster golden swaps",
+    "added": "2026-11-27"
   }
 ]

@@ -1504,3 +1504,16 @@ Example (`MovieClip-v6` `output.fp23.txt` vs our old output): `PASSED: mcm == 1 
 
 **Decision:** match Flash (landed, `action.c`; rule 6 is read-back only, the renderer keeps its float matrix). Prune
 criterion: Ruffle adopts the rule, or a Flash capture contradicts it.
+
+## s29 LOW stroke raster golden swaps (s29 coordinator, 2026-11-27)
+
+**Tests:** `visual/drawing_api/drawing_order`, `visual/drawing_api/cursor`.
+
+Flash Player 32 at quality LOW strokes with its own raster (s29 `w2b-lowq-stroke`, `6a27fc2e0`; fixture
+`regression/lowq_stroke_probe`, FP32 golden): width rounded on the ¼-px grid, a thin minor-axis pen of
+n = min(W, 4) px below 5.5 px, polygon above, the axis-band rule (n = 3 depends on travel direction), plus TSNAP
+translation snapping. Ruffle's LOW goldens use its GPU stroker. Ours with the rule vs the FP32 LOW captures
+(LNX == WIN, 0 px): `drawing_order` 12 784 → 3 016 channels; `cursor` 400 → 2 (golden 399 px off Flash).
+
+**Decision:** match Flash; both goldens swapped through `flash_fixes`. Prune criterion: Ruffle's LOW stroker adopts
+these rules, or upstream re-bakes the goldens from Flash.
