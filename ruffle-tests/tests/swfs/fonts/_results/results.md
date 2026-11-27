@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-27 16:08 UTC
+**Date**: 2026-11-27 22:24 UTC
 
-**Git SHA**: `2d40d37996`
+**Git SHA**: `0224aaf256`
 
-**Run Duration**: 2m 40s
+**Run Duration**: 2m 54s
 
 ## Summary
 
@@ -25,14 +25,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `device_font_glyph_fallback` | 36 | 24.0s |  |
-| 2 | `device_font_kerning` | 4 | 24.4s |  |
-| 3 | `device_font_list` | 64 | 24.3s |  |
-| 4 | `device_font_name_case` | 13 | 1.0s |  |
-| 5 | `embed_matching/fallback_preferences` | 0 | 25.2s |  |
-| 6 | `embed_matching/match_style` | 0 | 5.0s |  |
-| 7 | `embed_matching/no_font_found` | 0 | 6.9s |  |
-| 8 | `embed_name_lookup` | 242 | 18.5s |  |
+| 1 | `device_font_glyph_fallback` | 36 | 31.4s |  |
+| 2 | `device_font_kerning` | 4 | 30.9s |  |
+| 3 | `device_font_list` | 64 | 25.6s |  |
+| 4 | `device_font_name_case` | 13 | 1.5s |  |
+| 5 | `embed_matching/fallback_preferences` | 0 | 33.8s |  |
+| 6 | `embed_matching/match_style` | 0 | 6.0s |  |
+| 7 | `embed_matching/no_font_found` | 0 | 6.0s |  |
+| 8 | `embed_name_lookup` | 242 | 18.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -40,7 +40,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `device_font_no_ink` | 14 | 14 | 30.1s |  |
+| 1 | `device_font_no_ink` | 14 | 14 | 19.7s |  |
 
 ## Near-Passing Tests
 

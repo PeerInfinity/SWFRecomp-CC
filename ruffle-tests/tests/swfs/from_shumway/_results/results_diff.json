@@ -1,41 +1,45 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T07:04:59.002196+00:00",
+    "old_timestamp": "2026-11-27T16:08:12.424405+00:00",
     "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "new_timestamp": "2026-11-27T16:08:12.424405+00:00",
-    "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
+    "new_timestamp": "2026-11-27T22:24:41.208437+00:00",
+    "new_git_sha": "0224aaf256324c72a214123929b4570721246fc1",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 208,
+    "old_pass": 215,
     "old_ruffle_matched": 13,
-    "old_effective_pass": 221,
-    "old_total": 222,
-    "old_pass_rate": 93.7,
-    "new_pass": 215,
-    "new_ruffle_matched": 13,
+    "old_effective_pass": 228,
+    "old_total": 229,
+    "old_pass_rate": 93.9,
+    "new_pass": 218,
+    "new_ruffle_matched": 10,
     "new_effective_pass": 228,
     "new_total": 229,
-    "new_pass_rate": 93.9,
+    "new_pass_rate": 95.2,
     "old_mismatched_lines": 76,
-    "new_mismatched_lines": 76,
+    "new_mismatched_lines": 70,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 6,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 222,
-    "added": 7,
+    "status_changed": 3,
+    "unchanged": 226,
+    "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "image-loading",
-      "change_type": "added",
-      "old_status": null,
+      "test": "MaskTest-3",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
       "new_status": "pass",
-      "old_lines": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
       "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
@@ -43,75 +47,35 @@
       }
     },
     {
-      "test": "invalidClipDepth",
-      "change_type": "added",
-      "old_status": null,
+      "test": "avm2/flash/geom/transform/pixelBounds",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
       "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "local2global",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "localconnection",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      }
-    },
-    {
-      "test": "lzma",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "lzma_bytes",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
         "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
       }
     },
     {
-      "test": "mouse/mouse_coords",
-      "change_type": "added",
-      "old_status": null,
+      "test": "timeline/nav/clipDepth",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
       "new_status": "pass",
-      "old_lines": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 8,
+        "matching_lines": 4
+      },
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
       }
     }
   ]

@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T21:14:50.652708+00:00",
+    "timestamp": "2026-11-27T23:57:06.734276+00:00",
     "suite": "visual",
     "stem": "results_graphics",
-    "git_sha": "a18a0e03349f07a0a41e1c7bb971b8eafe349891",
+    "git_sha": "715a5300c822a50c51e4dc2e2a0052b0dfb62a7a",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "46061659732",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/46061659732",
+    "run_id": "46078812768",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/46078812768",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 148,
@@ -521,31 +521,31 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 45 (4 checks)",
-      "max_diff": 45,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 57 (4 checks)",
+      "max_diff": 57,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 33908,
-      "mean_diff": 0.0845,
+      "diff_channels": 33898,
+      "mean_diff": 0.0841,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 40000,
-          "outliers": 33908,
+          "outliers": 33898,
           "passed": true
         },
         {
           "tolerance": 16,
           "max_outliers": 1300,
-          "outliers": 1194,
+          "outliers": 1179,
           "passed": true
         },
         {
           "tolerance": 32,
           "max_outliers": 60,
-          "outliers": 48,
+          "outliers": 49,
           "passed": true
         },
         {
@@ -1399,19 +1399,19 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 3772,
-      "mean_diff": 0.0712,
+      "diff_channels": 3750,
+      "mean_diff": 0.0657,
       "checks": [
         {
           "tolerance": 10,
           "max_outliers": 3200,
-          "outliers": 1555,
+          "outliers": 1516,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 350,
-          "outliers": 134,
+          "outliers": 102,
           "passed": true
         },
         {
@@ -1441,19 +1441,19 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 3663,
-      "mean_diff": 0.0713,
+      "diff_channels": 3622,
+      "mean_diff": 0.0649,
       "checks": [
         {
           "tolerance": 10,
           "max_outliers": 3200,
-          "outliers": 1475,
+          "outliers": 1423,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 350,
-          "outliers": 169,
+          "outliers": 133,
           "passed": true
         },
         {
@@ -1477,25 +1477,25 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 127 (3 checks)",
-      "max_diff": 127,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 95 (3 checks)",
+      "max_diff": 95,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 3669,
-      "mean_diff": 0.0696,
+      "diff_channels": 3637,
+      "mean_diff": 0.0652,
       "checks": [
         {
           "tolerance": 10,
           "max_outliers": 3200,
-          "outliers": 1477,
+          "outliers": 1443,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 350,
-          "outliers": 145,
+          "outliers": 126,
           "passed": true
         },
         {
@@ -1519,25 +1519,25 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 127 (3 checks)",
-      "max_diff": 127,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 112 (3 checks)",
+      "max_diff": 112,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 3764,
-      "mean_diff": 0.072,
+      "diff_channels": 3743,
+      "mean_diff": 0.0674,
       "checks": [
         {
           "tolerance": 10,
           "max_outliers": 3200,
-          "outliers": 1561,
+          "outliers": 1538,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 350,
-          "outliers": 142,
+          "outliers": 104,
           "passed": true
         },
         {
@@ -1561,25 +1561,25 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 112 (3 checks)",
-      "max_diff": 112,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 111 (3 checks)",
+      "max_diff": 111,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 3634,
-      "mean_diff": 0.0643,
+      "diff_channels": 3615,
+      "mean_diff": 0.0592,
       "checks": [
         {
           "tolerance": 10,
           "max_outliers": 3200,
-          "outliers": 1427,
+          "outliers": 1398,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 350,
-          "outliers": 118,
+          "outliers": 86,
           "passed": true
         },
         {
@@ -1603,25 +1603,25 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 112 (3 checks)",
-      "max_diff": 112,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 111 (3 checks)",
+      "max_diff": 111,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 3240,
-      "mean_diff": 0.0435,
+      "diff_channels": 3234,
+      "mean_diff": 0.0419,
       "checks": [
         {
           "tolerance": 10,
           "max_outliers": 3200,
-          "outliers": 964,
+          "outliers": 950,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 350,
-          "outliers": 91,
+          "outliers": 85,
           "passed": true
         },
         {
@@ -1970,31 +1970,31 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 697 outliers (limit 900), max difference 128 (2 checks)",
+      "message": "Image check passed: 712 outliers (limit 900), max difference 128 (2 checks)",
       "max_diff": 128,
       "expected_source": "repo",
       "width": 275,
       "height": 275,
       "total_channels": 302500,
-      "diff_channels": 2299,
-      "mean_diff": 0.4807,
+      "diff_channels": 2328,
+      "mean_diff": 0.4903,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 2800,
-          "outliers": 2299,
+          "outliers": 2328,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 900,
-          "outliers": 697,
+          "outliers": 712,
           "passed": true
         }
       ],
       "applicable_checks": 2,
       "failed_checks": 0,
-      "outliers": 697,
+      "outliers": 712,
       "max_outliers": 900,
       "tolerance": 64,
       "excess_outliers": 0
@@ -6249,29 +6249,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 43098 outliers exceed limit of 3, max difference 180",
+      "message": "Image comparison failed: 44486 outliers exceed limit of 3, max difference 180",
       "reason": "pixel_mismatch",
       "max_diff": 180,
       "expected_source": "repo",
       "width": 871,
       "height": 528,
       "total_channels": 1839552,
-      "diff_channels": 43098,
-      "mean_diff": 0.5389,
+      "diff_channels": 44486,
+      "mean_diff": 0.5328,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 3,
-          "outliers": 43098,
+          "outliers": 44486,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 43098,
+      "outliers": 44486,
       "max_outliers": 3,
       "tolerance": 0,
-      "excess_outliers": 43095
+      "excess_outliers": 44483
     },
     {
       "suite": "visual",
@@ -6435,31 +6435,31 @@
       "trace_status": "pass",
       "known_failure": true,
       "status": "fail",
-      "message": "Image comparison failed: 12570 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 8718 outliers exceed limit of 0, max difference 224",
       "reason": "pixel_mismatch",
-      "max_diff": 255,
+      "max_diff": 224,
       "ruffle_match": false,
       "ruffle_max_diff": 255,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 15900,
-      "mean_diff": 1.5546,
+      "diff_channels": 12306,
+      "mean_diff": 0.5081,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 12570,
+          "outliers": 8718,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 12570,
+      "outliers": 8718,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 12570
+      "excess_outliers": 8718
     },
     {
       "suite": "visual",
