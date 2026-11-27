@@ -424,7 +424,11 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 		int saved_tag_skip_phase_e = g_tag_skip_mode;
 		g_tag_skip_mode = 1;
 		actionDrainSuppressEnter();
-		funcs[target](app_context);
+		{ extern int g_goto_inline_tagorder; extern size_t g_goto_inline_target;
+		  int _sv_to = g_goto_inline_tagorder; size_t _sv_tt = g_goto_inline_target;
+		  g_goto_inline_tagorder = 1; g_goto_inline_target = target;
+		  funcs[target](app_context);
+		  g_goto_inline_tagorder = _sv_to; g_goto_inline_target = _sv_tt; }
 		actionDrainSuppressLeave();
 		NG_NOTE_ROOT_DOACTION_RAN(target);
 		g_tag_skip_mode = saved_tag_skip_phase_e;
@@ -1086,6 +1090,12 @@ void tagMain(SWFAppContext* app_context)
 		// func runs this tick.
 		// Phase 3, early (s27 w2-exec-order-land, see exec_order_nested_early):
 		// nested sprites first, then their root-level parents (Phase 1).
+		// s29 w2-timers-goto-land: the timer check deferred by a busy stretch
+		// that overran the previous frame runs here, after the root playhead
+		// advance and before this tick's sprite advance / enterFrame /
+		// DoActions (FP32 regression/avm1_timer_late_frame_check). No-op
+		// unless processTimers deferred one.
+		{ extern void timerRunLatePass(SWFAppContext*); timerRunLatePass(app_context); }
 		{ extern void actionSnapshotEnterFrameCandidates(void); actionSnapshotEnterFrameCandidates(); }  // s28 w2-test12-land
 		const int nested_early = exec_order_nested_early();
 		if (nested_early)

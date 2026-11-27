@@ -392,7 +392,11 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 		int saved_tag_skip_phase_e = g_tag_skip_mode;
 		g_tag_skip_mode = 1;
 		actionDrainSuppressEnter();
-		funcs[target](app_context);
+		{ extern int g_goto_inline_tagorder; extern size_t g_goto_inline_target;
+		  int _sv_to = g_goto_inline_tagorder; size_t _sv_tt = g_goto_inline_target;
+		  g_goto_inline_tagorder = 1; g_goto_inline_target = target;
+		  funcs[target](app_context);
+		  g_goto_inline_tagorder = _sv_to; g_goto_inline_target = _sv_tt; }
 		actionDrainSuppressLeave();
 		g_tag_skip_mode = saved_tag_skip_phase_e;
 		ng_run_deferred_sprite_init_on_or_after(app_context, target);
@@ -1197,6 +1201,12 @@ void swfStart(SWFAppContext* app_context)
 		// SHUMWAY_AVM1_SUBTREES_PLAN.md Part B).
 		actionPromotePendingMCLLoads(app_context);
 
+		// s29 w2-timers-goto-land: the timer check deferred by a busy stretch
+		// that overran the previous frame runs here, after the root playhead
+		// advance and before this tick's sprite advance / enterFrame /
+		// DoActions (FP32 regression/avm1_timer_late_frame_check). No-op
+		// unless processTimers deferred one.
+		{ extern void timerRunLatePass(SWFAppContext*); timerRunLatePass(app_context); }
 		// Frame-first: advance sprites and run frame scripts before delivering events.
 		// This ensures that listeners registered in frame scripts receive events from
 		// the same tick (matching Flash/Ruffle's frame-then-event execution order).

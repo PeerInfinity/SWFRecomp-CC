@@ -712,6 +712,7 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
 // ---------------------------------------------------------------------------
 // Forward declaration for the inner processing logic (processes a single depth index).
 static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* parent_mc, size_t depth_idx);
+void ng_goto_inline_place_hook(SWFAppContext* app_context, size_t depth);
 
 static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* parent_mc)
 {
@@ -13392,7 +13393,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 {
 	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
 	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
-	if (g_tag_skip_mode) return;
+	if (g_tag_skip_mode) {
+		ng_goto_inline_place_hook(app_context, depth);
+		return;
+	}
 	ng_ensureDisplayListSize(app_context, depth);
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
@@ -14365,7 +14369,7 @@ void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, si
 {
 	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
 	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
-	if (g_tag_skip_mode) return;
+	if (g_tag_skip_mode) { ng_goto_inline_place_hook(app_context, depth); return; }
 	// Set pending so tagPlaceObject2 attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
@@ -14391,7 +14395,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 {
 	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
 	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
-	if (g_tag_skip_mode) return;
+	if (g_tag_skip_mode) { ng_goto_inline_place_hook(app_context, depth); return; }
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Same Phase-2 contract as tagPlaceObject2: placement is already done.
 	// Without this a script-only replay RE-PLACED the child from scratch
@@ -14926,7 +14930,7 @@ void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t dept
 {
 	// g_tag_skip_mode (a goto's scripts-only target replay): every build since s28
 	// browser-root-goto (the browser root gotos run ng_executeGotoCatchUp).
-	if (g_tag_skip_mode) return;
+	if (g_tag_skip_mode) { ng_goto_inline_place_hook(app_context, depth); return; }
 	// Set pending so tagPlaceObject2Ratio attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
@@ -17421,6 +17425,42 @@ void ng_fire_deferred_constructors(SWFAppContext* app_context)
 void ng_run_deferred_sprite_init(SWFAppContext* app_context)
 {
 	ng_run_deferred_sprite_init_impl(app_context, 0, 0);
+}
+
+// s29 w2-timers-goto-land: goto target frame queues child frame-1
+// scripts in TAG order (Flash, gnash misc-swfc.all/gotoFrameFromInterval{,2}:
+// DoAction A / PlaceObject c1..c3 / DoAction B runs A, c1, c2, c3, B — the same
+// order as a natural advance into that frame). Set by ng_executeGotoCatchUp
+// around the inline funcs[target] replay; tagPlaceObject2's g_tag_skip_mode
+// arm runs the deferred init of the child placed at that depth on the target
+// frame, so its script lands in the SCRIPT FIFO between A and B (FP32
+// regression/avm1_goto_target_child_order_{gotoscript,interval}). The
+// PlaceObject2 variants (clip actions / ratio) call it from their own
+// g_tag_skip_mode arms; PlaceObject3 delegates to tagPlaceObject2.
+int g_goto_inline_tagorder = 0;
+size_t g_goto_inline_target = 0;
+void ng_goto_inline_place_hook(SWFAppContext* app_context, size_t depth)
+{
+	if (!g_goto_inline_tagorder) return;
+	if (depth > max_depth) return;
+	DisplayObject* obj = &display_list[depth];
+	if (obj->char_id == 0 || !obj->sprite_needs_init) return;
+	if (obj->placed_at_frame != g_goto_inline_target) return;
+	extern void ng_sync_root_display_obj(void);
+	ng_sync_root_display_obj();
+	int saved_cu = catch_up_mode;
+	int saved_skip = g_tag_skip_mode;
+	g_tag_skip_mode = 0;
+	g_sprite_init_filter_active = 1;
+	g_sprite_init_before_target = 0;
+	g_sprite_init_target_frame = g_goto_inline_target;
+	catch_up_mode = 0;
+	actionDeferredSpriteInitEnter();
+	process_sprite_init_at_depth(app_context, &root_movieclip, depth);
+	actionDeferredSpriteInitLeave();
+	g_sprite_init_filter_active = 0;
+	catch_up_mode = saved_cu;
+	g_tag_skip_mode = saved_skip;
 }
 
 // Run deferred sprite inits only for sprites placed BEFORE target_frame.

@@ -38069,18 +38069,55 @@ void peekSecondVar(SWFAppContext* app_context, ActionVar* var)
 	}
 }
 
+// s29 w2-timers-goto-land (FP32 regression/avm1_enterframe_sprite_nextframe):
+// the NextFrame / PrevFrame opcode with a NON-ROOT target (SetTarget /
+// tellTarget, or a base-clip context) outside that sprite's own tag execution
+// is gotoAndStop(target._currentframe +/- 1) on THAT clip, inline (Flash:
+// `after next cf=3` then the sprite's frame-3 script). It used to fall
+// through to the root's next_frame, so the sprite never moved. Same route as
+// actionGotoFrame's g_current_context arm (ng_gotoFrameByMC).
+static int actionNavNonRootTarget(SWFAppContext* app_context, int dir)
+{
+	extern int g_settarget_none;
+	if (g_settarget_none || ng_isInsideSprite()) return 0;
+	MovieClip* mc = g_current_context;
+	if (mc == NULL || mc == &root_movieclip) return 0;
+	int cf = mc->currentframe;  // 1-indexed
+	if (dir < 0) {
+		if (cf <= 1) return 1;  // already on frame 1: Flash does nothing
+		return ng_gotoFrameByMC(app_context, mc, (u16)(cf - 2), 0) ? 1 : 0;
+	}
+	if (mc->totalframes > 0 && cf >= mc->totalframes) return 1;  // last frame
+	return ng_gotoFrameByMC(app_context, mc, (u16)cf, 0) ? 1 : 0;
+}
+
+static int actionEfNavInlineCtx(void)
+{
+	extern int g_inside_enterframe_dispatch;
+	return g_inside_enterframe_dispatch && !g_inside_event_handler && !g_inside_broadcaster_dispatch
+	    && g_current_context == &root_movieclip && !ng_isInsideSprite();
+}
+
 void actionPrevFrame(SWFAppContext* app_context)
 {
 	// Suppress unused parameter warning
 	(void)app_context;
 	// s26 w2: a loaded movie's own frame code -> its own playhead.
 	if (actionChildMovieBareGoto(app_context, 0, -1, 0)) return;
+	if (actionNavNonRootTarget(app_context, -1)) return;
 
 	// Access global frame control variables
 	extern size_t current_frame;
 	extern size_t next_frame;
 	extern int manual_next_frame;
 
+	// s29 w2-timers-goto-land: PrevFrame inside the root onEnterFrame
+	// runs inline too (see actionNextFrame); it used to defer, and the target
+	// frame's DoAction never ran.
+	if (actionEfNavInlineCtx()) {
+		if (current_frame > 0) actionGotoFrame(app_context, (u16)(current_frame - 1));
+		return;
+	}
 	// Move to previous frame if not already at first frame
 	if (current_frame > 0)
 	{
@@ -39710,6 +39747,7 @@ void actionNextFrame(SWFAppContext* app_context)
 
 	// s26 w2: a loaded movie's own frame code -> its own playhead.
 	if (actionChildMovieBareGoto(app_context, 0, +1, 0)) return;
+	if (actionNavNonRootTarget(app_context, +1)) return;
 	extern int g_settarget_explicit_root;
 	if (ng_isInsideSpriteInit() && g_settarget_explicit_root) {
 		// SetTarget("_root") + NextFrame from inside sprite init:
@@ -39795,6 +39833,17 @@ void actionNextFrame(SWFAppContext* app_context)
 	// rest of the run. g_inside_broadcaster_dispatch closes it with the same
 	// deferred-goto form. Key test: from_gnash/misc-ming.all/masks_test
 	// ("- Press any key to continue -" at 28/175 lines).
+	// s29 w2-timers-goto-land (FP32 regression/avm1_enterframe_root_nextframe):
+	// inside the ROOT onEnterFrame, NextFrame is gotoAndStop(_currentframe + 1) and runs
+	// INLINE like GotoFrame does since s28 4a25debc9 (FP32
+	// regression/avm1_enterframe_root_goto_opcode), on a stopped AND a playing
+	// root (the stopped-only deferred arm below left a playing root playing
+	// and its _currentframe stale inside the handler).
+	if (actionEfNavInlineCtx()) {
+		extern size_t g_frame_count;
+		if (current_frame + 1 < g_frame_count) actionGotoFrame(app_context, (u16)(current_frame + 1));
+		return;
+	}
 	{
 		extern int g_inside_enterframe_dispatch;
 		extern int is_playing;

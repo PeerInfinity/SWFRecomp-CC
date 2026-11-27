@@ -684,6 +684,28 @@ static void timerRunOverduePass(SWFAppContext* app_context)
 	free(ids);
 }
 
+static int g_timer_late_pass_pending = 0;
+
+// The deferred late-frame check (see processTimersImpl). Called by the frame
+// loops (swf.c / swf_core.c) at the top of the tick, after the root
+// playhead advance and before the sprite advance / enterFrame / DoActions.
+// The same timers the in-tick pass would have fired (every one due before
+// the clock, once each, creation order); only the point moves.
+void timerRunLatePass(SWFAppContext* app_context)
+{
+	if (!g_timer_late_pass_pending) return;
+	g_timer_late_pass_pending = 0;
+	g_in_process_timers++;
+	tagGotoInitTimerPass(1);
+	timerRunOverduePass(app_context);
+	timerTakeBusyUs();  // a nested busy callback only moves the clock
+	tagGotoInitTimerPass(0);
+	tagDrainGotoInitActions(app_context, 1);
+	ng_runPendingRootGotoFromEvent(app_context);
+	g_in_process_timers--;
+	timerTakeBusyUs();  // frame code after this check starts a fresh window
+}
+
 static void processTimersImpl(SWFAppContext* app_context, double frame_duration_ms)
 {
 	// Busy frame code since the last check: the clock moved under it, and
@@ -717,6 +739,22 @@ static void processTimersImpl(SWFAppContext* app_context, double frame_duration_
 	// callback run after the batch of timers due at the same instant
 	// (tagDrainGotoInitActions; gnash gotoFrameFromInterval `x0xx1x234`).
 	tagGotoInitTimerPass(1);
+	// s29 w2-timers-goto-land (FP32 regression/avm1_timer_late_frame_check):
+	// busy code that overran the frame's end leaves no idle time, so Flash's
+	// check for what it made overdue comes after the NEXT playhead advance
+	// (the callbacks read the advanced _root._currentframe), before that
+	// tick's enterFrame / DoActions. Defer the pass to timerRunLatePass,
+	// which the frame loops call there. A busy stretch inside the frame
+	// period keeps its check here (FP32: same frame, same _currentframe).
+	// No idle loop either: every timer due before the clock is overdue, and
+	// the deferred pass fires each once.
+	int late = 0;
+	if (busy_pass && g_timer_cur_us > frame_end)
+	{
+		busy_pass = 0;
+		late = 1;
+		g_timer_late_pass_pending = 1;
+	}
 	if (busy_pass)
 	{
 		timerRunOverduePass(app_context);
@@ -732,7 +770,7 @@ static void processTimersImpl(SWFAppContext* app_context, double frame_duration_
 	uint64_t batch_tick = 0;
 	for (;;)
 	{
-		if (g_execution_halted) break;
+		if (g_execution_halted || late) break;
 		// Earliest due active timer (ties: lowest id = creation order).
 		int best = -1;
 		for (int i = 0; i < g_timers_cap; i++)
@@ -760,7 +798,17 @@ static void processTimersImpl(SWFAppContext* app_context, double frame_duration_
 
 		if (!have_batch) { have_batch = 1; batch_tick = t->tick_us; }
 		timerTakeBusyUs();  // open this callback's busy window
-		if (!timerFireAndSettle(app_context, best, 0)) break;
+		// s29 w2-timers-goto-land (callback-time clock): Flash polls
+		// continuously while idle, so a callback runs at (about) its own due
+		// time, and a timer it creates is due `delay` after THAT, not after
+		// the frame's end (FP32 3/3: regression/avm1_timer_clock_model `n=1`
+		// in F3: a setTimeout(fn, 0) made in a 20 ms callback fires in the
+		// same frame). The loop bound stays the frame's end.
+		uint64_t cb_saved_clock = g_timer_cur_us;
+		if (t->tick_us < g_timer_cur_us) g_timer_cur_us = t->tick_us;
+		int cb_ok = timerFireAndSettle(app_context, best, 0);
+		g_timer_cur_us = cb_saved_clock;
+		if (!cb_ok) break;
 		uint64_t cb_busy = timerTakeBusyUs();
 		if (cb_busy != 0)
 		{

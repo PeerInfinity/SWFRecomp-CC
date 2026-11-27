@@ -245,10 +245,11 @@ in its own `test.toml`, confirming Ruffle knows its expectation is wrong.
 + FAILED: _root.asOrder: ... obtained: "x0xx1xx2xx3...x89..."  (Ruffle: runaway, 10 tests, never cleanly ends)
 ```
 
-**Caveat — this is not the usual "we match Flash" case.** Our runtime does **not**
-match Flash here either: we currently **time out** (a distinct pre-existing
-infinite-loop issue in the runaway path). So the entry is recorded as "Ruffle's
-expectation is wrong" rather than "we're right and Ruffle's wrong."
+**Caveat (updated s29 w2-timers-goto-land).** The old caveat here ("our runtime
+... currently **times out**") is stale: we have terminated cleanly since the s27
+timer work, and printed Flash's output except for one check (`asOrder`, see the
+"goto target frame runs its children in TAG order" entry at EOF). With that
+landed (s29), the row passes against Flash's `output.txt` in both modes.
 
 **Decision:** Do not pursue `ruffle_matched` — matching Ruffle's buggy,
 non-terminating output is not a worthwhile target (working rule: reach
@@ -1453,3 +1454,26 @@ adopts the translation snap, or upstream re-bakes these goldens from Flash.
   property. Script-created clips coerce from the start, and a non-numeric value coerces to INT_MIN (Ruffle agrees
   on INT_MIN for strings/objects). We match FP32 (`action.c` `tabRootNoteLookup`, `actionSetMember` tabIndex block):
   rm → pass. Regression rows `avm1_tabindex_{fn2_root_raw,fresh_child_coerce,read_first_coerce,mtasc_class_main}`.
+## goto target frame runs its children in TAG order (Ruffle runs the frame's DoActions first)
+
+**Tests:** `from_gnash/misc-swfc.all/gotoFrameFromInterval`, `gotoFrameFromInterval2`
+(both `known_failure = true` upstream; FLASH `output.txt`); regression fixtures
+`avm1_goto_target_child_order_{normal,gotoscript,interval}` (FP32 goldens, s29
+coordinator capture `session29-fanout-reports/w1-local-oracles/w1-timers-goto/goto_*.r1.txt`).
+
+A root goto (from a frame script or from a setInterval callback) whose target
+frame is `DoAction A / PlaceObject2 c1, c2 (sprites with frame-1 scripts) /
+DoAction B` runs, in Flash, `A, c1, c2, B` — the same tag order as a natural
+advance into that frame. Ruffle (`movie_clip.rs` `run_goto`: "Finally, run
+frames for children that are placed on this frame") runs `A, B, c1, c2`.
+
+```diff
+  (gnash, sc:67)
+- PASSED: asOrder == 0+1+2+3+4+1+2+3+4+1+2+3+4+     (Flash: after the 15 clip lines)
++ FAILED: asOrder: expected ..., obtained "0+"      (Ruffle / us before s29: before them)
+```
+
+**Decision:** match Flash. `ng_executeGotoCatchUp` (swf.c / swf_core.c) marks its
+inline target replay and the PlaceObject2 skip arms in `tag.c` run each
+target-frame child's deferred init at its own tag position
+(`ng_goto_inline_place_hook`). s29 w2-timers-goto-land.
