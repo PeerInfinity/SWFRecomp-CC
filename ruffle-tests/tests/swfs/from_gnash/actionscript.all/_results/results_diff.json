@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-26T21:04:08.216380+00:00",
-    "old_git_sha": "bfa47037b19ed3fa74c1dbbf9d4d98319f0fac79",
-    "new_timestamp": "2026-11-27T02:09:04.019034+00:00",
-    "new_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
+    "old_timestamp": "2026-11-27T02:09:04.019034+00:00",
+    "old_git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
+    "new_timestamp": "2026-11-27T03:57:01.507184+00:00",
+    "new_git_sha": "dbc43c157352371720c1fed7998018a150009d42",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,118 @@
     "old_effective_pass": 240,
     "old_total": 243,
     "old_pass_rate": 72.8,
-    "new_pass": 177,
-    "new_ruffle_matched": 63,
+    "new_pass": 181,
+    "new_ruffle_matched": 59,
     "new_effective_pass": 240,
     "new_total": 243,
-    "new_pass_rate": 72.8,
+    "new_pass_rate": 74.5,
     "old_mismatched_lines": 7696,
-    "new_mismatched_lines": 7696,
+    "new_mismatched_lines": 7614,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 82,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 243,
+    "status_changed": 4,
+    "unchanged": 237,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "ExternalInterface-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 118,
+        "expected_lines": 118,
+        "matching_lines": 114
+      },
+      "new_lines": {
+        "actual_lines": 118,
+        "expected_lines": 118,
+        "matching_lines": 115
+      }
+    },
+    {
+      "test": "MovieClip-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 363,
+        "expected_lines": 363,
+        "matching_lines": 353
+      },
+      "new_lines": {
+        "actual_lines": 363,
+        "expected_lines": 363,
+        "matching_lines": 363
+      }
+    },
+    {
+      "test": "MovieClip-v6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 936,
+        "expected_lines": 936,
+        "matching_lines": 916
+      },
+      "new_lines": {
+        "actual_lines": 936,
+        "expected_lines": 936,
+        "matching_lines": 936
+      }
+    },
+    {
+      "test": "MovieClip-v7",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 969,
+        "expected_lines": 969,
+        "matching_lines": 949
+      },
+      "new_lines": {
+        "actual_lines": 969,
+        "expected_lines": 969,
+        "matching_lines": 969
+      }
+    },
+    {
+      "test": "MovieClip-v8",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1087,
+        "expected_lines": 1087,
+        "matching_lines": 1062
+      },
+      "new_lines": {
+        "actual_lines": 1087,
+        "expected_lines": 1087,
+        "matching_lines": 1087
+      }
+    },
+    {
+      "test": "String-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 358,
+        "expected_lines": 358,
+        "matching_lines": 344
+      },
+      "new_lines": {
+        "actual_lines": 358,
+        "expected_lines": 358,
+        "matching_lines": 350
+      }
+    }
+  ]
 }
