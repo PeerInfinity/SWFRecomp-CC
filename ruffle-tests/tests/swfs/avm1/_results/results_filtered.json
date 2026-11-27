@@ -6,19 +6,19 @@
     "total_available": 791,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 9,
+    "ignored_count": 8,
     "filtered": true
   },
-  "total": 782,
+  "total": 783,
   "pass": 773,
-  "ruffle_matched": 6,
+  "ruffle_matched": 7,
   "fail": 3,
-  "pass_rate": 98.8,
-  "effective_pass": 779,
+  "pass_rate": 98.7,
+  "effective_pass": 780,
   "effective_pass_rate": 99.6,
   "breakdown": {
     "output_mismatch": 3,
-    "ruffle_matched": 6
+    "ruffle_matched": 7
   },
   "tests": [
     {
@@ -10525,6 +10525,25 @@
       },
       "duration": 1.94,
       "status": "pass"
+    },
+    {
+      "test": "tab_ordering_properties_tab_index_edge_case",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.624,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 1
+      },
+      "duration": 2.64,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
     },
     {
       "test": "tab_ordering_reverse",

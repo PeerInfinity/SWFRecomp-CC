@@ -6,20 +6,20 @@
 
 **Run Duration**: 51m 42s
 
-**Filtered**: 9 tests ignored out of 791 available
+**Filtered**: 8 tests ignored out of 791 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 782 |
-| Passing | **773** (98.8%) |
-| Ruffle-matched | 6 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **779** (99.6%) |
+| Total tests | 783 |
+| Passing | **773** (98.7%) |
+| Ruffle-matched | 7 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **780** (99.6%) |
 | Failing | 3 |
-| Total expected lines | 120273 |
-| Matching lines | 117167 (97.4%) |
-| Mismatched lines | 3106 |
+| Total expected lines | 120277 |
+| Matching lines | 117168 (97.4%) |
+| Mismatched lines | 3109 |
 
 ### Failure Breakdown
 
@@ -809,7 +809,7 @@
 
 ## Ruffle-Matched Tests
 
-**6 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**7 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
@@ -817,8 +817,9 @@
 | 2 | `attach_movie_export_not_yet_run` | 1 | 1 | 19.1s |  |
 | 3 | `edittext_onscroller` | 8 | 8 | 1.6s |  |
 | 4 | `load_cancel_via_unloadclip` | 2 | 2 | 0.8s |  |
-| 5 | `target_paths/swf5` | 654 | 654 | 0.5s |  |
-| 6 | `target_paths/swf6` | 654 | 654 | 0.5s |  |
+| 5 | `tab_ordering_properties_tab_index_edge_case` | 3 | 3 | 2.6s |  |
+| 6 | `target_paths/swf5` | 654 | 654 | 0.5s |  |
+| 7 | `target_paths/swf6` | 654 | 654 | 0.5s |  |
 
 ## Near-Passing Tests
 
@@ -961,4 +962,4 @@ No timeouts.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 5 | 0 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 33 | 33 | 0 |
-| | *(tests not in any document)* | 292 | 283 | 9 |
+| | *(tests not in any document)* | 293 | 283 | 10 |

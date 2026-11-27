@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T01:51:13.755232+00:00",
+    "timestamp": "2026-11-27T03:35:26.184597+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "6ee6eded7b669655ae826764d6f84c860a586e68",
+    "git_sha": "dbc43c157352371720c1fed7998018a150009d42",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45920452660",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45920452660",
+    "run_id": "45928279588",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45928279588",
     "run_attempt": "1"
   },
-  "tests_with_comparisons": 95,
-  "comparisons": 95,
+  "tests_with_comparisons": 96,
+  "comparisons": 96,
   "ignored": 0,
   "pass": 90,
-  "fail": 2,
+  "fail": 3,
   "skip": 3,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 94.7,
+  "pass_rate": 93.8,
   "results": [
     {
       "suite": "regression",
@@ -2060,29 +2060,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 2815 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 10987 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 35445,
-      "mean_diff": 0.316,
+      "diff_channels": 42818,
+      "mean_diff": 1.1445,
       "checks": [
         {
           "tolerance": 2,
           "max_outliers": 0,
-          "outliers": 2815,
+          "outliers": 10987,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 2815,
+      "outliers": 10987,
       "max_outliers": 0,
       "tolerance": 2,
-      "excess_outliers": 2815
+      "excess_outliers": 10987
     },
     {
       "suite": "regression",
@@ -2121,29 +2121,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 2702 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 10924 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 33896,
-      "mean_diff": 0.3655,
+      "diff_channels": 41284,
+      "mean_diff": 1.1405,
       "checks": [
         {
           "tolerance": 3,
           "max_outliers": 0,
-          "outliers": 2702,
+          "outliers": 10924,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 2702,
+      "outliers": 10924,
       "max_outliers": 0,
       "tolerance": 3,
-      "excess_outliers": 2702
+      "excess_outliers": 10924
     },
     {
       "suite": "regression",
@@ -2764,6 +2764,37 @@
       "max_outliers": 2000,
       "tolerance": 2,
       "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "lowq_tsnap_tie_probe",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "fail",
+      "message": "Image comparison failed: 3164 outliers exceed limit of 3152, max difference 255",
+      "reason": "pixel_mismatch",
+      "max_diff": 255,
+      "expected_source": "repo",
+      "width": 320,
+      "height": 240,
+      "total_channels": 307200,
+      "diff_channels": 3164,
+      "mean_diff": 2.578,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 3152,
+          "outliers": 3164,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
+      "outliers": 3164,
+      "max_outliers": 3152,
+      "tolerance": 0,
+      "excess_outliers": 12
     },
     {
       "suite": "regression",

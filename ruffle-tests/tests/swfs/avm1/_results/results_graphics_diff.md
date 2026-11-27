@@ -1,27 +1,22 @@
 # Ruffle Test Results Diff
 
-**Previous:** `574824001e94` (2026-11-27T01:02:33.884790+00:00)
-**Current:** `6ee6eded7b66` (2026-11-27T01:51:12.149186+00:00)
+**Previous:** `6ee6eded7b66` (2026-11-27T01:51:12.149186+00:00)
+**Current:** `dbc43c157352` (2026-11-27T03:35:22.702464+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 771 | 773 | +2 |
+| Passing | 773 | 776 | +3 |
 | Total | 791 | 791 | 0 |
-| Pass rate | 97.5% | 97.7% | +0.2% |
-| Mismatched lines | 12145 | 12123 | -22 |
-|   Decreased | | | -22 |
+| Pass rate | 97.7% | 98.1% | +0.4% |
+| Mismatched lines | 12123 | 12119 | -4 |
+|   Decreased | | | -4 |
 
-## Newly Passing (2)
+## Newly Passing (3)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `globals_swf5` | output_mismatch | 295/304 | 304/304 |
-| `native_objects_swf6` | output_mismatch | 114/115 | 115/115 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `global_proto_decls` | output_mismatch | 50/4562 | 62/4562 | -12 |
+| `attach_movie_export_not_yet_run` | ruffle_matched | 1/2 | 2/2 |
+| `load_cancel_via_unloadclip` | ruffle_matched | 3/3 | 3/3 |
+| `tab_ordering_properties_tab_index_edge_case` | ruffle_matched | 1/4 | 4/4 |
