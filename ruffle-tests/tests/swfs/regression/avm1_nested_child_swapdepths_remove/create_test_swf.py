@@ -4,11 +4,12 @@ attached (h) and timeline-placed (t) -- is moved with d.swapDepths(100) and
 then removed with d.removeMovieClip(); a sibling (a) left at its timeline
 depth ignores removeMovieClip.
 
-OPEN CI DEFECT (s29 browser-gotoandstop-current, found while building
-avm1_goto_current_frame_clip): every build keeps `h.d` alive. swapDepths
-(ng_updateDisplayDepth) and removeMovieClip only touch the ROOT display list,
-so the entry in the parent sprite's display list never moves or clears, and
-`h.d` re-resolves to it.
+Found s29 browser-gotoandstop-current (while building
+avm1_goto_current_frame_clip): every build kept `h.d` alive, because swapDepths
+(ng_updateDisplayDepth) and removeMovieClip only touched the GLOBAL display
+list by name, so the entry in the parent sprite's display list never moved or
+cleared and `h.d` re-resolved to it. Fixed s30 browser-nested-swapdepths-remove
+(tag_stubs.c ng_nestedUpdateDisplayDepth / ng_nestedRemoveDisplayEntry).
 
 Golden: Flash Player 32 projector (tools/flash-oracle/run_trace.py, direct).
 Regenerate:  python3 create_test_swf.py

@@ -81794,12 +81794,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					MovieClip* _mc_parent = mc->parent ? mc->parent : &root_movieclip;
 					MovieClip* _tg_parent = _target->parent ? _target->parent : &root_movieclip;
 					if (_mc_parent == _tg_parent) {
+						// Two children of the same non-root parent: swap their
+						// entries in that parent's list (s30
+						// browser-nested-swapdepths-remove), not by name in the
+						// global one.
+						size_t _sd_i1, _sd_i2;
+						int _sd_nested = ng_nestedDLSlotOf(mc, &_sd_i1) != NULL &&
+						                 ng_nestedDLSlotOf(_target, &_sd_i2) != NULL &&
+						                 ng_nestedUpdateDisplayDepth(app_context, mc, _target->depth);
 						int _tmp = mc->depth;
 						mc->depth = _target->depth;
 						_target->depth = _tmp;
 						mc->depth_swapped = 1;
 						_target->depth_swapped = 1;
-						if (mc->name[0] && _target->name[0]) {
+						if (!_sd_nested && mc->name[0] && _target->name[0]) {
 							// Try a full display list swap first
 							ng_swapDisplayDepths(mc->name, _target->name);
 							// If one MC wasn't in the display list, the swap
@@ -81861,12 +81869,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					MovieClip* _tg_parent = _target_mc->parent ? _target_mc->parent : &root_movieclip;
 					if (_mc_parent == _tg_parent) {
 						int _tmp = mc->depth;
+						size_t _sd_i1, _sd_i2;
+						int _sd_nested = ng_nestedDLSlotOf(mc, &_sd_i1) != NULL &&
+						                 ng_nestedDLSlotOf(_target_mc, &_sd_i2) != NULL &&
+						                 ng_nestedUpdateDisplayDepth(app_context, mc, _target_mc->depth);
 						mc->depth = _target_mc->depth;
 						_target_mc->depth = _tmp;
 						mc->depth_swapped = 1;
 						_target_mc->depth_swapped = 1;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-						if (mc->name[0] && _target_mc->name[0])
+						if (!_sd_nested && mc->name[0] && _target_mc->name[0])
 							ng_swapDisplayDepths(mc->name, _target_mc->name);
 #endif
 						{
@@ -81898,9 +81910,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushUndefined(app_context);
 				return;
 			}
+			// A non-root clip moves inside its PARENT's list (s30
+			// browser-nested-swapdepths-remove); before mc->depth changes,
+			// since the slot lookup may key on the old depth.
+			int _sd_nested = ng_nestedUpdateDisplayDepth(app_context, mc, _new_depth);
 			mc->depth = _new_depth;
 			mc->depth_swapped = 1;
-			if (mc->name[0])
+			if (!_sd_nested && mc->name[0])
 				ng_updateDisplayDepth(app_context, mc->name, _new_depth);
 			// Keep the clone-depth table in sync so survives_rewind uses the
 			// post-swap SWF depth. No-op for timeline MCs (not registered).
@@ -83418,7 +83434,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// for the clone's display_list slot, then clear the slot so
 				// dispatch_enterframe doesn't keep firing on the removed
 				// clone. Look up by name (same pattern as actionRemoveSprite).
-				{
+				// A non-root clip's entry lives in its PARENT's list: clear it
+				// there (s30 browser-nested-swapdepths-remove); the by-name
+				// global lookup below never saw it (and could hit a same-named
+				// root clip).
+				if (!ng_nestedRemoveDisplayEntry(mc)) {
 					extern size_t ng_findDisplayEntryByName(const char* name);
 					size_t _rmc_dl = (mc->name && mc->name[0]) ? ng_findDisplayEntryByName(mc->name) : SIZE_MAX;
 					if (_rmc_dl != SIZE_MAX) {

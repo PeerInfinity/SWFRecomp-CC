@@ -383,6 +383,11 @@ int ng_findRootChildAtSWFDepth(size_t swf_depth, char* out_name, size_t out_name
 size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name);
 void ng_updateDisplayDepth(SWFAppContext* app_context, const char* name, int new_as_depth);
 void ng_swapDisplayDepths(const char* name1, const char* name2);
+// Non-root clips: depth move / removal in the PARENT sprite's own list (the
+// by-name functions above only see the global display_list). 1 = handled.
+DisplayObject* ng_nestedDLSlotOf(MovieClip* mc, size_t* out_idx);
+int ng_nestedUpdateDisplayDepth(SWFAppContext* app_context, MovieClip* mc, int new_as_depth);
+int ng_nestedRemoveDisplayEntry(MovieClip* mc);
 void ng_renameDisplayEntry(const char* old_name, const char* new_name);
 void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame);
 int ng_isSpriteAtDepth(size_t depth);

@@ -2434,6 +2434,146 @@ void ng_updateDisplayDepth(SWFAppContext* app_context, const char* name, int new
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Non-root clips: depth moves / removal inside the PARENT sprite's list
+// ---------------------------------------------------------------------------
+// ng_updateDisplayDepth / ng_swapDisplayDepths / removeMovieClip's slot clear
+// all work on the GLOBAL display_list by instance name, i.e. on the root list
+// (or on the sprite list swapped in while that sprite's own frame script
+// runs). A sprite's timeline child moved or removed from any OTHER script --
+// `_root.h.d.swapDepths(100); _root.h.d.removeMovieClip()` from a root frame --
+// never touched the entry in h's sprite_display_list, so `h.d` re-resolved to
+// that entry and conjured a fresh clip (s30 browser-nested-swapdepths-remove,
+// regression/avm1_nested_child_swapdepths_remove, Flash FP32 golden). Worse,
+// the by-name root lookup could move/clear an unrelated ROOT clip of the same
+// name.
+//
+// ng_nestedDLSlotOf: returns the DisplayObject that OWNS mc's entry (the
+// parent's display_obj, holder of sprite_display_list) and its index, or NULL
+// when mc is a root child, its parent has no list of its own, the entry cannot
+// be located, or the parent's list is the one currently swapped into the global
+// display_list (the by-name global paths already handle that case).
+DisplayObject* ng_nestedDLSlotOf(MovieClip* mc, size_t* out_idx)
+{
+	if (mc == NULL || mc->parent == NULL || mc->parent == &root_movieclip) return NULL;
+	DisplayObject* holder = (DisplayObject*)mc->parent->display_obj;
+	if (holder == NULL || holder->sprite_display_list == NULL) return NULL;
+	DisplayObject* base = holder->sprite_display_list;
+	if (base == display_list) return NULL;
+	size_t cap = holder->sprite_dl_capacity;
+	size_t idx = SIZE_MAX;
+	DisplayObject* own = (DisplayObject*)mc->display_obj;
+	if (own != NULL && own >= base && own < base + cap)
+		idx = (size_t)(own - base);
+	else if (mc->name[0] && mc->depth != INT_MIN)
+	{
+		long long d = (long long)mc->depth + 16384;
+		if (d >= 0 && (size_t)d < cap && (size_t)d <= holder->sprite_max_depth &&
+		    base[d].char_id != 0 && base[d].instance_name != NULL &&
+		    swf_name_match(base[d].instance_name, mc->name))
+			idx = (size_t)d;
+	}
+	if (idx == SIZE_MAX || base[idx].char_id == 0) return NULL;
+	*out_idx = idx;
+	return holder;
+}
+
+// Re-aim every cached clip's display_obj that pointed at slot a/b of `base`.
+static void nested_dl_retarget(DisplayObject* a, DisplayObject* b)
+{
+	extern int child_mc_count;
+	extern MovieClip* child_mc_cache[];
+	for (int _ci = 0; _ci < child_mc_count; _ci++)
+	{
+		MovieClip* _m = child_mc_cache[_ci];
+		if (_m == NULL) continue;
+		if (_m->display_obj == (void*)a) _m->display_obj = b;
+		else if (_m->display_obj == (void*)b) _m->display_obj = a;
+	}
+}
+
+// swapDepths(number) for a non-root clip. Returns 1 when handled (the caller
+// must NOT also run the global by-name ng_updateDisplayDepth), 0 to fall back.
+// Same slot semantics as ng_updateDisplayDepth: placed_at_frame / place_gen
+// stay with the depth, both slots become depth_swapped.
+int ng_nestedUpdateDisplayDepth(SWFAppContext* app_context, MovieClip* mc, int new_as_depth)
+{
+	size_t old_idx;
+	DisplayObject* holder = ng_nestedDLSlotOf(mc, &old_idx);
+	if (holder == NULL) return 0;
+	size_t new_idx = (size_t)((long long)new_as_depth + 16384);
+	if (new_idx == old_idx) return 1;
+	if (new_idx >= holder->sprite_dl_capacity)
+	{
+		if (new_idx >= AVM_CLONE_SLOT_CAP) return 1;  // as the root path: leave it
+		ng_spriteDLRealloc(app_context, &holder->sprite_display_list,
+		                   &holder->sprite_dl_capacity, new_idx + 64);
+		if (new_idx >= holder->sprite_dl_capacity) return 1;  // OOM
+	}
+	DisplayObject* dl = holder->sprite_display_list;
+	extern size_t current_frame;
+	extern size_t g_place_gen;
+	if (new_idx <= holder->sprite_max_depth && dl[new_idx].char_id != 0)
+	{
+		size_t paf_old = dl[old_idx].placed_at_frame, paf_new = dl[new_idx].placed_at_frame;
+		size_t pg_old = dl[old_idx].place_gen, pg_new = dl[new_idx].place_gen;
+		DisplayObject tmp = dl[old_idx];
+		dl[old_idx] = dl[new_idx];
+		dl[new_idx] = tmp;
+		dl[old_idx].placed_at_frame = paf_old;
+		dl[new_idx].placed_at_frame = paf_new;
+		dl[old_idx].place_gen = pg_old;
+		dl[new_idx].place_gen = pg_new;
+		dl[old_idx].depth_swapped = 1;
+		dl[new_idx].depth_swapped = 1;
+		// The displaced clip (same parent) takes mc's old depth.
+		extern int child_mc_count;
+		extern MovieClip* child_mc_cache[];
+		for (int _ci = 0; _ci < child_mc_count; _ci++)
+		{
+			MovieClip* _m = child_mc_cache[_ci];
+			if (_m != NULL && _m != mc && _m->parent == mc->parent &&
+			    _m->display_obj == (void*)&dl[new_idx])
+			{
+				_m->depth = (int)old_idx - 16384;
+				break;
+			}
+		}
+	}
+	else
+	{
+		dl[new_idx] = dl[old_idx];
+		dl[new_idx].placed_at_frame = current_frame;
+		dl[new_idx].place_gen = g_place_gen;
+		dl[new_idx].depth_swapped = 1;
+		memset(&dl[old_idx], 0, sizeof(DisplayObject));
+	}
+	nested_dl_retarget(&dl[old_idx], &dl[new_idx]);
+	if (new_idx > holder->sprite_max_depth) holder->sprite_max_depth = new_idx;
+	while (holder->sprite_max_depth > 0 && dl[holder->sprite_max_depth].char_id == 0)
+		holder->sprite_max_depth--;
+	return 1;
+}
+
+// removeMovieClip for a non-root clip: clear its entry in the parent's list.
+// Returns 1 when handled (the caller must skip the global by-name slot clear).
+// The entry's own child list is left unreferenced, exactly as the root path's
+// memset does (freeing it would need ng_freeSpriteDL's alias scrub, and the
+// removed clip's display_obj still names it until the caller NULLs it).
+int ng_nestedRemoveDisplayEntry(MovieClip* mc)
+{
+	size_t idx;
+	DisplayObject* holder = ng_nestedDLSlotOf(mc, &idx);
+	if (holder == NULL) return 0;
+	DisplayObject* dl = holder->sprite_display_list;
+	if (dl[idx].instance_name_owned && dl[idx].instance_name != NULL)
+		free(dl[idx].instance_name);
+	memset(&dl[idx], 0, sizeof(DisplayObject));
+	while (holder->sprite_max_depth > 0 && dl[holder->sprite_max_depth].char_id == 0)
+		holder->sprite_max_depth--;
+	return 1;
+}
+
 void ng_swapDisplayDepths(const char* name1, const char* name2)
 {
 	size_t d1 = SIZE_MAX, d2 = SIZE_MAX;
