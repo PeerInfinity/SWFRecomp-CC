@@ -1,11 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T03:35:22.770759+00:00",
-    "git_sha": "dbc43c157352371720c1fed7998018a150009d42",
-    "duration_seconds": 54.38,
+    "timestamp": "2026-11-27T06:45:05.594242+00:00",
+    "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
+    "duration_seconds": 43.04,
     "total_available": 3,
-    "shards": 30,
+    "shards": 29,
     "expected_shards": 30,
+    "missing_shards": 1,
+    "incomplete": true,
     "ignored_count": 0,
     "filtered": true
   },
@@ -22,8 +24,8 @@
       "test": "avm1_imports_avm1",
       "phases": {
         "recomp": 0.004,
-        "compile": 1.506,
-        "run": 0.673
+        "compile": 1.568,
+        "run": 0.688
       },
       "num_frames": 1,
       "lines": {
@@ -31,7 +33,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 2.31,
+      "duration": 2.39,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -71,9 +73,9 @@
     {
       "test": "avm1_non_swf_import",
       "phases": {
-        "recomp": 0.005,
-        "compile": 25.369,
-        "run": 0.445
+        "recomp": 0.003,
+        "compile": 19.712,
+        "run": 0.327
       },
       "num_frames": 4,
       "lines": {
@@ -81,15 +83,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 25.83,
+      "duration": 20.05,
       "status": "pass"
     },
     {
       "test": "empty_url",
       "phases": {
-        "recomp": 0.006,
-        "compile": 25.667,
-        "run": 0.452
+        "recomp": 0.003,
+        "compile": 20.165,
+        "run": 0.34
       },
       "num_frames": 2,
       "lines": {
@@ -97,7 +99,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 26.13,
+      "duration": 20.51,
       "status": "pass"
     }
   ]

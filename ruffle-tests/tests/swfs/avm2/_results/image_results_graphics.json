@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T03:35:26.009995+00:00",
+    "timestamp": "2026-11-27T06:45:07.153227+00:00",
     "suite": "avm2",
     "stem": "results_graphics",
-    "git_sha": "dbc43c157352371720c1fed7998018a150009d42",
+    "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "source": "results_graphics.json",
-    "incomplete": false,
-    "run_id": "45928279588",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45928279588",
+    "incomplete": true,
+    "run_id": "45938113471",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45938113471",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 115,
   "comparisons": 130,
   "ignored": 1,
-  "pass": 107,
+  "pass": 106,
   "fail": 23,
-  "skip": 0,
+  "skip": 1,
   "no_render": 0,
   "fail_known_failure": 6,
   "ruffle_matched_fail": 0,
-  "pass_rate": 82.3,
+  "pass_rate": 81.5,
   "results": [
     {
       "suite": "avm2",
@@ -36,7 +36,7 @@
       "height": 700,
       "total_channels": 2688000,
       "diff_channels": 1990896,
-      "mean_diff": 37.4594,
+      "mean_diff": 37.4593,
       "checks": [
         {
           "tolerance": 30,
@@ -1720,31 +1720,11 @@
       "suite": "avm2",
       "test": "edittext_tag_indent",
       "comparison": "output",
-      "trace_status": "pass",
+      "trace_status": null,
       "known_failure": false,
-      "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 1",
-      "max_diff": 1,
-      "expected_source": "repo",
-      "width": 50,
-      "height": 300,
-      "total_channels": 60000,
-      "diff_channels": 96,
-      "mean_diff": 0.0016,
-      "checks": [
-        {
-          "tolerance": 128,
-          "max_outliers": 0,
-          "outliers": 0,
-          "passed": true
-        }
-      ],
-      "applicable_checks": 1,
-      "failed_checks": 0,
-      "outliers": 0,
-      "max_outliers": 0,
-      "tolerance": 128,
-      "excess_outliers": 0
+      "status": "skip",
+      "reason": "test_not_run",
+      "message": "no image comparison recorded for this run"
     },
     {
       "suite": "avm2",
@@ -2570,7 +2550,7 @@
       "trace_status": "pass",
       "known_failure": true,
       "status": "fail",
-      "message": "Image comparison failed: 293 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 296 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "ruffle_match": false,
@@ -2579,22 +2559,22 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 1306,
-      "mean_diff": 0.0686,
+      "diff_channels": 1309,
+      "mean_diff": 0.0692,
       "checks": [
         {
           "tolerance": 1,
           "max_outliers": 0,
-          "outliers": 293,
+          "outliers": 296,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 293,
+      "outliers": 296,
       "max_outliers": 0,
       "tolerance": 1,
-      "excess_outliers": 293
+      "excess_outliers": 296
     },
     {
       "suite": "avm2",
@@ -2633,7 +2613,7 @@
       "trace_status": "pass",
       "known_failure": true,
       "status": "fail",
-      "message": "Image comparison failed: 114 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 116 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "ruffle_match": false,
@@ -2642,22 +2622,22 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 114,
-      "mean_diff": 0.033,
+      "diff_channels": 116,
+      "mean_diff": 0.0336,
       "checks": [
         {
           "tolerance": 1,
           "max_outliers": 0,
-          "outliers": 114,
+          "outliers": 116,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 114,
+      "outliers": 116,
       "max_outliers": 0,
       "tolerance": 1,
-      "excess_outliers": 114
+      "excess_outliers": 116
     },
     {
       "suite": "avm2",
