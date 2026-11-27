@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T21:15:19.086660+00:00",
-    "git_sha": "a18a0e03349f07a0a41e1c7bb971b8eafe349891",
-    "duration_seconds": 25.82,
+    "timestamp": "2026-11-27T22:24:42.187349+00:00",
+    "git_sha": "0224aaf256324c72a214123929b4570721246fc1",
+    "duration_seconds": 0.72,
     "total_available": 3
   },
   "total": 3,
@@ -19,9 +19,9 @@
     {
       "test": "global_instance_decls",
       "phases": {
-        "recomp": 0.005,
-        "compile": 24.176,
-        "run": 0.02
+        "recomp": 0.006,
+        "compile": 0.208,
+        "run": 0.024
       },
       "num_frames": 1,
       "lines": {
@@ -29,7 +29,7 @@
         "expected_lines": 853,
         "matching_lines": 262
       },
-      "duration": 24.2,
+      "duration": 0.24,
       "status": "output_mismatch",
       "detail": "591 line(s) differ (actual=726, expected=853)",
       "actual_output": "_global.TextSnapshot, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  getCount, DONT_ENUM, type=[function]\n  setSelected, DONT_ENUM, type=[function]\n  getSelected, DONT_ENUM, type=[function]\n  getText, DONT_ENUM, type=[function]\n  getSelectedText, DONT_ENUM, type=[function]\n  hitTestTextNearPos, DONT_ENUM, type=[function]\n  findText, DONT_ENUM, type=[function]\n  setSelectColor, DONT_ENUM, type=[function]\n  getTextRunInfo, DONT_ENUM, type=[function]\n_global.PrintJob, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.MovieClipLoader, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  _listeners, own, DONT_ENUM, type=[object]\n_global.LocalConnection, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.textRenderer, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.flash.automation.Configuration, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  getTestAutomationConfiguration, DONT_ENUM, type=[function]\n  getDeviceConfiguration, DONT_ENUM, type=[function]\n  setDeviceConfiguration, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.ActionGenerator, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  generateAction, DONT_ENUM, type=[function]\n  generateActions, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.StageCapture, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.external.ExternalInterface, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.flash.net.FileReferenceList, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n... (676 lines after) ...",
@@ -38,9 +38,9 @@
     {
       "test": "global_proto_decls",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.747,
-        "run": 0.021
+        "recomp": 0.005,
+        "compile": 0.174,
+        "run": 0.023
       },
       "num_frames": 1,
       "lines": {
@@ -48,7 +48,7 @@
         "expected_lines": 3714,
         "matching_lines": 97
       },
-      "duration": 0.78,
+      "duration": 0.21,
       "status": "output_mismatch",
       "detail": "4413 line(s) differ (actual=4510, expected=3714)",
       "actual_output": "Testing _global\n  TextSnapshot, own, DONT_ENUM, type=[function with prototype]\n  PrintJob, own, DONT_ENUM, type=[function with prototype]\n  MovieClipLoader, own, DONT_ENUM, type=[function with prototype]\n  LocalConnection, own, DONT_ENUM, type=[function with prototype]\n  textRenderer, own, DONT_ENUM, type=[function with prototype]\n  flash, own, DONT_ENUM, type=[object]\n  System, own, DONT_ENUM, type=[object]\n  SoundCodec, own, DONT_ENUM, type=[object]\n  Accessibility, own, DONT_ENUM, type=[object]\n  Video, own, DONT_ENUM, type=[function with prototype]\n  Stage, own, DONT_ENUM, type=[object]\n  TextFormat, own, DONT_ENUM, type=[function with prototype]\n  TextField, own, DONT_ENUM, type=[function with prototype]\n  Button, own, DONT_ENUM, type=[function with prototype]\n  Key, own, DONT_ENUM, type=[object]\n  Mouse, own, DONT_ENUM, type=[object]\n  Selection, own, DONT_ENUM, type=[object]\n  LoadVars, own, DONT_ENUM, type=[function with prototype]\n  XML, own, DONT_ENUM, type=[function with prototype]\n  XMLNode, own, DONT_ENUM, type=[function with prototype]\n  Sound, own, DONT_ENUM, type=[function with prototype]\n  Math, own, DONT_ENUM, type=[object]\n  Array, own, DONT_ENUM, type=[function with prototype]\n  String, own, DONT_ENUM, type=[function with prototype]\n  Date, own, DONT_ENUM, type=[function with prototype]\n  Boolean, own, DONT_ENUM, type=[function with prototype]\n  Number, own, DONT_ENUM, type=[function with prototype]\n  o, own, DONT_ENUM, type=[null]\n  clearRequestHeaders, own, DONT_ENUM, type=[function with prototype]\n  addRequestHeader, own, DONT_ENUM, type=[function with prototype]\n  showRedrawRegions, own, DONT_ENUM, type=[function]\n  setTimeout, own, DONT_ENUM, type=[function]\n  clearInterval, own, DONT_ENUM, type=[function]\n  clearTimeout, own, DONT_ENUM, type=[function]\n  setInterval, own, DONT_ENUM, type=[function]\n  isFinite, own, DONT_ENUM, type=[function]\n  isNaN, own, DONT_ENUM, type=[function]\n  updateAfterEvent, own, DONT_ENUM, type=[function]\n  trace, own, DONT_ENUM, type=[function]\n  parseFloat, own, DONT_ENUM, type=[function]\n  parseInt, own, DONT_ENUM, type=[function]\n  unescape, own, DONT_ENUM, type=[function]\n  escape, own, DONT_ENUM, type=[function]\n  ASSetNativeAccessor, own, DONT_ENUM, type=[function]\n  ASSetNative, own, DONT_ENUM, type=[function]\n  ASSetPropFlags, own, DONT_ENUM, type=[function]\n  RemoteLSOUsage, own, DONT_ENUM, type=[function with prototype]\n  AssetCache, own, DONT_ENUM, type=[function with prototype]\n  AsSetupError, own, DONT_ENUM, type=[function with prototype]\n... (4460 lines after) ...",
@@ -57,9 +57,9 @@
     {
       "test": "global_proto_decls_delete",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.71,
-        "run": 0.018
+        "recomp": 0.005,
+        "compile": 0.149,
+        "run": 0.021
       },
       "num_frames": 1,
       "lines": {
@@ -67,7 +67,7 @@
         "expected_lines": 874,
         "matching_lines": 299
       },
-      "duration": 0.74,
+      "duration": 0.18,
       "status": "output_mismatch",
       "detail": "3812 line(s) differ (actual=4111, expected=874)",
       "actual_output": "... (282 lines before) ...\n  constructor, DONT_DELETE\nTesting _global.System.privateBytes\nTesting _global.System.IME._listeners\nTesting _global.System.IME.removeListener\n  prototype, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.removeListener.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.addListener\n  prototype, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.addListener.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.broadcastMessage\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.doConversion\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.setCompositionString\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.setConversionMode\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.getConversionMode\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.setEnabled\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.getEnabled\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.IME.ALPHANUMERIC_FULL\nTesting _global.System.IME.ALPHANUMERIC_HALF\nTesting _global.System.IME.CHINESE\nTesting _global.System.IME.JAPANESE_HIRAGANA\nTesting _global.System.IME.JAPANESE_KATAKANA_FULL\nTesting _global.System.IME.JAPANESE_KATAKANA_HALF\nTesting _global.System.IME.KOREAN\nTesting _global.System.IME.UNKNOWN\nTesting _global.System.IME\n  _listeners, DONT_DELETE\n  removeListener, DONT_DELETE\n  addListener, DONT_DELETE\n... (3779 lines after) ...",

@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T07:04:58.952708+00:00",
+    "timestamp": "2026-11-27T16:08:12.352340+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 10193.88,
+    "duration_seconds": 10602.92,
     "total_available": 1574,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 1522,
-  "pass": 1514,
+  "total": 1574,
+  "pass": 1564,
   "ruffle_matched": 8,
-  "fail": 0,
-  "pass_rate": 99.5,
-  "effective_pass": 1522,
-  "effective_pass_rate": 100.0,
-  "breakdown": {},
+  "fail": 2,
+  "pass_rate": 99.4,
+  "effective_pass": 1572,
+  "effective_pass_rate": 99.9,
+  "breakdown": {
+    "output_mismatch": 2
+  },
   "tests": [
     {
       "test": "as3/AMF/AMFSerializer",
@@ -19392,6 +19392,844 @@
         "matching_lines": 1
       },
       "duration": 6.08,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_10_1",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 6.25,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 6.26,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_2_1",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 6.521,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 6.53,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_5_1",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.147,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 6.16,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_5_2",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.122,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 6.13,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_5_3",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 6.217,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 6.23,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_1_1",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.111,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 6.12,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_1",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.06,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.07,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_2",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.933,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.95,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_3",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.057,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.07,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_4",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.091,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.1,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_5",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.907,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.92,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_6",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.068,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.08,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_7",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.058,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.07,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_2_8",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.035,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.05,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_1",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.078,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.09,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_10",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.949,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 1.96,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_11",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.073,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.09,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_19",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.129,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 6.14,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_2",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.065,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.08,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_3",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.058,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.07,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_4",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 6.158,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 6.17,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_6_3_9_rt",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.078,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.09,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/e12_9_1",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.141,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 6.15,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/edowhile_001",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.089,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 6.1,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/edowhile_002",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.087,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 6.1,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/edowhile_003",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.079,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 6.09,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/edowhile_004",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.09,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 6.1,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/edowhile_005",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.076,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 6.09,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/edowhile_006",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.966,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 1.98,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/edowhile_007",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.153,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "duration": 6.17,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eforin_001",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 6.55,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 12
+      },
+      "duration": 6.56,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=16, expected=16)",
+      "actual_output": "object[0] PASSED!\nobject[year] PASSED!\nobject[company] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\nobject[0] PASSED!\nobject[year] PASSED!\nobject[company] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == values[0] PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == object[properties[0]] PASSED!",
+      "expected_output": "object[0] PASSED!\nobject[company] PASSED!\nobject[year] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\nobject[0] PASSED!\nobject[company] PASSED!\nobject[year] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == values[0] PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == object[properties[0]] PASSED!"
+    },
+    {
+      "test": "ecma3/Statements/eforin_001_500476",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.916,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 1.93,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eforin_002",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 6.522,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 0
+      },
+      "duration": 6.54,
+      "status": "output_mismatch",
+      "detail": "10 line(s) differ (actual=10, expected=10)",
+      "actual_output": "for...in loop in a with loop.  (true)[value] == value PASSED!\nfor...in loop in a with loop.  (true)[valueOf] == valueOf PASSED!\nfor...in loop in a with loop.  (true)[toString] == toString PASSED!\nfor...in loop in a with loop.  (true)[toNumber] == toNumber PASSED!\nfor...in loop in a with loop.  (true)[toBoolean] == toBoolean PASSED!\nwith loop in a for...in loop.  (true)[value] == value PASSED!\nwith loop in a for...in loop.  (true)[valueOf] == valueOf PASSED!\nwith loop in a for...in loop.  (true)[toString] == toString PASSED!\nwith loop in a for...in loop.  (true)[toNumber] == toNumber PASSED!\nwith loop in a for...in loop.  (true)[toBoolean] == toBoolean PASSED!",
+      "expected_output": "for...in loop in a with loop.  (true)[toString] == toString PASSED!\nfor...in loop in a with loop.  (true)[value] == value PASSED!\nfor...in loop in a with loop.  (true)[toNumber] == toNumber PASSED!\nfor...in loop in a with loop.  (true)[toBoolean] == toBoolean PASSED!\nfor...in loop in a with loop.  (true)[valueOf] == valueOf PASSED!\nwith loop in a for...in loop.  (true)[toString] == toString PASSED!\nwith loop in a for...in loop.  (true)[value] == value PASSED!\nwith loop in a for...in loop.  (true)[toNumber] == toNumber PASSED!\nwith loop in a for...in loop.  (true)[toBoolean] == toBoolean PASSED!\nwith loop in a for...in loop.  (true)[valueOf] == valueOf PASSED!"
+    },
+    {
+      "test": "ecma3/Statements/eif_001",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.06,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.07,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/elabel_001",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.929,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 5.94,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/elabel_002",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.152,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 6.16,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eregress_131348",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.282,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 6.3,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eregress_74474_001",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.991,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 2.0,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eregress_74474_002",
+      "phases": {
+        "recomp": 0.239,
+        "compile": 60.236,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 60.48,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eregress_74474_003",
+      "phases": {
+        "recomp": 0.237,
+        "compile": 59.83,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 60.08,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eregress_83532_001",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.076,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.09,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eregress_83532_002",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.066,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 6.08,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eswitch_001",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.143,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 6.16,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eswitch_002",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.101,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 6.11,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eswitch_003",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.955,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 1.97,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/eswitch_004",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 6.245,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 6.26,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/etry_001",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.2,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 6.21,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/etry_003",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 6.411,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 6.42,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/etry_004",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.152,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 6.16,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/etry_005",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.17,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 6.18,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/etry_006",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.165,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 6.18,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Statements/etry_007",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.166,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 6.18,
       "status": "pass"
     },
     {
