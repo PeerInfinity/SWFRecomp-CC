@@ -489,6 +489,11 @@ technically correct within their precision domains.
 
 **Decision:** Accept; inherent floating-point vs integer precision difference at exact boundary.
 
+**2026-11-27 (pre-s30 FP32 run, `SWFRecompDocs/plans/session30-fanout-reports/pre-launch-oracles/README.md` §1): the
+"both are correct" premise is REFUTED.** The golden is byte-identical to FP32, and FP32 prints `false` here, like
+Ruffle's integer-twip path. This line is a real Flash gap (integer-twip morph interpolation / winding for shape-flag
+hitTest), not an acceptable precision difference. Kept listed until it is fixed; do not cite it as ACCEPTED.
+
 ### `movieclip_hittest_shapeflag` — Drawing API stroke tessellation (0 diff lines as of s26; was 1)
 
 **Example diff (scribble curve boundary):**
@@ -1180,7 +1185,7 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | ~~`tab_ordering_properties_tab_index_edge_case`~~ | ~~FP32 raw-vs-coerce discriminator unknown (Category 7; s29 HOLD)~~ | ~~3 of 4~~ | **RESOLVED s29** (`w2b-tabindex`): now PASS 4/4 (root raw-property rule, see the entry) — | Accept pending the FP32 fixture run (`w2-disposition-land-oracle/tabindex/`); corpus golden == FP32, MTASC L3b fixtures coerce in FP32 |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 4 (171–177; was 7; s29 recount) | Accept; proprietary Flash font metrics |
 | `movieclip_hittest_shapeflag` | Hit test accuracy ('layers' shape geometry, line 71: FP32 true, ours false) | 1 | open lead (s29 w1-disposition-audit L4), not a font issue |
-| `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary, line 296: FP32 false = Ruffle, ours true) | 1 | **REAL GAP** (pre-s30 FP32 run refuted "both correct"); open lead |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 0 (was 1; line 137 no longer differs, s26) | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash's dissolve permutation is not Ruffle's Feistel (corrected s26) | 20 (trace lines; **no image comparison exists**; was ~38) | Accept; 98.5% match, no Ruffle oracle for `ruffle_matched` |
 | `visual/video/colorconversion/h263` | Spark IDCT precision, FAAN IDCT landed (Category 9) | 3 image outlier channels, max 1 | Accept (image axis only; trace passes). The single pixel (447,289) the FAAN arm predicted; tolerance 0 / max_outliers 0 upstream |

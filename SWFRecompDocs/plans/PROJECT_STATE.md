@@ -90,9 +90,9 @@ the booked regression fixture above. s29 moved `globals_swf5`, `native_objects_s
    own script and the clip-event merge. `action_execution_order_test11` already moved Flash-ward, so it is the probe.
 3. **Pixels: LOW residues.** The LOW fill .5-vertex tie, `acid-large` (swap candidate after a WIN == LNX check), the
    ungraded `avm2_layer_group_alpha/_erase` LOW captures, `sprite_with_frames` re-grade.
-4. **Pixels: real Flash gaps.** `acid-shapes` (88; FP32 HIGH capture of the residue first), `place_object_test` (2604),
+4. **Pixels: real Flash gaps.** `acid-shapes` (88; captured pre-s30: needs curved-stroke edge geometry AND the HIGH AA rule), `place_object_test` (2604),
    `acid-stroke-0` (3413), `morph_test1` ×6 LOW glyph rule, the AVM2 twin of the w3 seam-join gate.
-5. **Small trace leads:** TextField `tabIndex = null` (needs FP32), `movieclip_hittest_shapeflag` (one Flash run),
+5. **Small trace leads:** TextField `tabIndex = null` (needs FP32), `movieclip_hittest_shapeflag` lines 71/296 (FP32-graded pre-s30: real gaps; the row cannot flip, 4 device-font lines stay ACCEPTED),
    `avm1_nested_child_swapdepths_remove` (M), the #2044 ErrorEvent path for `html_text_img_parsing`.
 
 ## 3. Not worth doing (summary; full register in `NO_GO_REGISTER.md`)

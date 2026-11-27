@@ -2,11 +2,12 @@
 
 You are a NEW session: the **coordinator** of fan-out session 30 in `/home/robert/CC/SWFRecomp-CC`. You own s30 end to
 end: wave 1 → wave 2 → grading → closeout. Nobody else coordinates it. The s29 coordinator wrote this brief at Robert's
-request, relayed by the s28 coordinator (2026-11-27).
+request, relayed by the s28 coordinator (2026-11-27), then revised after the s28 coordinator's review and a pre-launch
+FLASH ORACLE PASS (`session30-fanout-reports/pre-launch-oracles/README.md`: read it before writing wave-1 briefs).
 
 **Project state first:** read `SWFRecompDocs/plans/PROJECT_STATE.md` (where the project stands, the ranked "Worth
 doing" list in §2, every non-corpus track) and `SWFRecompDocs/plans/NO_GO_REGISTER.md` (every standing NO-GO with its
-reopen criterion, the verdicts that fell, and the 3 UNSURE items left in §4). Update both at your closeout.
+reopen criterion, the verdicts that fell, and the UNSURE items left in §4: the pre-launch pass resolved two of the three). Update both at your closeout.
 
 ## Standing directives (all from Robert; memories hold the detail)
 
@@ -23,8 +24,8 @@ reopen criterion, the verdicts that fell, and the 3 UNSURE items left in §4). U
   `EMCC_CORES=4`. **Never run full suites locally.**
 - **Stage files by name** (never `git add -A`, never `git commit -a`). See "Committing in the shared tree" below: s29
   found two ways a commit sweeps a peer's work.
-- **Pages deploy is authorized.** A green `dry_run` deploys NOTHING: confirm the "Deploy to GitHub Pages" step ran. Run a
-  dry run on every runtime/recompiler landing. If the real deploy fails at "Deploy to GitHub Pages" with "No artifacts
+- **Pages deploy is authorized.** A green `dry_run` deploys NOTHING: confirm the "Deploy to GitHub Pages" step ran. Run one
+  dry run per interim batch that touched runtime or recompiler code (not one per patch). If the real deploy fails at "Deploy to GitHub Pages" with "No artifacts
   named github-pages" / "Found 0 artifact(s)", **dispatch a FRESH run; never `gh run rerun`** (it re-uploads into the
   same run and then fails on "Multiple artifacts"). It happened again in s29 (`46032563406` → fresh `46033409898`).
 - **Pruning:** at closeout, cmp EVERY report/patch/log/fixture blob on each `fanout/*` branch against master (s28: 3
@@ -42,6 +43,11 @@ reopen criterion, the verdicts that fell, and the 3 UNSURE items left in §4). U
 - Windows ClearType may be switched off for a Flash capture, if you switch it back on afterwards (EXIT trap,
   `C:\playwright\cleartype\ct.ps1`).
 - **Flash binaries never leave this machine**; cloud workers write LOCAL ORACLE REQUESTS, which you run between waves.
+- **You launch and own the browser ladder** (§"Local ladders"): one session at a time, running concurrently with the
+  waves. Its builds take the same `flock`.
+- **After any recompiler landing, rebuild the local recompiler** (`cmake --build SWFRecomp/build -j4`, under the lock)
+  before grading anything locally. `verify_output.py` does not rebuild it. In s29 a stale binary made `swz` look
+  broken locally while CI passed (pre-launch README §5).
 - **The N procgen arc is CANCELLED** (Robert, 2026-11-26; `NO_GO_REGISTER.md` §1d): the level-load/detect substrate,
   the level generator, portals and `nPhysics.js`. **No slot, ladder or rider may touch it.**
 
@@ -130,9 +136,10 @@ oracle; the Ruffle exporter is a fallback. AVM1 runs DIRECT, pinned 1:1; non-LAY
    - gnash `argstest-v6/7/8`;
    - the ExternalInterface-v8 rest (s29 refuted its "S" half).
 
-   The goldens ARE Flash (s29 w1-disposition-audit). Wave 1 should build the per-class table (members, attributes,
-   enumeration order) from FP32 captures and price each row before anyone edits `setupNativeFuncOwnProps`. Run the
-   captures coordinator-side.
+   The goldens ARE Flash (s29 w1-disposition-audit). **Coordinator: run the FP32 captures BEFORE launching wave 1**
+   (per class: members, attributes, enumeration order, for the 3 `global_*_decls`, `argstest-v6/7/8` and EI-v8), so
+   the wave-1 DIAGNOSIS slot builds and prices the table from real data instead of filing a LOCAL ORACLE REQUEST and
+   waiting a wave. Implementation is wave 2. Nobody edits `setupNativeFuncOwnProps` before the table is priced.
 3. **Exec order, the remaining halves (M–L).** `078350610` made natural-advance frame scripts ONE list, newest
    place_seq first, `_root` last (kill switch `SWF_EXEC_ORDER_MERGED=0`). Still open:
    - enterFrame before the clip's own script;
@@ -140,14 +147,21 @@ oracle; the Ruffle exporter is a fallback. AVM1 runs DIRECT, pinned 1:1; non-LAY
 
    The family is gnash `ActionOrderTest3/4/5`, `PlaceAndRemove`, `action_execution_order_extend_test`, `_test4` and
    `_test11`. `_test11` already moved Flash-ward (10 → 8 diff lines), so it is the probe. The NO_GO action_order row's
-   reopen criterion is now partly met. Price on a native A/B over the action-order + timeline rows first.
+   reopen criterion is now partly met. **Fund it in wave 1 as an IMPLEMENTATION slot, in parallel with item 2** (separate
+   mechanisms; s28 coordinator review). Probe `_test11`; A/B with the `SWF_EXEC_ORDER_MERGED` kill switch over the
+   action-order + timeline rows. **Grade the browser build too, via child_probe**: `078350610` came from the browser
+   ladder and exec order touches every build. In `SIBLING_FILE_MAP.md`, mark this slot and ladder item 1
+   (`browser-attach-child-early`) as file-adjacent (frame loops in `swf.c`/`swf_core.c`, `tag_stubs.c`
+   `ng_attachMovie`, `action_queue.c`), and land them one at a time.
 4. **ruffle_matched pool (M per slot, split by VM;** memory `triage-bucket-by-vm-not-symptom`). These are the
    s28 w1b "priced, not worked" buckets (`session28-fanout-reports/w1b-rm-*-report.md`; NO_GO §1a), each with a
    completion cell. Re-price against FP32 before funding. Candidates: AVM2 frame/event lifecycle, the device-font
    metrics family, typed nulls, `avm1movie`, the FTE line model.
 5. **Small trace leads (S each; mostly coordinator FP32 runs):**
-   - **`movieclip_hittest_shapeflag`: the last s28 UNSURE item** (NO_GO §4.8). Run Flash on the 3 FP32-`false` lines
-     and check them against our ACCEPTED lines, then resolve the disposition.
+   - **`movieclip_hittest_shapeflag`: GRADED pre-launch, NO_GO §4.8 resolved** (pre-launch README §1). Golden == FP32.
+     Lines 171–177 stay ACCEPTED (device-font outlines). Two real gaps remain: line 71 (`layers` shape geometry, S–M)
+     and line 296 (morph boundary: FP32 `false` like Ruffle's integer-twip path; ours `true`; S). Fixing both does not
+     flip the row (171–177 remain), so price it as a lead, not a flip.
    - TextField `tabIndex = null`: we still coerce to 0. Clips and buttons already unset (FP32, `2d40d3799`). Needs an
      FP32 text-field capture (w3 report's LOCAL ORACLE REQUEST).
    - The #2044 unhandled ErrorEvent path for `avm2/html_text_img_parsing`. Check its platform-split NO-GO row first.
@@ -157,14 +171,18 @@ oracle; the Ruffle exporter is a fallback. AVM1 runs DIRECT, pinned 1:1; non-LAY
 6. **LOW residues (M).**
    - The LOW fill .5-vertex tie: `regression/lowq_tsnap_tie_probe` rows 4–5, budget 3152 (45° stroke width, the 3-px
      rect band, drawRect .5).
-   - `acid-large`: s29's one priced loss. Our output moved toward its FP32 capture, and the golden is Ruffle-made. It
-     becomes a swap candidate after a coordinator WIN == LNX check.
-   - `avm2_layer_group_alpha` / `_erase`: exporter HIGH goldens; TSNAP moved them ~8 k. FP32 LOW captures were TAKEN
-     but never graded (`session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/regression__avm2_layer_group_*.low.png`).
+   - `acid-large`: **CAPTURED pre-launch, swap-ready** (README §2): WIN == LNX byte-identical; ours→FP32 138 478 vs
+     golden→FP32 178 720. Add the flash_fixes entry in your first landing batch and ledger it (it stays a fail, honestly).
+   - `avm2_layer_group_alpha` / `_erase`: **GRADED pre-launch** (README §4): WIN == LNX; TSNAP's move was Flash-ward
+     (t2: 81 986 vs golden 89 617; erase 79 910 vs 88 046). Re-golden both OUR fixtures to the FP32 LOW captures
+     (`session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/regression__avm2_layer_group_*.low.png`) and price the
+     remaining ~80 k gap (layer-group compositing at LOW) as its own lead.
    - Re-grade `sprite_with_frames` against FP32 LOW now that the stroke raster is in.
-7. **`acid-shapes` FP32 HIGH residue capture (S coordinator, then M).** It is at 88 over limit after s29 (structural:
-   thick curved strokes). Capture first, then fund. This is also the reopen criterion for the Flash-exact HIGH AA
-   NO-GO (NO_GO §1b; w1-aa-sizing measured 0 flips, −11).
+7. **`acid-shapes` (M): CAPTURED pre-launch** (README §3; LNX == WIN == golden). It fails only t16 (+85) and t32
+   (+88), and that excess is edge-only AA. The t128 geometry residue is 146 px on the thick curved strokes' outer
+   edges, where FP32 paints stroke colour and we leave background. Neither fix alone flips it: the row needs the
+   curved-stroke edge geometry AND the faithful HIGH AA rule. That is the AA NO-GO's reopen criterion (NO_GO §1b).
+   Fund the geometry half first, graded with w1-aa-sizing's `scan_run.py -DSSAA_PROBE -DSSAA_VSNAP` leg.
 8. **Real Flash gaps with Flash goldens (M):**
    - `place_object_test` (2604);
    - `acid-stroke-0` (3413);
@@ -194,7 +212,9 @@ oracle; the Ruffle exporter is a fallback. AVM1 runs DIRECT, pinned 1:1; non-LAY
   2. **`regression/avm1_nested_child_swapdepths_remove` (M).** This booked expected-fail is the one failing
      `regression/` row: a timeline child's swapDepths + removeMovieClip survives. The bug is in EVERY build, and the
      fixture came from this ladder (`c91637b7a`). It belongs here unless you fund it as a cloud slot. Either way it
-     flips fail → pass in both modes, and nothing else may move.
+     flips fail → pass in both modes, and nothing else may move. It is booked ONLY by its "OPEN DEFECT" row in
+     `ruffle-tests/tests/swfs/regression/README.md` (no ignore entry, no `known_failure`). Rewrite that row in the same
+     commit as the fix.
   3. **The timeline-sprite self-goto port §5a (M)**, plus deleting the dead `pending_remove` code. The oracle is
      `nested_sprite_inframe_goto` via child_probe.
 - **How to run them:** launch with
