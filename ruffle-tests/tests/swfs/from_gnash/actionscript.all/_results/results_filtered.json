@@ -1,22 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T07:04:59.009704+00:00",
+    "timestamp": "2026-11-27T16:08:12.435167+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 1491.89,
+    "duration_seconds": 1505.25,
     "total_available": 243,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
-    "ignored_count": 0,
+    "ignored_count": 3,
     "filtered": true
   },
-  "total": 235,
-  "pass": 176,
+  "total": 240,
+  "pass": 181,
   "ruffle_matched": 59,
   "fail": 0,
-  "pass_rate": 74.9,
-  "effective_pass": 235,
+  "pass_rate": 75.4,
+  "effective_pass": 240,
   "effective_pass_rate": 100.0,
   "breakdown": {
     "ruffle_matched": 59
@@ -3162,6 +3160,86 @@
         "matching_lines": 207
       },
       "duration": 1.28,
+      "status": "pass"
+    },
+    {
+      "test": "XMLSocket-v5",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.972,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 35,
+        "expected_lines": 35,
+        "matching_lines": 35
+      },
+      "duration": 1.98,
+      "status": "pass"
+    },
+    {
+      "test": "XMLSocket-v6",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.95,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 35,
+        "expected_lines": 35,
+        "matching_lines": 35
+      },
+      "duration": 1.96,
+      "status": "pass"
+    },
+    {
+      "test": "XMLSocket-v7",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.7,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 35,
+        "expected_lines": 35,
+        "matching_lines": 35
+      },
+      "duration": 1.71,
+      "status": "pass"
+    },
+    {
+      "test": "XMLSocket-v8",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.18,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 35,
+        "expected_lines": 35,
+        "matching_lines": 35
+      },
+      "duration": 1.19,
+      "status": "pass"
+    },
+    {
+      "test": "argstest-v5",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 1.586,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 1.59,
       "status": "pass"
     },
     {

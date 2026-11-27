@@ -1,29 +1,29 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-27 07:04 UTC
+**Date**: 2026-11-27 16:08 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 24m 52s
+**Run Duration**: 25m 5s
 
-**Filtered**: 0 tests ignored out of 243 available
+**Filtered**: 3 tests ignored out of 243 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 235 |
-| Passing | **176** (74.9%) |
+| Total tests | 240 |
+| Passing | **181** (75.4%) |
 | Ruffle-matched | 59 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **235** (100.0%) |
+| Effective pass | **240** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 31960 |
-| Matching lines | 30750 (96.2%) |
+| Total expected lines | 32104 |
+| Matching lines | 30894 (96.2%) |
 | Mismatched lines | 1210 |
 
 ## Passing Tests
 
-**176 tests passing**
+**181 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -164,45 +164,50 @@
 | 135 | `XMLNode-v6` | 207 | 6.4s |  |
 | 136 | `XMLNode-v7` | 207 | 5.7s |  |
 | 137 | `XMLNode-v8` | 207 | 1.3s |  |
-| 138 | `case-v5` | 39 | 2.0s |  |
-| 139 | `case-v6` | 73 | 2.6s |  |
-| 140 | `case-v7` | 67 | 2.5s |  |
-| 141 | `case-v8` | 67 | 1.1s |  |
-| 142 | `delete-v5` | 61 | 20.1s |  |
-| 143 | `delete-v6` | 61 | 1.9s |  |
-| 144 | `delete-v7` | 61 | 2.1s |  |
-| 145 | `delete-v8` | 61 | 1.3s |  |
-| 146 | `enumerate-v5` | 6 | 1.5s |  |
-| 147 | `enumerate-v6` | 49 | 2.3s |  |
-| 148 | `enumerate-v7` | 49 | 2.0s |  |
-| 149 | `enumerate-v8` | 49 | 1.1s |  |
-| 150 | `flash-v5` | 10 | 2.2s |  |
-| 151 | `flash-v6` | 10 | 2.2s |  |
-| 152 | `flash-v7` | 10 | 1.8s |  |
-| 153 | `flash-v8` | 41 | 3.1s |  |
-| 154 | `getvariable-v5` | 58 | 3.5s |  |
-| 155 | `getvariable-v6` | 64 | 3.6s |  |
-| 156 | `getvariable-v7` | 64 | 3.7s |  |
-| 157 | `getvariable-v8` | 64 | 1.7s |  |
-| 158 | `ops-v5` | 260 | 7.5s |  |
-| 159 | `ops-v6` | 260 | 7.4s |  |
-| 160 | `ops-v7` | 262 | 7.7s |  |
-| 161 | `ops-v8` | 262 | 1.3s |  |
-| 162 | `swap-v5` | 7 | 26.9s |  |
-| 163 | `swap-v6` | 7 | 0.8s |  |
-| 164 | `swap-v7` | 7 | 2.1s |  |
-| 165 | `swap-v8` | 7 | 1.9s |  |
-| 166 | `targetPath-v5` | 12 | 2.5s |  |
-| 167 | `targetPath-v6` | 23 | 2.8s |  |
-| 168 | `targetPath-v7` | 23 | 2.4s |  |
-| 169 | `targetPath-v8` | 23 | 1.9s |  |
-| 170 | `toString_valueOf-v6` | 155 | 6.1s |  |
-| 171 | `toString_valueOf-v7` | 155 | 5.8s |  |
-| 172 | `toString_valueOf-v8` | 155 | 1.9s |  |
-| 173 | `with-v5` | 49 | 3.9s |  |
-| 174 | `with-v6` | 107 | 5.2s |  |
-| 175 | `with-v7` | 107 | 4.9s |  |
-| 176 | `with-v8` | 107 | 2.1s |  |
+| 138 | `XMLSocket-v5` | 35 | 2.0s |  |
+| 139 | `XMLSocket-v6` | 35 | 2.0s |  |
+| 140 | `XMLSocket-v7` | 35 | 1.7s |  |
+| 141 | `XMLSocket-v8` | 35 | 1.2s |  |
+| 142 | `argstest-v5` | 4 | 1.6s |  |
+| 143 | `case-v5` | 39 | 2.0s |  |
+| 144 | `case-v6` | 73 | 2.6s |  |
+| 145 | `case-v7` | 67 | 2.5s |  |
+| 146 | `case-v8` | 67 | 1.1s |  |
+| 147 | `delete-v5` | 61 | 20.1s |  |
+| 148 | `delete-v6` | 61 | 1.9s |  |
+| 149 | `delete-v7` | 61 | 2.1s |  |
+| 150 | `delete-v8` | 61 | 1.3s |  |
+| 151 | `enumerate-v5` | 6 | 1.5s |  |
+| 152 | `enumerate-v6` | 49 | 2.3s |  |
+| 153 | `enumerate-v7` | 49 | 2.0s |  |
+| 154 | `enumerate-v8` | 49 | 1.1s |  |
+| 155 | `flash-v5` | 10 | 2.2s |  |
+| 156 | `flash-v6` | 10 | 2.2s |  |
+| 157 | `flash-v7` | 10 | 1.8s |  |
+| 158 | `flash-v8` | 41 | 3.1s |  |
+| 159 | `getvariable-v5` | 58 | 3.5s |  |
+| 160 | `getvariable-v6` | 64 | 3.6s |  |
+| 161 | `getvariable-v7` | 64 | 3.7s |  |
+| 162 | `getvariable-v8` | 64 | 1.7s |  |
+| 163 | `ops-v5` | 260 | 7.5s |  |
+| 164 | `ops-v6` | 260 | 7.4s |  |
+| 165 | `ops-v7` | 262 | 7.7s |  |
+| 166 | `ops-v8` | 262 | 1.3s |  |
+| 167 | `swap-v5` | 7 | 26.9s |  |
+| 168 | `swap-v6` | 7 | 0.8s |  |
+| 169 | `swap-v7` | 7 | 2.1s |  |
+| 170 | `swap-v8` | 7 | 1.9s |  |
+| 171 | `targetPath-v5` | 12 | 2.5s |  |
+| 172 | `targetPath-v6` | 23 | 2.8s |  |
+| 173 | `targetPath-v7` | 23 | 2.4s |  |
+| 174 | `targetPath-v8` | 23 | 1.9s |  |
+| 175 | `toString_valueOf-v6` | 155 | 6.1s |  |
+| 176 | `toString_valueOf-v7` | 155 | 5.8s |  |
+| 177 | `toString_valueOf-v8` | 155 | 1.9s |  |
+| 178 | `with-v5` | 49 | 3.9s |  |
+| 179 | `with-v6` | 107 | 5.2s |  |
+| 180 | `with-v7` | 107 | 4.9s |  |
+| 181 | `with-v8` | 107 | 2.1s |  |
 
 ## Ruffle-Matched Tests
 

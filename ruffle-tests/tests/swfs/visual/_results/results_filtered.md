@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-27 07:04 UTC
+**Date**: 2026-11-27 16:08 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 31m 39s
+**Run Duration**: 32m 47s
 
 **Filtered**: 0 tests ignored out of 151 available
 
@@ -12,10 +12,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 146 |
-| Passing | **144** (98.6%) |
+| Total tests | 151 |
+| Passing | **149** (98.7%) |
 | Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **146** (100.0%) |
+| Effective pass | **151** (100.0%) |
 | Failing | 0 |
 | Total expected lines | 350 |
 | Matching lines | 301 (86.0%) |
@@ -23,7 +23,7 @@
 
 ## Passing Tests
 
-**144 tests passing**
+**149 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -141,36 +141,41 @@
 | 112 | `fonts/font_lookup_as3` | 0 | 6.0s |  |
 | 113 | `fonts/glyph` | 0 | 6.0s |  |
 | 114 | `fonts/leading_define_font` | 0 | 18.7s |  |
-| 115 | `gradient_same_ratios` | 0 | 18.2s |  |
-| 116 | `layout/line_vertical_align` | 0 | 23.6s |  |
-| 117 | `opaque_background` | 0 | 0.9s |  |
-| 118 | `scale_rotation_cache` | 106 | 18.6s |  |
-| 119 | `scroll_rect_culling` | 0 | 23.8s |  |
-| 120 | `simple_shapes/gradients/focal_radial` | 0 | 0.9s |  |
-| 121 | `simple_shapes/gradients/gradients` | 0 | 1.0s |  |
-| 122 | `simple_shapes/gradients/radial` | 0 | 1.1s |  |
-| 123 | `simple_shapes/gradients/reflect` | 0 | 1.1s |  |
-| 124 | `simple_shapes/gradients/repeat` | 0 | 1.1s |  |
-| 125 | `simple_shapes/heavy_tesselation` | 0 | 80.1s |  |
-| 126 | `simple_shapes/layers` | 0 | 1.3s |  |
-| 127 | `simple_shapes/masks` | 0 | 1.4s |  |
-| 128 | `simple_shapes/masks_equal_clipdepth` | 0 | 1.0s |  |
-| 129 | `simple_shapes/overlaps` | 0 | 1.3s |  |
-| 130 | `simple_shapes/scroll_rect_mask` | 0 | 1.0s |  |
-| 131 | `simple_shapes/strokes/scale` | 0 | 1.0s |  |
-| 132 | `simple_shapes/text_field_mask` | 0 | 1.0s |  |
-| 133 | `simple_shapes/winding_rule` | 0 | 18.9s |  |
-| 134 | `static_text_offstage` | 0 | 1.0s |  |
-| 135 | `text/String_path_variable_button` | 0 | 1.8s |  |
-| 136 | `video/colorconversion/h263` | 0 | 26.8s |  |
-| 137 | `video/colorconversion/vp6` | 0 | 1.8s |  |
-| 138 | `video/colorconversion/vp6a` | 0 | 2.0s |  |
-| 139 | `video/deblocking` | 0 | 27.6s |  |
-| 140 | `video/h264` | 0 | 32.9s |  |
-| 141 | `video/h264_multinalu` | 0 | 31.9s |  |
-| 142 | `video/vp6_alphaoffset` | 0 | 24.7s |  |
-| 143 | `video/vp6_dispsize` | 0 | 25.0s |  |
-| 144 | `video/vp6_inter_frames` | 0 | 26.3s |  |
+| 115 | `fonts/leading_device_font` | 0 | 5.9s |  |
+| 116 | `fonts/leading_embedded_font` | 0 | 6.1s |  |
+| 117 | `gradient_issue_9892` | 0 | 18.6s |  |
+| 118 | `gradient_nonsequential_ratios` | 0 | 18.3s |  |
+| 119 | `gradient_radial_same_ratios` | 0 | 18.6s |  |
+| 120 | `gradient_same_ratios` | 0 | 18.2s |  |
+| 121 | `layout/line_vertical_align` | 0 | 23.6s |  |
+| 122 | `opaque_background` | 0 | 0.9s |  |
+| 123 | `scale_rotation_cache` | 106 | 18.6s |  |
+| 124 | `scroll_rect_culling` | 0 | 23.8s |  |
+| 125 | `simple_shapes/gradients/focal_radial` | 0 | 0.9s |  |
+| 126 | `simple_shapes/gradients/gradients` | 0 | 1.0s |  |
+| 127 | `simple_shapes/gradients/radial` | 0 | 1.1s |  |
+| 128 | `simple_shapes/gradients/reflect` | 0 | 1.1s |  |
+| 129 | `simple_shapes/gradients/repeat` | 0 | 1.1s |  |
+| 130 | `simple_shapes/heavy_tesselation` | 0 | 80.1s |  |
+| 131 | `simple_shapes/layers` | 0 | 1.3s |  |
+| 132 | `simple_shapes/masks` | 0 | 1.4s |  |
+| 133 | `simple_shapes/masks_equal_clipdepth` | 0 | 1.0s |  |
+| 134 | `simple_shapes/overlaps` | 0 | 1.3s |  |
+| 135 | `simple_shapes/scroll_rect_mask` | 0 | 1.0s |  |
+| 136 | `simple_shapes/strokes/scale` | 0 | 1.0s |  |
+| 137 | `simple_shapes/text_field_mask` | 0 | 1.0s |  |
+| 138 | `simple_shapes/winding_rule` | 0 | 18.9s |  |
+| 139 | `static_text_offstage` | 0 | 1.0s |  |
+| 140 | `text/String_path_variable_button` | 0 | 1.8s |  |
+| 141 | `video/colorconversion/h263` | 0 | 26.8s |  |
+| 142 | `video/colorconversion/vp6` | 0 | 1.8s |  |
+| 143 | `video/colorconversion/vp6a` | 0 | 2.0s |  |
+| 144 | `video/deblocking` | 0 | 27.6s |  |
+| 145 | `video/h264` | 0 | 32.9s |  |
+| 146 | `video/h264_multinalu` | 0 | 31.9s |  |
+| 147 | `video/vp6_alphaoffset` | 0 | 24.7s |  |
+| 148 | `video/vp6_dispsize` | 0 | 25.0s |  |
+| 149 | `video/vp6_inter_frames` | 0 | 26.3s |  |
 
 ## Ruffle-Matched Tests
 

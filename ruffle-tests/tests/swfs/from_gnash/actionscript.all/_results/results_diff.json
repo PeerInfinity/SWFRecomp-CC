@@ -1,134 +1,130 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T03:57:01.507184+00:00",
-    "old_git_sha": "dbc43c157352371720c1fed7998018a150009d42",
-    "new_timestamp": "2026-11-27T07:04:59.009704+00:00",
+    "old_timestamp": "2026-11-27T07:04:59.009704+00:00",
+    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
+    "new_timestamp": "2026-11-27T16:08:12.435167+00:00",
     "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 181,
+    "old_pass": 176,
     "old_ruffle_matched": 59,
-    "old_effective_pass": 240,
-    "old_total": 243,
-    "old_pass_rate": 74.5,
-    "new_pass": 176,
+    "old_effective_pass": 235,
+    "old_total": 235,
+    "old_pass_rate": 74.9,
+    "new_pass": 181,
     "new_ruffle_matched": 59,
-    "new_effective_pass": 235,
-    "new_total": 235,
-    "new_pass_rate": 74.9,
-    "old_mismatched_lines": 7614,
-    "new_mismatched_lines": 1210,
+    "new_effective_pass": 240,
+    "new_total": 243,
+    "new_pass_rate": 74.5,
+    "old_mismatched_lines": 1210,
+    "new_mismatched_lines": 7614,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 235,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 8
+    "added": 8,
+    "removed": 0
   },
   "changes": [
     {
       "test": "XMLSocket-v5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 35,
         "expected_lines": 35,
         "matching_lines": 35
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "XMLSocket-v6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 35,
         "expected_lines": 35,
         "matching_lines": 35
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "XMLSocket-v7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 35,
         "expected_lines": 35,
         "matching_lines": 35
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "XMLSocket-v8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 35,
         "expected_lines": 35,
         "matching_lines": 35
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "argstest-v5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 4
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "argstest-v6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "output_mismatch",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2644,
         "expected_lines": 2192,
         "matching_lines": 84
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "argstest-v7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "output_mismatch",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2644,
         "expected_lines": 2061,
         "matching_lines": 78
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "argstest-v8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "output_mismatch",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 3006,
         "expected_lines": 2434,
         "matching_lines": 121
-      },
-      "new_lines": null
+      }
     }
   ]
 }

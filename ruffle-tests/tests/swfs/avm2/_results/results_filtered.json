@@ -1,22 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T07:04:58.932906+00:00",
+    "timestamp": "2026-11-27T16:08:12.326474+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 12340.52,
+    "duration_seconds": 12833.96,
     "total_available": 1352,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
-    "ignored_count": 24,
+    "ignored_count": 29,
     "filtered": true
   },
-  "total": 1283,
-  "pass": 1267,
+  "total": 1323,
+  "pass": 1307,
   "ruffle_matched": 15,
   "fail": 1,
   "pass_rate": 98.8,
-  "effective_pass": 1282,
+  "effective_pass": 1322,
   "effective_pass_rate": 99.9,
   "breakdown": {
     "output_mismatch": 1,
@@ -16336,6 +16334,646 @@
         "matching_lines": 1
       },
       "duration": 23.45,
+      "status": "pass"
+    },
+    {
+      "test": "slots_force_autoassigned",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.912,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.92,
+      "status": "pass"
+    },
+    {
+      "test": "socket_after_disconnect",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 5.965,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.98,
+      "status": "pass"
+    },
+    {
+      "test": "socket_close",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.816,
+        "run": 0.003
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 5.83,
+      "status": "pass"
+    },
+    {
+      "test": "socket_connect",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 5.799,
+        "run": 0.003
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 5.81,
+      "status": "pass"
+    },
+    {
+      "test": "socket_errors",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.276,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 56,
+        "expected_lines": 56,
+        "matching_lines": 56
+      },
+      "duration": 6.29,
+      "status": "pass"
+    },
+    {
+      "test": "socket_read_big",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.919,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      },
+      "duration": 5.93,
+      "status": "pass"
+    },
+    {
+      "test": "socket_read_little",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.59,
+        "run": 0.003
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      },
+      "duration": 1.6,
+      "status": "pass"
+    },
+    {
+      "test": "socket_read_write_object",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 5.858,
+        "run": 0.003
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 5.87,
+      "status": "pass"
+    },
+    {
+      "test": "socket_write_big",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.977,
+        "run": 0.015
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "duration": 6.0,
+      "status": "pass"
+    },
+    {
+      "test": "socket_write_little",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.826,
+        "run": 0.003
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 5.84,
+      "status": "pass"
+    },
+    {
+      "test": "sound_constructor_with_args",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 6.028,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 6.04,
+      "status": "pass"
+    },
+    {
+      "test": "sound_embeddedprops",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.0,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      },
+      "duration": 6.01,
+      "status": "pass"
+    },
+    {
+      "test": "sound_load_multiple",
+      "phases": {
+        "recomp": 0.014,
+        "compile": 6.586,
+        "run": 0.004
+      },
+      "num_frames": 16,
+      "lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "duration": 6.61,
+      "status": "pass"
+    },
+    {
+      "test": "sound_play",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 6.048,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "duration": 6.06,
+      "status": "pass"
+    },
+    {
+      "test": "sound_rootless",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 5.857,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 5.87,
+      "status": "pass"
+    },
+    {
+      "test": "sound_valueof",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.943,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
+      },
+      "duration": 5.96,
+      "status": "pass"
+    },
+    {
+      "test": "soundchannel_position_after_end",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.461,
+        "run": 0.003
+      },
+      "num_frames": 130,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 6.47,
+      "status": "pass"
+    },
+    {
+      "test": "soundchannel_soundtransform",
+      "phases": {
+        "recomp": 0.013,
+        "compile": 25.258,
+        "run": 0.004
+      },
+      "num_frames": 49,
+      "lines": {
+        "actual_lines": 835,
+        "expected_lines": 835,
+        "matching_lines": 835
+      },
+      "duration": 25.28,
+      "status": "pass"
+    },
+    {
+      "test": "soundchannel_soundtransform_exists",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 23.49,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 23.5,
+      "status": "pass"
+    },
+    {
+      "test": "soundchannel_stop",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 23.51,
+        "run": 0.003
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 23.52,
+      "status": "pass"
+    },
+    {
+      "test": "soundmixer_buffertime",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.776,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 5.79,
+      "status": "pass"
+    },
+    {
+      "test": "soundmixer_soundtransform",
+      "phases": {
+        "recomp": 0.014,
+        "compile": 7.569,
+        "run": 0.004
+      },
+      "num_frames": 49,
+      "lines": {
+        "actual_lines": 900,
+        "expected_lines": 900,
+        "matching_lines": 900
+      },
+      "duration": 7.59,
+      "status": "pass"
+    },
+    {
+      "test": "soundmixer_stopall",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.862,
+        "run": 0.003
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 5.87,
+      "status": "pass"
+    },
+    {
+      "test": "soundtransform",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 9.604,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 442,
+        "expected_lines": 442,
+        "matching_lines": 442
+      },
+      "duration": 9.62,
+      "status": "pass"
+    },
+    {
+      "test": "space_justifier_clone",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 5.772,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 5.78,
+      "status": "pass"
+    },
+    {
+      "test": "sprite_with_frames",
+      "phases": {
+        "recomp": 0.01,
+        "compile": 23.638,
+        "run": 0.003
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 23.66,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_agal_cross_product",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 8.092,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.12,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_agal_upload_errors",
+      "phases": {
+        "recomp": 0.014,
+        "compile": 8.095,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 66,
+        "expected_lines": 66,
+        "matching_lines": 66
+      },
+      "duration": 8.12,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_bitmap",
+      "phases": {
+        "recomp": 0.084,
+        "compile": 27.385,
+        "run": 0.247
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.72,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_blend",
+      "phases": {
+        "recomp": 0.013,
+        "compile": 25.467,
+        "run": 0.121
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 81,
+        "expected_lines": 81,
+        "matching_lines": 81
+      },
+      "duration": 25.61,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_context3d_string_args",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 6.932,
+        "run": 0.005
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 158,
+        "expected_lines": 158,
+        "matching_lines": 158
+      },
+      "duration": 6.95,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_errors",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.9,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 5.91,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_errors_atf",
+      "phases": {
+        "recomp": 0.037,
+        "compile": 6.972,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 7.02,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_errors_swf_29",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 5.961,
+        "run": 0.003
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 5.97,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_float1_index",
+      "phases": {
+        "recomp": 0.013,
+        "compile": 25.556,
+        "run": 0.009
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.58,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_fractal",
+      "phases": {
+        "recomp": 0.016,
+        "compile": 25.801,
+        "run": 0.968
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 26.79,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_ignore_sampler_override",
+      "phases": {
+        "recomp": 0.013,
+        "compile": 26.07,
+        "run": 0.027
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 26.11,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_missing_vertex_stream",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 6.014,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      },
+      "duration": 6.03,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_multistage_triangle",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 8.324,
+        "run": 0.01
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 8.35,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_program_constants_bytearray_be",
+      "phases": {
+        "recomp": 0.016,
+        "compile": 27.21,
+        "run": 0.013
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.24,
       "status": "pass"
     },
     {

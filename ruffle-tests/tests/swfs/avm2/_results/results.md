@@ -1,23 +1,23 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-27 07:04 UTC
+**Date**: 2026-11-27 16:08 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 205m 41s
+**Run Duration**: 213m 54s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1307 |
-| Passing | **1276** (97.6%) |
-| Ruffle-matched | 25 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1301** (99.5%) |
+| Total tests | 1352 |
+| Passing | **1316** (97.3%) |
+| Ruffle-matched | 30 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **1346** (99.6%) |
 | Failing | 6 |
-| Total expected lines | 161404 |
-| Matching lines | 159953 (99.1%) |
-| Mismatched lines | 1451 |
+| Total expected lines | 164470 |
+| Matching lines | 162918 (99.1%) |
+| Mismatched lines | 1552 |
 
 ### Failure Breakdown
 
@@ -27,7 +27,7 @@
 
 ## Passing Tests
 
-**1276 tests passing**
+**1316 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -1044,273 +1044,313 @@
 | 1011 | `simplebutton_structure` | 27 | 6.1s |  |
 | 1012 | `simplebutton_symbolclass` | 68 | 6.1s |  |
 | 1013 | `slot_disp_id_shared_numbering` | 1 | 23.4s |  |
-| 1014 | `stage3d_program_constants_bytearray_le` | 0 | 27.1s |  |
-| 1015 | `stage3d_program_constants_invalid_input` | 21 | 6.6s |  |
-| 1016 | `stage3d_raytrace` | 0 | 28.8s |  |
-| 1017 | `stage3d_rotating_cube` | 0 | 8.5s |  |
-| 1018 | `stage3d_sampler` | 0 | 7.9s |  |
-| 1019 | `stage3d_sampler_partial_upload` | 0 | 7.9s |  |
-| 1020 | `stage3d_stencil` | 0 | 25.7s |  |
-| 1021 | `stage3d_texture` | 0 | 12.9s |  |
-| 1022 | `stage3d_texture_bytearray` | 0 | 9.3s |  |
-| 1023 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 8.6s |  |
-| 1024 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 9.4s |  |
-| 1025 | `stage3d_triangle` | 0 | 8.2s |  |
-| 1026 | `stage3d_triangle_bytes4` | 0 | 8.2s |  |
-| 1027 | `stage3d_triangle_float1` | 0 | 8.1s |  |
-| 1028 | `stage3d_triangle_index_upload` | 0 | 8.1s |  |
-| 1029 | `stage3d_x_y` | 22 | 5.8s |  |
-| 1030 | `stage_access` | 10 | 5.8s |  |
-| 1031 | `stage_display_state` | 6 | 5.8s |  |
-| 1032 | `stage_displayobject_properties` | 24 | 5.7s |  |
-| 1033 | `stage_domain_getQualifiedDefinitionNames` | 5 | 5.8s |  |
-| 1034 | `stage_framerate_nan` | 7 | 5.8s |  |
-| 1035 | `stage_framerate_negative` | 6 | 5.8s |  |
-| 1036 | `stage_framerate_zero` | 6 | 5.7s |  |
-| 1037 | `stage_invalidate` | 38 | 6.0s |  |
-| 1038 | `stage_loaderinfo_properties` | 24 | 23.4s |  |
-| 1039 | `stage_mousechildren` | 2 | 5.8s |  |
-| 1040 | `stage_mouseenabled` | 15 | 5.7s |  |
-| 1041 | `stage_overriden_setters` | 31 | 5.8s |  |
-| 1042 | `stage_properties` | 30 | 5.8s |  |
-| 1043 | `stage_properties2` | 213 | 5.9s |  |
-| 1044 | `stage_scale_factor` | 12 | 26.8s |  |
-| 1045 | `stage_stage3Ds_vector` | 1 | 5.7s |  |
-| 1046 | `static_length` | 24 | 6.0s |  |
-| 1047 | `static_text` | 3 | 5.9s |  |
-| 1048 | `static_var_with_this_in_ctor` | 2 | 5.8s |  |
-| 1049 | `statictext_text` | 8 | 1.7s |  |
-| 1050 | `stored_properties` | 11 | 5.9s |  |
-| 1051 | `strict_equality` | 34 | 5.9s |  |
-| 1052 | `string_call` | 13 | 5.8s |  |
-| 1053 | `string_case` | 23 | 5.8s |  |
-| 1054 | `string_char_at` | 27 | 5.8s |  |
-| 1055 | `string_char_code_at` | 28 | 5.7s |  |
-| 1056 | `string_concat_fromcharcode` | 37 | 5.6s |  |
-| 1057 | `string_constr` | 25 | 5.8s |  |
-| 1058 | `string_indexof_lastindexof` | 87 | 5.9s |  |
-| 1059 | `string_length` | 16 | 23.6s |  |
-| 1060 | `string_locale_compare` | 39 | 6.1s |  |
-| 1061 | `string_match` | 51 | 23.9s |  |
-| 1062 | `string_relational_compare` | 4 | 5.8s |  |
-| 1063 | `string_replace` | 51 | 6.0s |  |
-| 1064 | `string_search` | 41 | 5.9s |  |
-| 1065 | `string_slice_substr_substring` | 170 | 6.6s |  |
-| 1066 | `string_split` | 29 | 5.9s |  |
-| 1067 | `string_substr_negative` | 21 | 5.8s |  |
-| 1068 | `string_substr_weird` | 182 | 5.7s |  |
-| 1069 | `stylesheet` | 221 | 6.4s |  |
-| 1070 | `stylesheet_parse_color` | 69 | 5.8s |  |
-| 1071 | `stylesheet_transform` | 307 | 6.0s |  |
-| 1072 | `sub_super_same_field` | 12 | 1.7s |  |
-| 1073 | `subclass_superclass_linked_symbol` | 4 | 6.2s |  |
-| 1074 | `subtract` | 1058 | 13.0s |  |
-| 1075 | `super_get_call` | 12 | 5.8s |  |
-| 1076 | `supercall_two_classobjects` | 2 | 5.8s |  |
-| 1077 | `supercalls_coerce` | 8 | 5.8s |  |
-| 1078 | `supercalls_weird` | 2 | 5.7s |  |
-| 1079 | `superinterface_call` | 20 | 5.8s |  |
-| 1080 | `superinterface_instanceof` | 18 | 5.9s |  |
-| 1081 | `swf8` | 1 | 5.8s |  |
-| 1082 | `swf_10_queued_goto_scripts_construct` | 52 | 23.5s |  |
-| 1083 | `swf_9_goto_in_enter_frame` | 17 | 5.9s |  |
-| 1084 | `swf_9_goto_in_enter_frame_simple` | 15 | 5.9s |  |
-| 1085 | `swf_9_queued_goto_scripts` | 6 | 23.2s |  |
-| 1086 | `swf_9_queued_goto_scripts_construct` | 28 | 0.4s |  |
-| 1087 | `swf_9_versioning` | 2 | 5.8s |  |
-| 1088 | `swf_wrong_frame_count` | 38 | 6.1s |  |
-| 1089 | `swf_wrong_frame_count_isplaying` | 22 | 5.8s |  |
-| 1090 | `swz` | 3 | 6.3s |  |
-| 1091 | `symbol_class_binary_data` | 8 | 5.8s |  |
-| 1092 | `symbol_class_conflict` | 4 | 5.9s |  |
-| 1093 | `symbol_class_root_not_zero` | 1 | 5.7s |  |
-| 1094 | `symbolclass_invalid_utf8` | 2 | 5.8s |  |
-| 1095 | `system_exit` | 3 | 5.8s |  |
-| 1096 | `system_setclipboard_null` | 1 | 5.7s |  |
-| 1097 | `tab_ordering_arrows` | 998 | 24.7s |  |
-| 1098 | `tab_ordering_automatic_advanced` | 184 | 6.4s |  |
-| 1099 | `tab_ordering_automatic_basic` | 45 | 5.9s |  |
-| 1100 | `tab_ordering_children` | 116 | 6.0s |  |
-| 1101 | `tab_ordering_custom_basic` | 34 | 5.9s |  |
-| 1102 | `tab_ordering_properties` | 732 | 6.2s |  |
-| 1103 | `tab_ordering_stage_tab_children` | 32 | 8.0s |  |
-| 1104 | `tab_ordering_stage_tab_children_remove_root` | 5 | 7.9s |  |
-| 1105 | `tab_ordering_tabbable` | 47 | 8.1s |  |
-| 1106 | `tabstop_properties` | 105 | 8.4s |  |
-| 1107 | `text_element_basic` | 34 | 8.1s |  |
-| 1108 | `text_engine_fontdescription` | 27 | 8.1s |  |
-| 1109 | `text_engine_groupelement` | 64 | 9.0s |  |
-| 1110 | `text_run` | 7 | 7.8s |  |
-| 1111 | `textblock_createline_errors` | 23 | 8.1s |  |
-| 1112 | `textblock_createline_fte` | 9 | 8.0s |  |
-| 1113 | `textblock_properties` | 118 | 8.3s |  |
-| 1114 | `textblock_recreate_text_line_width` | 5 | 8.2s |  |
-| 1115 | `textbox_click` | 37 | 31.6s |  |
-| 1116 | `textfield_default_text_format_null` | 20 | 8.0s |  |
-| 1117 | `textfield_event` | 66 | 8.3s |  |
-| 1118 | `textfield_focusin_event` | 9 | 7.9s |  |
-| 1119 | `textfield_get_text_format_args` | 567 | 8.1s |  |
-| 1120 | `textfield_input_dead_keys_windows` | 15 | 7.9s |  |
-| 1121 | `textfield_input_events` | 25 | 26.4s |  |
-| 1122 | `textfield_set_text_format_args` | 904 | 8.1s |  |
-| 1123 | `textfield_unload` | 39 | 31.7s |  |
-| 1124 | `textformat` | 1134 | 7.9s |  |
-| 1125 | `textformat_display` | 14 | 8.1s |  |
-| 1126 | `textformat_font_max_length` | 4 | 8.0s |  |
-| 1127 | `textjustifier_locale` | 132 | 8.2s |  |
-| 1128 | `textline_has_tabs` | 47 | 8.1s |  |
-| 1129 | `textline_inapplicable_properties` | 10 | 8.0s |  |
-| 1130 | `textline_metrics` | 20 | 8.2s |  |
-| 1131 | `textline_name` | 1 | 8.0s |  |
-| 1132 | `textline_raw_text_length` | 30 | 8.1s |  |
-| 1133 | `textline_splitting_basic` | 76 | 8.2s |  |
-| 1134 | `textline_throwerror` | 30 | 8.0s |  |
-| 1135 | `textline_validity` | 162 | 8.2s |  |
-| 1136 | `throw` | 3 | 8.1s |  |
-| 1137 | `timeline_scripts` | 3 | 8.1s |  |
-| 1138 | `timer` | 90 | 9.1s |  |
-| 1139 | `timer_checks_per_frame` | 6 | 8.5s |  |
-| 1140 | `timer_events` | 3 | 8.2s |  |
-| 1141 | `timer_finished` | 11 | 8.1s |  |
-| 1142 | `timer_invalid_delay` | 30 | 8.1s |  |
-| 1143 | `timer_reset` | 8 | 8.3s |  |
-| 1144 | `timer_setdelay` | 5 | 1.9s |  |
-| 1145 | `timer_tie_order` | 64 | 6.3s |  |
-| 1146 | `timer_timeout_ids` | 11 | 6.0s |  |
-| 1147 | `trace` | 12 | 6.0s |  |
-| 1148 | `truthiness` | 30 | 6.0s |  |
-| 1149 | `try_catch` | 11 | 6.1s |  |
-| 1150 | `try_catch_typed` | 12 | 6.0s |  |
-| 1151 | `typeof` | 30 | 6.1s |  |
-| 1152 | `uint_constr` | 92 | 6.2s |  |
-| 1153 | `uint_toexponential` | 1215 | 6.1s |  |
-| 1154 | `uint_tofixed` | 1215 | 5.9s |  |
-| 1155 | `uint_toprecision` | 1125 | 6.1s |  |
-| 1156 | `uint_tostring` | 3375 | 6.2s |  |
-| 1157 | `uncaught_error_basic` | 2 | 6.0s |  |
-| 1158 | `unchecked_function` | 15 | 6.0s |  |
-| 1159 | `unescape` | 28 | 6.0s |  |
-| 1160 | `url_loader` | 25 | 6.1s |  |
-| 1161 | `url_vars` | 27 | 6.2s |  |
-| 1162 | `urlrequest` | 18 | 6.0s |  |
-| 1163 | `urlstream_basic` | 5 | 6.0s |  |
-| 1164 | `urshift` | 1058 | 13.5s |  |
-| 1165 | `utils3d` | 7 | 6.0s |  |
-| 1166 | `vector3d` | 397 | 8.8s |  |
-| 1167 | `vector3d_near_equals` | 80 | 6.0s |  |
-| 1168 | `vector_class` | 36 | 6.2s |  |
-| 1169 | `vector_class_call` | 11 | 6.0s |  |
-| 1170 | `vector_coercion` | 66 | 6.7s |  |
-| 1171 | `vector_concat` | 90 | 6.5s |  |
-| 1172 | `vector_constr` | 107 | 6.7s |  |
-| 1173 | `vector_enumeration` | 5 | 6.0s |  |
-| 1174 | `vector_every` | 92 | 6.8s |  |
-| 1175 | `vector_filter` | 95 | 6.8s |  |
-| 1176 | `vector_holes` | 24 | 6.0s |  |
-| 1177 | `vector_indexing_cutoffs` | 18 | 6.1s |  |
-| 1178 | `vector_indexof` | 302 | 9.2s |  |
-| 1179 | `vector_insertat` | 270 | 6.8s |  |
-| 1180 | `vector_int_access` | 4 | 5.9s |  |
-| 1181 | `vector_int_delete` | 11 | 6.0s |  |
-| 1182 | `vector_join` | 58 | 6.4s |  |
-| 1183 | `vector_join_reentrant` | 96 | 6.2s |  |
-| 1184 | `vector_lastindexof` | 302 | 5.8s |  |
-| 1185 | `vector_legacy` | 10 | 6.0s |  |
-| 1186 | `vector_map` | 85 | 6.5s |  |
-| 1187 | `vector_object_final` | 1 | 1.6s |  |
-| 1188 | `vector_object_toString` | 10 | 32.4s |  |
-| 1189 | `vector_prototype_some` | 125 | 32.9s |  |
-| 1190 | `vector_pushpop` | 255 | 10.2s |  |
-| 1191 | `vector_reborrow_bug` | 10 | 8.7s |  |
-| 1192 | `vector_removeat` | 172 | 10.0s |  |
-| 1193 | `vector_reverse` | 232 | 9.9s |  |
-| 1194 | `vector_shiftunshift` | 252 | 8.5s |  |
-| 1195 | `vector_slice` | 331 | 10.7s |  |
-| 1196 | `vector_sort` | 905 | 18.6s |  |
-| 1197 | `vector_sort_arguments` | 355 | 9.0s |  |
-| 1198 | `vector_splice` | 693 | 12.9s |  |
-| 1199 | `vector_splice_fixed_bug_compat` | 4 | 8.6s |  |
-| 1200 | `vector_tostring` | 79 | 9.3s |  |
-| 1201 | `verification` | 8 | 8.5s |  |
-| 1202 | `verify_abnormal_loop` | 1 | 8.5s |  |
-| 1203 | `verify_dxns_without_flag` | 3 | 8.9s |  |
-| 1204 | `verify_exception_target_two_jumps` | 1 | 8.5s |  |
-| 1205 | `verify_exception_targets_edge_case` | 1 | 8.5s |  |
-| 1206 | `verify_illegal_opcode` | 1 | 3.1s |  |
-| 1207 | `verify_jump_to_middle_of_op` | 1 | 8.5s |  |
-| 1208 | `verify_lookup_switch_edge_case` | 1 | 8.5s |  |
-| 1209 | `verify_method_info_oob` | 1 | 0.7s |  |
-| 1210 | `verify_stack` | 5 | 8.7s |  |
-| 1211 | `verify_typecheck` | 4 | 8.6s |  |
-| 1212 | `verify_unreachable_exception` | 2 | 8.6s |  |
-| 1213 | `versioned_isplaying` | 2 | 8.7s |  |
-| 1214 | `virtual_properties` | 16 | 8.8s |  |
-| 1215 | `weird_number_bound_methods` | 12 | 8.8s |  |
-| 1216 | `weird_superinterface_properties` | 2 | 8.7s |  |
-| 1217 | `with` | 4 | 8.8s |  |
-| 1218 | `worker_terminate` | 56 | 9.5s |  |
-| 1219 | `wrong_arg_count` | 7 | 8.9s |  |
-| 1220 | `xml_abstract_equality` | 36 | 9.0s |  |
-| 1221 | `xml_advanced` | 52 | 8.7s |  |
-| 1222 | `xml_appendchild` | 10 | 8.8s |  |
-| 1223 | `xml_appendchild_swf_v21` | 13 | 9.1s |  |
-| 1224 | `xml_as_attribute` | 9 | 8.9s |  |
-| 1225 | `xml_attribute` | 35 | 9.1s |  |
-| 1226 | `xml_attribute_name` | 40 | 8.9s |  |
-| 1227 | `xml_basic` | 33 | 8.9s |  |
-| 1228 | `xml_child` | 25 | 9.0s |  |
-| 1229 | `xml_childindex` | 7 | 8.9s |  |
-| 1230 | `xml_children` | 43 | 9.6s |  |
-| 1231 | `xml_class_call` | 9 | 8.8s |  |
-| 1232 | `xml_contains` | 197 | 31.8s |  |
-| 1233 | `xml_copy` | 20 | 8.6s |  |
-| 1234 | `xml_ctor_from_tostring` | 23 | 32.8s |  |
-| 1235 | `xml_delete` | 114 | 8.7s |  |
-| 1236 | `xml_descendants` | 83 | 8.8s |  |
-| 1237 | `xml_duplicate_attribute` | 14 | 8.8s |  |
-| 1238 | `xml_elements` | 6 | 8.7s |  |
-| 1239 | `xml_equals_namespace_check` | 2 | 8.5s |  |
-| 1240 | `xml_explicit_use_namespace` | 5 | 8.9s |  |
-| 1241 | `xml_getdescendants_qname` | 21 | 8.6s |  |
-| 1242 | `xml_has_property_via_in` | 26 | 8.4s |  |
-| 1243 | `xml_hasownproperty` | 6 | 8.4s |  |
-| 1244 | `xml_ignore_white` | 6 | 8.5s |  |
-| 1245 | `xml_length` | 2 | 8.5s |  |
-| 1246 | `xml_list_as_attribute` | 9 | 8.4s |  |
-| 1247 | `xml_list_concat` | 20 | 8.3s |  |
-| 1248 | `xml_list_ctor_errors` | 34 | 8.3s |  |
-| 1249 | `xml_list_delete_clear_parent` | 6 | 8.2s |  |
-| 1250 | `xml_list_enumerate` | 4 | 8.2s |  |
-| 1251 | `xml_many_namespace_declarations` | 2 | 8.3s |  |
-| 1252 | `xml_methods_settings` | 3 | 8.2s |  |
-| 1253 | `xml_mismatched_tag` | 45 | 8.4s |  |
-| 1254 | `xml_namespace` | 39 | 8.3s |  |
-| 1255 | `xml_namespace_methods` | 245 | 8.5s |  |
-| 1256 | `xml_namespaced_property` | 7 | 8.4s |  |
-| 1257 | `xml_no_namespace` | 1 | 8.3s |  |
-| 1258 | `xml_nodekind` | 3 | 8.3s |  |
-| 1259 | `xml_normalize` | 35 | 8.4s |  |
-| 1260 | `xml_notification_bubbling` | 361 | 8.4s |  |
-| 1261 | `xml_parent` | 8 | 8.3s |  |
-| 1262 | `xml_set_children` | 17 | 8.5s |  |
-| 1263 | `xml_set_name` | 34 | 8.3s |  |
-| 1264 | `xml_settings` | 6 | 2.7s |  |
-| 1265 | `xml_simple_complex_content` | 47 | 8.4s |  |
-| 1266 | `xml_socket` | 11 | 8.6s |  |
-| 1267 | `xml_text` | 7 | 8.3s |  |
-| 1268 | `xml_tostring` | 6 | 8.3s |  |
-| 1269 | `xml_tostring_namespace` | 12 | 8.2s |  |
-| 1270 | `xml_unescaping` | 23 | 8.4s |  |
-| 1271 | `xml_unescaping_nul_char_ref` | 19 | 8.6s |  |
-| 1272 | `xml_weird_ignores` | 54 | 8.6s |  |
-| 1273 | `xml_wildcard` | 11 | 8.3s |  |
-| 1274 | `xmldocument` | 254 | 8.5s |  |
-| 1275 | `xmlnode` | 3540 | 8.7s |  |
-| 1276 | `zero_frame_clip` | 3 | 8.6s |  |
+| 1014 | `slots_force_autoassigned` | 1 | 5.9s |  |
+| 1015 | `socket_after_disconnect` | 1 | 6.0s |  |
+| 1016 | `socket_close` | 2 | 5.8s |  |
+| 1017 | `socket_connect` | 4 | 5.8s |  |
+| 1018 | `socket_errors` | 56 | 6.3s |  |
+| 1019 | `socket_read_big` | 48 | 5.9s |  |
+| 1020 | `socket_read_little` | 48 | 1.6s |  |
+| 1021 | `socket_read_write_object` | 8 | 5.9s |  |
+| 1022 | `socket_write_big` | 15 | 6.0s |  |
+| 1023 | `socket_write_little` | 14 | 5.8s |  |
+| 1024 | `sound_constructor_with_args` | 6 | 6.0s |  |
+| 1025 | `sound_embeddedprops` | 26 | 6.0s |  |
+| 1026 | `sound_load_multiple` | 19 | 6.6s |  |
+| 1027 | `sound_play` | 19 | 6.1s |  |
+| 1028 | `sound_rootless` | 7 | 5.9s |  |
+| 1029 | `sound_valueof` | 33 | 6.0s |  |
+| 1030 | `soundchannel_position_after_end` | 6 | 6.5s |  |
+| 1031 | `soundchannel_soundtransform` | 835 | 25.3s |  |
+| 1032 | `soundchannel_soundtransform_exists` | 5 | 23.5s |  |
+| 1033 | `soundchannel_stop` | 8 | 23.5s |  |
+| 1034 | `soundmixer_buffertime` | 5 | 5.8s |  |
+| 1035 | `soundmixer_soundtransform` | 900 | 7.6s |  |
+| 1036 | `soundmixer_stopall` | 6 | 5.9s |  |
+| 1037 | `soundtransform` | 442 | 9.6s |  |
+| 1038 | `space_justifier_clone` | 12 | 5.8s |  |
+| 1039 | `sprite_with_frames` | 0 | 23.7s |  |
+| 1040 | `stage3d_agal_cross_product` | 0 | 8.1s |  |
+| 1041 | `stage3d_agal_upload_errors` | 66 | 8.1s |  |
+| 1042 | `stage3d_bitmap` | 0 | 27.7s |  |
+| 1043 | `stage3d_blend` | 81 | 25.6s |  |
+| 1044 | `stage3d_context3d_string_args` | 158 | 7.0s |  |
+| 1045 | `stage3d_errors` | 7 | 5.9s |  |
+| 1046 | `stage3d_errors_atf` | 3 | 7.0s |  |
+| 1047 | `stage3d_errors_swf_29` | 6 | 6.0s |  |
+| 1048 | `stage3d_float1_index` | 0 | 25.6s |  |
+| 1049 | `stage3d_fractal` | 0 | 26.8s |  |
+| 1050 | `stage3d_ignore_sampler_override` | 0 | 26.1s |  |
+| 1051 | `stage3d_missing_vertex_stream` | 37 | 6.0s |  |
+| 1052 | `stage3d_multistage_triangle` | 3 | 8.3s |  |
+| 1053 | `stage3d_program_constants_bytearray_be` | 0 | 27.2s |  |
+| 1054 | `stage3d_program_constants_bytearray_le` | 0 | 27.1s |  |
+| 1055 | `stage3d_program_constants_invalid_input` | 21 | 6.6s |  |
+| 1056 | `stage3d_raytrace` | 0 | 28.8s |  |
+| 1057 | `stage3d_rotating_cube` | 0 | 8.5s |  |
+| 1058 | `stage3d_sampler` | 0 | 7.9s |  |
+| 1059 | `stage3d_sampler_partial_upload` | 0 | 7.9s |  |
+| 1060 | `stage3d_stencil` | 0 | 25.7s |  |
+| 1061 | `stage3d_texture` | 0 | 12.9s |  |
+| 1062 | `stage3d_texture_bytearray` | 0 | 9.3s |  |
+| 1063 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 8.6s |  |
+| 1064 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 9.4s |  |
+| 1065 | `stage3d_triangle` | 0 | 8.2s |  |
+| 1066 | `stage3d_triangle_bytes4` | 0 | 8.2s |  |
+| 1067 | `stage3d_triangle_float1` | 0 | 8.1s |  |
+| 1068 | `stage3d_triangle_index_upload` | 0 | 8.1s |  |
+| 1069 | `stage3d_x_y` | 22 | 5.8s |  |
+| 1070 | `stage_access` | 10 | 5.8s |  |
+| 1071 | `stage_display_state` | 6 | 5.8s |  |
+| 1072 | `stage_displayobject_properties` | 24 | 5.7s |  |
+| 1073 | `stage_domain_getQualifiedDefinitionNames` | 5 | 5.8s |  |
+| 1074 | `stage_framerate_nan` | 7 | 5.8s |  |
+| 1075 | `stage_framerate_negative` | 6 | 5.8s |  |
+| 1076 | `stage_framerate_zero` | 6 | 5.7s |  |
+| 1077 | `stage_invalidate` | 38 | 6.0s |  |
+| 1078 | `stage_loaderinfo_properties` | 24 | 23.4s |  |
+| 1079 | `stage_mousechildren` | 2 | 5.8s |  |
+| 1080 | `stage_mouseenabled` | 15 | 5.7s |  |
+| 1081 | `stage_overriden_setters` | 31 | 5.8s |  |
+| 1082 | `stage_properties` | 30 | 5.8s |  |
+| 1083 | `stage_properties2` | 213 | 5.9s |  |
+| 1084 | `stage_scale_factor` | 12 | 26.8s |  |
+| 1085 | `stage_stage3Ds_vector` | 1 | 5.7s |  |
+| 1086 | `static_length` | 24 | 6.0s |  |
+| 1087 | `static_text` | 3 | 5.9s |  |
+| 1088 | `static_var_with_this_in_ctor` | 2 | 5.8s |  |
+| 1089 | `statictext_text` | 8 | 1.7s |  |
+| 1090 | `stored_properties` | 11 | 5.9s |  |
+| 1091 | `strict_equality` | 34 | 5.9s |  |
+| 1092 | `string_call` | 13 | 5.8s |  |
+| 1093 | `string_case` | 23 | 5.8s |  |
+| 1094 | `string_char_at` | 27 | 5.8s |  |
+| 1095 | `string_char_code_at` | 28 | 5.7s |  |
+| 1096 | `string_concat_fromcharcode` | 37 | 5.6s |  |
+| 1097 | `string_constr` | 25 | 5.8s |  |
+| 1098 | `string_indexof_lastindexof` | 87 | 5.9s |  |
+| 1099 | `string_length` | 16 | 23.6s |  |
+| 1100 | `string_locale_compare` | 39 | 6.1s |  |
+| 1101 | `string_match` | 51 | 23.9s |  |
+| 1102 | `string_relational_compare` | 4 | 5.8s |  |
+| 1103 | `string_replace` | 51 | 6.0s |  |
+| 1104 | `string_search` | 41 | 5.9s |  |
+| 1105 | `string_slice_substr_substring` | 170 | 6.6s |  |
+| 1106 | `string_split` | 29 | 5.9s |  |
+| 1107 | `string_substr_negative` | 21 | 5.8s |  |
+| 1108 | `string_substr_weird` | 182 | 5.7s |  |
+| 1109 | `stylesheet` | 221 | 6.4s |  |
+| 1110 | `stylesheet_parse_color` | 69 | 5.8s |  |
+| 1111 | `stylesheet_transform` | 307 | 6.0s |  |
+| 1112 | `sub_super_same_field` | 12 | 1.7s |  |
+| 1113 | `subclass_superclass_linked_symbol` | 4 | 6.2s |  |
+| 1114 | `subtract` | 1058 | 13.0s |  |
+| 1115 | `super_get_call` | 12 | 5.8s |  |
+| 1116 | `supercall_two_classobjects` | 2 | 5.8s |  |
+| 1117 | `supercalls_coerce` | 8 | 5.8s |  |
+| 1118 | `supercalls_weird` | 2 | 5.7s |  |
+| 1119 | `superinterface_call` | 20 | 5.8s |  |
+| 1120 | `superinterface_instanceof` | 18 | 5.9s |  |
+| 1121 | `swf8` | 1 | 5.8s |  |
+| 1122 | `swf_10_queued_goto_scripts_construct` | 52 | 23.5s |  |
+| 1123 | `swf_9_goto_in_enter_frame` | 17 | 5.9s |  |
+| 1124 | `swf_9_goto_in_enter_frame_simple` | 15 | 5.9s |  |
+| 1125 | `swf_9_queued_goto_scripts` | 6 | 23.2s |  |
+| 1126 | `swf_9_queued_goto_scripts_construct` | 28 | 0.4s |  |
+| 1127 | `swf_9_versioning` | 2 | 5.8s |  |
+| 1128 | `swf_wrong_frame_count` | 38 | 6.1s |  |
+| 1129 | `swf_wrong_frame_count_isplaying` | 22 | 5.8s |  |
+| 1130 | `swz` | 3 | 6.3s |  |
+| 1131 | `symbol_class_binary_data` | 8 | 5.8s |  |
+| 1132 | `symbol_class_conflict` | 4 | 5.9s |  |
+| 1133 | `symbol_class_root_not_zero` | 1 | 5.7s |  |
+| 1134 | `symbolclass_invalid_utf8` | 2 | 5.8s |  |
+| 1135 | `system_exit` | 3 | 5.8s |  |
+| 1136 | `system_setclipboard_null` | 1 | 5.7s |  |
+| 1137 | `tab_ordering_arrows` | 998 | 24.7s |  |
+| 1138 | `tab_ordering_automatic_advanced` | 184 | 6.4s |  |
+| 1139 | `tab_ordering_automatic_basic` | 45 | 5.9s |  |
+| 1140 | `tab_ordering_children` | 116 | 6.0s |  |
+| 1141 | `tab_ordering_custom_basic` | 34 | 5.9s |  |
+| 1142 | `tab_ordering_properties` | 732 | 6.2s |  |
+| 1143 | `tab_ordering_stage_tab_children` | 32 | 8.0s |  |
+| 1144 | `tab_ordering_stage_tab_children_remove_root` | 5 | 7.9s |  |
+| 1145 | `tab_ordering_tabbable` | 47 | 8.1s |  |
+| 1146 | `tabstop_properties` | 105 | 8.4s |  |
+| 1147 | `text_element_basic` | 34 | 8.1s |  |
+| 1148 | `text_engine_fontdescription` | 27 | 8.1s |  |
+| 1149 | `text_engine_groupelement` | 64 | 9.0s |  |
+| 1150 | `text_run` | 7 | 7.8s |  |
+| 1151 | `textblock_createline_errors` | 23 | 8.1s |  |
+| 1152 | `textblock_createline_fte` | 9 | 8.0s |  |
+| 1153 | `textblock_properties` | 118 | 8.3s |  |
+| 1154 | `textblock_recreate_text_line_width` | 5 | 8.2s |  |
+| 1155 | `textbox_click` | 37 | 31.6s |  |
+| 1156 | `textfield_default_text_format_null` | 20 | 8.0s |  |
+| 1157 | `textfield_event` | 66 | 8.3s |  |
+| 1158 | `textfield_focusin_event` | 9 | 7.9s |  |
+| 1159 | `textfield_get_text_format_args` | 567 | 8.1s |  |
+| 1160 | `textfield_input_dead_keys_windows` | 15 | 7.9s |  |
+| 1161 | `textfield_input_events` | 25 | 26.4s |  |
+| 1162 | `textfield_set_text_format_args` | 904 | 8.1s |  |
+| 1163 | `textfield_unload` | 39 | 31.7s |  |
+| 1164 | `textformat` | 1134 | 7.9s |  |
+| 1165 | `textformat_display` | 14 | 8.1s |  |
+| 1166 | `textformat_font_max_length` | 4 | 8.0s |  |
+| 1167 | `textjustifier_locale` | 132 | 8.2s |  |
+| 1168 | `textline_has_tabs` | 47 | 8.1s |  |
+| 1169 | `textline_inapplicable_properties` | 10 | 8.0s |  |
+| 1170 | `textline_metrics` | 20 | 8.2s |  |
+| 1171 | `textline_name` | 1 | 8.0s |  |
+| 1172 | `textline_raw_text_length` | 30 | 8.1s |  |
+| 1173 | `textline_splitting_basic` | 76 | 8.2s |  |
+| 1174 | `textline_throwerror` | 30 | 8.0s |  |
+| 1175 | `textline_validity` | 162 | 8.2s |  |
+| 1176 | `throw` | 3 | 8.1s |  |
+| 1177 | `timeline_scripts` | 3 | 8.1s |  |
+| 1178 | `timer` | 90 | 9.1s |  |
+| 1179 | `timer_checks_per_frame` | 6 | 8.5s |  |
+| 1180 | `timer_events` | 3 | 8.2s |  |
+| 1181 | `timer_finished` | 11 | 8.1s |  |
+| 1182 | `timer_invalid_delay` | 30 | 8.1s |  |
+| 1183 | `timer_reset` | 8 | 8.3s |  |
+| 1184 | `timer_setdelay` | 5 | 1.9s |  |
+| 1185 | `timer_tie_order` | 64 | 6.3s |  |
+| 1186 | `timer_timeout_ids` | 11 | 6.0s |  |
+| 1187 | `trace` | 12 | 6.0s |  |
+| 1188 | `truthiness` | 30 | 6.0s |  |
+| 1189 | `try_catch` | 11 | 6.1s |  |
+| 1190 | `try_catch_typed` | 12 | 6.0s |  |
+| 1191 | `typeof` | 30 | 6.1s |  |
+| 1192 | `uint_constr` | 92 | 6.2s |  |
+| 1193 | `uint_toexponential` | 1215 | 6.1s |  |
+| 1194 | `uint_tofixed` | 1215 | 5.9s |  |
+| 1195 | `uint_toprecision` | 1125 | 6.1s |  |
+| 1196 | `uint_tostring` | 3375 | 6.2s |  |
+| 1197 | `uncaught_error_basic` | 2 | 6.0s |  |
+| 1198 | `unchecked_function` | 15 | 6.0s |  |
+| 1199 | `unescape` | 28 | 6.0s |  |
+| 1200 | `url_loader` | 25 | 6.1s |  |
+| 1201 | `url_vars` | 27 | 6.2s |  |
+| 1202 | `urlrequest` | 18 | 6.0s |  |
+| 1203 | `urlstream_basic` | 5 | 6.0s |  |
+| 1204 | `urshift` | 1058 | 13.5s |  |
+| 1205 | `utils3d` | 7 | 6.0s |  |
+| 1206 | `vector3d` | 397 | 8.8s |  |
+| 1207 | `vector3d_near_equals` | 80 | 6.0s |  |
+| 1208 | `vector_class` | 36 | 6.2s |  |
+| 1209 | `vector_class_call` | 11 | 6.0s |  |
+| 1210 | `vector_coercion` | 66 | 6.7s |  |
+| 1211 | `vector_concat` | 90 | 6.5s |  |
+| 1212 | `vector_constr` | 107 | 6.7s |  |
+| 1213 | `vector_enumeration` | 5 | 6.0s |  |
+| 1214 | `vector_every` | 92 | 6.8s |  |
+| 1215 | `vector_filter` | 95 | 6.8s |  |
+| 1216 | `vector_holes` | 24 | 6.0s |  |
+| 1217 | `vector_indexing_cutoffs` | 18 | 6.1s |  |
+| 1218 | `vector_indexof` | 302 | 9.2s |  |
+| 1219 | `vector_insertat` | 270 | 6.8s |  |
+| 1220 | `vector_int_access` | 4 | 5.9s |  |
+| 1221 | `vector_int_delete` | 11 | 6.0s |  |
+| 1222 | `vector_join` | 58 | 6.4s |  |
+| 1223 | `vector_join_reentrant` | 96 | 6.2s |  |
+| 1224 | `vector_lastindexof` | 302 | 5.8s |  |
+| 1225 | `vector_legacy` | 10 | 6.0s |  |
+| 1226 | `vector_map` | 85 | 6.5s |  |
+| 1227 | `vector_object_final` | 1 | 1.6s |  |
+| 1228 | `vector_object_toString` | 10 | 32.4s |  |
+| 1229 | `vector_prototype_some` | 125 | 32.9s |  |
+| 1230 | `vector_pushpop` | 255 | 10.2s |  |
+| 1231 | `vector_reborrow_bug` | 10 | 8.7s |  |
+| 1232 | `vector_removeat` | 172 | 10.0s |  |
+| 1233 | `vector_reverse` | 232 | 9.9s |  |
+| 1234 | `vector_shiftunshift` | 252 | 8.5s |  |
+| 1235 | `vector_slice` | 331 | 10.7s |  |
+| 1236 | `vector_sort` | 905 | 18.6s |  |
+| 1237 | `vector_sort_arguments` | 355 | 9.0s |  |
+| 1238 | `vector_splice` | 693 | 12.9s |  |
+| 1239 | `vector_splice_fixed_bug_compat` | 4 | 8.6s |  |
+| 1240 | `vector_tostring` | 79 | 9.3s |  |
+| 1241 | `verification` | 8 | 8.5s |  |
+| 1242 | `verify_abnormal_loop` | 1 | 8.5s |  |
+| 1243 | `verify_dxns_without_flag` | 3 | 8.9s |  |
+| 1244 | `verify_exception_target_two_jumps` | 1 | 8.5s |  |
+| 1245 | `verify_exception_targets_edge_case` | 1 | 8.5s |  |
+| 1246 | `verify_illegal_opcode` | 1 | 3.1s |  |
+| 1247 | `verify_jump_to_middle_of_op` | 1 | 8.5s |  |
+| 1248 | `verify_lookup_switch_edge_case` | 1 | 8.5s |  |
+| 1249 | `verify_method_info_oob` | 1 | 0.7s |  |
+| 1250 | `verify_stack` | 5 | 8.7s |  |
+| 1251 | `verify_typecheck` | 4 | 8.6s |  |
+| 1252 | `verify_unreachable_exception` | 2 | 8.6s |  |
+| 1253 | `versioned_isplaying` | 2 | 8.7s |  |
+| 1254 | `virtual_properties` | 16 | 8.8s |  |
+| 1255 | `weird_number_bound_methods` | 12 | 8.8s |  |
+| 1256 | `weird_superinterface_properties` | 2 | 8.7s |  |
+| 1257 | `with` | 4 | 8.8s |  |
+| 1258 | `worker_terminate` | 56 | 9.5s |  |
+| 1259 | `wrong_arg_count` | 7 | 8.9s |  |
+| 1260 | `xml_abstract_equality` | 36 | 9.0s |  |
+| 1261 | `xml_advanced` | 52 | 8.7s |  |
+| 1262 | `xml_appendchild` | 10 | 8.8s |  |
+| 1263 | `xml_appendchild_swf_v21` | 13 | 9.1s |  |
+| 1264 | `xml_as_attribute` | 9 | 8.9s |  |
+| 1265 | `xml_attribute` | 35 | 9.1s |  |
+| 1266 | `xml_attribute_name` | 40 | 8.9s |  |
+| 1267 | `xml_basic` | 33 | 8.9s |  |
+| 1268 | `xml_child` | 25 | 9.0s |  |
+| 1269 | `xml_childindex` | 7 | 8.9s |  |
+| 1270 | `xml_children` | 43 | 9.6s |  |
+| 1271 | `xml_class_call` | 9 | 8.8s |  |
+| 1272 | `xml_contains` | 197 | 31.8s |  |
+| 1273 | `xml_copy` | 20 | 8.6s |  |
+| 1274 | `xml_ctor_from_tostring` | 23 | 32.8s |  |
+| 1275 | `xml_delete` | 114 | 8.7s |  |
+| 1276 | `xml_descendants` | 83 | 8.8s |  |
+| 1277 | `xml_duplicate_attribute` | 14 | 8.8s |  |
+| 1278 | `xml_elements` | 6 | 8.7s |  |
+| 1279 | `xml_equals_namespace_check` | 2 | 8.5s |  |
+| 1280 | `xml_explicit_use_namespace` | 5 | 8.9s |  |
+| 1281 | `xml_getdescendants_qname` | 21 | 8.6s |  |
+| 1282 | `xml_has_property_via_in` | 26 | 8.4s |  |
+| 1283 | `xml_hasownproperty` | 6 | 8.4s |  |
+| 1284 | `xml_ignore_white` | 6 | 8.5s |  |
+| 1285 | `xml_length` | 2 | 8.5s |  |
+| 1286 | `xml_list_as_attribute` | 9 | 8.4s |  |
+| 1287 | `xml_list_concat` | 20 | 8.3s |  |
+| 1288 | `xml_list_ctor_errors` | 34 | 8.3s |  |
+| 1289 | `xml_list_delete_clear_parent` | 6 | 8.2s |  |
+| 1290 | `xml_list_enumerate` | 4 | 8.2s |  |
+| 1291 | `xml_many_namespace_declarations` | 2 | 8.3s |  |
+| 1292 | `xml_methods_settings` | 3 | 8.2s |  |
+| 1293 | `xml_mismatched_tag` | 45 | 8.4s |  |
+| 1294 | `xml_namespace` | 39 | 8.3s |  |
+| 1295 | `xml_namespace_methods` | 245 | 8.5s |  |
+| 1296 | `xml_namespaced_property` | 7 | 8.4s |  |
+| 1297 | `xml_no_namespace` | 1 | 8.3s |  |
+| 1298 | `xml_nodekind` | 3 | 8.3s |  |
+| 1299 | `xml_normalize` | 35 | 8.4s |  |
+| 1300 | `xml_notification_bubbling` | 361 | 8.4s |  |
+| 1301 | `xml_parent` | 8 | 8.3s |  |
+| 1302 | `xml_set_children` | 17 | 8.5s |  |
+| 1303 | `xml_set_name` | 34 | 8.3s |  |
+| 1304 | `xml_settings` | 6 | 2.7s |  |
+| 1305 | `xml_simple_complex_content` | 47 | 8.4s |  |
+| 1306 | `xml_socket` | 11 | 8.6s |  |
+| 1307 | `xml_text` | 7 | 8.3s |  |
+| 1308 | `xml_tostring` | 6 | 8.3s |  |
+| 1309 | `xml_tostring_namespace` | 12 | 8.2s |  |
+| 1310 | `xml_unescaping` | 23 | 8.4s |  |
+| 1311 | `xml_unescaping_nul_char_ref` | 19 | 8.6s |  |
+| 1312 | `xml_weird_ignores` | 54 | 8.6s |  |
+| 1313 | `xml_wildcard` | 11 | 8.3s |  |
+| 1314 | `xmldocument` | 254 | 8.5s |  |
+| 1315 | `xmlnode` | 3540 | 8.7s |  |
+| 1316 | `zero_frame_clip` | 3 | 8.6s |  |
 
 ## Ruffle-Matched Tests
 
-**25 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**30 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
@@ -1333,12 +1373,17 @@
 | 17 | `primitive_bound_methods` | 1 | 1 | 8.3s |  |
 | 18 | `simplebutton_childevents_multichild` | 101 | 101 | 6.0s |  |
 | 19 | `simplebutton_childevents_script_order` | 4 | 4 | 6.2s |  |
-| 20 | `swf_9_goto_in_construct_frame` | 12 | 12 | 23.4s |  |
-| 21 | `textblock_line_changes` | 44 | 44 | 8.6s |  |
-| 22 | `textblock_recreateline` | 137 | 138 | 8.6s |  |
-| 23 | `textblock_releaselines` | 4 | 4 | 9.7s |  |
-| 24 | `textline_atom_index_at_char_index` | 3 | 3 | 9.1s |  |
-| 25 | `uncaught_errors_stringified` | 15 | 15 | 6.0s |  |
+| 20 | `slot_holes_fail` | 1 | 1 | 5.8s |  |
+| 21 | `slot_id_exceeds_trait_count` | 3 | 3 | 5.8s |  |
+| 22 | `soundchannel_position` | 74 | 74 | 24.4s |  |
+| 23 | `soundchannel_soundcomplete` | 10 | 10 | 5.9s |  |
+| 24 | `sprite_dropTarget` | 15 | 15 | 5.8s |  |
+| 25 | `swf_9_goto_in_construct_frame` | 12 | 12 | 23.4s |  |
+| 26 | `textblock_line_changes` | 44 | 44 | 8.6s |  |
+| 27 | `textblock_recreateline` | 137 | 138 | 8.6s |  |
+| 28 | `textblock_releaselines` | 4 | 4 | 9.7s |  |
+| 29 | `textline_atom_index_at_char_index` | 3 | 3 | 9.1s |  |
+| 30 | `uncaught_errors_stringified` | 15 | 15 | 6.0s |  |
 
 ## Near-Passing Tests
 

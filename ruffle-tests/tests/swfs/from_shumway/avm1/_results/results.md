@@ -1,25 +1,25 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-27 07:04 UTC
+**Date**: 2026-11-27 16:08 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 1m 50s
+**Run Duration**: 1m 51s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 46 |
-| Passing | **46** (100.0%) |
+| Total tests | 47 |
+| Passing | **47** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 483 |
-| Matching lines | 483 (100.0%) |
+| Total expected lines | 491 |
+| Matching lines | 491 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**46 tests passing**
+**47 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -63,12 +63,13 @@
 | 38 | `target` | 18 | 1.0s |  |
 | 39 | `text-bind` | 0 | 24.6s |  |
 | 40 | `textfield/textfield-html` | 4 | 1.0s |  |
-| 41 | `undefined/undefined-swf6` | 39 | 1.0s |  |
-| 42 | `undefined/undefined-swf7` | 39 | 0.9s |  |
-| 43 | `watch` | 2 | 1.3s |  |
-| 44 | `xml/xmlbuild` | 1 | 0.9s |  |
-| 45 | `xml/xmlload` | 4 | 1.8s |  |
-| 46 | `xml/xmlstring` | 9 | 1.5s |  |
+| 41 | `textfield/textfield-text-setters` | 8 | 1.0s |  |
+| 42 | `undefined/undefined-swf6` | 39 | 1.0s |  |
+| 43 | `undefined/undefined-swf7` | 39 | 0.9s |  |
+| 44 | `watch` | 2 | 1.3s |  |
+| 45 | `xml/xmlbuild` | 1 | 0.9s |  |
+| 46 | `xml/xmlload` | 4 | 1.8s |  |
+| 47 | `xml/xmlstring` | 9 | 1.5s |  |
 
 ## Near-Passing Tests
 

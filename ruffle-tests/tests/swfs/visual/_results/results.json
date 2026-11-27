@@ -1,20 +1,18 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T07:04:58.985342+00:00",
+    "timestamp": "2026-11-27T16:08:12.398949+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 1899.09,
+    "duration_seconds": 1966.67,
     "total_available": 151,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 146,
-  "pass": 144,
+  "total": 151,
+  "pass": 149,
   "ruffle_matched": 2,
   "fail": 0,
-  "pass_rate": 98.6,
-  "effective_pass": 146,
+  "pass_rate": 98.7,
+  "effective_pass": 151,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -1878,6 +1876,86 @@
         "matching_lines": 0
       },
       "duration": 18.71,
+      "status": "pass"
+    },
+    {
+      "test": "fonts/leading_device_font",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 5.881,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.9,
+      "status": "pass"
+    },
+    {
+      "test": "fonts/leading_embedded_font",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 6.099,
+        "run": 0.003
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.11,
+      "status": "pass"
+    },
+    {
+      "test": "gradient_issue_9892",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 18.542,
+        "run": 0.001
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 18.55,
+      "status": "pass"
+    },
+    {
+      "test": "gradient_nonsequential_ratios",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 18.321,
+        "run": 0.001
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 18.33,
+      "status": "pass"
+    },
+    {
+      "test": "gradient_radial_same_ratios",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 18.543,
+        "run": 0.001
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 18.55,
       "status": "pass"
     },
     {

@@ -1,23 +1,23 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-27 07:04 UTC
+**Date**: 2026-11-27 16:08 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 30m 31s
+**Run Duration**: 30m 55s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 108 |
-| Passing | **72** (66.7%) |
-| Ruffle-matched | 27 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **99** (91.7%) |
+| Total tests | 111 |
+| Passing | **74** (66.7%) |
+| Ruffle-matched | 28 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **102** (91.9%) |
 | Failing | 9 |
-| Total expected lines | 5181 |
-| Matching lines | 4305 (83.1%) |
-| Mismatched lines | 876 |
+| Total expected lines | 5248 |
+| Matching lines | 4365 (83.2%) |
+| Mismatched lines | 883 |
 
 ### Failure Breakdown
 
@@ -27,7 +27,7 @@
 
 ## Passing Tests
 
-**72 tests passing**
+**74 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -88,25 +88,27 @@
 | 55 | `move_object_test` | 11 | 19.3s |  |
 | 56 | `multi_doactions_and_goto_frame_test` | 6 | 19.2s |  |
 | 57 | `new_child_in_unload_test` | 11 | 19.4s |  |
-| 58 | `place_and_remove_object_test` | 13 | 18.8s |  |
-| 59 | `place_object_test` | 12 | 1.7s |  |
-| 60 | `place_object_test2` | 19 | 19.2s |  |
-| 61 | `register_class/RegisterClassTest3` | 12 | 19.5s |  |
-| 62 | `register_class/registerClassTest` | 51 | 21.1s |  |
-| 63 | `replace_shapes1test` | 23 | 2.6s |  |
-| 64 | `replace_sprites1test` | 21 | 1.8s |  |
-| 65 | `reverse_execute_PlaceObject2_test1` | 8 | 19.3s |  |
-| 66 | `reverse_execute_PlaceObject2_test2` | 10 | 19.6s |  |
-| 67 | `runtime_vm_stack_test` | 9 | 27.8s |  |
-| 68 | `shape_test` | 21 | 28.2s |  |
-| 69 | `static_vs_dynamic1` | 17 | 26.0s |  |
-| 70 | `static_vs_dynamic2` | 18 | 25.8s |  |
-| 71 | `timeline_var_test` | 11 | 25.6s |  |
-| 72 | `unload_movieclip_test1` | 6 | 25.3s |  |
+| 58 | `opcode_guard_test` | 18 | 1.7s |  |
+| 59 | `place_and_remove_object_insane_test` | 22 | 19.1s |  |
+| 60 | `place_and_remove_object_test` | 13 | 18.8s |  |
+| 61 | `place_object_test` | 12 | 1.7s |  |
+| 62 | `place_object_test2` | 19 | 19.2s |  |
+| 63 | `register_class/RegisterClassTest3` | 12 | 19.5s |  |
+| 64 | `register_class/registerClassTest` | 51 | 21.1s |  |
+| 65 | `replace_shapes1test` | 23 | 2.6s |  |
+| 66 | `replace_sprites1test` | 21 | 1.8s |  |
+| 67 | `reverse_execute_PlaceObject2_test1` | 8 | 19.3s |  |
+| 68 | `reverse_execute_PlaceObject2_test2` | 10 | 19.6s |  |
+| 69 | `runtime_vm_stack_test` | 9 | 27.8s |  |
+| 70 | `shape_test` | 21 | 28.2s |  |
+| 71 | `static_vs_dynamic1` | 17 | 26.0s |  |
+| 72 | `static_vs_dynamic2` | 18 | 25.8s |  |
+| 73 | `timeline_var_test` | 11 | 25.6s |  |
+| 74 | `unload_movieclip_test1` | 6 | 25.3s |  |
 
 ## Ruffle-Matched Tests
 
-**27 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**28 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
@@ -135,8 +137,9 @@
 | 23 | `loop/loop_test6` | 11 | 12 | 21.6s |  |
 | 24 | `loop/loop_test7` | 1 | 8 | 2.2s |  |
 | 25 | `masks_test` | 16 | 16 | 27.1s |  |
-| 26 | `register_class/registerClassTest2` | 8 | 28 | 27.6s |  |
-| 27 | `replace_buttons1test` | 3 | 3 | 2.6s |  |
+| 26 | `path_format_test` | 7 | 28 | 3.1s |  |
+| 27 | `register_class/registerClassTest2` | 8 | 28 | 27.6s |  |
+| 28 | `replace_buttons1test` | 3 | 3 | 2.6s |  |
 
 ## Near-Passing Tests
 

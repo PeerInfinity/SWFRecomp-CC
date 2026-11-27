@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-27 07:04 UTC
+**Date**: 2026-11-27 16:08 UTC
 
 **Git SHA**: `2d40d37996`
 
-**Run Duration**: 42m 39s
+**Run Duration**: 43m 51s
 
 **Filtered**: 6 tests ignored out of 229 available
 
@@ -12,18 +12,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 216 |
-| Passing | **208** (96.3%) |
+| Total tests | 223 |
+| Passing | **215** (96.4%) |
 | Ruffle-matched | 8 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **216** (100.0%) |
+| Effective pass | **223** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 2383 |
-| Matching lines | 2337 (98.1%) |
+| Total expected lines | 2409 |
+| Matching lines | 2363 (98.1%) |
 | Mismatched lines | 46 |
 
 ## Passing Tests
 
-**208 tests passing**
+**215 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -194,47 +194,54 @@
 | 165 | `hitTestStyleChange` | 1 | 23.9s |  |
 | 166 | `hittesting/hittesting` | 18 | 6.0s |  |
 | 167 | `hittesting/mask-hit-test` | 1 | 1.7s |  |
-| 168 | `mouse/start_drag` | 3 | 23.9s |  |
-| 169 | `mouse/start_drag_lock` | 3 | 5.9s |  |
-| 170 | `movieclip` | 9 | 5.9s |  |
-| 171 | `movieinfo1` | 3 | 0.9s |  |
-| 172 | `slider_component` | 4 | 11.5s |  |
-| 173 | `stream1` | 9 | 6.0s |  |
-| 174 | `stroke1` | 1 | 5.9s |  |
-| 175 | `stylesheet` | 3 | 5.9s |  |
-| 176 | `targetPath1` | 8 | 0.9s |  |
-| 177 | `timeline/Timeline3` | 5 | 23.4s |  |
-| 178 | `timeline/Timeline4` | 5 | 23.6s |  |
-| 179 | `timeline/Timeline8` | 5 | 6.1s |  |
-| 180 | `timeline/Timeline9` | 11 | 6.1s |  |
-| 181 | `timeline/events/timeline_events_fp10` | 67 | 6.3s |  |
-| 182 | `timeline/events/timeline_events_fp9` | 48 | 32.2s |  |
-| 183 | `timeline/nav/blendMode` | 8 | 8.2s |  |
-| 184 | `timeline/nav/cacheAsBitmap` | 8 | 8.0s |  |
-| 185 | `timeline/nav/colorTransform` | 8 | 8.2s |  |
-| 186 | `timeline/nav/filters` | 8 | 8.1s |  |
-| 187 | `timeline/nav/matrix` | 8 | 8.1s |  |
-| 188 | `timeline/nav/morphShape` | 4 | 23.8s |  |
-| 189 | `timeline/nav/name` | 8 | 6.0s |  |
-| 190 | `timeline/nav/ratio` | 4 | 6.0s |  |
-| 191 | `timeline/nav/ratio2` | 4 | 5.8s |  |
-| 192 | `timeline/nav/ratio3` | 4 | 0.4s |  |
-| 193 | `timeline/nav/shape` | 4 | 5.9s |  |
-| 194 | `timeline/scene/EncodedU32` | 1 | 24.5s |  |
-| 195 | `timeline/scene/Scene_1_MainTimeline` | 70 | 33.6s |  |
-| 196 | `timeline/scene/Scene_2_MovieClipTimeline` | 70 | 9.0s |  |
-| 197 | `timeline/scene/Scene_3_GotoAndStop_LabelScene` | 15 | 9.0s |  |
-| 198 | `timeline/scene/Scene_4_GotoAndStop_FrameScene` | 15 | 8.8s |  |
-| 199 | `timeline/scene/Scene_5_GotoAndPlay_LabelScene` | 15 | 8.4s |  |
-| 200 | `timeline/scene/Scene_6_GotoAndPlay_FrameScene` | 40 | 8.9s |  |
-| 201 | `timeline/scene/Scene_7_NextPrevScene` | 7 | 33.5s |  |
-| 202 | `timeline/timeline_as2_1` | 3 | 24.7s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
-| 203 | `timeline/timeline_as2_2` | 3 | 1.6s |  |
-| 204 | `timeline/timeline_as2_3` | 3 | 24.7s |  |
-| 205 | `timeline/timeline_as2_4` | 2 | 24.5s |  |
-| 206 | `timeline/timeline_as2_5` | 4 | 2.0s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
-| 207 | `timeline/timeline_loop` | 7 | 31.9s |  |
-| 208 | `timeline/timeline_name_0` | 13 | 31.6s |  |
+| 168 | `image-loading` | 4 | 6.0s |  |
+| 169 | `invalidClipDepth` | 0 | 18.7s |  |
+| 170 | `local2global` | 1 | 5.9s |  |
+| 171 | `localconnection` | 12 | 6.1s |  |
+| 172 | `lzma` | 5 | 5.8s |  |
+| 173 | `lzma_bytes` | 2 | 23.5s |  |
+| 174 | `mouse/mouse_coords` | 2 | 5.8s |  |
+| 175 | `mouse/start_drag` | 3 | 23.9s |  |
+| 176 | `mouse/start_drag_lock` | 3 | 5.9s |  |
+| 177 | `movieclip` | 9 | 5.9s |  |
+| 178 | `movieinfo1` | 3 | 0.9s |  |
+| 179 | `slider_component` | 4 | 11.5s |  |
+| 180 | `stream1` | 9 | 6.0s |  |
+| 181 | `stroke1` | 1 | 5.9s |  |
+| 182 | `stylesheet` | 3 | 5.9s |  |
+| 183 | `targetPath1` | 8 | 0.9s |  |
+| 184 | `timeline/Timeline3` | 5 | 23.4s |  |
+| 185 | `timeline/Timeline4` | 5 | 23.6s |  |
+| 186 | `timeline/Timeline8` | 5 | 6.1s |  |
+| 187 | `timeline/Timeline9` | 11 | 6.1s |  |
+| 188 | `timeline/events/timeline_events_fp10` | 67 | 6.3s |  |
+| 189 | `timeline/events/timeline_events_fp9` | 48 | 32.2s |  |
+| 190 | `timeline/nav/blendMode` | 8 | 8.2s |  |
+| 191 | `timeline/nav/cacheAsBitmap` | 8 | 8.0s |  |
+| 192 | `timeline/nav/colorTransform` | 8 | 8.2s |  |
+| 193 | `timeline/nav/filters` | 8 | 8.1s |  |
+| 194 | `timeline/nav/matrix` | 8 | 8.1s |  |
+| 195 | `timeline/nav/morphShape` | 4 | 23.8s |  |
+| 196 | `timeline/nav/name` | 8 | 6.0s |  |
+| 197 | `timeline/nav/ratio` | 4 | 6.0s |  |
+| 198 | `timeline/nav/ratio2` | 4 | 5.8s |  |
+| 199 | `timeline/nav/ratio3` | 4 | 0.4s |  |
+| 200 | `timeline/nav/shape` | 4 | 5.9s |  |
+| 201 | `timeline/scene/EncodedU32` | 1 | 24.5s |  |
+| 202 | `timeline/scene/Scene_1_MainTimeline` | 70 | 33.6s |  |
+| 203 | `timeline/scene/Scene_2_MovieClipTimeline` | 70 | 9.0s |  |
+| 204 | `timeline/scene/Scene_3_GotoAndStop_LabelScene` | 15 | 9.0s |  |
+| 205 | `timeline/scene/Scene_4_GotoAndStop_FrameScene` | 15 | 8.8s |  |
+| 206 | `timeline/scene/Scene_5_GotoAndPlay_LabelScene` | 15 | 8.4s |  |
+| 207 | `timeline/scene/Scene_6_GotoAndPlay_FrameScene` | 40 | 8.9s |  |
+| 208 | `timeline/scene/Scene_7_NextPrevScene` | 7 | 33.5s |  |
+| 209 | `timeline/timeline_as2_1` | 3 | 24.7s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 210 | `timeline/timeline_as2_2` | 3 | 1.6s |  |
+| 211 | `timeline/timeline_as2_3` | 3 | 24.7s |  |
+| 212 | `timeline/timeline_as2_4` | 2 | 24.5s |  |
+| 213 | `timeline/timeline_as2_5` | 4 | 2.0s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 214 | `timeline/timeline_loop` | 7 | 31.9s |  |
+| 215 | `timeline/timeline_name_0` | 13 | 31.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -285,4 +292,4 @@ No output mismatches.
 | 2 | [SHUMWAY_AVM1_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) | 11 | 11 | 0 |
 | 3 | [SHUMWAY_AVM1_SUBTREES_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_SUBTREES_PLAN.md) | 1 | 1 | 0 |
 | 4 | [SHUMWAY_FUZZ_TIMELINE_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) | 20 | 20 | 0 |
-| | *(tests not in any document)* | 182 | 174 | 8 |
+| | *(tests not in any document)* | 189 | 181 | 8 |

@@ -1,26 +1,24 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T07:04:59.016758+00:00",
+    "timestamp": "2026-11-27T16:08:12.445869+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "duration_seconds": 1830.81,
+    "duration_seconds": 1854.8,
     "total_available": 111,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 1,
     "filtered": true
   },
-  "total": 107,
-  "pass": 72,
-  "ruffle_matched": 27,
+  "total": 110,
+  "pass": 74,
+  "ruffle_matched": 28,
   "fail": 8,
   "pass_rate": 67.3,
-  "effective_pass": 99,
-  "effective_pass_rate": 92.5,
+  "effective_pass": 102,
+  "effective_pass_rate": 92.7,
   "breakdown": {
     "output_mismatch": 8,
-    "ruffle_matched": 27
+    "ruffle_matched": 28
   },
   "tests": [
     {
@@ -1560,6 +1558,57 @@
         "matching_lines": 11
       },
       "duration": 19.37,
+      "status": "pass"
+    },
+    {
+      "test": "opcode_guard_test",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 1.699,
+        "run": 0.002
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 1.72,
+      "status": "pass"
+    },
+    {
+      "test": "path_format_test",
+      "phases": {
+        "recomp": 0.013,
+        "compile": 3.086,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 20
+      },
+      "duration": 3.11,
+      "ruffle_diff_count": 28,
+      "ours_diff_count": 7,
+      "status": "ruffle_matched",
+      "detail": "diffs 7 \u2286 ruffle 28"
+    },
+    {
+      "test": "place_and_remove_object_insane_test",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 19.068,
+        "run": 0.002
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      },
+      "duration": 19.08,
       "status": "pass"
     },
     {

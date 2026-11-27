@@ -1,13 +1,11 @@
 {
   "metadata": {
-    "timestamp": "2026-11-27T07:04:58.991193+00:00",
+    "timestamp": "2026-11-27T16:08:12.407919+00:00",
     "git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
     "duration_seconds": 77.2,
     "total_available": 8,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 0,
     "filtered": true
   },
