@@ -23,7 +23,9 @@ Upstream: `b7ff32d93..66f9073de` (11 commits; 1 new row `avm2/xmldocument_tostri
 
 ## Local one-task sessions
 
-- Browser ladder: (see below as launched)
+- Browser ladder #1: `browser-attach-child-early` launched 2026-11-27 (brief `browser-attach-child-early-prompt.md`; pid 1609015, cwd verified; handshake sent). **DONE `3944257a4`** (REPORT BACK verified on disk + pushed): attach's force-nested-build pass now runs under `g_build_only` (browser fixture = FP32 82/82, Minesweeper radio 0 px); spurious loopback warning = s28 `613c0f100` regression (dropped `g_nested_loopback_quiet` reader), restored browser-only; native 48/48. Touches `tag.c` `tagPlaceObject2*` (browser-flag only). Grade: next interim (expected 0 CI moves).
+- Browser ladder #2: `browser-nested-swapdepths-remove` (brief `browser-nested-swapdepths-remove-prompt.md`).
+- N ladder: PARKED (no new lever). N procgen: CANCELLED.
 
 ## Wave 1 (cloud)
 
