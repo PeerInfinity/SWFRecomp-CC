@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T06:45:05.625080+00:00",
+    "old_timestamp": "2026-11-27T16:16:08.662081+00:00",
     "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "new_timestamp": "2026-11-27T16:16:08.662081+00:00",
-    "new_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
+    "new_timestamp": "2026-11-27T18:08:28.323397+00:00",
+    "new_git_sha": "f4edebdcecf426a7799858f7936da7a7f4bd36f8",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 45,
+    "old_pass": 47,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 45,
-    "old_total": 45,
+    "old_effective_pass": 47,
+    "old_total": 47,
     "old_pass_rate": 100.0,
     "new_pass": 47,
     "new_ruffle_matched": 0,
@@ -25,34 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 45,
-    "added": 2,
+    "unchanged": 47,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "loadevent",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "loadvariables/loadvariables",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    }
-  ]
+  "changes": []
 }
