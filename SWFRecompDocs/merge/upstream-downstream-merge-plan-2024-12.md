@@ -285,7 +285,7 @@ Since this document was created on December 4, 2025, **significant architectural
 
 ### Impact on This Repository
 
-1. **app-context-migration-plan.md is now OBSOLETE** - The migration plan created in this repo on Dec 4 anticipated adopting the `app_context` convention. Upstream has now completed this refactoring AND gone further by moving `stack` and `sp` into the `SWFAppContext` structure.
+1. **app-context-migration-plan.md is now OBSOLETE** (moved to `SWFRecomp-CC-history:SWFRecompDocs/planning/app-context-migration-plan.md` in repo-cleanup S3) - The migration plan created in this repo on Dec 4 anticipated adopting the `app_context` convention. Upstream has now completed this refactoring AND gone further by moving `stack` and `sp` into the `SWFAppContext` structure.
 
 2. **Function signatures have fundamentally changed** - All action functions upstream now use:
    ```c

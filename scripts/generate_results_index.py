@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generate RUFFLE_RESULTS.md and RUFFLE_RESULTS_FILTERED.md in the project root.
+"""Generate the cross-suite result tables in ruffle-tests/results/.
+
+Writes RUFFLE_RESULTS{,_FILTERED}.md (no-graphics) and
+RUFFLE_RESULTS_GRAPHICS{,_FILTERED}.md (graphics). They lived at the repo root
+until repo-cleanup slice S3 (2026-11-28); scripts/ci/publish_results.sh removes
+any root copies still on the ruffle-test-results branch.
 
 Scans for _results/results.json under ruffle-tests/tests/swfs/ and produces
 two summary documents: one for unfiltered (raw) results and one for filtered.
@@ -7,6 +12,7 @@ two summary documents: one for unfiltered (raw) results and one for filtered.
 
 import glob
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,8 +20,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 RUFFLE_DIR = BASE_DIR / "ruffle-tests"
 SWF_DIR = RUFFLE_DIR / "tests" / "swfs"
-OUTPUT_RAW = BASE_DIR / "RUFFLE_RESULTS.md"
-OUTPUT_FILTERED = BASE_DIR / "RUFFLE_RESULTS_FILTERED.md"
+RESULTS_DIR = RUFFLE_DIR / "results"
 
 # Per-mode index variants. Each entry produces a parallel pair of top-level
 # files (raw + filtered) plus rolls up the matching per-suite JSONs. The
@@ -23,8 +28,8 @@ OUTPUT_FILTERED = BASE_DIR / "RUFFLE_RESULTS_FILTERED.md"
 # (results.json → results.md, results_graphics.json → results_graphics.md).
 MODE_INDEX_FILES = [
     # (stem,              label,      raw_path,                                  filtered_path)
-    ("results",           "",         BASE_DIR / "RUFFLE_RESULTS.md",            BASE_DIR / "RUFFLE_RESULTS_FILTERED.md"),
-    ("results_graphics",  "Graphics", BASE_DIR / "RUFFLE_RESULTS_GRAPHICS.md",   BASE_DIR / "RUFFLE_RESULTS_GRAPHICS_FILTERED.md"),
+    ("results",           "",         RESULTS_DIR / "RUFFLE_RESULTS.md",            RESULTS_DIR / "RUFFLE_RESULTS_FILTERED.md"),
+    ("results_graphics",  "Graphics", RESULTS_DIR / "RUFFLE_RESULTS_GRAPHICS.md",   RESULTS_DIR / "RUFFLE_RESULTS_GRAPHICS_FILTERED.md"),
 ]
 
 
@@ -122,7 +127,9 @@ def load_all_suites(stem: str = "results"):
 
         rows.append({
             "cat_name": cat_name,
-            "results_rel": str(results_dir.relative_to(BASE_DIR)),
+            # Relative to the output dir, so the [details] links resolve
+            # from ruffle-tests/results/ on GitHub.
+            "results_rel": os.path.relpath(results_dir, RESULTS_DIR),
             "stem": stem,
             "data": data,
             "filtered": load_json(results_dir / f"{stem}_filtered.json"),
@@ -174,7 +181,7 @@ def generate_report(rows, filtered, mode_label: str = ""):
     # --- Header ---
     if filtered:
         lines.append(f"# Ruffle Test Results{title_suffix} (Filtered)\n")
-        lines.append("*Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  ")
+        lines.append("*Tests on the [ignored list](../ignored_tests.txt) are excluded.*  ")
         lines.append(f"*See [{raw_name}]({raw_name}) for unfiltered results.*\n")
     else:
         lines.append(f"# Ruffle Test Results{title_suffix}\n")
@@ -436,6 +443,7 @@ def generate_report(rows, filtered, mode_label: str = ""):
 def main():
     any_generated = False
 
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     for stem, label, raw_path, filtered_path in MODE_INDEX_FILES:
         rows = load_all_suites(stem)
         if not rows:

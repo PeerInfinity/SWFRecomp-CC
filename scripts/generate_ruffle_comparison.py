@@ -9,7 +9,8 @@ suite under ``ruffle-tests/tests/swfs/`` and groups tests into four buckets:
     3. SWFRecomp passes, Ruffle fails    (← we beat Ruffle here)
     4. SWFRecomp fails,  Ruffle fails
 
-Produces two reports in the project root:
+Produces two reports in ruffle-tests/results/ (the repo root until
+repo-cleanup slice S3, 2026-11-28):
 
 * ``RUFFLE_COMPARISON.md``           — every available test
 * ``RUFFLE_COMPARISON_FILTERED.md``  — tests on the relevant ``ignored_tests.txt``
@@ -34,8 +35,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 RUFFLE_DIR = BASE_DIR / "ruffle-tests"
 SWF_DIR = RUFFLE_DIR / "tests" / "swfs"
-OUTPUT_RAW = BASE_DIR / "RUFFLE_COMPARISON.md"
-OUTPUT_FILTERED = BASE_DIR / "RUFFLE_COMPARISON_FILTERED.md"
+RESULTS_DIR = RUFFLE_DIR / "results"
+OUTPUT_RAW = RESULTS_DIR / "RUFFLE_COMPARISON.md"
+OUTPUT_FILTERED = RESULTS_DIR / "RUFFLE_COMPARISON_FILTERED.md"
 
 # Bucket keys (kept stable; used as dict keys and for column ordering)
 BUCKETS = ("sr_pass_ru_pass", "sr_fail_ru_pass", "sr_pass_ru_fail", "sr_fail_ru_fail")
@@ -270,6 +272,7 @@ def render_report(suites, filtered):
 
 
 def main():
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     for filtered, output_path in ((False, OUTPUT_RAW), (True, OUTPUT_FILTERED)):
         suites = collect_suites(filtered=filtered)
         markdown = render_report(suites, filtered=filtered)

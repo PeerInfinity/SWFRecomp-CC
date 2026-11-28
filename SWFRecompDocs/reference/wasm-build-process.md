@@ -411,12 +411,12 @@ sup from SWF 4
 
 ```bash
 cd ~/projects/SWFRecomp
-./scripts/deploy_example.sh trace_swf_4 ../SWFRecompDocs/docs/examples
+./scripts/deploy_example.sh trace_swf_4 ../docs/examples
 ```
 
 **What this does:**
 
-1. Creates directory: `SWFRecompDocs/docs/examples/trace_swf_4/`
+1. Creates directory: `docs/examples/trace_swf_4/`
 2. Copies WASM files:
    - `trace_swf_4.wasm`
    - `trace_swf_4.js`
@@ -433,7 +433,7 @@ Build and deploy all examples with a single command:
 source ~/tools/emsdk/emsdk_env.sh
 
 # Build and deploy all non-excluded tests
-./scripts/build_all_examples.sh ../SWFRecompDocs/docs/examples
+./scripts/build_all_examples.sh ../docs/examples
 ```
 
 **What this does:**
@@ -528,7 +528,7 @@ The documentation index is automatically updated when examples are deployed:
 
 **Manual regeneration:**
 ```bash
-./scripts/generate_examples_index.sh ../SWFRecompDocs/docs
+./scripts/generate_examples_index.sh ../docs
 ```
 
 ### Adding Config Files to Tests
@@ -875,7 +875,7 @@ python3 -m http.server 8000
 
 # 4. Deploy to docs
 cd ~/projects/SWFRecomp
-./scripts/deploy_example.sh trace_swf_4 ../SWFRecompDocs/docs/examples
+./scripts/deploy_example.sh trace_swf_4 ../docs/examples
 ```
 
 ### Quick Rebuilds

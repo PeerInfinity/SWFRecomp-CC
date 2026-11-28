@@ -73,6 +73,7 @@ fi
 # generated file with the branch's copy and the `git add` at the end
 # re-commits that stale copy. Left out of this loop between 2026-05-09 and
 # 2026-07-26, which froze the "Flash-Spec Results" table in RUFFLE_RESULTS.md
+# (now ruffle-tests/results/RUFFLE_RESULTS.md)
 # at a 2.5-month-old snapshot. Any future non-mode-derived result stem needs
 # adding here too.
 #
@@ -160,6 +161,23 @@ for f in ruffle-results.md ruffle-results-diff.md ruffle-results-filtered.md \
   git rm -f "$f" 2>/dev/null || true
 done
 
+# The cross-suite tables moved from the repo root to ruffle-tests/results/ in
+# repo-cleanup slice S3 (2026-11-28). Deleting the root copies here (while the
+# generator writes the new path) makes this commit a RENAME root -> new path,
+# the same rename master made, so a plain `git merge origin/ruffle-test-results`
+# is clean and never brings root copies back. Replayed in a scratch worktree
+# before landing: a master that only DELETED the root files instead hit a
+# rename/delete conflict here.
+#
+# RUFFLE_COMPARISON{,_FILTERED}.md are deliberately NOT in this list: CI never
+# regenerates them (scripts/generate_ruffle_comparison.py is run by hand), so
+# the branch's untouched root copies are harmless, whereas deleting them here
+# turns master's rename of them into a rename/delete conflict.
+for f in RUFFLE_RESULTS.md RUFFLE_RESULTS_FILTERED.md \
+         RUFFLE_RESULTS_GRAPHICS.md RUFFLE_RESULTS_GRAPHICS_FILTERED.md; do
+  git rm -q -f --ignore-unmatch "$f" 2>/dev/null || true
+done
+
 # The graphics-headless-legacy mode was deleted (Phase 1 of
 # mode-consolidation-plan.md). Drop its stale result files from the inherited
 # branch state — otherwise every merge of ruffle-test-results back into master
@@ -239,7 +257,7 @@ python3 scripts/generate_results_index.py || true
 find ruffle-tests/tests/swfs -path '*/_results/*_current.json' -delete 2>/dev/null || true
 
 find ruffle-tests/tests/swfs -path '*/_results/*.json' -o -path '*/_results/*.md' | xargs git add -f 2>/dev/null || true
-git add -f RUFFLE_RESULTS*.md 2>/dev/null || true
+git add -f ruffle-tests/results/RUFFLE_RESULTS*.md 2>/dev/null || true
 
 if git diff --staged --quiet; then
   echo "No changes to commit"

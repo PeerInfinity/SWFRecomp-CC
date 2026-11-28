@@ -80,5 +80,5 @@ with (obj) {
 ### References
 
 - SWF Spec: ActionWith (0x94) modifies scope chain for property lookups
-- Implementation guide: `SWFRecompDocs/parallel-opcode-implementation-guide.md`
+- Implementation guide: `SWFRecomp-CC-history:SWFRecompDocs/parallel-opcode-implementation-guide.md`
 - Task description: `SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-with-0x94.md`

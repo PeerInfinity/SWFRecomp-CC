@@ -1,6 +1,6 @@
 # Opcode Implementation Task: WITH (0x94)
 
-Please read the implementation guide at SWFRecompDocs/parallel-opcode-implementation-guide.md.
+Please read the implementation guide at SWFRecomp-CC-history:SWFRecompDocs/parallel-opcode-implementation-guide.md.
 
 Your task is to implement support for the AS2 opcode: **WITH**
 

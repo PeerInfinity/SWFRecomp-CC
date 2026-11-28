@@ -219,7 +219,8 @@ jobs:
   # Replaces the old `ruffle-tests` single-runner job, which handled both
   # `parallel: '1'` and `single_test`. Nothing used the former: across the 20
   # runs before 2026-07-26 the job executed exactly once, for a single_test
-  # dispatch, and no caller sets parallel=1 (all-tests.yml passes 10,
+  # dispatch, and no caller sets parallel=1 (all-tests.yml passed 10 until it was deleted in
+  # repo-cleanup S3,
   # weekly-no-graphics.yml takes the default 30). `parallel: '1'` now simply
   # means a one-shard matrix through the normal path, so there is no longer a
   # second full copy of the setup + publish tail to keep in sync — which is
@@ -1321,8 +1322,7 @@ jobs:
           name: ruffle-test-results
           path: |
             ruffle-tests/tests/swfs/**/_results/
-            RUFFLE_RESULTS.md
-            RUFFLE_RESULTS_FILTERED.md
+            ruffle-tests/results/RUFFLE_RESULTS*.md
           retention-days: 90
           if-no-files-found: ignore
 

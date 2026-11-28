@@ -13,7 +13,8 @@
 #                                [--demo-type <type>]
 #
 # Defaults:
-#   swf_dir       = <repo_root>/local_swf_batch/
+#   swf_dir       = <repo_root>/local_swf_batch/  (untracked, gitignored: create it
+#                   and drop .swf files in; clean_swf_batch.sh leaves it alone)
 #   --docs-dir    = docs            (relative to <repo_root>)
 #   --namespace   = local_batch     (used for tests/<ns>/, examples/<ns>/, id prefix)
 #   --catalog-name = local_catalog.json

@@ -175,5 +175,5 @@ cd SWFRecomp
 ## References
 
 - **SWF Specification**: Section on ActionWith (0x94)
-- **Implementation Guide**: `SWFRecompDocs/parallel-opcode-implementation-guide.md`
+- **Implementation Guide**: `SWFRecomp-CC-history:SWFRecompDocs/parallel-opcode-implementation-guide.md`
 - **Opcode Prompt**: `SWFRecomp-CC-history:SWFRecompDocs/prompts/opcode-with-0x94.md`

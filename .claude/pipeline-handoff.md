@@ -148,6 +148,7 @@ The workflow force-pushes results to `origin/ruffle-test-results`. Merge that br
    - Clean merge (or auto-generated merge commit): proceed.
    - `Already up to date`: fine, note it and proceed; no new results to diff.
    - Conflict: `git merge --abort`, leave `stage=merging`, tell the user `Merge conflict in test results — resolve manually, commit, then re-run the pipeline.` Stop.
+   - The cross-suite tables are `ruffle-tests/results/RUFFLE_RESULTS{,_FILTERED,_GRAPHICS,_GRAPHICS_FILTERED}.md` (repo root until repo-cleanup S3, 2026-11-28). After the merge, `git ls-files 'RUFFLE_*.md'` (repo root) must print nothing. A root copy that comes back means a publish ran the pre-S3 `publish_results.sh` (a run dispatched at a ref older than S3); `git rm` it and commit. The next current-layout publish deletes it from the branch too.
 4. Set `stage=analyzing`. Fall through.
 
 ### analyzing → analyze

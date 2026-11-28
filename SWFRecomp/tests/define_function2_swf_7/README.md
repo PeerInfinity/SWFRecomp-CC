@@ -145,7 +145,7 @@ The runtime provides:
 
 - SWF Specification: Section on ActionDefineFunction2
 - Implementation Guide: `SWFRecomp-CC-history:SWFRecompDocs/prompts/opcode-define-function2-0x8e.md`
-- Parallel Implementation Guide: `SWFRecompDocs/parallel-opcode-implementation-guide.md`
+- Parallel Implementation Guide: `SWFRecomp-CC-history:SWFRecompDocs/parallel-opcode-implementation-guide.md`
 
 ## Status
 

@@ -276,8 +276,9 @@ SWFRecomp/tests/flasharchive/
 # gpuprobe --catalog-name gpuprobe_catalog.json`, and unlike wasm_probes/ it
 # has no hand-written source to keep — its inputs are corpus SWFs.
 SWFRecomp/tests/gpuprobe/
-local_swf_batch/*.swf
-local_swf_batch/*.SWF
+# local_swf_batch/ is build_swf_batch.sh's default input dir; untracked since
+# repo-cleanup S3 (its README moved into the script header).
+/local_swf_batch/
 
 # AI agent handoff scratch directory (cross-instance messages, runtime probes)
 .ai_handoff/

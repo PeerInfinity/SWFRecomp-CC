@@ -29,8 +29,8 @@ Ruffle.
   (MAD 0.0000)** to the pre-update build. The pre-update stash is retained as
   `stash@{0}` in that checkout ("SWFRecomp local patches pre-update 2026-07-22");
   drop it once you trust the vendored patch.
-- **Older single-purpose doc:** [`../ruffle-probing-trace-log.md`](../ruffle-probing-trace-log.md)
-  + `../probing-trace-log.patch` document **only** the `--trace-log` patch
+- **Older single-purpose doc:** [`SWFRecomp-CC-history:SWFRecompDocs/ruffle-probing-trace-log.md`](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/ruffle-probing-trace-log.md)
+  + `SWFRecomp-CC-history:SWFRecompDocs/probing-trace-log.patch` (moved there in repo-cleanup S3) document **only** the `--trace-log` patch
   (family A below); this doc supersedes it as the full inventory. The trace-log
   patch itself is unchanged and is now part of the vendored full patch.
 

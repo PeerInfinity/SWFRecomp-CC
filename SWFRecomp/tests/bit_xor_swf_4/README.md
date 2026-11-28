@@ -150,5 +150,5 @@ SWF Runtime Loaded (Native Build)
 
 - SWF File Format Specification v19
 - ActionScript 2.0 Language Reference
-- Implementation guide: `SWFRecompDocs/parallel-opcode-implementation-guide.md`
+- Implementation guide: `SWFRecomp-CC-history:SWFRecompDocs/parallel-opcode-implementation-guide.md`
 - Opcode specification: `SWFRecomp-CC-history:SWFRecompDocs/prompts/opcode-bit-xor-0x62.md`
