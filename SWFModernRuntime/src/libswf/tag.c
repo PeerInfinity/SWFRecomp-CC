@@ -1806,11 +1806,15 @@ static void advance_sprite_frames_impl(SWFAppContext* app_context)
 		// Mark eligible for AS2 onEnterFrame dispatch (sprite actually advanced)
 		obj->enterframe_eligible = 1;
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Initialize any children placed by the frame function (deferred Phase 2
 		// scripts from eager init). Sprite frame functions don't have tagShowFrame,
 		// so process_sprite_needs_init must be called explicitly here.
 		// Only if any child actually needs init (avoid unnecessary MC lookups).
+		// s30 browser-clip-event-order: every build. Browser-WASM left a child
+		// placed by a sprite's LATER frame at sprite_initialized 0 forever (the
+		// tagShowFrame pass only reaches children of sprites that need init
+		// themselves), so its onClipEvent(enterFrame) never fired (gnash
+		// action_execution_order_test11 mc11/mc21/mc12).
 		{
 			int any_needs_init = 0;
 			for (size_t ci = 1; ci <= max_depth; ci++) {
@@ -1837,7 +1841,6 @@ static void advance_sprite_frames_impl(SWFAppContext* app_context)
 				process_sprite_needs_init(app_context, parent_for_init ? parent_for_init : &root_movieclip);
 			}
 		}
-#endif
 
 		// Recurse: advance nested sprites within this sprite's display list.
 		// When g_advance_defer_nested is set (top-level call from swf_core.c),
@@ -7305,9 +7308,9 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 // every per-tick pass: upgrade_sprite_initialized, dispatch_enterframe_clip_
 // actions and hasClipEnterFrameHandlers all walk only the root display_list.
 // So the handler never fired (Ruffle fires it every frame — regression test
-// avm1_attach_clipevent_enterframe). Browser-WASM has its own separate passes
-// (upgrade_attached_clip_initialized / dispatch_attached_clip_enterframe) and
-// is untouched here.
+// avm1_attach_clipevent_enterframe). Browser-WASM keeps its own init
+// promotion (upgrade_attached_clip_initialized) but, since s30
+// browser-clip-event-order, shares the clip-event enterFrame gather below.
 //
 // Collects (dobj, mc) pairs, deduplicated by dobj so two cache MCs aliasing one
 // struct can never double-fire. Returns the pair count.
@@ -7315,12 +7318,10 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 #define ATTACHED_STANDALONE_CAP 4096
 // Scratch for collect_attached_standalone. Static (not stack) — every consumer
 // finishes reading it before any AS handler runs, so it is never live across a
-// re-entrant call.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// re-entrant call. s30 browser-clip-event-order: every build (the browser
+// root clip-event pass gathers attached clips through it too).
 static DisplayObject* g_att_sa_d[ATTACHED_STANDALONE_CAP];
 static MovieClip* g_att_sa_mc[ATTACHED_STANDALONE_CAP];
-#endif
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 static size_t collect_attached_standalone(DisplayObject** out_d, MovieClip** out_mc)
 {
 	size_t n = 0;
@@ -7359,7 +7360,6 @@ static size_t collect_attached_standalone(DisplayObject** out_d, MovieClip** out
 	}
 	return n;
 }
-#endif
 
 // Promote sprite_initialized 1→2 inside attached clips' standalone lists. Called
 // at the tick boundary (swf_core.c / swf.c), so a clip attached (and init-drained)
@@ -7575,7 +7575,6 @@ static void clip_ef_fire_entry(SWFAppContext* app_context, ClipEFEntry* entries,
 	actionSetBaseClip(saved_base);
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // s28 w2-test12-land: Flash dispatches a clip's onClipEvent(enterFrame) and its
 // onEnterFrame method together, in ONE exec-list walk (newest first), not all
 // clip events before all methods (FP32 regression/
@@ -7586,6 +7585,8 @@ static void clip_ef_fire_entry(SWFAppContext* app_context, ClipEFEntry* entries,
 // place_seq >= a visited clip's own before that clip's method
 // (tagClipEFFireNewerOrEqual), and the rest at its end (tagClipEFFireRemaining).
 // A clip's own clip event still precedes its method (avm1/clip_events).
+// s30 browser-clip-event-order: every build (browser-WASM fired all clip
+// events, then all attached clips' clip events, before the method pass).
 static int g_clip_ef_collect = 0;
 static int g_clip_ef_pend_active = 0;
 static ClipEFEntry* g_clip_ef_pend = NULL;
@@ -7637,10 +7638,6 @@ void tagClipEFFireRemaining(SWFAppContext* app_context)
 	tagClipEFFireNewerOrEqual(app_context, 0);
 	clip_ef_pend_end();
 }
-#else
-void tagClipEFFireNewerOrEqual(SWFAppContext* app_context, size_t place_seq) { (void)app_context; (void)place_seq; }
-void tagClipEFFireRemaining(SWFAppContext* app_context) { (void)app_context; }
-#endif
 
 // Dispatch CLIP_EVENT_ENTER_FRAME in flat global LIFO order (place_seq DESC
 // across the entire display tree, not per-subtree). Mirrors Ruffle's
@@ -7661,11 +7658,12 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 	size_t n = 0;
 	int gathered = gather_clip_ef_entries(app_context, dl, dl_max, parent_mc,
 		entries, &n, CLIP_EF_FLAT_CAP);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Root dispatch also gathers every attachMovie'd clip's standalone child
 	// list (see collect_attached_standalone), into the SAME flat list so the
 	// place_seq DESC sort below interleaves them with timeline clips exactly
-	// like Ruffle's single global exec list.
+	// like Ruffle's single global exec list. s30 browser-clip-event-order:
+	// every build (the browser's separate dispatch_attached_clip_enterframe
+	// pass, which fired all attached clips after every root clip, is gone).
 	size_t att_n = 0;
 	if (include_attached) {
 		att_n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
@@ -7681,14 +7679,10 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 				g_att_sa_mc[k], entries, &n, CLIP_EF_FLAT_CAP);
 		}
 	}
-#else
-	(void)include_attached;
-#endif
 	if (!gathered)
 	{
 		// Overflow: fall back to per-subtree recursion (pre-flat-LIFO behavior).
 		dispatch_enterframe_clip_actions_recursive(app_context, dl, dl_max, parent_mc);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// The collected pairs are consumed here before any handler can re-enter
 		// collect (static scratch); copy them off first.
 		if (att_n > 0) {
@@ -7707,7 +7701,6 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 			free(ad);
 			free(am);
 		}
-#endif
 		return;
 	}
 
@@ -7722,7 +7715,6 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 		entries[b+1] = key;
 	}
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// s28 w2-test12-land: the root pass hands its sorted entries to the
 	// method pass instead of firing them here (see clip_ef_fire_entry).
 	if (g_clip_ef_collect && include_attached && n > 0) {
@@ -7741,7 +7733,6 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 			return;
 		}
 	}
-#endif
 
 	// Register the gathered array for pointer rebase while handlers run
 	// (see ClipEFRebaseFrame above).
@@ -7790,9 +7781,8 @@ void ng_dispatch_loaded_shell_enterframe(SWFAppContext* app_context)
 }
 #endif
 
-// Per-tick ROOT dispatch: the root display_list plus (CI modes) every
-// attachMovie'd clip's standalone child list. Browser-WASM keeps its own
-// dispatch_attached_clip_enterframe pass, so there this is the plain root walk.
+// Per-tick ROOT dispatch: the root display_list plus every attachMovie'd
+// clip's standalone child list (all builds since s30 browser-clip-event-order).
 void dispatch_root_enterframe_clip_actions(SWFAppContext* app_context)
 {
 	extern MovieClip root_movieclip;
@@ -7800,33 +7790,20 @@ void dispatch_root_enterframe_clip_actions(SWFAppContext* app_context)
 		&root_movieclip, 1);
 }
 
-// s28 w2-test12-land: the per-tick root pass, interleaved with the onEnterFrame
-// method pass that MUST follow it (actionDispatchEnterFrameHandlers fires the
-// gathered entries; browser-WASM keeps the separate pass).
-void tagClipEFCollectRootPass(SWFAppContext* app_context)
-{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	g_clip_ef_collect = 1;
-	dispatch_root_enterframe_clip_actions(app_context);
-	g_clip_ef_collect = 0;
-#else
-	dispatch_root_enterframe_clip_actions(app_context);
-#endif
-}
-
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-// Browser-WASM: dispatch CLIP_EVENT_ENTER_FRAME for sprites nested inside
-// attachMovie'd clips. The root walk above (over display_list) cannot reach
-// these: ng_attachMovie copies a parent display-list entry that it never marks
-// sprite_initialized, so gather_clip_ef_entries skips it (< 2) and never
-// recurses into the attached clip's sub-list. Concrete case: Doodle Jump's
-// blue platform is charId 32 instance "aaa" placed inside the attached "cloud"
-// clip; its onEnterFrame clip action (clip_action_8) slides it left-right.
-//
-// Dispatch directly over each attached clip's AUTHORITATIVE standalone
-// sprite_display_list (the one an attached clip's goto rebuilds), not the
-// stale parent copy. No double-fire with the root walk for the reasons above.
-void dispatch_attached_clip_enterframe(SWFAppContext* app_context)
+// Browser-WASM: link each named child of an attachMovie'd clip's standalone
+// list to its MovieClip. A clip action mutates the MC's spatial props by name
+// (Doodle Jump's blue platform "aaa" inside the attached "cloud": `this._x +=
+// ac` from its onClipEvent(enterFrame)), but that MC is created lazily with
+// display_obj == NULL, so compose_children's per-tick overlay (which matches
+// the MC to its entry by display_obj == obj) never finds it and the motion
+// never renders. Resolve the MC (name + this clip as parent) and point its
+// display_obj at the entry; only when NULL, never clobbering a linkage.
+// (Was the tail of the browser's separate dispatch_attached_clip_enterframe
+// pass, retired in s30 browser-clip-event-order: those clip events now join
+// the root pass's single exec-order list.)
+// Same clip filter as the retired pass (every tick, address-range test).
+static void ng_link_attached_named_children(SWFAppContext* app_context)
 {
 	extern MovieClip* child_mc_cache[];
 	extern int child_mc_count;
@@ -7838,27 +7815,8 @@ void dispatch_attached_clip_enterframe(SWFAppContext* app_context)
 		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
 		if (mc->avm1_removed || mc->pending_removal) continue;
 		DisplayObject* d = (DisplayObject*)mc->display_obj;
-		// Only standalone attachMovie'd clips — skip timeline-placed clips
-		// whose display_obj lives in the global display_list array (those are
-		// covered by the root walk).
 		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
 		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
-
-		MovieClip* saved_ctx = g_current_context;
-		actionSetCurrentContext(mc);
-		dispatch_enterframe_clip_actions(app_context, d->sprite_display_list,
-			d->sprite_max_depth, mc);
-		actionSetCurrentContext(saved_ctx);
-
-		// Link each named nested clip's MovieClip to its display entry. The clip
-		// action above mutates the MC's spatial props (e.g. blue platform "aaa"
-		// `this._x += ac`), but the MC is created lazily by NAME during dispatch
-		// with display_obj == NULL, so compose_children's per-tick overlay (which
-		// matches the moving MC to its entry by display_obj == obj) can't find it
-		// and the motion never renders. Resolve the per-cloud MC (keyed by name +
-		// this cloud as parent) and point its display_obj at the entry so the
-		// overlay applies the AS transform. Only set when NULL — never clobber an
-		// existing linkage.
 		for (size_t dd = 1; dd <= d->sprite_max_depth; dd++) {
 			DisplayObject* co = &d->sprite_display_list[dd];
 			if (co->char_id == 0 || co->instance_name == NULL) continue;
@@ -7869,6 +7827,20 @@ void dispatch_attached_clip_enterframe(SWFAppContext* app_context)
 	}
 }
 #endif
+
+// s28 w2-test12-land: the per-tick root pass, interleaved with the onEnterFrame
+// method pass that MUST follow it (actionDispatchEnterFrameHandlers fires the
+// gathered entries via tagClipEFFireNewerOrEqual / tagClipEFFireRemaining).
+// s30 browser-clip-event-order: every build.
+void tagClipEFCollectRootPass(SWFAppContext* app_context)
+{
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	ng_link_attached_named_children(app_context);
+#endif
+	g_clip_ef_collect = 1;
+	dispatch_root_enterframe_clip_actions(app_context);
+	g_clip_ef_collect = 0;
+}
 
 // Recursively set enterframe_eligible=1 for all display entries with sprite_initialized >= 2.
 // Walks into sprite and button child display lists. This ensures button children get the flag
@@ -7940,13 +7912,10 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
 	// s28 w2-test12-land: CI modes gather here and fire interleaved with the
 	// onEnterFrame methods in actionDispatchEnterFrameHandlers below.
+	// s30 browser-clip-event-order: the browser gathers attachMovie'd clips'
+	// children here too (its separate dispatch_attached_clip_enterframe pass,
+	// which fired after every root clip event, is gone).
 	tagClipEFCollectRootPass(app_context);
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM: fire enterFrame for clip actions on sprites nested inside
-	// attachMovie'd clips (e.g. Doodle Jump blue platform charId 32 "aaa"),
-	// which the root walk above structurally can't reach.
-	dispatch_attached_clip_enterframe(app_context);
-#endif
 	// Dispatch AS2 mc.onEnterFrame property handlers. s26 n-exec-order: the
 	// ROOT arms are deferred to after this tick's queued child frame scripts
 	// (action.c g_defer_root_enterframe / actionFireDeferredRootEnterFrame).
