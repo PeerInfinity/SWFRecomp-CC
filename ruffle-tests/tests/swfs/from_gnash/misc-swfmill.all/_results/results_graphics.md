@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-28 16:53 UTC
+**Date**: 2026-11-28 17:54 UTC
 
-**Git SHA**: `d81f64081e`
+**Git SHA**: `d387fcee5b`
 
-**Run Duration**: 6m 53s
+**Run Duration**: 7m 22s
 
 ## Summary
 
@@ -23,26 +23,26 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 25.9s |  |
-| 2 | `background` | 0 | 20.4s |  |
-| 3 | `dict_callframe` | 3 | 19.7s |  |
-| 4 | `dict_cross` | 3 | 17.9s |  |
-| 5 | `dict_event` | 5 | 21.8s |  |
-| 6 | `dict_override` | 2 | 22.9s |  |
-| 7 | `func_dict` | 3 | 19.5s |  |
-| 8 | `initaction_in_definesprite` | 2 | 20.3s |  |
-| 9 | `jump_after_end` | 3 | 20.3s |  |
-| 10 | `jump_to_prev_block` | 1 | 20.3s |  |
-| 11 | `missing_bitmap` | 0 | 20.3s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 20.3s |  |
-| 13 | `registers` | 36 | 21.5s |  |
-| 14 | `tags_after_last_showframe` | 1 | 20.2s |  |
-| 15 | `trace-as2/arguments` | 8 | 21.0s |  |
-| 16 | `trace-as2/root_onload` | 4 | 19.9s |  |
-| 17 | `trace-as2/shortstack` | 2 | 19.9s |  |
-| 18 | `trace-as2/super` | 8 | 19.8s |  |
-| 19 | `trace-as2/this` | 8 | 19.9s |  |
-| 20 | `zeroframe_definesprite` | 3 | 20.9s |  |
+| 1 | `afunc_dict` | 2 | 19.7s |  |
+| 2 | `background` | 0 | 26.3s |  |
+| 3 | `dict_callframe` | 3 | 26.6s |  |
+| 4 | `dict_cross` | 3 | 16.7s |  |
+| 5 | `dict_event` | 5 | 20.9s |  |
+| 6 | `dict_override` | 2 | 19.6s |  |
+| 7 | `func_dict` | 3 | 20.5s |  |
+| 8 | `initaction_in_definesprite` | 2 | 19.4s |  |
+| 9 | `jump_after_end` | 3 | 20.1s |  |
+| 10 | `jump_to_prev_block` | 1 | 20.6s |  |
+| 11 | `missing_bitmap` | 0 | 23.0s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 19.7s |  |
+| 13 | `registers` | 36 | 26.3s |  |
+| 14 | `tags_after_last_showframe` | 1 | 20.6s |  |
+| 15 | `trace-as2/arguments` | 8 | 21.3s |  |
+| 16 | `trace-as2/root_onload` | 4 | 26.4s |  |
+| 17 | `trace-as2/shortstack` | 2 | 25.8s |  |
+| 18 | `trace-as2/super` | 8 | 26.6s |  |
+| 19 | `trace-as2/this` | 8 | 20.4s |  |
+| 20 | `zeroframe_definesprite` | 3 | 20.5s |  |
 
 ## Near-Passing Tests
 
