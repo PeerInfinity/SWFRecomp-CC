@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-27 23:57 UTC
+**Date**: 2026-11-28 00:52 UTC
 
-**Git SHA**: `715a5300c8`
+**Git SHA**: `9498e80c12`
 
-**Run Duration**: 0m 43s
+**Run Duration**: 0m 44s
 
 ## Summary
 
@@ -23,9 +23,9 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm1_imports_avm1` | 6 | 3.0s |  |
-| 2 | `avm1_non_swf_import` | 6 | 17.7s |  |
-| 3 | `empty_url` | 2 | 21.9s |  |
+| 1 | `avm1_imports_avm1` | 6 | 2.5s |  |
+| 2 | `avm1_non_swf_import` | 6 | 20.0s |  |
+| 3 | `empty_url` | 2 | 21.0s |  |
 
 ## Near-Passing Tests
 
