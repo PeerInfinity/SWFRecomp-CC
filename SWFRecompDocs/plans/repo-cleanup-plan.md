@@ -557,6 +557,7 @@ Ruled in discussion session `repo-cleanup-discussion` while S3 ran. Recorded her
     pins check passes, run read-only against the updated submodule checkout. The smoke test is recorded. The handoff
     note is delivered.
 - **R2: swfrecomp-browser release 4 (D11b), gated on Archipelago-CC making p4h the default.**
+  - **Also (Robert, 2026-11-28):** refresh `release.json`'s `files[]` inventory, which went stale with R4's docs-only commit `16a80c7` (old README hashes, 3 new `licenses/` files missing). Nothing reads those rows, so the refresh waits for R2. The gate is P2, Archipelago's p4h default flip.
   - `make_release.py --rebuild` at the shipped recompiler commit.
   - **Done:** release 4 is pushed, `release.json`'s `source.commit` equals the shipped Seedling build's recompiler,
     the Pages page loads and recompiles one example, and Archipelago-CC has been told.
