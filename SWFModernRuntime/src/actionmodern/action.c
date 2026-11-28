@@ -69552,6 +69552,17 @@ void actionRemoveSprite(SWFAppContext* app_context)
 			// When deferred ONLY because of a descendant (clip itself has no
 			// onUnload), strip the non-surviving lower-depth children.
 			int _rs_self_unload = _rs_has_unload;
+			// s30 browser-pending-finalize: a slot onClipEvent(unload) clip
+			// action defers too (Flash FP32: regression/
+			// avm1_swapdepths_remove_clipevent_unload -- the clip stays
+			// 'movieclip' until its unload runs at the end of the script).
+			if (!_rs_has_unload && _rs_mc->name[0]) {
+				extern size_t ng_findDisplayEntryByName(const char* name);
+				extern int ng_compute_has_unload(size_t depth);
+				size_t _rs_cdl = ng_findDisplayEntryByName(_rs_mc->name);
+				if (_rs_cdl != SIZE_MAX && ng_compute_has_unload(_rs_cdl))
+					_rs_has_unload = _rs_self_unload = 1;
+			}
 			if (!_rs_has_unload)
 				_rs_has_unload = mcOrDescendantHasOnUnload(_rs_mc);
 
@@ -69573,8 +69584,17 @@ void actionRemoveSprite(SWFAppContext* app_context)
 					if (_rs_dl != SIZE_MAX) {
 						extern DisplayObject* display_list;
 						extern void ng_queue_slot_unload_events(SWFAppContext*, size_t, MovieClip*);
+						extern int ng_compute_has_unload(size_t depth);
+						int _rs_slot_unload = ng_compute_has_unload(_rs_dl);
 						ng_queue_slot_unload_events(app_context, _rs_dl, _rs_mc);
-						memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
+						if (_rs_slot_unload) {
+							// s30: keep the entry until the post-drain finalize
+							// (same as the removeMovieClip method arm).
+							extern void queue_pending_finalize_mc(MovieClip*, int, size_t);
+							queue_pending_finalize_mc(_rs_mc, (int)_rs_dl, _rs_dl);
+						} else {
+							memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
+						}
 					}
 				}
 				// NOTE: do NOT reset g_current_context here when the removed MC is
@@ -84498,13 +84518,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					extern size_t ng_findDisplayEntryByName(const char* name);
 					size_t _rmc_dl = (mc->name && mc->name[0]) ? ng_findDisplayEntryByName(mc->name) : SIZE_MAX;
 					if (_rmc_dl != SIZE_MAX) {
+						// s30 browser-pending-finalize: a slot onClipEvent(unload)
+						// clip action defers the removal like an AS onUnload
+						// (Flash FP32: regression/avm1_swapdepths_remove_clipevent_unload).
+						extern int ng_compute_has_unload(size_t depth);
+						if (!_rmc_has_unload && ng_compute_has_unload(_rmc_dl))
+							_rmc_has_unload = _rmc_self_unload = 1;
+						int _rmc_slot_unload = ng_compute_has_unload(_rmc_dl);
 						extern void ng_queue_slot_unload_events(SWFAppContext*, size_t, MovieClip*);
 						ng_queue_slot_unload_events(app_context, _rmc_dl, mc);
+						if (_rmc_slot_unload) {
+							// Keep the entry (by-name lookups still find the clip)
+							// until the post-drain finalize, as tagRemoveObject2's
+							// deferred path does.
+							extern void queue_pending_finalize_mc(MovieClip*, int, size_t);
+							queue_pending_finalize_mc(mc, (int)_rmc_dl, _rmc_dl);
+						} else {
 						if (display_list[_rmc_dl].instance_name_owned &&
 						    display_list[_rmc_dl].instance_name != NULL) {
 							free(display_list[_rmc_dl].instance_name);
 						}
 						memset(&display_list[_rmc_dl], 0, sizeof(DisplayObject));
+						}
 					}
 				}
 

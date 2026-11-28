@@ -1,0 +1,13 @@
+f1
+k ef 1
+c ef 1
+c depth=-16383
+c depth after swap=10
+c after remove=movieclip
+k after remove (no swap)=movieclip
+c unload t=2 typeof=movieclip
+k ef 2
+f3 c=undefined k=movieclip
+k ef 3
+f4
+k ef 4
