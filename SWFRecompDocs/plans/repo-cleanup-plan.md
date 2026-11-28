@@ -622,6 +622,54 @@ The other three builds are untouched.
   The swfrecomp-browser pin is unaffected: it pins the default build's recompiler, and that is still p4g on `344c85a`.
 - **Next:** R3 (the docs discussion) is unblocked. R2 still waits for p4h to become the default.
 
+### R3 rulings (2026-11-28, discussion session `cleanup-r3-sibling-docs`)
+
+The docs were read as a Ruffle developer would read them: seedling-wasm `main` `ecc5eaf` (README, `docs/pin-policy.md`,
+`docs/history.md`, `builds.json` prose) and swfrecomp-browser `main` `6c5b422` (README, the `release.json` `$comment`),
+with Archipelago-CC `origin/main` `c0cf42327d` checked for the gates.
+
+**Findings:**
+- **seedling-wasm:** what it is, the play link and the source commits are all clear in the first screen. The
+  jargon (p4g, L57/L112, tape v13, ⛓/⚖, slice names) sits in the generated table rows, the role legend and `docs/`.
+  The README already says the bot builds are not for playing. **Licence gap:** the README calls the builds Unlicense
+  because the game is. But every `.wasm` also contains SWFModernRuntime (MIT, now including the Ruffle-derived code,
+  D12a), zlib, libtess2 (SGI-B), o1heap, stb, QuickJS and LZMA, and the repo carries none of their notices. Also
+  stale: `history.md` §"History size" says "nothing rewrites history today" just above §"The shed of 2026-09-14".
+- **swfrecomp-browser:** clear and nearly free of jargon. Two defects:
+  1. It never links its own live page, `https://peerinfinity.github.io/swfrecomp-browser/recompiler/` (Pages is on).
+  2. Its licence table has no Ruffle row, and it says "no third-party piece was added", yet Ruffle-derived ports
+     ship as source in `recompiler/bundle/` and `recompiler/host/` (86 files mention Ruffle) and inside the host
+     `.wasm` files.
+- **Costs found in Archipelago-CC:**
+  - Every seedling-wasm commit means a gitlink bump there.
+  - A README-only diff does not meet the letter of the manifest-prose exemption, so `check-seedling-full-tier-owed.mjs`
+    reds until it is discharged.
+  - **A new file** in seedling-wasm reds `check-seedling-wasm-pins.mjs`, whose `TOP_LEVEL_FILES` and `DOC_FILES` are
+    fixed lists.
+  - Rewording a table row means editing `builds.json` `summary` fields and regenerating the table.
+  - swfrecomp-browser's `README.md`, `LICENSE` and `licenses/` are hand-editable under its `$comment`. Archipelago-CC
+    pins only `source.commit`, so a docs-only commit there costs it nothing.
+
+| # | Ruling |
+|---|---|
+| D11c1 | **swfrecomp-browser: edit now, as a docs-only commit** (not deferred to R2). Add the live-page link and the SWFRecomp-CC Pages copy. Add a Ruffle row (plus the h263-rs and rust-flash-lso rows that A1 found) to the licence table, with the licence texts under `licenses/`. Correct the "no third-party piece was added" sentence. No rebuild; `source.commit` and `release.json` do not move. |
+| D11c2 | **seedling-wasm licence: one README paragraph, no new file.** It says the game is Unlicense but each `.wasm` also contains the SWFModernRuntime runtime (MIT, with Ruffle-derived code) and third-party pieces, and links SWFRecomp-CC's `LICENSE`, `THIRD_PARTY_NOTICES.md` and `SWFModernRuntime/third_party/ruffle/` on `master`. Not at each build's recompiler commit: none of `344c85a16`, `746c39489` or `8e6ef0c35` has the Ruffle row, which S4 and A1 added later. It is outside the generated region, so `builds.json` and the pins gate are untouched. It rides the gitlink bump that R1 already owes (`a335206→ecc5eaf`, which owes the full tier anyway because the demo's md5 moved). |
+| D11c3 | **Everything else in seedling-wasm stays as it is:** the table wording, the role legend, `pin-policy.md` and `history.md`, including the stale "History size" line. |
+
+**Edit slice R4 (D11c1, D11c2), after A1 (landed `ab18c4dff`):**
+- Robert's rulings above explicitly authorize these two commits in the sibling repos; no other file there is to be
+  touched.
+- **swfrecomp-browser:** README (the link line near the top; the licence section's sentence and new rows) plus
+  `licenses/` copies of `SWFModernRuntime/third_party/ruffle/LICENSE-MIT*.txt`. Credit only what is in release 3
+  (`344c85a16`): check the bundle and host sources for each Ruffle-family row before adding it.
+- **seedling-wasm:** the README licence paragraph only. Before committing, run `seedling-wasm-readme.mjs --check`
+  and `check-seedling-wasm-pins.mjs` read-only in a `git clone --shared` of Archipelago-CC `origin/main`, with the
+  submodule at the new commit. Then send Archipelago-CC a note: the pending bump target moved from `ecc5eaf` to the new
+  head, and the README diff is prose outside the generated region. If Archipelago-CC has already bumped to `ecc5eaf`,
+  say so; the new commit then needs a bump of its own.
+- **Done:** both commits are pushed, both gates are green read-only, the swfrecomp-browser live link resolves, and
+  the Archipelago-CC note is delivered. Closeout as §10 "R4 closeout".
+
 ## 11. S4 closeout (2026-11-28, session `cleanup-s4-readme-getting-started`)
 
 **Done.** Main repo `beb2daeee` (README, GETTING_STARTED draft, Ruffle attribution), `d62ed2bd0` (fixes from the
