@@ -1,7 +1,12 @@
 # Test Suite Overview
 
-> **2026-11-26: these headline numbers are stale.** The current state, the remaining work and the NO-GO register
-> are in [`PROJECT_STATE.md`](../../../../SWFRecompDocs/plans/PROJECT_STATE.md) and [`NO_GO_REGISTER.md`](../../../../SWFRecompDocs/plans/NO_GO_REGISTER.md).
+> **SUPERSEDED (2026-11-28): every number on this page is stale.** The pass rates, suite totals and "where to focus"
+> notes below are snapshots from 2026-03 to 2026-07, before the full corpus import and the Flash-over-Ruffle goal.
+> The current numbers, the remaining work and the NO-GO register are in
+> [`PROJECT_STATE.md`](../../../../SWFRecompDocs/plans/PROJECT_STATE.md) and
+> [`NO_GO_REGISTER.md`](../../../../SWFRecompDocs/plans/NO_GO_REGISTER.md); the live per-suite tables are regenerated
+> by every CI run in [`ruffle-tests/results/`](../../../results/README.md). This page is kept as a dated log of the
+> AVM1/Gnash/Shumway work.
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
@@ -46,6 +51,8 @@ Last updated: 2026-05-19 — planning sweep. Every non-ignored filtered failure 
 Last updated: 2026-05-15 (CI `eb8206f8` no-graphics, run `25896064893` — first run after SUBTESTS_HARNESS shipped. 66 previously-undiscoverable tests with `[subtests]`/no `output.txt` are now visible (53 in actionscript.all, 8 in misc-ming.all, 3 in misc-swfc.all, 2 in misc-swfmill.all). Newly-added: 2 raw pass (`Global-v5`, `misc-swfmill.all/trace-as2/arguments`), 8 ruffle_matched (`ops-v5/v6/v7`, `setProperty-v5/v6/v7/v8`, `BitmapDataDraw`), 45 output_mismatch. Three regressions: `avm1/placeobject_occupied_depth` (pass → output_mismatch), `misc-ming.all/loop/loop_test10` (RM 5/28 → mismatch 1/28), `misc-ming.all/register_class/RegisterClassTest4` (17/42 → 7/42 lines). Triage of the new output_mismatch tests in `from_gnash/_investigation/incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md` (now closed, moved to `complete/`).)
 
 ## Suite Summary
+
+> Superseded: a 2026-05-15 snapshot. Current numbers: [`PROJECT_STATE.md`](../../../../SWFRecompDocs/plans/PROJECT_STATE.md) §1.
 
 "Effective pass" = raw pass + `ruffle_matched` (diffs ⊆ Ruffle's diffs against Flash; auto-promoted when upstream has `known_failure=true` + `output.ruffle.txt`).
 
@@ -362,6 +369,8 @@ Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already p
 - `from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md` — All actionable items done (9 tests fixed)
 
 ## Where to Focus
+
+> Superseded: the ranked worklist is now [`PROJECT_STATE.md`](../../../../SWFRecompDocs/plans/PROJECT_STATE.md) §2.
 
 AVM1 filtered suite is at 100% (zero filtered failures). Shumway flat suite reached 100% filtered effective (76/76) and the avm1 sub-tree reached 100% raw effective (47/47, 100% filtered) after Part C landed (CI run `25578374215`). Remaining actionable work is mostly in the Gnash suites.
 

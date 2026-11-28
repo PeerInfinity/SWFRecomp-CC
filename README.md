@@ -73,7 +73,7 @@ The in-browser recompiler is also released as a standalone page in
 | [`SWFRecomp/`](SWFRecomp/README.md) | **The recompiler** (C++). `src/swf.cpp` and `src/tag.cpp` parse the SWF; `src/action/action.cpp` translates AVM1 bytecode to C; `src/abc/` parses, verifies and emits AVM2 (ABC) code; shapes and glyphs are tessellated at recompile time. `scripts/` builds native and WASM targets. |
 | [`SWFModernRuntime/`](SWFModernRuntime/README.md) | **The runtime** (C) the generated code links against. `src/actionmodern/` is the AVM1 VM (`action.c` is the core); `src/avm2/` is the AVM2 VM and the flash.* class library; `src/libswf/` is the player loop, display list and tags (`swf.c` with rendering, `swf_core.c` headless); `src/rendering/render_webgpu.c` is the WebGPU renderer (native through Dawn, browser through Emscripten); `src/audio/`. |
 | [`ruffle-tests/`](ruffle-tests/README.md) | **The test harness.** `verify_output.py` recompiles, compiles and runs one test and compares it with its golden. `download_tests.sh` fetches the upstream corpus (not stored here). `tests/swfs/regression/` is this project's own fixture suite (tracked). `results/` has the cross-suite tables. |
-| [`SWFRecompDocs/`](SWFRecompDocs/README.md) | Docs: `plans/PROJECT_STATE.md` (start here), guides, specs, reference notes. |
+| [`SWFRecompDocs/`](SWFRecompDocs/README.md) | Docs: [`ARCHITECTURE.md`](SWFRecompDocs/ARCHITECTURE.md) (how it works, and how it differs from Ruffle), `plans/PROJECT_STATE.md` (current state), guides, specs, reference notes. |
 | `tools/` | Flash oracle, divergence harnesses (where our run first differs from Ruffle or Flash), browser drivers, SWF analysis, perf rigs. |
 | `scripts/` | CI result processing, environment setup, the Dawn build. |
 | `docs/` | The GitHub Pages site above (`docs/recompiler/` is the in-browser recompiler). |
@@ -83,6 +83,8 @@ The in-browser recompiler is also released as a standalone page in
 
 The pipeline in one line: `test.swf` → `SWFRecomp` → `RecompiledScripts/*.c` + `RecompiledTags/*.c` (+
 `RecompiledABC/` for AVM2) → `gcc` or `emcc` with `SWFModernRuntime/` → a native binary or a `.wasm` page.
+The full walk-through, written for Ruffle developers, is
+[`SWFRecompDocs/ARCHITECTURE.md`](SWFRecompDocs/ARCHITECTURE.md).
 
 ## Relationships
 
@@ -91,7 +93,8 @@ The pipeline in one line: `test.swf` → `SWFRecomp` → `RecompiledScripts/*.c`
 [Ruffle](https://ruffle.rs/) is the Flash emulator that actually preserves Flash content today, and this project
 leans on it heavily. Its test suite, and the work behind it (including what it imported from Gnash, Shumway and
 Tamarin), is how we measure ourselves, and Ruffle's source is our first reference for how a Flash API behaves. The
-architecture is different (ahead-of-time C emission plus a C runtime, where Ruffle is an interpreter in Rust), but
+architecture is different (ahead-of-time C emission plus a C runtime, where Ruffle is an interpreter in Rust;
+[ARCHITECTURE §5](SWFRecompDocs/ARCHITECTURE.md#5-main-differences-from-ruffles-design) compares them), but
 many behaviours were ported from Ruffle's Rust to C: number formatting, array sorting, ByteArray, BitmapData, timers
 and more: 165 functions, tables and shaders in 63 files. Each one names its Ruffle source file in a comment, and they
 are all listed in [`SWFModernRuntime/third_party/ruffle/README.md`](SWFModernRuntime/third_party/ruffle/README.md).

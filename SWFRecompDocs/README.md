@@ -1,84 +1,100 @@
-# SWFRecomp Documentation
+# SWFRecompDocs
 
-Documentation for SWFRecomp-CC, which recompiles Adobe Flash (SWF) content to C code. This directory began as the [SWFRecomp/SWFRecompDocs](https://github.com/SWFRecomp/SWFRecompDocs) repository (frozen November 2025) and has been maintained inside the combined [SWFRecomp-CC](https://github.com/PeerInfinity/SWFRecomp-CC) repository since. For how this project relates to LittleCube's upstream SWFRecomp, see [merge/README.md](merge/README.md).
+The documentation of [SWFRecomp-CC](../README.md), a static recompiler that turns Flash SWF files (AVM1 and AVM2)
+into C for native and WebAssembly builds. This page is the index.
 
-**Live Demos:** [https://peerinfinity.github.io/SWFRecomp-CC/](https://peerinfinity.github.io/SWFRecomp-CC/) - Flash running as WebAssembly, plus an in-browser recompiler.
+This directory began in 2025 as the [SWFRecomp/SWFRecompDocs](https://github.com/SWFRecomp/SWFRecompDocs)
+repository. The session-by-session record (dated status logs, session briefs, fan-out reports, finished plans and
+superseded 2025 docs) moved to the public
+[SWFRecomp-CC-history](https://github.com/PeerInfinity/SWFRecomp-CC-history) repository in November 2026, at the same
+relative paths. Citations written `SWFRecomp-CC-history:<path>` point there, and the stub READMEs in `status/`,
+`prompts/`, `games/` and `deprecated/` say what moved.
 
-## Documentation Structure
+## Start here
 
-### Live Demos
+| Doc | What |
+|---|---|
+| [`../README.md`](../README.md) | What the project is, headline results, code map, relationship to Ruffle |
+| [`../GETTING_STARTED.md`](../GETTING_STARTED.md) | Build the recompiler and runtime and run one test |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The pipeline, recompiler and runtime layout, test harness and oracle, and the differences from Ruffle's design |
+| [`plans/PROJECT_STATE.md`](plans/PROJECT_STATE.md) | **The current state**: corpus results, what is still worth doing, and every non-corpus track |
+| [`plans/NO_GO_REGISTER.md`](plans/NO_GO_REGISTER.md) | Work ruled not worth doing, each with its reopen criterion |
+| [`BACKLOG.md`](BACKLOG.md) | Known issues and deferred work, one line each |
 
-Interactive WebAssembly demonstrations of recompiled Flash content (the 2025 `SWFRecompDocs/docs/` example builds were deleted in 7393244a4; the live Pages site is the repo-root [`docs/`](../docs/)):
+## Plans, playbooks and arcs (`plans/`)
 
-- **[trace_swf_4 Demo](https://swfrecomp.github.io/SWFRecompDocs/examples/trace_swf_4/)** - Console output demo showing SWF → C → WASM pipeline
+[`plans/README.md`](plans/README.md) indexes every plan. The live ones:
 
-### Implementation Guides
+| Doc | What |
+|---|---|
+| [`plans/polish-sweep-arc.md`](plans/polish-sweep-arc.md) | The trace-corpus fan-out arc: per-session results and the ranked worklist |
+| [`plans/graphics-fanout-playbook.md`](plans/graphics-fanout-playbook.md) | The pixel-parity fan-out playbook |
+| [`plans/graphics-image-baseline.md`](plans/graphics-image-baseline.md) | The `images=true` render baseline and how to run it |
+| [`plans/flash-oracle-report.md`](plans/flash-oracle-report.md) | How the Flash Player 32 oracle was built, and what it can and cannot capture |
+| [`plans/feature-priority-map.md`](plans/feature-priority-map.md) | Feature areas ranked by test yield (numbers from 2026-07; `PROJECT_STATE.md` has the current ones) |
+| [`plans/avm2-support-plan.md`](plans/avm2-support-plan.md) | The AVM2 umbrella plan and its architecture sketch |
+| [`plans/repo-cleanup-plan.md`](plans/repo-cleanup-plan.md) | The November 2026 repository cleanup |
+| [`../tools/coord/README.md`](../tools/coord/README.md) | Fan-out coordinator tooling and brief template |
 
-Step-by-step implementation guides for various components:
+## Guides (`guides/`)
 
-- **[as3-implementation.md](guides/as3-implementation.md)** - ActionScript 3 implementation guide
-  - **[as3-seedling-implementation.md](guides/as3-seedling-implementation.md)** - An implementation guide for only the AS3 features required to run the game Seedling
-  - **[abc-parser-implementation.md](guides/abc-parser-implementation.md)** - Phase 1: ABC Parser implementation
-  - **[as3-test-swf-generation.md](guides/as3-test-swf-generation.md)** - Guide for generating AS3 test SWF files
+| Guide | What |
+|---|---|
+| [`guides/wasm-game-debugging-session-guide.md`](guides/wasm-game-debugging-session-guide.md) | Debugging full games in the browser build: divergence harness first |
+| [`guides/divergence-harness-usage.md`](guides/divergence-harness-usage.md) | Finding the first point where our run differs from Ruffle or Flash |
+| [`guides/browser-test-harness-usage.md`](guides/browser-test-harness-usage.md) | The browser-WASM test harness |
+| [`guides/ci-crash-capture.md`](guides/ci-crash-capture.md) | Cores, binaries and backtraces for intermittent CI crashes |
+| [`guides/adding-graphics-tests.md`](guides/adding-graphics-tests.md) | Adding a test to the original `SWFRecomp/tests/graphics/` suite (swfmill-generated SWFs) |
+| [`guides/building-docs2-demos.md`](guides/building-docs2-demos.md) | Building the local-only `docs2/` demos |
+| [`guides/avm2-sharedobject-host-hook.md`](guides/avm2-sharedobject-host-hook.md) | Persisting AVM2 SharedObjects in the browser |
+| [`guides/flash-browser-setup.md`](guides/flash-browser-setup.md) | Running Flash Player in a browser (the oracle is now [`../tools/flash-oracle/`](../tools/flash-oracle/README.md)) |
 
-- **[font-implementation.md](guides/font-implementation.md)** - Implementation guide for font handling in SWF files
-  - **[font-phase1-implementation.md](guides/font-phase1-implementation.md)** - Phase 1: Basic font support implementation
+2025 design guides, kept for the record (the code has moved on since):
+[`as3-implementation.md`](guides/as3-implementation.md),
+[`as3-seedling-implementation.md`](guides/as3-seedling-implementation.md),
+[`abc-parser-implementation.md`](guides/abc-parser-implementation.md),
+[`as3-test-swf-generation.md`](guides/as3-test-swf-generation.md),
+[`font-implementation.md`](guides/font-implementation.md),
+[`font-phase1-implementation.md`](guides/font-phase1-implementation.md).
 
-### Plans
+## Reference (`reference/`)
 
-High-level project planning documents:
+| Doc | What |
+|---|---|
+| [`reference/performance-optimizations.md`](reference/performance-optimizations.md) | Every shipped performance optimisation, with measured impact and rejected candidates |
+| [`reference/performance-optimizations-vs-ruffle.md`](reference/performance-optimizations-vs-ruffle.md) | The same, compared with what Ruffle already does |
+| [`reference/browser-wasm-gate-inventory.md`](reference/browser-wasm-gate-inventory.md) | Code arms that differ between the browser build and the CI builds |
+| [`reference/ruffle-local-patches.md`](reference/ruffle-local-patches.md) | Local patches to a Ruffle checkout for oracle and perf tooling |
+| [`reference/wasm-build-process.md`](reference/wasm-build-process.md) | How a WASM build is put together |
+| [`reference/native-windowed-graphics-assessment.md`](reference/native-windowed-graphics-assessment.md) | Native windowed graphics: what exists and what it would take |
+| [`reference/n-level-and-demo-format.md`](reference/n-level-and-demo-format.md) | N's level data and demo (input replay) format |
+| [`reference/abc-format.md`](reference/abc-format.md) | Notes on the ABC file format |
+| [`reference/trace-swf4-wasm-generation.md`](reference/trace-swf4-wasm-generation.md) | A 2026-02 walkthrough of one SWF → C → WASM build |
 
-- **[wasm-project-plan.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/plans/completed/wasm-project-plan.md)** - Overall WebAssembly project architecture and roadmap
-- **[streamline-test-builds.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/plans/completed/streamline-test-builds.md)** - Proposal for streamlining the test build process to reduce duplication and leverage SWFModernRuntime
+## Specifications (`specs/`)
 
-### Status
+Adobe's published specifications; sources in [`specs/README.md`](specs/README.md):
+[SWF 19](specs/swf-spec-19.txt), [ABC 46.16](specs/abc-format-46-16.txt), [AVM2 overview](specs/avm2overview.txt),
+[AVM2 opcodes](specs/avm2_opcodes_raw.txt), [`opcodes.as`](specs/opcodes.as), and the [PDFs](specs/pdf/).
 
-Current project status and progress tracking (see [SWFRecomp-CC-history:SWFRecompDocs/status/README.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/README.md) for details):
+## Upstream SWFRecomp (`merge/`, `upstream-comparison/`)
 
-- **[project-status.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/project-status.md)** - Current status of the SWFRecomp project
-- **[2025-11-01-string-variable-implementation.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/2025-11-01-string-variable-implementation.md)** - String variable storage and optimization implementation summary
+| Doc | What |
+|---|---|
+| [`merge/README.md`](merge/README.md) | The repository map: this project, LittleCube's upstream, the older forks |
+| [`merge/upstream-relationship-2026-07.md`](merge/upstream-relationship-2026-07.md) | The July 2026 decision: a permanent friendly fork that exchanges knowledge, not code |
+| [`upstream-comparison/README.md`](upstream-comparison/README.md) | What each architecture does better, and the trap map kept for upstream |
 
-### Upstream Relationship
+## Elsewhere in the repository
 
-How SWFRecomp-CC relates to the upstream SWFRecomp org repositories (see [merge/README.md](merge/README.md) for the repository map):
+- Test harness: [`../ruffle-tests/README.md`](../ruffle-tests/README.md), with per-suite status under
+  `ruffle-tests/tests/swfs/<suite>/_investigation/` and the cross-suite tables in
+  [`../ruffle-tests/results/`](../ruffle-tests/results/README.md).
+- Flash Player 32 oracle: [`../tools/flash-oracle/README.md`](../tools/flash-oracle/README.md).
+- Ruffle-derived code and its attribution: [`../SWFModernRuntime/third_party/ruffle/README.md`](../SWFModernRuntime/third_party/ruffle/README.md).
+- Maintenance scripts for these docs: [`scripts/README.md`](scripts/README.md).
 
-- **[merge/upstream-relationship-2026-07.md](merge/upstream-relationship-2026-07.md)** - The July 2026 decision: permanent friendly fork, knowledge exchange, no code merges; §7 is the running status check
-- **[upstream-comparison/](upstream-comparison/README.md)** - What each architecture does better, "what would X buy us?" analyses, and the trap map maintained for upstream (`warnings-for-upstream.md`)
-- **[deprecated/merge/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/deprecated/merge/)** - Historical: the 2025 `wasm-support` branch comparisons and merge analyses from the original fork creation
+## Licence
 
-### Reference
-
-Manually compiled reference material, separate from the official specifications:
-
-- **[performance-optimizations.md](reference/performance-optimizations.md)** - Catalog of every shipped performance optimization (AVM2/AVM1/GC/renderer), with mechanisms, measured impact, rejected candidates, and measurement rules
-- **[trace-swf4-wasm-generation.md](reference/trace-swf4-wasm-generation.md)** - Complete walkthrough: SWF → C → WebAssembly pipeline
-- **[abc-format.md](reference/abc-format.md)** - Technical reference for the ActionScript Byte Code (ABC) file format
-
-### Specifications
-
-Official Adobe Flash and ActionScript specifications (see [specs/README.md](specs/README.md) for detailed source information):
-
-- **[swf-spec-19.txt](specs/swf-spec-19.txt)** - SWF File Format Specification (Version 19)
-- **[abc-format-46-16.txt](specs/abc-format-46-16.txt)** - ActionScript Bytecode (ABC) format specification
-- **[avm2overview.txt](specs/avm2overview.txt)** - ActionScript Virtual Machine 2 (AVM2) Overview
-- **[avm2_opcodes_raw.txt](specs/avm2_opcodes_raw.txt)** - Raw AVM2 opcode reference
-- **[opcodes.as](specs/opcodes.as)** - ActionScript opcode definitions
-- **[pdf/](specs/pdf/)** - PDF versions of official specifications
-- **[swf-spec-19-images/](specs/swf-spec-19-images/)** - Images referenced in SWF specification
-
-### Deprecated
-
-Older documentation that may still be useful for historical reference (see [SWFRecomp-CC-history:SWFRecompDocs/deprecated/README.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/deprecated/README.md) for details):
-
-- Various implementation plans and analyses that have been superseded by current approaches
-- See [deprecated/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/deprecated/) directory for full list
-
-### Scripts
-
-Maintenance utilities for the documentation repository (see [scripts/README.md](scripts/README.md) for details):
-
-- **[fix-markdown-formatting.sh](scripts/fix-markdown-formatting.sh)** - Fix consecutive double-asterisk lines in markdown files
-
-## License
-
-See the main [SWFRecomp project](https://github.com/SWFRecomp/SWFRecomp) for licensing information.
+MIT, as the rest of the repository ([`../LICENSE`](../LICENSE)). The Adobe specifications in `specs/` keep their own
+terms; see [`specs/README.md`](specs/README.md).

@@ -813,3 +813,67 @@ Ruled after S4 found Ruffle ports that nobody had credited (§11).
 - Comments and docs only for the attribution. The three D12c fixes are minimal code changes.
 - **Done:** every ported function names its Ruffle source, and the table exists. The three D12c fixes are landed. A
   per-change graphics CI run passes with no pass→fail. Closeout as §12 "A1 closeout". Next slice line: S5.
+
+## 13. S5 closeout (2026-11-28, session `cleanup-s5-docs-index-architecture`)
+
+**Done.** One docs-only commit (this section included). No code, CI or Pages path changed, so no CI run.
+
+### What changed
+
+- **`SWFRecompDocs/README.md` rewritten as an index.** Start here (root README, GETTING_STARTED, ARCHITECTURE,
+  `PROJECT_STATE.md`, `NO_GO_REGISTER.md`, `BACKLOG.md`); the live plans, playbooks and arcs (with `plans/README.md`
+  as the full plan index and `tools/coord/` for fan-out tooling); current guides, with the six 2025 design guides
+  listed separately as historical; all of `reference/`; `specs/`; `merge/` and `upstream-comparison/`; pointers into the
+  harness, the oracle and the Ruffle attribution table. **One** link to `PeerInfinity/SWFRecomp-CC-history`; the
+  `status/`, `prompts/`, `games/` and `deprecated/` stubs are named, not linked. Dropped: the dead
+  `swfrecomp.github.io` demo link, the history-repo links to 2025 status and plans, and the "see upstream for
+  licensing" line (it now says MIT, as the repo).
+- **`SWFRecompDocs/ARCHITECTURE.md` (new)**, for Ruffle developers: §1 pipeline (whole-program AOT, child movies
+  recompiled and linked, AVM1/AVM2 per SWF); §2 recompiler (AVM1 and AVM2 emission shapes, recompile-time verifier
+  and VerifyError stubs, libtess2 tessellation with earcut kept for morphs, the three emission options); §3 runtime
+  (AVM1 `action.c` and neighbours, refcount + tick-boundary mark-sweep backstop, action queue, goto replay; AVM2
+  core, startup order, class library, between-ticks GC, the Flixel intrinsic; `libswf/` file roles; renderer and
+  audio; the three builds; the in-browser recompiler); §4 harness, CI and the FP32 oracle; §5 a Ruffle-vs-us design
+  table and the costs; §6 Ruffle-derived code per D12 and the A1 table.
+- **Every claim was checked against the tree** (generated C of `avm1/add` and `avm2/hello_world`, `verify_output.py`'s
+  source lists and defines, file headers, `object.c`/`avm2_gc.c` config, the A1 table) and, for Ruffle-side claims,
+  against `~/CC/ruffle` (e.g. AVM2 verification is lazy: `Method::verify` on first run). Stale facts found in older
+  docs and not repeated: `action.c` is ~90k lines, not ~50k (CLAUDE.md, SESSION_START_GUIDE); `action.cpp` is ~3k,
+  not ~2k; `tag.c` and `tag_stubs.c` are compiled in **both** harness modes (memory `key_architecture_notes` said
+  graphics = `tag.c`, no-graphics = `tag_stubs.c`; fixed); `SWFRecomp/tests/` is not run by CI except two WASM link
+  builds (SESSION_START_GUIDE still names the deleted "SWFRecomp CI"/"Run All Tests" workflows; left for a later
+  docs pass, not in S5 scope).
+- **`OVERVIEW.md`**: the 2026-11-26 banner became an explicit SUPERSEDED banner pointing at `PROJECT_STATE.md`,
+  `NO_GO_REGISTER.md` and `ruffle-tests/results/`, plus one-line "superseded" notes under "Suite Summary" and "Where to
+  Focus". The body is kept as a dated log.
+- **Root `README.md`** links ARCHITECTURE from the code-map row, after the one-line pipeline, and from the Ruffle
+  paragraph (to §5).
+- **New `SWFRecompDocs/scripts/check_links.py`** (documented in `scripts/README.md`): checks relative links and
+  `#anchors` (GitHub slugs), skips external links, exits 1 on a break. A negative test (a missing file and a missing
+  anchor) reports both as BAD.
+
+### Link check (plan §3 S5 done-line)
+
+```
+$ python3 SWFRecompDocs/scripts/check_links.py README.md            → 26 relative links checked, 0 broken; 19 external skipped
+$ python3 SWFRecompDocs/scripts/check_links.py SWFRecompDocs/README.md        → 57 checked, 0 broken; 2 external skipped
+$ python3 SWFRecompDocs/scripts/check_links.py SWFRecompDocs/ARCHITECTURE.md  → 27 checked, 0 broken; 1 external skipped
+$ python3 SWFRecompDocs/scripts/check_links.py ruffle-tests/tests/swfs/_investigation/OVERVIEW.md → 16 checked, 0 broken
+```
+
+The external links in the two new docs (history repo, `SWFRecomp/SWFRecompDocs`, Dawn) return HTTP 200.
+
+### Notes for Robert
+
+- The plan has **no "A1 closeout" section** yet, although A1 landed in `ab18c4dff` (§12 asks for one, with a
+  per-change graphics CI run). S5 used the A1 table and commit message as the record and did not write A1's closeout.
+- ARCHITECTURE §5 is the page a Ruffle developer is most likely to dispute. Its Ruffle column states only what was
+  checked in the local Ruffle checkout or is well known (interpreter, `gc-arena`, lyon, pluggable renderers, lazy
+  verification).
+
+### Next slice
+
+**S6: branch and worktree prune** (§3 S6), protecting p4h's things per D11e (the `SWFRecomp-CC-p4h` and
+`SWFRecomp-CC-p4h-rc1` worktrees, seedling-wasm's `p4h-main` and `p4h-rc1`) and the `seedling-wasm-leak` branch (§3 S6)
+until an Archipelago-CC session says which it still needs. **S7: the SWF review with Robert**
+(§3 S7), which must still precede the next fan-out.

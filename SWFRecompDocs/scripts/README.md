@@ -60,6 +60,18 @@ The script automatically inserts blank lines between consecutive `**` lines:
 find . -name '*.md.bak' -delete
 ```
 
+### check_links.py
+
+Checks the relative links in Markdown files: each target path must exist, and each `#anchor` must match a heading
+in the target (GitHub's slug rules). External links are skipped. Exits 1 if any link is broken.
+
+```bash
+python3 SWFRecompDocs/scripts/check_links.py README.md SWFRecompDocs/README.md SWFRecompDocs/ARCHITECTURE.md
+```
+
+Added by repo-cleanup slice S5 (2026-11-28) for the root README, this index and `ARCHITECTURE.md`. Run it after
+editing any of them.
+
 ## Adding New Scripts
 
 When adding new maintenance scripts to this directory:
