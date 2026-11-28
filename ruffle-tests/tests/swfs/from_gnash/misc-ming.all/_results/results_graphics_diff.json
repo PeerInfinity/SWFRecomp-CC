@@ -1,50 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-28T00:52:29.340880+00:00",
-    "old_git_sha": "9498e80c12e3422fa6cdfe634e4080b94ad93e57",
-    "new_timestamp": "2026-11-28T01:46:36.964291+00:00",
-    "new_git_sha": "6441e7d5d74977b48292b4b9d1c8c64ac2f6d586",
+    "old_timestamp": "2026-11-28T01:46:36.964291+00:00",
+    "old_git_sha": "6441e7d5d74977b48292b4b9d1c8c64ac2f6d586",
+    "new_timestamp": "2026-11-28T07:02:09.986791+00:00",
+    "new_git_sha": "3dfab12779f578444ee527167da7ee8e759fe388",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 76,
-    "old_ruffle_matched": 28,
+    "old_pass": 77,
+    "old_ruffle_matched": 27,
     "old_effective_pass": 104,
     "old_total": 111,
-    "old_pass_rate": 68.5,
+    "old_pass_rate": 69.4,
     "new_pass": 77,
     "new_ruffle_matched": 27,
     "new_effective_pass": 104,
     "new_total": 111,
     "new_pass_rate": 69.4,
-    "old_mismatched_lines": 872,
+    "old_mismatched_lines": 845,
     "new_mismatched_lines": 845,
     "increased_mismatches": 0,
-    "decreased_mismatches": 27,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 110,
+    "status_changed": 0,
+    "unchanged": 111,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "EmbeddedFontTest",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 87,
-        "expected_lines": 87,
-        "matching_lines": 60
-      },
-      "new_lines": {
-        "actual_lines": 87,
-        "expected_lines": 87,
-        "matching_lines": 87
-      }
-    }
-  ]
+  "changes": []
 }

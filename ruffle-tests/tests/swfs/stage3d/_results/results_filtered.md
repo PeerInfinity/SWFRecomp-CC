@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-28 02:31 UTC
+**Date**: 2026-11-28 08:08 UTC
 
-**Git SHA**: `b8671fd2f5`
+**Git SHA**: `3dfab12779`
 
-**Run Duration**: 1m 19s
+**Run Duration**: 1m 21s
 
 **Filtered**: 0 tests ignored out of 8 available
 
@@ -25,14 +25,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `draw_to_bitmap_data_unconfigured` | 8 | 24.9s |  |
-| 2 | `request_matching_profiles` | 190 | 6.5s |  |
-| 3 | `request_profiles` | 16 | 6.2s |  |
-| 4 | `sampler_odd_size` | 1 | 8.4s |  |
-| 5 | `scissor_rectangle` | 0 | 8.2s |  |
-| 6 | `scissor_rectangle_invalid` | 1 | 7.9s |  |
-| 7 | `unbound_texture` | 0 | 8.2s |  |
-| 8 | `unbound_texture_multiple` | 0 | 8.2s |  |
+| 1 | `draw_to_bitmap_data_unconfigured` | 8 | 25.2s |  |
+| 2 | `request_matching_profiles` | 190 | 6.2s |  |
+| 3 | `request_profiles` | 16 | 6.3s |  |
+| 4 | `sampler_odd_size` | 1 | 7.8s |  |
+| 5 | `scissor_rectangle` | 0 | 8.1s |  |
+| 6 | `scissor_rectangle_invalid` | 1 | 8.0s |  |
+| 7 | `unbound_texture` | 0 | 10.9s |  |
+| 8 | `unbound_texture_multiple` | 0 | 8.1s |  |
 
 ## Near-Passing Tests
 
