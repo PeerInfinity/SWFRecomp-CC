@@ -57,6 +57,7 @@ the shared tree. Never run full suites locally; CI is needed only for slices tha
 | D8 | Side projects | **Decided in S2** (2026-11-28): per-path rulings D8a–D8l below. Finished-game one-offs, reports and provenance captures go to the history repo; the perf dumps are deleted; everything that tests or drives code still here stays. Executed by S2b. |
 | D9 | Order | Structural moves first, so the docs written later point at final paths. The prune is independent. |
 | D10 | SWF files in git (S2, 2026-11-28) | **The SWFs already tracked stay in both repos** (no history purge, and the history repo is not deleted and re-created). **No more `git add -f`:** a SWF is tracked only when a `.gitignore` allow rule covers it. Robert wants to review the tracked SWFs in detail first (slice S7). Until S7 rules, `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md:80` ("`git add -f` the `.swf` fixtures") is left unchanged; no fan-out is planned before then. The history repo got a `.gitignore` (`*.swf`, build outputs, Flash binaries; `7879606`). |
+| D11 | Sibling repos `seedling-wasm` and `swfrecomp-browser` (Robert, 2026-11-28) | **Both join the cleanup.** Rulings and slices are in §10. In short: rebuild the vanilla Seedling now; swfrecomp-browser release 4 waits for Archipelago-CC's p4h; one docs discussion covers both repos; no history shed; protect p4h's worktrees and branches; leave the old `PeerInfinity/SWFRecomp` and `SWFModernRuntime` forks as they are. |
 
 ### D8 side-project rulings (S2, Robert, 2026-11-28)
 
@@ -197,9 +198,10 @@ citations; `du -sh tools/divergence/perf` is under 1 MB.
   anything unlanded before removing it, then `git worktree remove` and `git worktree prune`.
 - Delete the 290 merged local branches with `git branch -d`. `-d` refuses unmerged branches, so it is safe; the 3
   unmerged ones (`seedling-wasm-leak` and the rest) are listed for Robert.
+- **D11 exception:** leave `SWFRecomp-CC-p4h` and `SWFRecomp-CC-p4h-rc1` (Archipelago-CC's p4h build trees) and `seedling-wasm-leak` alone until an Archipelago-CC session says which ones it still needs.
 - Review the remote branches with Robert one at a time (`claude/*` cloud-worker branches, `lowq-fixes`, `t5-iso-v1`).
   Keep `ruffle-test-results` and `ruffle-image-results`.
-- **Done:** `git worktree list` shows only the main tree. `git branch` lists master plus the branches Robert chose to
+- **Done:** `git worktree list` shows only the main tree, plus any worktree Archipelago-CC still needs (D11). `git branch` lists master plus the branches Robert chose to
   keep. The remote branch list matches his rulings.
 
 **S7: SWF review and whitelist (discussion with Robert, then execution; ruled in D10).**
@@ -507,3 +509,56 @@ were updated. No memory cited a moved or deleted doc.
 `ruffle-tests/results/RUFFLE_RESULTS_GRAPHICS.md` for headline numbers. S5 owns the `SWFRecompDocs/README.md` rewrite
 (it still lists 2025 content). S6 is independent. S7 (SWF review) must still precede the next fan-out, and
 `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md:80` is untouched.
+
+## 10. Sibling repos: seedling-wasm and swfrecomp-browser (D11, Robert, 2026-11-28)
+
+Ruled in discussion session `repo-cleanup-discussion` while S3 ran. Recorded here after S3's closeout landed.
+
+**Facts (2026-11-28):**
+- `PeerInfinity/seedling-wasm` is PUBLIC. It holds 4 builds in a 146 MB tree:
+  - `seedling_original` (the vanilla demo, role `demo`), on SWFRecomp-CC `344c85a` from 2026-10-19;
+  - `p4g` (the default, `344c85a`);
+  - `p4h` (the candidate, `746c39489`);
+  - `p4d` (the control).
+- Archipelago-CC consumes seedling-wasm as a submodule. It gates the repo with
+  `scripts/procgen/check-seedling-wasm-pins.mjs` and generates the README build table with
+  `scripts/procgen/seedling-wasm-readme.mjs --write`.
+- Its history was shed once (orphan commit and force-push, 2026-09-14), under its own `docs/history.md` policy.
+- `PeerInfinity/swfrecomp-browser` is PUBLIC: one release of the in-browser recompiler page (release 3, `344c85a`,
+  2026-10-19, 25 MB). This repo's `tools/browser-release/make_release.py` writes it.
+- Archipelago-CC consumes swfrecomp-browser as a submodule as well. It **pins its `source.commit` against the
+  recompiler of the shipped Seedling build.**
+- Archipelago-CC is setting up p4h on `746c39489` (seedling-wasm branches `p4h-main` and `p4h-rc1`, 2026-11-22).
+- `dawn-prebuilt` calls itself disposable, but `ruffle-tests.yml`, `build-dawn.yml` and `cloud_env_setup.sh` use it,
+  so it stays.
+
+**Rulings:**
+
+| # | Ruling |
+|---|---|
+| D11a | **Rebuild only the vanilla `seedling_original`** on the latest SWFRecomp-CC, from its own SWF bytes (`~/CC/seedling_original_build/Seedling_original_r1.swf`, md5 `a543c03a…`): no mxmlc, no inject. Commit to seedling-wasm only (the build dir, the `builds.json` entry and the README table row). Run Archipelago-CC's pins check and README generator READ-ONLY to produce and check them. An Archipelago-CC session gets a note asking it to bump the submodule under its own gates. The bot builds are not rebuilt here. |
+| D11b | **swfrecomp-browser release 4 waits** until Archipelago-CC makes p4h the default. Then it is built on the recompiler commit Archipelago ships (`746c39489`, or newer if p4h is rebuilt), so the pin holds. |
+| D11c | **Docs: discuss first.** Robert thinks the seedling-wasm docs might be fine as they are. One discussion covers seedling-wasm and swfrecomp-browser. Suggested so far: one line in the swfrecomp-browser README linking SWFRecomp-CC's live Pages copy. |
+| D11d | **No history shed for seedling-wasm.** Prune its stale branch `p4f-rebuild` (2026-10-04). Keep `p4h-main` and `p4h-rc1`. |
+| D11e | **Protect p4h's things:** the SWFRecomp-CC worktrees `SWFRecomp-CC-p4h` and `SWFRecomp-CC-p4h-rc1`, and the seedling-wasm branches `p4h-main` and `p4h-rc1`. S6 asks an Archipelago-CC session before touching any of them. |
+| D11f | **Leave the old forks `PeerInfinity/SWFRecomp` and `PeerInfinity/SWFModernRuntime` as they are.** No archive flag, no pointer README. |
+
+**Slices:**
+- **R1: vanilla Seedling rebuild (D11a, D11d), next.**
+  - Build in a fresh detached worktree at the current `master` HEAD, under `flock /tmp/swfrecomp-cpu.lock`, with -j4
+    / `EMCC_CORES=4`.
+  - Recipe: `FRESH=1 build_wasm_avm2.sh` with the defaults, then `deploy_wasm_avm2.sh`. The recipe is in the
+    `seedling_original` `builtFrom` field.
+  - Smoke-test it in a browser: it boots, the title appears, ▶ Start reaches gameplay. SwiftShader in WSL is fine for
+    function; take no perf numbers there.
+  - Commit and push to seedling-wasm. Delete `p4f-rebuild` there.
+  - Leave the Archipelago-CC note.
+  - **Done:** seedling-wasm `main` carries the rebuilt `seedling_original` with a matching `builds.json` entry. The
+    pins check passes, run read-only against the updated submodule checkout. The smoke test is recorded. The handoff
+    note is delivered.
+- **R2: swfrecomp-browser release 4 (D11b), gated on Archipelago-CC making p4h the default.**
+  - `make_release.py --rebuild` at the shipped recompiler commit.
+  - **Done:** release 4 is pushed, `release.json`'s `source.commit` equals the shipped Seedling build's recompiler,
+    the Pages page loads and recompiles one example, and Archipelago-CC has been told.
+- **R3: docs discussion for seedling-wasm and swfrecomp-browser (D11c), after R1.** A discussion with Robert. Rulings
+  are appended here; an edit slice follows only if he rules one.
