@@ -1,6 +1,0 @@
-f1
-g f3
-init2 f3
-init3 f3
-f1 after g
-f3

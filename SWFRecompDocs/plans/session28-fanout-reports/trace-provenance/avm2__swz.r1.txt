@@ -1,3 +1,0 @@
-Error #2044: Unhandled securityError:. text=Error #2046: The loaded file did not have a valid signature.
-	at Test()[/Users/haydencurtis/Desktop/rust/ruffle/tests/tests/swfs/avm2/swz/Test.as:12]
-	at test_fla::MainTimeline/frame1()[test_fla.MainTimeline::frame1:3]

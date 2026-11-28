@@ -1,8 +1,0 @@
-**Pixels, the native renderer never soft-wraps `wordWrap` fields** (s26 refuted "wraps per character": it has no soft wrap at all; playbook §25 "Text and glyphs", priced M–L). Categories: `from_shumway`, `visual`, `avm1`, `avm2`, `text`, `fonts`, `from_gnash`, `regression`.
-
-1. **Price the family first.** Which graded pixel rows (failing or passing) contain a `wordWrap`/`multiline` EditText whose text exceeds its width? Grep the DefineEditText flags (the recompiler's EditText emit records them) and AS `wordWrap = true`. Check the F/G device-font + FlashType rows (`hardwrap` 3099, `captions` 6528, `stylesheet` 2089, `flash_text_TextField` 966, `acid-textfield` 15754, `acid-text-4/5`) for how much of each excess is the missing wrap versus glyph/font fidelity.
-2. Locate the layout owner(s): AVM1 EditText layout (`ng_shared.c` text layout / `tag.c` EditText render / `action.c` TextField layout used for `textWidth`, `maxscroll`, `bottomScroll`; these already wrap for metrics?) and AVM2 `avm2_render_textbox`. If the trace-side metrics already wrap, the fix may be "render from the layout the metrics use". Read Ruffle's `core/src/html/layout.rs` for the Flash wrap rule (break opportunities, trailing spaces, a single over-long word, `\r`).
-3. Prototype the wrap in the render path, measured: per-row before/after, a render-canary md5 sweep, and the trace rows that read `textHeight`/`numLines`/`bottomScroll` (no trace regressions).
-4. If L, deliver the phase plan with the first phase prototyped and graded.
-
-Sibling: `w1-text-glyph-fidelity` (glyph compose rounding, DefineText matrices). Self-localize: a new static layout helper, not edits inside the glyph emit loop.

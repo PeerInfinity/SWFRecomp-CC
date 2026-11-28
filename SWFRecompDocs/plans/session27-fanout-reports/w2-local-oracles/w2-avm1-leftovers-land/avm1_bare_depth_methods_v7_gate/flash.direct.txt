@@ -1,6 +1,0 @@
-typeof gv getNextHighestDepth: undefined 
-cf getNextHighestDepth: undefined 
-cm _root.getNextHighestDepth: undefined 
-cf getInstanceAtDepth(5): undefined 
-cm _root.getInstanceAtDepth(5): undefined 
-cf getDepth: number -16384

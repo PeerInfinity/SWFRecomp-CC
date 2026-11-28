@@ -1,6 +1,0 @@
-# s27 w2b-filter-kernels-residual FLASH ORACLE PROBE (display-filter growth).
-# output.expected.png is OUR render (provisional) until the Flash capture replaces it.
-num_frames = 1
-
-[image_comparisons.output]
-tolerance = 3

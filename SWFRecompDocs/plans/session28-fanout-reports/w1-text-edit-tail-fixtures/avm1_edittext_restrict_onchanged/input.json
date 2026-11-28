@@ -1,8 +1,0 @@
-[
-  { "type": "TextInput", "codepoint": "X" },
-  { "type": "Wait" },
-  { "type": "TextInput", "codepoint": "5" },
-  { "type": "Wait" },
-  { "type": "TextInput", "codepoint": "Y" },
-  { "type": "Wait" }
-]

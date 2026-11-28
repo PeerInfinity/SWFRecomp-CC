@@ -1,4 +1,0 @@
-textColor=16711680
-span0.color=0
-newfmt.color=16711680
-tf2 span0.color=16711680

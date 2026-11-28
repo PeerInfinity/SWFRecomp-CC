@@ -1,5 +1,0 @@
-A draw(tf) = ff0000
-A draw(tf, ct) = ff00
-B draw(holder>tinted tf) = ff00
-B draw(holder>tinted shape) = ff00
-C tf.background(timeline-less) = true

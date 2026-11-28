@@ -1,9 +1,0 @@
-num_ticks = 2
-
-# s28 w1-text-edit-tail (c). Golden: FLASH request (run_image.py --ticks 2,
-# draw() AND --screen: selection painting under draw() is unmeasured).
-[image_comparisons.output]
-tolerance = 2
-
-[player_options]
-with_renderer = { optional = false }

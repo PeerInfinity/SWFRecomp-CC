@@ -1,5 +1,0 @@
-resolve(zzz) this=mc
-missing: R_zzz
-present: 7
-child: kid
-builtin: mc

@@ -1,4 +1,0 @@
-frame 1 handlers set
-frame 2 unloads=300
-frame 3 unloads=300 alive=0
-frame 3 depth 300 instance=undefined

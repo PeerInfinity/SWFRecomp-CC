@@ -1,6 +1,0 @@
-typeof(sa)=movieclip typeof(sb)=movieclip
-sa==sb: true sb==_level0: true
-typeof(ma)=movieclip typeof(mb)=movieclip
-ma._name=ma mb._name=mb
-ma.getDepth()= mb.getDepth()=
-mb=_level0.mb mb._x=120 ma._x=100

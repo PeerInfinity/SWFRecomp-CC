@@ -1,7 +1,0 @@
-init
-fillRect
-setPixel
-lock/setPixel32/unlock
-draw
-contrast=2 + filters reassigned
-copyPixels

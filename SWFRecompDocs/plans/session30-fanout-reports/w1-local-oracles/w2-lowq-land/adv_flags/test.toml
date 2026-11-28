@@ -1,8 +1,0 @@
-num_ticks = 1
-
-[image_comparisons.output]
-tolerance = 2
-max_outliers = 999999
-
-[player_options]
-with_renderer = { optional = false, quality = "low" }

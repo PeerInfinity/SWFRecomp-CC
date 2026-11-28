@@ -1,1 +1,0 @@
-tick 1: SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/fills_and_lines.win.low.png 550x400 quality=low stop=done vs SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__drawing_api__fills_and_lines__output.low.png: {'outliers': 78884, 'outlier_pixels': 36155, 'max_difference': 4}

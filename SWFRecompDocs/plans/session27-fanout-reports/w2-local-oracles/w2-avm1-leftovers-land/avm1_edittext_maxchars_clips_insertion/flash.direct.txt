@@ -1,4 +1,0 @@
-ready: ABCD caret=1
-changed #1: AXBCD caret=2
-changed #2: AXBCD caret=2
-changed #3: AXBCD caret=2

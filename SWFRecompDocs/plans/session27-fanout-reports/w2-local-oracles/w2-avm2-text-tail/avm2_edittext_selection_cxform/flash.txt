@@ -1,2 +1,0 @@
-TypeError: Error #1009: Cannot access a property or method of a null object reference.
-	at Test()

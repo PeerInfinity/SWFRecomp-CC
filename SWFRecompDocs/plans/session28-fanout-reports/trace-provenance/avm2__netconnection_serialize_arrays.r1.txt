@@ -1,3 +1,0 @@
---- Testing NetConnection Array Serialization ---
-Error #2044: Unhandled NetStatusEvent:. level=error, code=NetConnection.Call.Failed
-	at Test()

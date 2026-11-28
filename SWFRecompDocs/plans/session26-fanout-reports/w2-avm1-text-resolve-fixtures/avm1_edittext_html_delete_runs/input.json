@@ -1,4 +1,0 @@
-[
-  { "type": "TextControl", "code": "Backspace" },
-  { "type": "TextControl", "code": "Delete" }
-]

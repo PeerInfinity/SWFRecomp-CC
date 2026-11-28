@@ -1,28 +1,7 @@
-# Status Documentation
+# Moved: `SWFRecompDocs/status/`
 
-This directory contains status updates and implementation summaries for the SWFRecomp project.
+The dated status logs and slice closeouts (all 114 files: every one is a dated record of one session or slice) moved to the public history repo on 2026-11-28 (repo-cleanup slice S1):
+**<https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/status>**
 
-## Files
-
-### Project Status
-
-- **[project-status.md](project-status.md)** - Overall project status and progress tracking for SWFRecomp
-
-### Implementation Summaries
-
-- **[2025-11-01-string-variable-implementation.md](2025-11-01-string-variable-implementation.md)** - Complete implementation summary for string variable storage and optimization system
-
-## Purpose
-
-Status documents provide:
-- Current state of various project components
-- Implementation completion summaries
-- Test results and validation status
-- Performance impact analysis
-- Historical record of major milestones
-
-## Related Documentation
-
-- **[../guides/](../guides/)** - Implementation guides and how-tos
-- **[../plans/](../plans/)** - High-level project planning
-- **[../deprecated/](../deprecated/)** - Superseded documentation
+The files keep the same relative paths there. Main-repo citations read `SWFRecomp-CC-history:SWFRecompDocs/status/<file>`.
+Current state lives in [`../plans/PROJECT_STATE.md`](../plans/PROJECT_STATE.md) and [`../plans/NO_GO_REGISTER.md`](../plans/NO_GO_REGISTER.md).

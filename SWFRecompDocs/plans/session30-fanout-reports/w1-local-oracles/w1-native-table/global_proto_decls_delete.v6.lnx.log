@@ -1,2 +1,0 @@
-# NOTE: output.txt contains Flash ErrorReportingEnable lines (Warning: ...): running with --log-warnings
-# flash trace: mode=direct frames=1 rate=24.0 stop=max_duration pin=settled 550x452

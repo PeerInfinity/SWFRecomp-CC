@@ -1,3 +1,0 @@
-tick 1: SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/lowq_sample_point.high.png 240x160 quality=high stop=done vs SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-avm2-vector-flash/lowq_sample_point.high.png: {'outliers': 0, 'outlier_pixels': 0, 'max_difference': 0}
-screen: SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/lowq_sample_point.high.screen.png (window at (704, 1092)) vs draw(): {'outliers': 0, 'outlier_pixels': 0, 'max_difference': 0}
-screen vs SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-avm2-vector-flash/lowq_sample_point.high.png: {'outliers': 0, 'outlier_pixels': 0, 'max_difference': 0}

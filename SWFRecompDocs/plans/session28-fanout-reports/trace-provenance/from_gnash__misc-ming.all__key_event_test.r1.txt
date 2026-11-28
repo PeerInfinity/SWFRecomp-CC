@@ -1,5 +1,0 @@
-PASSED: object == object
-PASSED: undefined == undefined
-PASSED: undefined == undefined
-PASSED: undefined == undefined
-1. Press a single key to continue the test

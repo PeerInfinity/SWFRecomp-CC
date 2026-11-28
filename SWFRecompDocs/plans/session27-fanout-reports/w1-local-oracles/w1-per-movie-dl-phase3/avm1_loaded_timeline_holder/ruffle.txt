@@ -1,7 +1,0 @@
-c1 30
-t2 tt:movieclip tf:1
-c2 30
-t3 tt:movieclip tf:2
-c3
-t4 tt:movieclip tf:3
-t5 tt:movieclip tf:3

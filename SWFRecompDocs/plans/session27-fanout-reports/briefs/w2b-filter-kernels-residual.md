@@ -1,8 +1,0 @@
-**AVM2 filter kernels: the residual rows, gradient filters, GPU growth, and the blur disposition** (follow-up to `w2-flash-filter-kernels`, landed `cceb5133a`). Categories: `avm2`, `visual`, `regression`.
-
-Read `session27-fanout-reports/w2-flash-filter-kernels-report.md`. Held fixtures with their Flash `output.txt`: `session27-fanout-reports/w2-held-fixtures/avm2_applyfilter_glow_kernels` (16/23 lines exact) and `avm2_bitmapdata_draw_filtered` (11/13).
-1. Close the residual 1–2-level rows (inner/bevel arithmetic: rounding order, premultiply, the blur of the inverted alpha), and land both fixtures in `regression/` once they pass.
-2. **Gradient filters:** `SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-flash-filter-kernels/avm2_applyfilter_gradient_opaque_probe/flash.txt` (Flash 32 trace; 30 lines differ from the provisional output). Implement the GradientGlow/GradientBevel kernels to Flash, and land the probe as a fixture.
-3. **GPU display-filter growth:** the `PASS_SCALES` growth rule (confirmed for applyFilter) probably applies to display-object filters in `render_webgpu.c`/`tag.c` too. Measure it against Flash with a display-filter fixture (LOCAL ORACLE REQUEST, FLASH image), and against `visual/filters/blur_pass_scaling` (whose golden == applyFilter cells).
-4. **`avm2/bitmapdata_applyfilter_blur` disposition:** our render now equals Flash outside the text band (`SWFRecompDocs/plans/flash-oracle-captures/bitmapdata_applyfilter_blur/flash.png`); its Ruffle-made golden moved 39351 → 47515. Draft the ACCEPTED/RvF update with the `<!-- image-axis -->` marker (docs-only hunks in your patch).
-5. Delete the unreached `bd_glowlike_source_region` / `bd_blur_source_region` (~200 lines).

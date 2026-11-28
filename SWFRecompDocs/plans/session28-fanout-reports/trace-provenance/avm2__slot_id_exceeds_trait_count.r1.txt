@@ -1,4 +1,0 @@
-VerifyError: Error #1107: The ABC data is corrupt, attempt to read out of bounds.
-
-ReferenceError: Error #1065: Variable SlotTest is not defined.
-

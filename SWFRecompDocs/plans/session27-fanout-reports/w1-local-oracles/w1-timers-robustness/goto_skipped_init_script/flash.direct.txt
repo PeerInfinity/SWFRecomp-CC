@@ -1,5 +1,0 @@
-f1
-f1 after f3
-init2 f3
-init3 f3
-f3

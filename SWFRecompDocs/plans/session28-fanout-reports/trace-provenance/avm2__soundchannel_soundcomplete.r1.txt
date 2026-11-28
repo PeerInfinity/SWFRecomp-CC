@@ -1,8 +1,0 @@
-///var silence = new Silence();
-///var silence_channel = silence.play();
-///var ew = new EventWatcher("silence_channel", silence_channel);
-TypeError: Error #1009: Cannot access a property or method of a null object reference.
-	at EventWatcher/setup()[I:\Code\ruffle\tests\tests\swfs\avm2\soundchannel_soundcomplete\EventWatcher.as:26]
-	at EventWatcher()[I:\Code\ruffle\tests\tests\swfs\avm2\soundchannel_soundcomplete\EventWatcher.as:14]
-	at global$init()[I:\Code\ruffle\tests\tests\swfs\avm2\soundchannel_soundcomplete\Test.as:15]
-	at test_fla::MainTimeline/frame1()[test_fla.MainTimeline::frame1:3]

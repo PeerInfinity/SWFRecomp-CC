@@ -1,4 +1,0 @@
-before: c0=16711680 c1=16711680 c2=255 c3=255
-changed: text=ABC c0=16711680 c1=16711680 n=3
-  c2=255
-changed: text=BC c0=16711680 c1=255 n=2

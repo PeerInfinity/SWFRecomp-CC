@@ -1,7 +1,0 @@
-t2 tt:undefined tf:1 tx:undefined rx:10
-c1 30
-t3 tt:movieclip tf:1 tx:30 rx:10
-c2 30
-t4 tt:movieclip tf:2 tx:30 rx:10
-c3
-t5 tt:movieclip tf:3 tx:30 rx:10

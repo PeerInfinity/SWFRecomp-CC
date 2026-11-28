@@ -1,3 +1,0 @@
-This is a very simple test. Do anything you like with the buttons and you should get no failures
-PASSED: instance2 == instance2
-PASSED: square1.button.getDepth()  ==  -16383 [ButtonPropertiesTest.c:177]

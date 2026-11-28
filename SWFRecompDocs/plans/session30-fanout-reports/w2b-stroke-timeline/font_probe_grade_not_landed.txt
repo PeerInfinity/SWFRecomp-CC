@@ -1,2 +1,0 @@
-from_gnash/misc-ming.all/Video-EmbedSquareTest output: FAIL->FAIL | t5 1818->1818/0 | L1 237744->237267 (-0.20%)
-text/br_at_start output: pass->pass | t128 0->0/8 | L1 51851->51636 (-0.41%)

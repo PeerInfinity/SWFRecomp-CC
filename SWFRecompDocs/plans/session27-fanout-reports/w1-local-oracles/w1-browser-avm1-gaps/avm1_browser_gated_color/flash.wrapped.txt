@@ -1,3 +1,0 @@
-getRGB=3368601
-cm a=2 d=1 tx=10 ty=5
-ct rm=0 ro=51 go=102 bo=153

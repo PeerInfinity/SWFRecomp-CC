@@ -1,5 +1,0 @@
-  in handler: n=1 this=_level0.b this.n=undefined
-frame 1 after method call: _root.n=1 b.n=undefined
-  in handler: n=NaN this=_level0.a this.n=NaN
-frame 2 after remove: _root.n=1
-frame 3: _root.n=1

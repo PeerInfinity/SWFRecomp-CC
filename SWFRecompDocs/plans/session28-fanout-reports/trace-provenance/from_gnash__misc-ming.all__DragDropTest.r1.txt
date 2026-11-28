@@ -1,3 +1,0 @@
-[ debug-22403-05c7ba106]
-- This test is for drag&drop operations. Follow the instructions - 
-1. Click OUTSIDE of any drawing.

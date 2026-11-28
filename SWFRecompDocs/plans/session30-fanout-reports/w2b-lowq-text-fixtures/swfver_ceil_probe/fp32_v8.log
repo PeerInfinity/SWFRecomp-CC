@@ -1,2 +1,0 @@
-tick 1: /home/robert/CC/SWFRecomp-CC/SWFRecompDocs/plans/session30-fanout-reports/w2b-lowq-text-fixtures/swfver_ceil_probe/fp32_v8.lnx.low.png 480x130 quality=low stop=done
-screen: /home/robert/CC/SWFRecomp-CC/SWFRecompDocs/plans/session30-fanout-reports/w2b-lowq-text-fixtures/swfver_ceil_probe/fp32_v8.lnx.low.screen.png (window at (704, 1092)) vs draw(): {'outliers': 0, 'outlier_pixels': 0, 'max_difference': 0}

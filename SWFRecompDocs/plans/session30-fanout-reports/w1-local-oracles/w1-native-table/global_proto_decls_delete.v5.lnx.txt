@@ -1,2 +1,0 @@
-Warning: Reference to undeclared variable, '_global'
-Done

@@ -1,4 +1,0 @@
-r:movieclip s:movieclip q:movieclip tq:movieclip
-r:movieclip s:movieclip q:movieclip tq:movieclip
-r:movieclip s:movieclip q:movieclip tq:movieclip
-r:movieclip s:movieclip q:movieclip tq:movieclip

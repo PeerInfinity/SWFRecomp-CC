@@ -1,8 +1,0 @@
-**Pixel tail: static_text_offstage (c), pixelbender_dithering, acid-color-0, and the disposition records.** Categories: `visual`, `avm2`, `from_shumway`, `from_gnash`, `fonts`.
-
-1. `visual/static_text_offstage` 9600 — the AVM1 `BitmapData.draw` timeline arm, sub-mechanism (c) (read the s24/s25 pixel-text reports: grep `static_text_offstage` under `session2[345]-fanout-reports/`).
-2. `avm2/pixelbender_dithering` (1277415; CPU bitmap-fill arm).
-3. `from_shumway/acid/acid-color-0` (17312: JPEG3 alpha edges + ring + centring).
-4. Then the **disposition records** the playbook asks for so rows stop being re-diagnosed: F/G device-font + FlashType text rows (`flash_text_TextField` 966, `stylesheet` 2089, `hardwrap` 3099, `captions` 6528, `acid-textfield` 15754, `acid-text-4/5`), `visual/fonts/font_lookup_as3` (RVF entry to write), `definefont4`, `bitmapbuttons`, `place_object_test`, `blend_shader_luma_lighten` (PBJ→WGSL; the L6 CPU-PixelBender route is the live alternative — price it), `simple_shapes/strokes/scale` 19287, `shape_test` 15994, `acid-stroke-0`, `acid-shapes-testing`, `BeginBitmapFill`, `Video-EmbedSquareTest`, `stage3d_*`, `away3d_*`. For each: one-line mechanism + disposition (NO-GO with completion mechanism / GO priced / Flash-vs-Ruffle), written as a drafted entry for the playbook's image-axis dispositions (and RVF/ACCEPTED where it applies — draft the text in your report; the coordinator commits docs). **An old disposition is a claim to re-test**: re-run at least the cheapest-looking third.
-
-Prototype any GO, measured, full render-canary md5 sweep. Siblings: `w1-pixel-nearpass` (small-excess + gradient ramps), `w1-pixel-layer-colour` (layers / CM / colour), `w1-attached-button-dispatch` (`String_path_variable_button`).

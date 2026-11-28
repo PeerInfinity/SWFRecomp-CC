@@ -1,9 +1,0 @@
-tf depth=7
-gnhd=8
-after tf2: tf=undefined tf2=object
-giad7=_level0.tf2
-after m: tf2=undefined m=movieclip m.depth=7
-num name: object
-num depth=9
-tf over mc: m2=undefined tf3=object
-gnhd2=12

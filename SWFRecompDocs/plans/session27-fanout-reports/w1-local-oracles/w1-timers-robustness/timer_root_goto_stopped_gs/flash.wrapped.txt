@@ -1,3 +1,0 @@
-f1
-after cf=3
-f3 cf=3

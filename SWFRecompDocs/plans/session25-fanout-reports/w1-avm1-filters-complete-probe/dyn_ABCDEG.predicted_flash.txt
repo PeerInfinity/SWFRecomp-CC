@@ -1,7 +1,0 @@
-A 1
-B 20
-C 0
-D.n 2
-D.0.blurX 10
-D.1.matrix.n 20
-E 1

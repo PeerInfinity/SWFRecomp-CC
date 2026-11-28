@@ -1,2 +1,0 @@
-r0=true r63=true r64=true r69=true
-wc=70 o69.x=1

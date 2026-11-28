@@ -1,6 +1,0 @@
-# flash trace: mode=direct frames=6 rate=24.0 stop=TRUNCATED pin=settled 550x452
-########################################################################
-# WARNING: flashlog was STILL BEING WRITTEN at the run cap: this capture
-# may be TRUNCATED (or the test traces every frame forever). Re-run with a
-# larger --max-duration / --overrun before grading against it.
-########################################################################

@@ -1,3 +1,0 @@
-init2 f0
-init3 f0
-f1

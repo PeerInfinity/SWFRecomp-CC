@@ -1,6 +1,0 @@
-f0 true true true
-removeChild direct: s.mask=[object Shape] m1.parent=null
-removeChild ancestor: s2.mask=[object Shape]
-hidden: true
-re-add m1: s.mask=[object Shape]
-done

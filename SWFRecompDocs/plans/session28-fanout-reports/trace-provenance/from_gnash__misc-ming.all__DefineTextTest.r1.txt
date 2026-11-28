@@ -1,6 +1,0 @@
-Follow the instructions. Click means press and release
-Move the mouse onto the green O
-PASSED: mc.stext1  ==  mc [DefineTextTest.c:150]
-PASSED: typeof(mc.stext1)  ==  'movieclip' [DefineTextTest.c:151]
-PASSED: mc.stext1._target  ==  '/mc' [DefineTextTest.c:152]
-PASSED: mc._width  ==  288.05 [DefineTextTest.c:154]

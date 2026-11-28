@@ -1,7 +1,0 @@
-Event: onLoadStart
-Event: onLoadProgress
-Event: onLoadProgress
-Event: onLoadComplete
-MovieClip: 
-MovieClip: clip
-Event: onLoadInit

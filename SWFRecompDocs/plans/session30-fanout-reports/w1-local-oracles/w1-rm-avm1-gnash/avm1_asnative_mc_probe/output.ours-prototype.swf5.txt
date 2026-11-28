@@ -1,8 +1,0 @@
-A typeof cs=function
-A typeof a1=movieclip a1=_level0.a1 depth=
-B typeof a2=undefined a2=
-C typeof a3=movieclip a3=_level0.a3
-D same-as-proto=true two-calls-equal=true
-E a3.gd()=12
-F typeof a3.inner=undefined typeof _root.inner=undefined
-done

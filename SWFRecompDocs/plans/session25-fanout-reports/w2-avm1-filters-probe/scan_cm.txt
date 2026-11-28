@@ -1,8 +1,0 @@
-visual/filters/color_matrix/test.swf  [('root', [6], 'single-CM')] 1
-regression/_side_probe/test.swf AFFECTED [('sprite', ['CX', 6], 'AFFECTED'), ('sprite', ['CX', 6, 6], 'AFFECTED'), ('root', ['CX', 6], 'AFFECTED'), ('root', ['CX', 6, 6], 'AFFECTED')] 4
-regression/avm1_nested_po3_filters/test.swf  [('sprite', [6], 'single-CM'), ('root', [6], 'single-CM')] 2
-avm2/color_matrix_filter/test.swf AFFECTED [('root', [6, 6], 'AFFECTED')] 1
-avm2/filter_rewind/test.swf  [('sprite', [6], 'single-CM'), ('sprite', [6], 'single-CM'), ('sprite', [6], 'single-CM')] 3
-from_shumway/avm1/filters/test.swf  [('root', [0, 1, 2, 3, 4, 7, 6], 'single-CM')] 1
-avm1/bitmap_filters/assets.swf  [('root', [6], 'single-CM')] 1
-avm1/bitmap_filters/test.swf  [('root', [6], 'single-CM')] 1

@@ -1,2 +1,0 @@
-focus=true
-sel=1,4

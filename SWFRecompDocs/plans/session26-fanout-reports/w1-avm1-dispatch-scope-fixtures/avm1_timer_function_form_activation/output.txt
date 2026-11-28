@@ -1,3 +1,0 @@
-t1 lx=5 n=1 a0=A this=undefined
-t2 ly=5 n=1 a0=B this=undefined
-leak: lx=undefined ly=undefined

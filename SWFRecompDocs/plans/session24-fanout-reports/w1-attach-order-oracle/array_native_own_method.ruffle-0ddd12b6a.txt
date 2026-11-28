@@ -1,8 +1,0 @@
-lit typeof ch.toString before: function
-lit typeof ch.toString after: function
-lit call: 1,2
-lit len: 2
-filters typeof ch.toString before: function
-filters typeof ch.toString after: function
-filters call: [object Object]
-filters len: 1

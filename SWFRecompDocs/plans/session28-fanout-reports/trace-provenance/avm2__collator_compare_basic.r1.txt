@@ -1,6 +1,0 @@
-// Identical strings
-TypeError: Error #2007: Parameter Constructor Failed must be non-null.
-	at flash.globalization::Collator/ctor()
-	at flash.globalization::Collator()
-	at Test/testIdentity()
-	at Test()

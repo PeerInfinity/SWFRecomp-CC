@@ -1,5 +1,0 @@
-w: maxscroll=1 bottomScroll=2 textHeight=21
-c: maxscroll=1 bottomScroll=2 textHeight=21
-i: maxscroll=1 bottomScroll=3 textHeight=32
-l: maxscroll=1 bottomScroll=2 textHeight=21
-h: maxscroll=1 bottomScroll=3 textHeight=32
