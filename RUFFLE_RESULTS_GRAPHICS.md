@@ -2,17 +2,17 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `3dfab12779f5`  
-**Date:** 2026-11-28 07:02 UTC  
-**Total duration:** 12h31m19s
+**Commit:** `d81f64081ece`  
+**Date:** 2026-11-28 16:53 UTC  
+**Total duration:** 11h49m27s
 
 ## Results by Suite
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 5 | 5 | 100% | [details](ruffle-tests/tests/swfs/audio/_results/results_graphics.md) |
-| avm1 | 776 | 791 | 98.1% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics.md) |
-| avm2 | 1322 | 1353 | 97.7% | [details](ruffle-tests/tests/swfs/avm2/_results/results_graphics.md) |
+| avm1 | 777 | 794 | 97.9% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics.md) |
+| avm2 | 1322 | 1354 | 97.6% | [details](ruffle-tests/tests/swfs/avm2/_results/results_graphics.md) |
 | fonts | 8 | 9 | 88.9% | [details](ruffle-tests/tests/swfs/fonts/_results/results_graphics.md) |
 | from_avmplus | 1567 | 1574 | 99.6% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_graphics.md) |
 | from_gnash/actionscript.all | 193 | 243 | 79.4% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_graphics.md) |
@@ -30,15 +30,15 @@
 | text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_graphics.md) |
 | timeline | 16 | 17 | 94.1% | [details](ruffle-tests/tests/swfs/timeline/_results/results_graphics.md) |
 | visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results_graphics.md) |
-| **Total** | **4809** | **4969** | **96.8%** | |
+| **Total** | **4810** | **4973** | **96.7%** | |
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | audio | 24 | 24 | 100% |
-| avm1 | 127,286 | 137,880 | 92.3% |
-| avm2 | 163,183 | 164,501 | 99.2% |
+| avm1 | 127,290 | 137,887 | 92.3% |
+| avm2 | 163,201 | 164,521 | 99.2% |
 | fonts | 363 | 377 | 96.3% |
 | from_avmplus | 85,956 | 85,996 | 99.95% |
 | from_gnash/actionscript.all | 31,367 | 38,791 | 80.9% |
@@ -56,15 +56,15 @@
 | text | 979 | 979 | 100% |
 | timeline | 370 | 371 | 99.7% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **422,163** | **442,594** | **95.4%** |
+| **Total** | **422,185** | **442,621** | **95.4%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch |
 |-------|-----------------:|
 | audio | - |
-| avm1 | 9 |
-| avm2 | 5 |
+| avm1 | 11 |
+| avm2 | 6 |
 | fonts | - |
 | from_avmplus | 2 |
 | from_gnash/actionscript.all | 3 |
@@ -82,7 +82,7 @@
 | text | - |
 | timeline | - |
 | visual | - |
-| **Total** | **29** |
+| **Total** | **32** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -94,17 +94,14 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | avm1 | movieclip_hittest_shapeflag | 99% |
 | avm1 | bitmap_data_thorough/pixelDissolve | 99% |
 | avm2 | loader_load | 98% |
+| avm2 | shared_object | 90% |
 | from_gnash/misc-swfc.all | matrix_accuracy_test1 | 83% |
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| from_shumway | 1 | - | 1 | - |
+*No changes since last run.*
 
-**from_shumway — newly passing:** `as3-loader/bug1157243/empty`
-
-*Comparing `6441e7d5d749` → `3dfab12779f5`*
+*Comparing `3dfab12779f5` → `d81f64081ece`*
 
 ## Per-Suite Details
 
@@ -117,17 +114,17 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ### avm1
 
-- **Pass:** 776/791 (98.1%)
-- **Duration:** 1h12m30s across 30 shards
-- **Lines:** 127,286/137,880 matching (92.3%)
-- **Avg test duration:** 5.5s — slowest: `tab_ordering_movieclip_enabled_default` (33.7s)
+- **Pass:** 777/794 (97.9%)
+- **Duration:** 1h00m19s across 30 shards
+- **Lines:** 127,290/137,887 matching (92.3%)
+- **Avg test duration:** 4.5s — slowest: `netstream_play_flv_screen` (32.7s)
 
 ### avm2
 
-- **Pass:** 1322/1353 (97.7%)
-- **Duration:** 3h52m56s across 30 shards
-- **Lines:** 163,183/164,501 matching (99.2%)
-- **Avg test duration:** 10.3s — slowest: `away3d_advanced_shallow_water_demo` (87.8s)
+- **Pass:** 1322/1354 (97.6%)
+- **Duration:** 3h40m40s across 30 shards
+- **Lines:** 163,201/164,521 matching (99.2%)
+- **Avg test duration:** 9.7s — slowest: `away3d_advanced_shallow_water_demo` (88.5s)
 
 ### fonts
 
@@ -146,51 +143,51 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### from_gnash/actionscript.all
 
 - **Pass:** 193/243 (79.4%)
-- **Duration:** 25m59s across 30 shards
+- **Duration:** 21m22s across 30 shards
 - **Lines:** 31,367/38,791 matching (80.9%)
-- **Avg test duration:** 6.4s — slowest: `MovieClip-v8` (59.6s)
+- **Avg test duration:** 5.2s — slowest: `MovieClip-v8` (53.2s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 77/111 (69.4%)
-- **Duration:** 30m08s across 30 shards
+- **Duration:** 24m56s across 30 shards
 - **Lines:** 4,403/5,248 matching (83.9%)
-- **Avg test duration:** 16.3s — slowest: `matrix_test` (84.4s)
+- **Avg test duration:** 13.5s — slowest: `matrix_test` (88.9s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m55s across 30 shards
+- **Duration:** 2m19s across 30 shards
 - **Lines:** 215/231 matching (93.1%)
-- **Avg test duration:** 12.8s — slowest: `TextFieldTest` (21.8s)
+- **Avg test duration:** 15.5s — slowest: `TextFieldTest` (26.5s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 17/21 (81.0%)
-- **Duration:** 5m17s across 30 shards
+- **Duration:** 4m20s across 30 shards
 - **Lines:** 565/603 matching (93.7%)
-- **Avg test duration:** 15.1s — slowest: `movieclip_destruction_test1` (27.8s)
+- **Avg test duration:** 12.4s — slowest: `action_execution_order_test10` (27.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 20/20 (100%)
-- **Duration:** 6m54s across 30 shards
+- **Duration:** 6m53s across 30 shards
 - **Lines:** 95/95 matching (100%)
-- **Avg test duration:** 20.7s — slowest: `missing_bitmap` (26.3s)
+- **Avg test duration:** 20.6s — slowest: `afunc_dict` (25.9s)
 
 ### from_shumway
 
 - **Pass:** 218/229 (95.2%)
-- **Duration:** 48m14s across 30 shards
+- **Duration:** 47m07s across 30 shards
 - **Lines:** 2,414/2,484 matching (97.2%)
-- **Avg test duration:** 12.6s — slowest: `acid/acid-large` (77.8s)
+- **Avg test duration:** 12.3s — slowest: `acid/acid-large` (77.0s)
 
 ### from_shumway/avm1
 
 - **Pass:** 47/47 (100%)
 - **Duration:** 2m23s across 30 shards
 - **Lines:** 491/491 matching (100%)
-- **Avg test duration:** 3.0s — slowest: `hitarea` (20.5s)
+- **Avg test duration:** 3.0s — slowest: `label` (20.6s)
 
 ### import_assets
 
@@ -209,9 +206,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 347/347 (100%)
-- **Duration:** 1h05m07s across 30 shards
+- **Duration:** 59m13s across 30 shards
 - **Lines:** 3,770/3,770 matching (100%)
-- **Avg test duration:** 11.2s — slowest: `avm2_stroke_curve_scale_s16_w16_k0` (37.8s)
+- **Avg test duration:** 10.2s — slowest: `avm2_layer_group_alpha` (29.2s)
 
 ### stage3d
 
