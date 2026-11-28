@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-28 01:46 UTC
+**Date**: 2026-11-28 07:02 UTC
 
-**Git SHA**: `6441e7d5d7`
+**Git SHA**: `3dfab12779`
 
-**Run Duration**: 6m 37s
+**Run Duration**: 5m 25s
 
 **Filtered**: 0 tests ignored out of 17 available
 
@@ -27,22 +27,22 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 25.8s |  |
-| 2 | `frame_label_count_oom` | 1 | 19.7s |  |
-| 3 | `frame_script_cleanup` | 30 | 22.5s |  |
-| 4 | `frame_script_cleanup2` | 32 | 26.2s |  |
-| 5 | `frame_script_cleanup3` | 30 | 25.9s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 25.7s |  |
-| 7 | `frame_script_cleanup_goto2` | 34 | 10.4s |  |
-| 8 | `frame_script_construct` | 25 | 27.5s |  |
-| 9 | `missing_frame_scripts` | 22 | 34.0s |  |
-| 10 | `scene_count_oom` | 1 | 1.7s |  |
-| 11 | `swf_9_event_goto_frame_script` | 5 | 27.0s |  |
-| 12 | `swf_9_frame_script_button_order` | 15 | 27.7s |  |
-| 13 | `swf_9_frame_script_cleanup_goto` | 30 | 8.6s |  |
-| 14 | `swf_9_frame_script_cleanup_goto2` | 34 | 27.4s |  |
-| 15 | `swf_9_frame_script_dynamic_goto` | 34 | 29.6s |  |
-| 16 | `swf_9_frame_script_dynamic_goto_2` | 33 | 23.4s |  |
+| 1 | `clip_action_no_key_code` | 1 | 20.9s |  |
+| 2 | `frame_label_count_oom` | 1 | 20.4s |  |
+| 3 | `frame_script_cleanup` | 30 | 7.8s |  |
+| 4 | `frame_script_cleanup2` | 32 | 29.4s |  |
+| 5 | `frame_script_cleanup3` | 30 | 26.7s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 7.9s |  |
+| 7 | `frame_script_cleanup_goto2` | 34 | 7.9s |  |
+| 8 | `frame_script_construct` | 25 | 7.6s |  |
+| 9 | `missing_frame_scripts` | 22 | 25.2s |  |
+| 10 | `scene_count_oom` | 1 | 2.6s |  |
+| 11 | `swf_9_event_goto_frame_script` | 5 | 29.6s |  |
+| 12 | `swf_9_frame_script_button_order` | 15 | 26.9s |  |
+| 13 | `swf_9_frame_script_cleanup_goto` | 30 | 7.8s |  |
+| 14 | `swf_9_frame_script_cleanup_goto2` | 34 | 22.6s |  |
+| 15 | `swf_9_frame_script_dynamic_goto` | 34 | 29.7s |  |
+| 16 | `swf_9_frame_script_dynamic_goto_2` | 33 | 25.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,7 +50,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 33.5s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 26.0s |  |
 
 ## Near-Passing Tests
 
