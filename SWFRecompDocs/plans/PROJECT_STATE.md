@@ -138,9 +138,9 @@ native-object enumeration rows (`global_instance_decls`, `global_proto_decls_del
   - Moving the quad ends to place snapped corners. It cracked corners, and the ledger caught it (n-join-disc §3.1).
   - Removing the W ≥ 2 cap/corner residue per vertex. It comes from AA granularity (4 MSAA samples vs Flash's 16) and needs an analytic-coverage pass (n-join-disc §5, item 3).
   - "The drawing-API snap costs ~0.7 ms/frame." An in-wasm timer measured +0.11 ms (arc §29.2).
-  - Fixing the L1 trap-switch 27 px. It is a Ruffle tessellation-cache artifact, so the Flash rule was kept (`n-trap-stroke-report.md`, s26).
-  - "Coin streaks persist." They are N's authored pickup morphs; one SwiftShader screenshot made it look like a bug (`n-gold-residue-report.md`, 2026-11-22).
-  - The edge dots on ragdoll limbs. They come from Ruffle's 0.1 px curve flattening; ours draws the exact curve (`n-ragdoll-strokes-report.md`, s27).
+  - Fixing the L1 trap-switch 27 px. It is a Ruffle tessellation-cache artifact, so the Flash rule was kept (`SWFRecomp-CC-history:SWFRecompDocs/plans/n-trap-stroke-report.md`, s26).
+  - "Coin streaks persist." They are N's authored pickup morphs; one SwiftShader screenshot made it look like a bug (`SWFRecomp-CC-history:SWFRecompDocs/plans/n-gold-residue-report.md`, 2026-11-22).
+  - The edge dots on ragdoll limbs. They come from Ruffle's 0.1 px curve flattening; ours draws the exact curve (`SWFRecomp-CC-history:SWFRecompDocs/plans/n-ragdoll-strokes-report.md`, s27).
 
 ### 2. N procgen substrate: level generator, portals, JS physics
 

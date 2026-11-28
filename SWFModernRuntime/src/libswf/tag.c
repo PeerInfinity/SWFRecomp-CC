@@ -4231,7 +4231,7 @@ static const float* lowq_tsnap_slot_xform(const DisplayObject* obj,
 
 // ---------------------------------------------------------------------------
 // s27 w2-layer-alpha-group: blendMode = LAYER as a TRANSPARENCY GROUP.
-// Flash Player 32 (oracle capture flash-oracle-captures/n3_layer_alpha): a
+// Flash Player 32 (oracle capture SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/n3_layer_alpha): a
 // LAYER clip at alpha 50% holding two overlapping OPAQUE rects shows only the
 // top rect at the overlap, (128,128,255) — its children are composited
 // opaquely into the group and the alpha is applied ONCE to the group. The

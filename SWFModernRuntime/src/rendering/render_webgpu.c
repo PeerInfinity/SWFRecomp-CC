@@ -106,7 +106,7 @@ EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, d
 // s28 w2-lowq-sample-point: Flash Player's quality=LOW vector rasteriser
 // (Flash 32 captures: SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/
 // w1-avm2-vector-flash/lowq_sample_point.low.png and
-// n-stroke-snap-captures/fill_edges/flash_low.png; regression fixtures
+// SWFRecomp-CC-history:SWFRecompDocs/plans/n-stroke-snap-captures/fill_edges/flash_low.png; regression fixtures
 // lowq_sample_point_probe and lowq_fill_edges).
 // - Slanted edges cross a scanline at its TOP (sample (x + 0.5, y)), while
 //   the rows a horizontal edge covers follow the pixel-centre rule, an exact
@@ -2340,7 +2340,7 @@ static void lowq_stroke_place(double* cdx, double* cdy, double* odx, double* ody
 // s28 n-join-disc goal 2: a single no*Scale flag scales the width by the
 // SIGNED device component of v = M*(1,1) (NoVScale v.x, NoHScale v.y, y
 // down), clamped at 0 -> hairline. Flash 32, 34 cells
-// (SWFRecompDocs/plans/n-join-disc-report.md §2): diag(-1,2) NoVScale is a
+// (SWFRecomp-CC-history:SWFRecompDocs/plans/n-join-disc-report.md §2): diag(-1,2) NoVScale is a
 // hairline, not 8 px; R45*diag(1,2) (v.x = -0.71) is acid-stroke-0's
 // hairline cell. SWF_STROKE_NOSCALE_SIGNED=0 restores |v.x| / |v.y|.
 static int stroke_noscale_signed = 1;
@@ -3737,7 +3737,7 @@ static inline void stage_dyn_verts(WebGPURenderContext* ctx, u32 vert_base,
 	const void* verts, u32 vcount);
 
 // Flash Player 32's stroke rule in device pixels (s28 n-stroke-snap; pinned
-// with the Flash oracle, SWFRecompDocs/plans/n-stroke-snap-report.md):
+// with the Flash oracle, SWFRecomp-CC-history:SWFRecompDocs/plans/n-stroke-snap-report.md):
 //   u = round(4 * device width)             (width in quarter pixels)
 //   pixelHinting: SNAP, W = max(1, u / 4)
 //   else:         SNAP when u <= 4 (W = 1) or u == 8 (W = 2) or u == 12 (W = 3)
@@ -3756,7 +3756,7 @@ static inline double stroke_snap_centre(double e, int W)
 }
 
 // s28 n-join-disc: Flash's ends and corners of a SNAPPED stroke (HIGH quality;
-// pinned with the Flash oracle, SWFRecompDocs/plans/n-join-disc-report.md).
+// pinned with the Flash oracle, SWFRecomp-CC-history:SWFRecompDocs/plans/n-join-disc-report.md).
 // Flash draws each snapped axis-aligned segment as its band (perpendicular
 // axis snapped) running between its QUANTISED, unsnapped endpoints, plus:
 //  - an open end (cap): W = 1 nothing (butt); W >= 2 a disc of radius W/2 on

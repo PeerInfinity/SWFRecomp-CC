@@ -7,7 +7,7 @@ Precedent/format: `SEEDLING_AB_STATUS.md`. All rig numbers: Windows Chrome,
 real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 (`WINDOWS_PLAYWRIGHT_FROM_WSL.md`); metric `__swfPerf.cpu` gameplay p50
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
-TAS (`_rwk_tas`), TZ=NPT-5:45.
+TAS (`SWFRecomp-CC-history:ruffle-tests/_rwk_tas`), TZ=NPT-5:45.
 
 ## ★ SESSION 2026-07-20d — extend the collision intrinsic to the 2.35 titles (RWF / RWIC)
 
@@ -526,7 +526,7 @@ advance — which is precisely what levers 5 and 6 lacked.
   > different 2.35 *and are control-flow obfuscated with different per-title
   > seeds*. One substitution covers the 2.21 pair only — which is fine, because
   > that pair is exactly the two unplayable titles.
-- **The cheap oracle only validates the worthless lever.** `_rwk_tas` proves
+- **The cheap oracle only validates the worthless lever.** `SWFRecomp-CC-history:ruffle-tests/_rwk_tas` proves
   byte-identical trace + frames, but `overlapNode` invokes the collision
   callback in node-list order and those callbacks **mutate positions** — so any
   change to tree *shape* changes the frames even when correct. Pooling and an

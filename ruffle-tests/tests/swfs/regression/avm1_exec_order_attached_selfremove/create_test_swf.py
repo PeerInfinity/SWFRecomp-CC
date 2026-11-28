@@ -25,7 +25,7 @@ Variants (argv[2]):
   sibling  the full shape (tl + a + b). Still FAILS after the fix: ours runs
            every child enterFrame before any child frame script, and timeline
            sprites' scripts before attached clips'; Ruffle interleaves per clip,
-           newest first. Parked (SWFRecompDocs/plans/n-exec-order-report.md §2).
+           newest first. Parked (SWFRecomp-CC-history:SWFRecompDocs/plans/n-exec-order-report.md §2).
 
 Usage: create_test_swf.py <out.swf> [root|sibling]
 """

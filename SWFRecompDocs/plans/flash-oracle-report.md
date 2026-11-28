@@ -1,7 +1,7 @@
 # Flash Player oracle: report (one-task session, 2026-11-23)
 
 Brief: `c40b6560a` (flash-oracle one-task session). Tooling and how-to: `tools/flash-oracle/README.md`. Captures:
-`SWFRecompDocs/plans/flash-oracle-captures/` (see `PROVENANCE.md`).
+`SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/` (see `PROVENANCE.md`).
 
 ## What works
 

@@ -704,7 +704,7 @@ to pass.
 **Decision:** match Flash (user ruling 2026-09-29, Flash over Ruffle). **Prune criterion:** a Flash capture of this
 SWF (s26 local oracle request) re-grades it.
 
-**s27 Flash capture** (`SWFRecompDocs/plans/flash-oracle-captures/bitmapdata_applyfilter_blur/flash.png`, Flash Player
+**s27 Flash capture** (`SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/bitmapdata_applyfilter_blur/flash.png`, Flash Player
 32 LNX, `--screen`, quality low; screen == draw()): it confirms the grown-output blur model. The trace is
 byte-identical to `output.txt`. The capture cannot replace the golden as is, because its "Ruffle" text band renders in
 Flash's device serif, where the golden has Ruffle's default font (with_default_font has no Flash equivalent). **Updated
@@ -734,7 +734,7 @@ is NOT covered: re-triage the blur path.
 ```
 
 **Flash** (Flash Player 32 debug projector, LNX 32,0,0,465, XTest typing; 3/3 identical runs;
-`SWFRecompDocs/plans/flash-oracle-captures/avm1_edittext_html_typed_runs/output.flash.txt`) is byte-identical to the
+`SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/avm1_edittext_html_typed_runs/output.flash.txt`) is byte-identical to the
 fixture's analytic `output.txt`: a character inserted at index 0 takes the format of the run it is inserted into.
 Ruffle's `replace_text` at index 0 gives the new character the default format (`c0=0`).
 
@@ -1037,7 +1037,7 @@ and still passes. The cause is Flash's thin-stroke rule:
 - axis-aligned strokes of ≤ 1 px, 2 px or 3 px device width are drawn solid on whole pixels;
 - Ruffle centres them on the edge with AA.
 
-Rule and captures: `SWFRecompDocs/plans/n-stroke-snap-report.md` §1.
+Rule and captures: `SWFRecomp-CC-history:SWFRecompDocs/plans/n-stroke-snap-report.md` §1.
 
 **Decision:** match Flash (user ruling: Flash over Ruffle). These image comparisons fail against the Ruffle goldens.
 The trace row passes and is NOT ignored.

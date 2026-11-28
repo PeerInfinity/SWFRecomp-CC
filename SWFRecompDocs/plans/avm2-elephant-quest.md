@@ -341,7 +341,7 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   is a hash/vtable lookup (`avm2_domain_find` + `avm2_vtable_find`), not a linear
   class scan. Remaining suspects: per-door object construction / filter /
   tessellation work, or an O(doors²) link/adjacency pass in the game's own
-  (recompiled) AS3. Repro: `_eq_tas/story_drive.txt` (build +
+  (recompiled) AS3. Repro: `SWFRecomp-CC-history:ruffle-tests/_eq_tas/story_drive.txt` (build +
   `AVM2_MAX_TICKS=545`, direct binary with `stdbuf -oL` + `timeout` to watch
   `DOOR n` cadence). **Fix this and EQ becomes the first title we play that
   Ruffle cannot** (Ruffle times out at ~18 s; we must finish faster). EQ-4.
@@ -725,7 +725,7 @@ never exercised.
     full-stage intro clips), not `playB` (0 errors, no advance). The menu settles
     ~**tick 335**; a click at **tick 345** reliably picks `SimpleButton playB` →
     `clicky` → `#1010 hideLoginStatus`. Fixed drive:
-    `_eq_tas/play_then_newgame_events.txt` (preloader click tick 5, playB tick
+    `SWFRecomp-CC-history:ruffle-tests/_eq_tas/play_then_newgame_events.txt` (preloader click tick 5, playB tick
     345). New env-gated diagnostic `AVM2_MOUSE_DEBUG=1` prints the picked target
     per press/click (the pick analog of `AVM2_DUMP_TREE`).
   - **Unknown #2 (agi shell) RESOLVED — all checkpoints met.** With the shell,

@@ -1,5 +1,5 @@
 num_frames = 12
 
 # Golden: FLASH PLAYER 32 direct capture (s26 held fixture),
-# SWFRecompDocs/plans/flash-oracle-captures/avm1_loaded_bare_goto/output.flash.txt.
+# SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/avm1_loaded_bare_goto/output.flash.txt.
 # Landed s28 w2-loaded-shell-land (newest-load-first order + next-tick goto scripts).

@@ -135,7 +135,7 @@ exactly these markers plus the global `ignored_tests.txt`.
 | `visual/video/deblocking output` | Spark IDCT precision, one Cb level | 104 channels, max 4 |
 | `avm1/netstream_play_flv output` | Sorenson Spark pixel parity | 44 channels, max 3 |
 | ~~`visual/simple_shapes/masks output` + `…/masks_equal_clipdepth output`~~ | **RETIRED s22 (`w2-float-verts`): not a tie — integer-twip vertex quantization in the recompiler; both render 0 outliers with the sub-twip remainder kept (`SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/w1-stroke-staircase-report.md`).** History: **NARROWED s16** — was "1-sample rasteriser tie" for all 1738 channels; 1474 of them were our mask stencil rasterising the masker's STROKE (fixed s16). | now scoped to the **359 interior** channels measured after the fix (1738 → 359, mean 0.4927 → 0.0940; curve flattening / AA). A residual materially above ~359 is NOT covered. |
-| `avm2/bitmapdata_applyfilter_blur output` | **RE-DISPOSITIONED s26/s27 (RvF, `RUFFLE_VS_FLASH_DIFFERENCES.md` §`bitmapdata_applyfilter_blur`)**: the golden is Ruffle's own blur, cropped at the sourceRect; Flash grows the output (Flash capture `flash-oracle-captures/bitmapdata_applyfilter_blur/flash.png`). Ours == Flash outside the text bands (0 px over 1); the bands are Flash's device serif vs Ruffle's default font. (History: s16 text-band entry, RESOLVED s21 w2-noto-d1.) | ~47.5 k outliers vs the Ruffle golden, max 238 (s27 `cceb5133a`). Above that, or any ours-vs-flash.png diff over 1 outside rows 87–104 / 305–323 / 523–545 ⇒ re-triage the blur path. |
+| `avm2/bitmapdata_applyfilter_blur output` | **RE-DISPOSITIONED s26/s27 (RvF, `RUFFLE_VS_FLASH_DIFFERENCES.md` §`bitmapdata_applyfilter_blur`)**: the golden is Ruffle's own blur, cropped at the sourceRect; Flash grows the output (Flash capture `SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/bitmapdata_applyfilter_blur/flash.png`). Ours == Flash outside the text bands (0 px over 1); the bands are Flash's device serif vs Ruffle's default font. (History: s16 text-band entry, RESOLVED s21 w2-noto-d1.) | ~47.5 k outliers vs the Ruffle golden, max 238 (s27 `cceb5133a`). Above that, or any ours-vs-flash.png diff over 1 outside rows 87–104 / 305–323 / 523–545 ⇒ re-triage the blur path. |
 
 **Explicitly NOT dispositioned (do not add):**
 
@@ -1599,7 +1599,7 @@ mechanism in `image_triage.py` or the runner (S–M; design first).
   - GPU display-filter growth: NO-GO as of record;
   - w2b-group-alpha `shadow_shape_a50` residual, 768 px.
 - **N:** thin-stroke Flash pixel snapping is the N ladder's next slice (hairline fixture parked under
-  `SWFRecompDocs/plans/n-levels-5plus-hairline-fixture/`).
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/n-levels-5plus-hairline-fixture/`).
 - **Leads:**
   - `movieclip_hittest_shapeflag`: pinned Flash says `false` on 3 golden-`true` lines;
   - the `shapeflag` hit-test lead;

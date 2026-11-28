@@ -100,7 +100,7 @@ whose reason was "it costs a Ruffle-golden pass" is suspect wherever the golden 
 
 | item | scope | decision | ruled where | reopen criterion |
 |---|---|---|---|---|
-| **N procgen substrate arc** | level load/detect substrate, level generator (`n-level-generator-plan.md`, P0–P2 done), portals (`n-portals-plan.md`), JS physics (`n-physics-js-reimplementation-plan.md`) | CANCELLED: the whole arc. Existing code and docs stay in place; the N pixel-parity ladder is unaffected | Robert, 2026-11-26 | A new decision from Robert only |
+| **N procgen substrate arc** | level load/detect substrate, level generator (`SWFRecomp-CC-history:SWFRecompDocs/plans/n-level-generator-plan.md`, P0–P2 done), portals (`SWFRecomp-CC-history:SWFRecompDocs/plans/n-portals-plan.md`), JS physics (`SWFRecomp-CC-history:SWFRecompDocs/plans/n-physics-js-reimplementation-plan.md`) | CANCELLED: the whole arc. Existing code stays in place; the docs moved to the history repo (`SWFRecomp-CC-history:SWFRecompDocs/plans/n-*`, repo-cleanup S2b, 2026-11-28). The N pixel-parity ladder is unaffected (parked) | Robert, 2026-11-26 | A new decision from Robert only |
 
 ---
 

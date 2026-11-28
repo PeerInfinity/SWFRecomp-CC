@@ -39,10 +39,10 @@ descent, exact alien patrol schedules, and the key negative results (no
 direct shelf-2 right exit; platform-2 has NO safe park — alien-3's
 turnaround IS the right lip; the floor pocket at world ~310 is lethal
 t~1030-1116). All tools + plans + autopsies now git-tracked in
-`ruffle-tests/_rwk_tas/` (README = source of truth). Oracle spot-check
+`SWFRecomp-CC-history:ruffle-tests/_rwk_tas/` (README = source of truth). Oracle spot-check
 done: state-aligned park frame vs the RUFFLE_INPUT_FILE exporter, **MAD
 1.23 / 2.07% px**, player+tiles 0 diff px, all diffs = documented pacing
-artifact classes. RWK-4: finish the TAS from `_rwk_tas/README.md`'s phase
+artifact classes. RWK-4: finish the TAS from `SWFRecomp-CC-history:ruffle-tests/_rwk_tas/README.md`'s phase
 tables (re-measure alien-3's left-end turn first), then FlxSave
 persistence + collectable strings. **[Re-scoped 2026-07-18, see §3: the TAS
 is now its own optional RWK-TAS track — schedule deliberately; RWK-4 =
@@ -204,7 +204,7 @@ gets sound for free once that lands.
   `robot-wants-kitty-playbot.md` (deterministic scripted navigation of this
   exact game) — consider merging the two efforts when scheduling. State:
   descent-to-J route solved after 7 iteration plans;
-  `ruffle-tests/_rwk_tas/README.md` is the source of truth (phase tables,
+  `SWFRecomp-CC-history:ruffle-tests/_rwk_tas/README.md` is the source of truth (phase tables,
   tools, negative results); next leg = re-measure alien-3's left-end turn,
   then J → SHOOT → DBLJUMP → row-62 corridor → kitty.
 - **RWK-4 (later, optional)**: FlxSave localStorage persistence, Kong variant,

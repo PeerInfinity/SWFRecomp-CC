@@ -18,7 +18,7 @@ at (100, 60); root frame 6 traces.
 
 Golden: Ruffle exporter frame 5 (one instance per shape); the Flash Player
 oracle (tools/flash-oracle) is checked against it (see output.txt notes in
-SWFRecompDocs/plans/n-l2l4-pixel-pass-report.md).
+SWFRecomp-CC-history:SWFRecompDocs/plans/n-l2l4-pixel-pass-report.md).
 
 Regenerate:  python3 create_test_swf.py
 Golden:      WGPU_BACKEND=vulkan ~/CC/ruffle/target/release/exporter -s -f 6 test.swf out  (keep out/5.png)

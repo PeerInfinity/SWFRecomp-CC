@@ -53,7 +53,7 @@ origin/master. Pull first (`git pull --no-rebase`).
    `avm2_applyfilter_glow_kernels`, `avm2_bitmapdata_draw_filtered`, N3 `probes/n3_layer_alpha.swf`,
    `bitmapdata_applyfilter_blur`, `avm1_edittext_html_typed_runs` (trace), and the loaded-shell fixtures
    `avm1_loaded_bare_goto`, `_unload_shell`, `_shell_consumers` (trace timing). Capture them and archive the outputs
-   with provenance (player version, platform, command) under `SWFRecompDocs/plans/flash-oracle-captures/`. DO NOT edit
+   with provenance (player version, platform, command) under `SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/`. DO NOT edit
    fixtures, goldens or dispositions yourself — the **s27 fan-out coordinator (`s27-coordinator`) owns landing them**;
    message it with what you captured and where.
 

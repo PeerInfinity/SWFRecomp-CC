@@ -4,7 +4,7 @@
 //
 // Flash Player 32 rasterises EVERY stroke, timeline or runtime, by one device-
 // space rule (pinned with the Flash oracle, SWFRecompDocs/plans/
-// n-stroke-snap-report.md §1):
+// SWFRecomp-CC-history:SWFRecompDocs/plans/n-stroke-snap-report.md §1):
 //   u = round(4 * device width)              width in quarter pixels
 //   pixelHinting: SNAP, W = max(1, u / 4)
 //   else:         SNAP when u <= 4 (W = 1), u == 8 (W = 2), u == 12 (W = 3);

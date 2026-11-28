@@ -452,7 +452,7 @@ void actionAQOrderSortSince(const ActionQueueOrderMark* m)
 
 // ---------------------------------------------------------------------------
 // s30 w1-exec-order: per-clip enterFrame immediately before that clip's own
-// queued frame script (n-exec-order-report.md section 2b, reqs 1 and 3).
+// queued frame script (SWFRecomp-CC-history:SWFRecompDocs/plans/n-exec-order-report.md section 2b, reqs 1 and 3).
 // Flash (gnash misc-ming action_order/action_execution_order_test11, Flash-
 // verified) and Ruffle (avm1/runtime.rs run_frame -> movie_clip.rs
 // run_frame_avm1) walk ONE exec list, newest instantiation first: each clip's

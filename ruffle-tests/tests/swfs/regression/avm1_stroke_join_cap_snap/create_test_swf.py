@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """s28 n-join-disc: snapped-stroke caps and corners (DefineShape1, round caps/joins).
 W = 0.5/1/2/3/4 px x 4 caps + 8 corners x 16 quarter-pixel (qx, qy) offsets. Regenerates test.swf.
-Flash golden: SWFRecompDocs/plans/n-join-disc-captures/jc/flash_high.png."""
+Flash golden: SWFRecomp-CC-history:SWFRecompDocs/plans/n-join-disc-captures/jc/flash_high.png."""
 import json, struct, sys, pathlib, math
 
 def tag(code, body, force_long=False):

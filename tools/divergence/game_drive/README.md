@@ -52,6 +52,15 @@ SWFRecomp **recompiler** string-pool bug (`str_NNN undeclared`) on Tetris — so
 this harness drives the **already-built** runtimes via real input instead, which
 needs no recompile and exercises the true browser path.
 
+## Files
+
+- `tetris_compare.py`, `tetris_*_probe.py`, `tetris_ruffle.html`: the Tetris comparison above.
+- `n_drive_compare.py`, `n_click_probe.py`: N drivers (see `ruffle-tests/tests/swfs/_swfbridge/livetest/n_*`).
+- `smoke_demo.py`, `ready_probe.py`, `dbg_capture.py`, `death_verify.py`, `dj_smoke.py`: demo smoke/capture helpers.
+
+The finished-game Minesweeper and Pacman probes (`minesweeper_*`, `pacman_*`) moved to the history repo on 2026-11-28
+(repo-cleanup S2b, D8b): `SWFRecomp-CC-history:tools/divergence/game_drive/`.
+
 ## Not committed (local-only / generated)
 
 `Tetris.swf` (copyrighted game asset — staged at runtime from

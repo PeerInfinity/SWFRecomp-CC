@@ -41,7 +41,7 @@ WHAT EACH ROW DISCRIMINATES
     moves anything (a one-frame movie has no advance entry -- phase 4 bullet 3).
 
 GOLDEN: output.txt is FLASH PLAYER 32 (direct capture,
-SWFRecompDocs/plans/flash-oracle-captures/avm1_loaded_bare_goto/output.flash.txt).
+SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/avm1_loaded_bare_goto/output.flash.txt).
 Flash runs the deliveries newest load first (`e1 d1 c1`) and runs a loaded
 movie's own goto target script on the NEXT tick (`d2`, `c2` one tick late);
 landed in s28 w2-loaded-shell-land.

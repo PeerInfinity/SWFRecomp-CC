@@ -21,7 +21,7 @@ scale, so two instances within 2x of each other get a stroke width that
 depends on which drew FIRST (N: the 7.5% locked-door trigger tessellates
 char 188, the 5% trap switch reuses it -> 0.67 px strokes). Flash rasterises
 each draw at its own matrix. With >2x spacing the exporter golden is the
-Flash rule; see SWFRecompDocs/plans/n-trap-stroke-report.md.
+Flash rule; see SWFRecomp-CC-history:SWFRecompDocs/plans/n-trap-stroke-report.md.
 
 Regenerate:  python3 create_test_swf.py
 Golden:      WGPU_BACKEND=vulkan ~/CC/ruffle/target/release/exporter -s -f 3 test.swf out  (keep out/2.png)

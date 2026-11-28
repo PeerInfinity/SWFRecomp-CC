@@ -18,7 +18,7 @@ SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-pixel-layer
 (generator: mkprobes.py there, `n3(2)`).
 
 GOLDEN = Flash Player 32 (LNX 32,0,0,465) capture of that probe at quality
-HIGH (SWFRecompDocs/plans/flash-oracle-captures/n3_layer_alpha/flash.high.png;
+HIGH (SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/n3_layer_alpha/flash.high.png;
 screen == draw(), and flash.low.png is identical: no edge is fractional). The
 AVM2 twin uses the same golden: a script-free timeline renders the same under
 both VMs (the twin adds FileAttributes.ActionScript3 and a minimal DoABC, the

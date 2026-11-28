@@ -80,7 +80,8 @@ is easier to localize. Sizes (run `ls -laS ~/CC/flasharchive/*.swf` to refresh):
    image divergence per game, plus cross-cutting patterns); the raw "what's
    broken". (Note: results predating the tracer fix `6a08f06aa` are invalid for
    `_root.onEnterFrame`-driven games — see PROGRESS.md.)
-3. **`SWFRecompDocs/games/FLASHARCHIVE_BUILD_RESULTS.md`** — which games build.
+3. **`SWFRecomp-CC-history:SWFRecompDocs/games/FLASHARCHIVE_BUILD_RESULTS.md`** — which games build (a
+   2026-05 snapshot, moved to the history repo in repo-cleanup S2b; rebuild a game to check it today).
 4. **`SWFRecomp-CC-history:SWFRecompDocs/status/<date>-<game>-*.md`** — per-game investigation logs
    (Doodle Jump and Snake have extensive histories; grep `SWFRecomp-CC-history:SWFRecompDocs/status/`
    for the game name).

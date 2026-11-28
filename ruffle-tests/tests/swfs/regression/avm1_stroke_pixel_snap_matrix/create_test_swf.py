@@ -2,7 +2,7 @@
 """avm1_stroke_pixel_snap_matrix (s28 n-stroke-snap): Flash Player 32 thin-stroke
 pixel snapping across widths, pixelHinting, scale, non-uniform scale, scaleMode none,
 90/10 degree rotation and curves. Golden = Flash Player 32 oracle (tick 1).
-Generated from SWFRecompDocs/plans/n-stroke-snap-captures/{probe,sweeps}.py ("combo").
+Generated from SWFRecomp-CC-history:SWFRecompDocs/plans/n-stroke-snap-captures/{probe,sweeps}.py ("combo").
 Regenerate: python3 create_test_swf.py"""
 import json, math, pathlib, struct, sys
 HERE = pathlib.Path(__file__).resolve().parent

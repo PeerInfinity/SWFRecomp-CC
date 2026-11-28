@@ -808,7 +808,7 @@ at 30 fps) — tick-driven, not wall-clock; pacing indistinguishable at full
 frame rate.
 
 **Kitty TAS (handed to RWK-4):** 7 iteration plans this session
-(`ruffle-tests/_rwk_tas/` — now git-tracked; README.md is the source of
+(`SWFRecomp-CC-history:ruffle-tests/_rwk_tas/` — now git-tracked; README.md is the source of
 truth). Solid results: corrected physics (player max walk ~1.05 world
 px/tick = 1.6x alien speed — the RWK-2 "4x" note was wrong; falls ~15
 ticks; kill band < 20 world px), a world-coordinate map of the descent

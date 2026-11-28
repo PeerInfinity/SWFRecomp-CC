@@ -3516,7 +3516,7 @@ coordinator-run, or an upstream golden proven equivalent): `avm1_attached_clip_t
 ### 26.4 Left on the board (session 26)
 
 **Trace** (40 failing graphics rows on the intersection):
-- **N**: `n-level-complete` (`5c0a4dcdb`, `n-level-complete-report.md`) found **no runtime divergence**: level 0
+- **N**: `n-level-complete` (`5c0a4dcdb`, `SWFRecomp-CC-history:SWFRecompDocs/plans/n-level-complete-report.md`) found **no runtime divergence**: level 0
   completes, level 1 loads and plays, and death/retry works. All 1528 game ticks are byte-identical across the Ruffle
   exporter, Ruffle web, native and browser WASM. Next N line: the frame-locked native-vs-exporter pixel pass (report §4; it
   was stopped by a low-memory kill); pin the browser-only injected-clip enterFrame off-by-one (frame 27 vs 28) with a
@@ -3622,7 +3622,7 @@ Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-
 
 **Trace**
 - **N** (local ladder):
-  - `n-browser-pfx` landed `005bea42a` (record `n-browser-pfx-report.md`): browser pfx clips exact, L1 route exporter = native = browser.
+  - `n-browser-pfx` landed `005bea42a` (record `SWFRecomp-CC-history:SWFRecompDocs/plans/n-browser-pfx-report.md`): browser pfx clips exact, L1 route exporter = native = browser.
   - `n-trap-stroke` was launched at closeout (L1 trap-switch 1-px stroke coverage under a ×0.06 parent, then the exit-door panel offset). Then levels 5+.
 - **Held fixtures (oracle-gated)**:
   - Loaded-shell `avm1_loaded_bare_goto`, `_unload_shell`, `_shell_consumers`: the Feb-2026 runner disagrees on load/unload tick timing. Needs a current Ruffle runner or a re-derivation.
@@ -3744,7 +3744,7 @@ Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slot
 
 ### 28.3 Method notes (deltas vs s26)
 
-- **Flash first, Ruffle exporter second.** Put "A REAL FLASH ORACLE EXISTS" in every brief (BRIEFS_COMMON.md). Cloud workers cannot run it: the binaries never leave the machine. So the coordinator ran each captured request locally and archived the PNG + trace under `w*-local-oracles/` and `flash-oracle-captures/`, and the next wave was briefed from the verdicts. AVM1 runs in DIRECT mode (pinned), and non-LAYER blends need `--screen`. A Ruffle golden that Flash disagrees with is a priced loss, never a target.
+- **Flash first, Ruffle exporter second.** Put "A REAL FLASH ORACLE EXISTS" in every brief (BRIEFS_COMMON.md). Cloud workers cannot run it: the binaries never leave the machine. So the coordinator ran each captured request locally and archived the PNG + trace under `w*-local-oracles/` and `SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/`, and the next wave was briefed from the verdicts. AVM1 runs in DIRECT mode (pinned), and non-LAYER blends need `--screen`. A Ruffle golden that Flash disagrees with is a priced loss, never a target.
 - **The s26 rule paid off.** Interim #3 was scheduled after the local-ladder landings and ran the NG leg (timers and exec-order touched NG code). It caught all 3 regressions while 3 more slots were in flight, and a wave-3 cloud slot fixed them before the final.
 - **Browser links fail loudly now** (`-Wl,--fatal-warnings` in child_probe, `build_test.sh`, bundle, `build_wasm_avm2.sh`). The Pages dry run on every landing caught a missing `avm1_filter_kernels.c` in the bundle snapshot (`1994a761f`).
 - **Hand merges of overlapping slots** used `git merge-file` against the merge-base (the partial clone blocks `--3way`), with commits made from the index. Two were needed: `setNewTextFormat` (leftovers vs browser ungating) and loaded-shell's delivery tick vs timers' growable queue.
@@ -3754,8 +3754,8 @@ Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slot
 ### 28.4 Left on the board (session 28)
 
 **Trace**
-- **`test12` (code, S–M; the only trace row that fell in s27):** implement Flash 10+'s enterFrame on clips 4 and 5 (line 17, `0+1+2+3+1+2+4+3+1+2+5+3+…`). Flash 32 == `output.fp10.txt` (capture archived in `flash-oracle-captures/`), so no disposition is needed. Ruffle also misses it: record an RvF entry when it lands (our line 19 already beats Ruffle's).
-- **N ladder (parked; head = thin-stroke Flash pixel snapping)**: the hairline fixture is parked at `SWFRecompDocs/plans/n-levels-5plus-hairline-fixture/`. Episodes 1–2 native = exporter.
+- **`test12` (code, S–M; the only trace row that fell in s27):** implement Flash 10+'s enterFrame on clips 4 and 5 (line 17, `0+1+2+3+1+2+4+3+1+2+5+3+…`). Flash 32 == `output.fp10.txt` (capture archived in `SWFRecomp-CC-history:SWFRecompDocs/plans/flash-oracle-captures/`), so no disposition is needed. Ruffle also misses it: record an RvF entry when it lands (our line 19 already beats Ruffle's).
+- **N ladder (parked; head = thin-stroke Flash pixel snapping)**: the hairline fixture is parked at `SWFRecomp-CC-history:SWFRecompDocs/plans/n-levels-5plus-hairline-fixture/`. Episodes 1–2 native = exporter.
 - **Browser ladder (parked; head = port OFFSCREEN's inline root-goto catch-up)** (`ng_executeGotoCatchUp` / `ng_runPendingRootGoto` from timer and event callbacks; M). Its oracle is `avm1_timer_root_goto_stopped_{gs,nf}` and `avm1_goto_backward_enterframe_once` in child_probe. Then:
   - `ng_apply_pending_sprite_self_gotos` in the browser (S).
   - Route `advance_attached_clip_frames` through the CI goto path (M; re-check Doodle Jump's `attachBlocks`).

@@ -26,5 +26,5 @@ Gotchas:
   attachMovie'd clips, because `ng_update_button_states_attached` is
   browser-only (`tag.c`). A scripted click on "play game" therefore does
   nothing natively even after the fix. That is a separate gap; see
-  `SWFRecompDocs/plans/n-play-game-report.md`.
-Write-up: `SWFRecompDocs/plans/n-play-game-report.md`.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/n-play-game-report.md`.
+Write-up: `SWFRecomp-CC-history:SWFRecompDocs/plans/n-play-game-report.md`.

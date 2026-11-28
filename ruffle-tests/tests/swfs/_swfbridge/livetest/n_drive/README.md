@@ -3,7 +3,7 @@
 Injected-AS probe that plays Metanet's **N** through its real game flow with a
 fixed, game-tick-indexed input script, so the same run can be replayed on any
 player (Ruffle exporter, Ruffle web, our native build, our browser WASM) and
-compared tick by tick. Record: `SWFRecompDocs/plans/n-level-complete-report.md`.
+compared tick by tick. Record: `SWFRecomp-CC-history:SWFRecompDocs/plans/n-level-complete-report.md`.
 
 N is **not** open source: never commit `N.swf`, the injected `n_drive.swf`, or
 decompiled N source. `*.swf` is gitignored.
@@ -99,7 +99,7 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   This is how the routes were built: grow a prefix one landing at a time.
 - `routes_ep0.txt`: the replayed scripts for levels 2 (thwumps) and 4 (drone).
   Each has an enemy-death attempt followed by a completing attempt. Record:
-  `SWFRecompDocs/plans/n-levels-report.md`.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/n-levels-report.md`.
 
 ## s26 n-gold-streaks additions
 
@@ -110,7 +110,7 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   streaks" were render-side: every instance of a morph drew the last-composed
   instance's ratio. Fixed in the runtime; fixture
   `regression/avm1_morph_instances_ratio`. Record:
-  `SWFRecompDocs/plans/n-gold-streaks-report.md`.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/n-gold-streaks-report.md`.
 
 ## s26 n-browser-pfx additions
 
@@ -130,7 +130,7 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   `EMCC_CFLAGS=-DMOCK_DATE_TIME=981152406000 build_test.sh flasharchive/N_drive wasm --graphics`
   (native through verify_output/run_native.py already defines it). With it, the
   level 3 route is byte-identical exporter = browser on every NF field incl.
-  `h=`/`o=`. Record: `SWFRecompDocs/plans/n-browser-pfx-report.md`.
+  `h=`/`o=`. Record: `SWFRecomp-CC-history:SWFRecompDocs/plans/n-browser-pfx-report.md`.
 
 ## s27 n-ragdoll-strokes additions
 
@@ -144,7 +144,7 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   It did not change the result here (the bug reproduced with and without the
   knob), but keep that in mind before trusting a TRACKPLAYER run as
   side-effect-free.
-- Record: `SWFRecompDocs/plans/n-ragdoll-strokes-report.md`. The "ragdoll
+- Record: `SWFRecomp-CC-history:SWFRecompDocs/plans/n-ragdoll-strokes-report.md`. The "ragdoll
   thin strokes" at shot 1560 were the ninja's own limb bones drawn by a
   runtime bug, not the ragdoll and not a stroke-width rule.
 
@@ -160,4 +160,4 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   tick 10. One run walks a whole episode (~2.5k frames):
   `START_EPISODE=1 AUTOEXIT=true OBJHASH=true FREEZE="" build.sh "<10 attempts>"`.
 - Episodes 1 and 2: exporter = native byte-identical telemetry. Record:
-  `SWFRecompDocs/plans/n-levels-5plus-report.md`.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/n-levels-5plus-report.md`.
