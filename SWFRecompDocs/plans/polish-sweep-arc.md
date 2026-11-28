@@ -3994,8 +3994,8 @@ the s28 failure again, so a FRESH dispatch was the retry).
 
 ## 31. Session 30 (2026-11-27) — dual-axis fan-out #22, CLOUD-FIRST, FLASH OVER RUFFLE: trace 4860 → 4891 eff (4893 → 4921 rows; +26 rm→pass, +4 mm→eff by name, 0 real regressions, 1 known intermittent; 28 new rows, all pass), pixels 553 → 556 on the s29 intersection (+3 / 0, 8 new comparisons pass → 564 / 137), flash_fixes 93 → 100, 0 unexplained regressions in either mode
 
-Commits `2d40d3799..HEAD` on master: 34 non-results commits. 17 cloud slots, Opus, env "SWFRecomp fan-out": 7 wave-1
-(diagnosis; `w1-exec-order` was an implementation slot), 7 wave-2, 3 wave-2b. All delivered, none lost. 5 local one-task
+Commits `2d40d3799..HEAD` on master: 34 non-results commits. 18 cloud slots, Opus, env "SWFRecomp fan-out": 7 wave-1
+(diagnosis; `w1-exec-order` was an implementation slot), 8 wave-2, 3 wave-2b. All delivered, none lost. 5 local one-task
 sessions on the browser ladder: `browser-attach-child-early` → `browser-nested-swapdepths-remove` →
 `browser-timeline-self-goto` → `browser-clip-event-order` → `browser-pending-finalize`. The N ladder stayed PARKED
 and the N procgen arc CANCELLED (no slot touched either). Every report, patch and local Flash capture is under
@@ -4032,8 +4032,8 @@ Pages: dry runs `46061672559`, `46078822038` green; REAL deploy at closeout (§3
 ### 31.0 Closeout facts
 
 - FINAL no-graphics `46095073993` at `b8671fd2f` (= FINAL graphics code + browser-only ladder #5; results `4fb87dedb`): **= ledger**. 4759 pass + 131 rm = **4890 eff**; mode diffs = `audio/aac`, `avm2/audio_computespectrum` (pre-s30 NG) and `bug1157243/empty` (PASSES in NG: the intermittent).
-- Branch prune: all 17 `fanout/*` blob-checked against master: every report, patch, log and fixture identical; the only differing blobs are shared code/docs that landed merged with other slots (and `w2b-lowq-text`'s `tag.c` with the y half defaulted off). Nothing archived; all pruned.
-- Pages: PAGES_REAL_PENDING.
+- Branch prune: all 18 `fanout/*` blob-checked against master: every report, patch, log and fixture identical; the only differing blobs are shared code/docs that landed merged with other slots (and `w2b-lowq-text`'s `tag.c` with the y half defaulted off). Nothing archived; all pruned.
+- Pages: dry runs green; REAL deploy `46098662667` at `71a763f42` (the "Deploy to GitHub Pages" step ran, success, first try).
 - Browser ladder at closeout: `browser-pending-finalize` (#5) still running; code `b8671fd2f` landed browser-only.
 
 ### 31.1 Ledger
