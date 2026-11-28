@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-28T02:31:31.741949+00:00",
-    "old_git_sha": "b8671fd2f516d8f233cc425f72ea7f897be22f7d",
-    "new_timestamp": "2026-11-28T08:08:56.259611+00:00",
-    "new_git_sha": "3dfab12779f578444ee527167da7ee8e759fe388",
+    "old_timestamp": "2026-11-28T08:08:56.259611+00:00",
+    "old_git_sha": "3dfab12779f578444ee527167da7ee8e759fe388",
+    "new_timestamp": "2026-11-28T18:23:52.899725+00:00",
+    "new_git_sha": "494d7c7e06fdef63067684390115803bb1c0df91",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 782,
     "old_total": 791,
     "old_pass_rate": 98.1,
-    "new_pass": 776,
+    "new_pass": 777,
     "new_ruffle_matched": 6,
-    "new_effective_pass": 782,
-    "new_total": 791,
-    "new_pass_rate": 98.1,
+    "new_effective_pass": 783,
+    "new_total": 795,
+    "new_pass_rate": 97.7,
     "old_mismatched_lines": 10594,
-    "new_mismatched_lines": 10594,
+    "new_mismatched_lines": 10610,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 791,
-    "added": 0,
+    "added": 4,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "shared_object",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "shared_object_localhost_network",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "shared_object_self_ref",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "text_field_movie_clip_loader_own_listeners",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 28,
+        "expected_lines": 28,
+        "matching_lines": 15
+      }
+    }
+  ]
 }

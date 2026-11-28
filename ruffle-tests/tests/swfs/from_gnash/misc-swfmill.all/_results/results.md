@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-28 08:08 UTC
+**Date**: 2026-11-28 18:23 UTC
 
-**Git SHA**: `3dfab12779`
+**Git SHA**: `494d7c7e06`
 
-**Run Duration**: 6m 37s
+**Run Duration**: 6m 49s
 
 ## Summary
 
@@ -23,26 +23,26 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 19.6s |  |
-| 2 | `background` | 0 | 19.2s |  |
-| 3 | `dict_callframe` | 3 | 19.9s |  |
-| 4 | `dict_cross` | 3 | 18.1s |  |
-| 5 | `dict_event` | 5 | 19.1s |  |
-| 6 | `dict_override` | 2 | 18.7s |  |
-| 7 | `func_dict` | 3 | 25.0s |  |
-| 8 | `initaction_in_definesprite` | 2 | 19.0s |  |
-| 9 | `jump_after_end` | 3 | 15.4s |  |
-| 10 | `jump_to_prev_block` | 1 | 19.0s |  |
-| 11 | `missing_bitmap` | 0 | 18.6s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 18.6s |  |
-| 13 | `registers` | 36 | 25.1s |  |
-| 14 | `tags_after_last_showframe` | 1 | 19.4s |  |
-| 15 | `trace-as2/arguments` | 8 | 15.3s |  |
-| 16 | `trace-as2/root_onload` | 4 | 20.3s |  |
-| 17 | `trace-as2/shortstack` | 2 | 21.7s |  |
+| 1 | `afunc_dict` | 2 | 19.2s |  |
+| 2 | `background` | 0 | 24.3s |  |
+| 3 | `dict_callframe` | 3 | 19.6s |  |
+| 4 | `dict_cross` | 3 | 24.7s |  |
+| 5 | `dict_event` | 5 | 24.7s |  |
+| 6 | `dict_override` | 2 | 21.2s |  |
+| 7 | `func_dict` | 3 | 20.7s |  |
+| 8 | `initaction_in_definesprite` | 2 | 24.3s |  |
+| 9 | `jump_after_end` | 3 | 24.4s |  |
+| 10 | `jump_to_prev_block` | 1 | 19.2s |  |
+| 11 | `missing_bitmap` | 0 | 16.5s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 19.1s |  |
+| 13 | `registers` | 36 | 17.0s |  |
+| 14 | `tags_after_last_showframe` | 1 | 19.3s |  |
+| 15 | `trace-as2/arguments` | 8 | 20.1s |  |
+| 16 | `trace-as2/root_onload` | 4 | 20.8s |  |
+| 17 | `trace-as2/shortstack` | 2 | 19.0s |  |
 | 18 | `trace-as2/super` | 8 | 19.1s |  |
-| 19 | `trace-as2/this` | 8 | 20.1s |  |
-| 20 | `zeroframe_definesprite` | 3 | 24.9s |  |
+| 19 | `trace-as2/this` | 8 | 19.9s |  |
+| 20 | `zeroframe_definesprite` | 3 | 15.4s |  |
 
 ## Near-Passing Tests
 
