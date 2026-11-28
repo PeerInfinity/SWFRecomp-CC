@@ -695,3 +695,26 @@ Docs only. No code, CI or Pages path changed.
 **S5: docs entry point and ARCHITECTURE** (§3 S5). `README.md` links `SWFRecompDocs/README.md`, which still lists 2025
 content; S5 rewrites it and must add the ARCHITECTURE link to the README. Also open for Robert: confirm the Ruffle
 attribution above. S6 is independent; S7 must still precede the next fan-out.
+
+## 12. Ruffle attribution and first-build fixes (D12, Robert, 2026-11-28)
+
+Ruled after S4 found Ruffle ports that nobody had credited (§11).
+
+- **D12a:** Ruffle-derived code is used **under MIT** (Ruffle is MIT OR Apache-2.0). S4's README paragraph,
+  `THIRD_PARTY_NOTICES.md` row and `SWFModernRuntime/third_party/ruffle/LICENSE-MIT.txt` stand.
+- **D12b:** a **per-file attribution audit (slice A1) runs before S5**, because ARCHITECTURE describes the same code.
+- **D12c:** A1 also fixes S4's three first-build defects:
+  - the GCC `-Wstringop-overflow` false positive at `SWFRecomp/src/swf.cpp:292`;
+  - `download_tests.sh` printing its summary twice;
+  - `verify_output.py`'s missing-Dawn error not naming `DAWN_INSTALL`.
+
+**A1: Ruffle attribution audit and first-build fixes.**
+- Find every function or block ported from, or closely modelled on, Ruffle code. Don't rely only on the comments that
+  say "port": also look for Ruffle-derived tables, constants and algorithms (e.g. `git grep -i ruffle` in
+  `SWFModernRuntime/` and `SWFRecomp/src/`, then read each hit).
+- Make every ported function's comment cite its Ruffle source file path. Add a commit ref where one is known.
+- Add an attribution table, file → Ruffle source, to `THIRD_PARTY_NOTICES.md` or to
+  `SWFModernRuntime/third_party/ruffle/README.md`.
+- Comments and docs only for the attribution. The three D12c fixes are minimal code changes.
+- **Done:** every ported function names its Ruffle source, and the table exists. The three D12c fixes are landed. A
+  per-change graphics CI run passes with no pass→fail. Closeout as §12 "A1 closeout". Next slice line: S5.
