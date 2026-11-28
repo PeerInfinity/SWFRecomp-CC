@@ -1,15 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6441e7d5d749` (2026-11-28T01:46:36.843660+00:00)
-**Current:** `3dfab12779f5` (2026-11-28T07:02:09.769304+00:00)
+**Previous:** `3dfab12779f5` (2026-11-28T07:02:09.769304+00:00)
+**Current:** `d81f64081ece` (2026-11-28T16:53:00.910704+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 776 | 776 | 0 |
-| Total | 791 | 791 | 0 |
-| Pass rate | 98.1% | 98.1% | 0% |
-| Mismatched lines | 10594 | 10594 | 0 |
+| Passing | 776 | 777 | +1 |
+| Total | 791 | 794 | +3 |
+| Pass rate | 98.1% | 97.9% | -0.2% |
+| Mismatched lines | 10594 | 10597 | +3 |
 
-No changes detected.
+## Added Tests (3)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `shared_object` | output_mismatch | 3/4 |
+| `shared_object_localhost_network` | output_mismatch | 0/2 |
+| `shared_object_self_ref` | pass | 1/1 |
