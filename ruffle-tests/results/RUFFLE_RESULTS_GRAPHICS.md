@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `d387fcee5b88`  
-**Date:** 2026-11-28 17:54 UTC  
-**Total duration:** 12h09m30s
+**Commit:** `ab18c4dff1c6`  
+**Date:** 2026-11-28 19:48 UTC  
+**Total duration:** 14h23m40s
 
 ## Results by Suite
 
@@ -101,7 +101,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `d81f64081ece` → `d387fcee5b88`*
+*Comparing `d387fcee5b88` → `ab18c4dff1c6`*
 
 ## Per-Suite Details
 
@@ -115,16 +115,16 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### avm1
 
 - **Pass:** 777/795 (97.7%)
-- **Duration:** 1h03m28s across 30 shards
+- **Duration:** 1h34m15s across 30 shards
 - **Lines:** 127,305/137,915 matching (92.3%)
-- **Avg test duration:** 4.8s — slowest: `mouse_hover_events_while_dragging` (34.0s)
+- **Avg test duration:** 7.1s — slowest: `define_function2_preload` (42.4s)
 
 ### avm2
 
 - **Pass:** 1322/1354 (97.6%)
-- **Duration:** 3h51m02s across 30 shards
+- **Duration:** 4h41m04s across 30 shards
 - **Lines:** 163,201/164,521 matching (99.2%)
-- **Avg test duration:** 10.2s — slowest: `away3d_advanced_shallow_water_demo` (120.3s)
+- **Avg test duration:** 12.4s — slowest: `away3d_advanced_shallow_water_demo` (118.1s)
 
 ### fonts
 
@@ -143,51 +143,51 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### from_gnash/actionscript.all
 
 - **Pass:** 193/243 (79.4%)
-- **Duration:** 21m56s across 30 shards
+- **Duration:** 34m18s across 30 shards
 - **Lines:** 31,367/38,791 matching (80.9%)
-- **Avg test duration:** 5.4s — slowest: `MovieClip-v8` (55.0s)
+- **Avg test duration:** 8.4s — slowest: `MovieClip-v8` (72.7s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 77/111 (69.4%)
-- **Duration:** 26m06s across 30 shards
+- **Duration:** 37m39s across 30 shards
 - **Lines:** 4,403/5,248 matching (83.9%)
-- **Avg test duration:** 14.1s — slowest: `matrix_test` (89.3s)
+- **Avg test duration:** 20.3s — slowest: `matrix_test` (82.5s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m17s across 30 shards
+- **Duration:** 2m29s across 30 shards
 - **Lines:** 215/231 matching (93.1%)
-- **Avg test duration:** 15.3s — slowest: `exception` (27.4s)
+- **Avg test duration:** 16.6s — slowest: `exception` (27.9s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 17/21 (81.0%)
-- **Duration:** 4m41s across 30 shards
+- **Duration:** 6m17s across 30 shards
 - **Lines:** 565/603 matching (93.7%)
-- **Avg test duration:** 13.4s — slowest: `action_execution_order_test12` (27.0s)
+- **Avg test duration:** 18.0s — slowest: `action_execution_order_test12` (27.9s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 20/20 (100%)
-- **Duration:** 7m21s across 30 shards
+- **Duration:** 7m20s across 30 shards
 - **Lines:** 95/95 matching (100%)
-- **Avg test duration:** 22.1s — slowest: `dict_callframe` (26.6s)
+- **Avg test duration:** 22.0s — slowest: `dict_callframe` (27.0s)
 
 ### from_shumway
 
 - **Pass:** 218/229 (95.2%)
-- **Duration:** 48m45s across 30 shards
+- **Duration:** 57m23s across 30 shards
 - **Lines:** 2,414/2,484 matching (97.2%)
-- **Avg test duration:** 12.7s — slowest: `esc` (87.9s)
+- **Avg test duration:** 15.0s — slowest: `esc` (82.1s)
 
 ### from_shumway/avm1
 
 - **Pass:** 47/47 (100%)
-- **Duration:** 2m24s across 30 shards
+- **Duration:** 3m21s across 30 shards
 - **Lines:** 491/491 matching (100%)
-- **Avg test duration:** 3.1s — slowest: `label` (20.3s)
+- **Avg test duration:** 4.2s — slowest: `label` (25.9s)
 
 ### import_assets
 
@@ -206,9 +206,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 347/347 (100%)
-- **Duration:** 1h01m35s across 30 shards
+- **Duration:** 1h19m37s across 30 shards
 - **Lines:** 3,770/3,770 matching (100%)
-- **Avg test duration:** 10.6s — slowest: `avm1_attached_clip_selfgoto_trace` (27.4s)
+- **Avg test duration:** 13.7s — slowest: `avm2_applyfilter_bevel_sample` (49.6s)
 
 ### stage3d
 
