@@ -1,0 +1,7 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session N (dual-axis #K), slot `SLUG`, wave 1 (DIAGNOSIS, measured prototypes welcome). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/SLUG` of PeerInfinity/SWFRecomp-CC (and ONLY that branch; never master, never force-push). Your report on that branch is your only deliverable.
+
+The session's briefs and every earlier session's reports live in the public history repo, not in SWFRecomp-CC. FIRST: `git clone --depth 1 https://github.com/PeerInfinity/SWFRecomp-CC-history /root/history` (re-clone or `git -C /root/history pull` if the coordinator says it pushed an update), then read `/root/history/SWFRecompDocs/plans/sessionN-fanout-reports/BRIEFS_COMMON.md` and follow its Setup, Standing rules and Delivery sections exactly. A citation `SWFRecomp-CC-history:<path>` means `/root/history/<path>`. Your branch is `fanout/SLUG` in SWFRecomp-CC; write your report there at `SWFRecompDocs/plans/sessionN-fanout-reports/SLUG-report.md` (plus an optional `SLUG-prototype.patch`); the coordinator archives it to the history repo. Also read `CLAUDE.md`.
+
+---- YOUR TASK ----
