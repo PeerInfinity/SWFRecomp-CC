@@ -415,3 +415,95 @@ The 13 dumps in `tools/divergence/perf` (19.5 MB): 5 `seedling_profile_*.json`, 
 
 **S3: root declutter and dead files** (§3 S3; run it only while the tree is quiet; it needs a full CI run). S6 is
 independent. S7 (SWF review with Robert) still has to precede the next fan-out.
+
+## 9. S3 closeout (2026-11-28, session `cleanup-s3-root-declutter`)
+
+**Done.** Main repo `7393244a4` (moves, deletes, CI publish path, citations) and `d387fcee5` (recovery citations for
+the deleted files), plus this closeout. History repo import `2d2f63f`. The tree was quiet: no commits after
+`825773464`; the busy peers were the launcher and non-SWFRecomp sessions. The GitHub root is now `.claude`, `.github`,
+`.gitignore`, `CLAUDE.md`, `LICENSE`, `README.md`, `THIRD_PARTY_NOTICES.md` and the real directories (`SWFModernRuntime`,
+`SWFRecomp`, `SWFRecompDocs`, `demos`, `docs`, `docs2`, `ruffle-tests`, `scripts`, `tools`).
+
+### Result tables moved to `ruffle-tests/results/`
+
+- `RUFFLE_RESULTS{,_FILTERED,_GRAPHICS,_GRAPHICS_FILTERED}.md` and `RUFFLE_COMPARISON{,_FILTERED}.md` were `git mv`'d
+  there. `generate_results_index.py` and `generate_ruffle_comparison.py` write there; links are now relative to that
+  dir (`../ignored_tests.txt`, `../tests/swfs/<suite>/_results/…`). `publish_results.sh` stages the new path, and the
+  upload-artifact path in `ruffle-tests.yml` changed. `weekly-no-graphics.yml` calls `ruffle-tests.yml`, so it needed
+  no edit. New `ruffle-tests/results/README.md`. The pipeline handoff's merge step now says root `RUFFLE_*.md` must not
+  come back.
+- **The merge flow (a brief delta for §3 S3 and §4).** The first design (master deletes the root copies and CI writes
+  the new path) **conflicted**. It was replayed in a scratch worktree with a sed'd `publish_results.sh` (fetch and
+  push stubbed) and a plain `git merge`. Git's rename detection reads the branch's "delete root + add new path" as a
+  rename (71–75 % similar), so the merge hit rename/delete. `git merge -X no-renames` (ort, git 2.43) did not avoid
+  it; only `-s recursive -X no-renames` did. The landed design needs no special merge:
+  - master makes a pure rename (content unchanged);
+  - `publish_results.sh` `git rm`s the four CI-generated root copies on the branch, so the branch's first publish is
+    the same rename;
+  - `RUFFLE_COMPARISON*` are deliberately left alone on the branch. CI never regenerates them, and deleting them there
+    made master's rename of them a rename/delete conflict. The branch keeps two stale, untouched root copies, which is
+    harmless: they never change, so a merge never brings them back.
+  Two rounds of publish → plain merge in the replay were clean, with 0 root `RUFFLE_*` files. Residual risk: a publish
+  from a run dispatched at a pre-S3 ref would re-add root copies, and a plain merge would bring them back silently.
+  The handoff's post-merge check covers it, and the next current-layout publish deletes them from the branch.
+- `RUFFLE_COMPARISON*.md` is a 2026-05-09 snapshot, run by hand, and the README says so. It was moved, not
+  regenerated: regenerating it needs a synced local corpus with the Ruffle `output.ruffle.txt` sidecars.
+
+### Deleted (git history keeps them; recover with `git checkout 7393244a4^ -- <path>`)
+
+| Path | Grep result |
+|---|---|
+| `md-files.json`, `repository-data.json`, `CC/` (2025 prompt scripts + `CC/docs`) | Only read by `CC/scripts` |
+| `local_swf_batch/{README.md,.gitkeep}` | **Live dir, tracked files dead.** It is `build_swf_batch.sh`'s default input (also in `guides/building-docs2-demos.md`). The directory stays as an untracked local working dir: `.gitignore` now ignores all of `/local_swf_batch/`, and the README's two facts moved into the script header. Robert's local `Snake.swf` there is untouched. |
+| `SWFModernRuntime/test_*.c` (5), `Makefile.test*` (4) | Only the component README (rewritten) |
+| `SWFRecomp/tests-wip/` (8) | none |
+| `docs/examples.staging/` (5, D8k) | none. Pages redeployed: see CI. |
+| `.github/workflows/test.yml` **and `all-tests.yml`** | `all-tests.yml` was `test.yml`'s only caller (no runs since 2026-02). Without `test.yml` it cannot run, so it went too. The `ruffle-tests.yml` comment that names it was updated. |
+| root `opcode-index{.json,.md,-plain.md}`, `feature-index{,-plain}.md`, `scripts/{build_opcode_index,generate_opcode_markdown,test-and-document}.py` | Only `test.yml`, `CC/`, and the `guides/adding-graphics-tests.md` steps (rewritten as "retired"). **Kept:** `docs/opcode-index.json`, because `docs/index.html` and `docs2/index.html` fetch it. It is now a frozen 2026-03 snapshot. The copy step in `generate_examples_index.sh` is left in place (it no-ops) with a comment. |
+| `demo-list.md` + `scripts/generate_demo_list.py` | Nothing read it. It duplicated the Pages catalog, so it was deleted rather than regenerated. |
+| `SWFRecompDocs/docs/` (144 files, 2.8 MB of 2025 example WASM builds) | **Not in the brief.** Dead build output, superseded by the root `docs/` Pages site. Deleted rather than moved (the D8f precedent: no build output in the history repo). `reference/wasm-build-process.md`'s commands now target `../docs/examples`. |
+
+### Moved to the history repo (11 files, `git ls-files -s` identical + `cmp` before the `git rm`)
+
+`SWFRecompDocs/{opcode-categorization,opcode-instance-prompt-template,parallel-opcode-experiments,parallel-opcode-implementation-guide,parallel-opcode-implementation-guide-v1,complete-implementation-guide,failing-test-fix-guide}.md`
+are the 2025 opcode-campaign guides and prompts. `planning/` (2 files) holds the app_context plan, marked OBSOLETE since
+2025-12-20. `ruffle-probing-trace-log.md` + `probing-trace-log.patch` are superseded by
+`reference/ruffle-local-patches{.md,.patch}`, which vendors that patch. These were copied with `git ls-files | tar`, not
+`cp -r`. Citations were rewritten in 7 `SWFRecomp/tests/*/README|STATUS` files, `reference/ruffle-local-patches.md` and
+the merge plan. No stubs: these are single files, and none is cited by a live doc, brief or memory.
+
+**Kept at the `SWFRecompDocs/` root:** `README.md` (S5 rewrites it; its one link to the deleted `docs/` was fixed),
+`BACKLOG.md` (live: entries from 2026-09, cited by the playbooks), and `scripts/` (`check_style.py` for upstream merges,
+the markdown fixer; tooling, not a one-off).
+
+### Workflows kept
+
+`deploy-pages-build.yml` ("Deploy GitHub Pages (with SWF build)") stays. It is maintained (runner pin 2026-11-21,
+bundle smoke 2026-09-02), and `plans/graphics-image-baseline.md` documents it as a dispatch target. It has no runs since
+2026-04 only because `deploy-pages.yml` is the default.
+
+### Memories
+
+`graphics_native_workflow`, `corpus-denominator-double-counts-nested` and `ci-results-branch-checkout-clobbers-unbacked-stems`
+now name the new path. The last one also gained the path-move trap. `repo-cleanup-for-ruffle-team` and its MEMORY.md line
+were updated. No memory cited a moved or deleted doc.
+
+### CI
+
+| Run | Mode | SHA | Result | Merge | Status moves (`corpus_status_diff.py`, read fresh off the merged JSONs) |
+|---|---|---|---|---|---|
+| `46170120039` | graphics, `all` | `d387fcee5` | green, published `63ccc2516` | plain merge clean, 0 root `RUFFLE_*` | **0** on 4,926 rows (4,763 pass + 131 rm + 32 mm), so no pass→fail |
+| `46173190962` | no-graphics, `all` | `494d7c7e0` | green, published `cb2c3a814` | plain merge clean, 0 root `RUFFLE_*` | **0** on 4,922 rows (4,760 + 131 + 31) |
+
+- The no-graphics leg was dispatched because `weekly-no-graphics.yml` publishes through the same `publish_results.sh`.
+- Every link in the four published tables resolves from `ruffle-tests/results/`.
+- After both publishes the branch tracks only the two stale `RUFFLE_COMPARISON*` root copies, as designed.
+- Pages: `deploy-pages.yml` run `46170122511`. The Deploy step ran (success). `examples.staging/` now returns 404, and
+  `opcode-index.json` is still served.
+
+### Next slice
+
+**S4: README and GETTING_STARTED** (§3 S4; it needs a fresh-clone cloud check). The S4 README should link
+`ruffle-tests/results/RUFFLE_RESULTS_GRAPHICS.md` for headline numbers. S5 owns the `SWFRecompDocs/README.md` rewrite
+(it still lists 2025 content). S6 is independent. S7 (SWF review) must still precede the next fan-out, and
+`tools/coord/COORDINATOR_BRIEF_TEMPLATE.md:80` is untouched.
