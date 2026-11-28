@@ -670,6 +670,52 @@ with Archipelago-CC `origin/main` `c0cf42327d` checked for the gates.
 - **Done:** both commits are pushed, both gates are green read-only, the swfrecomp-browser live link resolves, and
   the Archipelago-CC note is delivered. Closeout as §10 "R4 closeout".
 
+### R4 closeout (2026-11-28, session `cleanup-r4-sibling-docs-edits`)
+
+**Done.** Two docs-only commits, both pushed forward-only. No other file in either sibling repo was touched.
+
+- **swfrecomp-browser `main` `6c5b422` → `16a80c7`** (D11c1): `README.md` plus three new files under `licenses/`.
+  - A live-page line near the top: `https://peerinfinity.github.io/swfrecomp-browser/recompiler/` (this release) and
+    SWFRecomp-CC's copy `https://peerinfinity.github.io/SWFRecomp-CC/recompiler/`, noted as built from `master` at
+    deploy time and so possibly newer. Both return HTTP 200.
+  - The licence sentence now says that `THIRD_PARTY_NOTICES.md` at `344c85a16` missed the Ruffle-family code the build
+    commit already contains, and that SWFRecomp-CC credited it later on `master`. It links that file and
+    `third_party/ruffle/README.md`. The jxrlib clause is kept.
+  - Three rows, each checked against release 3's tree before adding:
+    - **Ruffle**: `SWFRecomp.wasm`, hosts, `bundle/`. 86 bundle/host sources mention Ruffle, and the
+      `SWFRecomp/src` rows (verifier, `swf.cpp` shape model) exist at `344c85a16`.
+    - **h263-rs**: hosts, `bundle/`. `bundle/runtime/src/actionmodern/video_codec.c` carries the deblock port, and
+      both host `.wasm` files carry `video_codec` symbols.
+    - **rust-flash-lso**: AVM2 host, `bundle/`. `bundle/runtime/src/avm2/avm2_amf.c` is present, and
+      `avm2_amf0_*`/`avm2_amf3_*` symbols are in `graphics_host_avm2.wasm` only.
+  - `licenses/ruffle-MIT.txt`, `h263-rs-MIT.txt` and `rust-flash-lso-MIT.txt` are byte copies of
+    `SWFModernRuntime/third_party/ruffle/LICENSE-MIT*.txt`.
+  - **Flag (stale inventory):** `release.json` was left untouched as the brief and D11c1 say. Its `files[]` list therefore
+    still holds the old README md5/sha256 and omits the three new licence files. The precedent `6c5b422` re-ran
+    `make_release.py` for its README edit, which rewrote only that inventory and `totalBytes`. Nothing reads these rows:
+    Archipelago-CC pins `source.commit`, and `make_release.py` checks only `build.files`. A page-only
+    `make_release.py` run would refresh them, so either R2 does it, or Robert can rule a one-line follow-up.
+- **seedling-wasm `main` `ecc5eaf` → `e9d8769`** (D11c2): one paragraph appended to `README.md` §Licence, outside the
+  generated region, with no new file. The game is Unlicense, but each `.wasm` also contains SWFModernRuntime (MIT,
+  including Ruffle-ported code used under MIT) and third-party pieces. It links SWFRecomp-CC `master`'s `LICENSE`,
+  `THIRD_PARTY_NOTICES.md` and `SWFModernRuntime/third_party/ruffle/`. All three exist on `master` (checked with
+  `gh api`).
+- **Gates, read-only, before the push:** a `git clone --shared` of Archipelago-CC `origin/main` **`b4f4093`** in the
+  scratchpad, with `frontend/modules/flashPanel/wasm` holding `e9d8769`. `seedling-wasm-readme.mjs --check` reported
+  OK, and `check-seedling-wasm-pins.mjs` reported **ALL PASS — 4 pinned builds, four views in agreement**. Nothing
+  was written to `~/CC/Archipelago-CC` beyond `git fetch`.
+- **Archipelago-CC note.** Its `origin/main` `b4f4093` still pins seedling-wasm at `a335206` (not yet bumped to `ecc5eaf`)
+  and swfrecomp-browser at `6c5b422`.
+  - **The pending seedling-wasm bump target moved from `ecc5eaf` to `e9d8769`.** One bump `a335206→e9d8769` covers
+    R1's rebuild and this README paragraph. The `e9d8769` diff is prose outside the generated region, and
+    `builds.json` and every build are unchanged. The full tier is owed anyway for R1's demo md5 move, as §10 R1
+    says. Per the liaison's 2026-11-28 reply, Archipelago bumps once, to R4's head: js-24 does it after its p4h
+    restore fix and P2. The head `e9d8769` goes to `user-decisions-liaison-7`, which forwards it. This session
+    handed that send to the launching session, `repo-cleanup-discussion`.
+  - swfrecomp-browser `16a80c7` is docs only (README + `licenses/`), with `source.commit` unchanged. Bumping it is
+    optional and costs nothing against the pin.
+- **Next:** R2 still waits for p4h to become the default. On the main track, S5 is next.
+
 ## 11. S4 closeout (2026-11-28, session `cleanup-s4-readme-getting-started`)
 
 **Done.** Main repo `beb2daeee` (README, GETTING_STARTED draft, Ruffle attribution), `d62ed2bd0` (fixes from the
