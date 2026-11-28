@@ -10,7 +10,7 @@ The idea comes from [N64Recomp](https://github.com/N64Recomp/N64Recomp) by Wiseg
 [Relationships](#relationships) below).
 
 **New here?** [`GETTING_STARTED.md`](GETTING_STARTED.md) builds the recompiler and runtime and runs one Ruffle test,
-in about ten minutes on a stock Ubuntu 24.04 machine.
+in about five minutes on a stock Ubuntu 24.04 machine.
 
 ## The goal: match Flash Player 32
 

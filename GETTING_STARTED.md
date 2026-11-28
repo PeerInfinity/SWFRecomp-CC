@@ -4,7 +4,8 @@ This page takes a fresh machine to one passing AVM1 test and one passing AVM2 te
 about five minutes. See the end of this page for when it was last checked end to end on a fresh clone.
 
 Everything here is for **Linux x86_64**; the commands are for **Ubuntu 24.04**, which is what CI runs. Other
-distributions work if they have the same tools. On Windows, use WSL2.
+distributions work if they have the same tools. On Windows, use WSL2. If you are root without `sudo` (a container,
+for example), drop `sudo` from every command.
 
 ## 1. Prerequisites
 
@@ -13,14 +14,12 @@ sudo apt-get update
 sudo apt-get install -y build-essential cmake git ca-certificates python3 zlib1g-dev ccache
 ```
 
-(Drop `sudo` if you are root and it is not installed.)
-
 - `gcc`/`g++` 13 or newer, CMake 3.28 or newer, Python 3.10 or newer. The test harness uses only the Python standard
   library. `zlib1g-dev` is needed because the runtime links the system zlib (the recompiler bundles its own).
 - `ccache` is optional, but it makes the second and later test runs much faster: every test compiles the runtime
   sources, and ccache caches them.
-- Disk: about 350 MB for this page (a shallow clone, the build, and the avm1 + avm2 tests); a few GB if you download
-  every suite and run many tests.
+- Disk: about 350 MB for this page (a shallow clone, the build, and the avm1 + avm2 tests), plus about 1 GB of apt
+  packages on a bare system; a few GB more if you download every suite and run many tests.
 
 ## 2. Clone
 
@@ -84,19 +83,24 @@ python3 ruffle-tests/verify_output.py --test=add --diff --verbose
 python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/avm2 --test=hello_world --diff --verbose
 ```
 
-Each should print:
+Each should print (the bracket holds the recompile, compile and run times):
 
 ```
-[1/1] add... PASS
-...
+[1/1] add... PASS [r=0.01s c=44.89s x=0.01s]
+
+============================================================
 Total tests:     1
 Pass:            1 (100.0%)
 Fail:            0
+
+Failure breakdown:
 ```
+
+The empty `Failure breakdown:` is normal for a passing run.
 
 The first AVM1 test takes about 40 seconds on 4 cores and the first AVM2 test about a minute, because the runtime
 sources are compiled for the first time (AVM2 compiles a different set). With ccache, repeat runs of a test take
-under a second.
+about a second.
 
 - Any test directory works the same way: `--tests-dir=ruffle-tests/tests/swfs/<suite>` plus `--test=<directory name>`.
   Nested suites are directories too, for example `--tests-dir=ruffle-tests/tests/swfs/from_gnash/actionscript.all`.
@@ -147,10 +151,12 @@ in. Trace results are the same as no-graphics apart from a few audio rows.
    python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/avm2 --test=hello_world --mode=graphics --diff --verbose
    ```
 
-   The first graphics run compiles the renderer too, about 45 seconds.
+   The first graphics run compiles the renderer too, about 50 seconds.
 
-To compare rendered frames with the tests' expected PNGs as well, install Pillow (`sudo apt-get install -y python3-pil`;
-plain `pip install` is refused by Ubuntu's system Python) and add `--images`. Image comparisons are reported separately and never decide a test's pass or fail. More detail:
+To compare rendered frames with the tests' expected PNGs as well, install Pillow (`sudo apt-get install -y
+python3-pil`; plain `pip install` is refused by Ubuntu's system Python) and add `--images` on a test that has an
+`output.expected.png` (`add` and `hello_world` have none). Image comparisons are reported separately and never decide
+a test's pass or fail. More detail:
 [`HEADLESS_SETUP.md`](ruffle-tests/tests/swfs/_investigation/HEADLESS_SETUP.md).
 
 ## 7. Where the results and CI are
@@ -179,4 +185,16 @@ plain `pip install` is refused by Ubuntu's system Python) and add `--images`. Im
 
 ## Last fresh-clone check
 
-Not yet checked (first draft, 2026-11-28).
+2026-11-28, guide at `d62ed2bd0`, by three Claude Code cloud sessions that followed it word for word from a fresh
+`git clone --depth 1`:
+
+| Where | No-graphics `add` / `hello_world` | Graphics `add` / `hello_world` |
+|---|---|---|
+| Bare `ubuntu:24.04` Docker image (92 packages at start; Dawn downloaded per section 6) | PASS / PASS | PASS / PASS |
+| Cloud Ubuntu 24.04 image, default environment (guide at `beb2daeee`) | PASS / PASS | not run |
+| Cloud Ubuntu 24.04 image with Dawn preinstalled (guide at `beb2daeee`) | PASS / PASS | PASS / PASS |
+
+The first two image checks found the missing `zlib1g-dev` (their images already had it) and the wording fixes since
+`beb2daeee`; the bare run needed no workaround. Their reports are in the
+[history repo](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/plans/repo-cleanup-s4-checks).
+Re-run the check whenever the build or the prerequisites change.

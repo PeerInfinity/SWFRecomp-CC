@@ -621,3 +621,77 @@ The other three builds are untouched.
 
   The swfrecomp-browser pin is unaffected: it pins the default build's recompiler, and that is still p4g on `344c85a`.
 - **Next:** R3 (the docs discussion) is unblocked. R2 still waits for p4h to become the default.
+
+## 11. S4 closeout (2026-11-28, session `cleanup-s4-readme-getting-started`)
+
+**Done.** Main repo `beb2daeee` (README, GETTING_STARTED draft, Ruffle attribution), `d62ed2bd0` (fixes from the
+first two checks, component READMEs) and the closeout commit (bare-image fixes, check record, this section). History
+repo `882fdf0` holds the three check reports at
+`SWFRecomp-CC-history:SWFRecompDocs/plans/repo-cleanup-s4-checks/`.
+
+### What changed
+
+- **`README.md` rewritten:** what the project is (no broken-links apology); the FP32 goal with Ruffle's corpus as the
+  instrument and `tools/flash-oracle/` as the oracle; dated headline results; live demos (gallery, in-browser
+  recompiler, Seedling play page, swfrecomp-browser); a code map; the Ruffle and upstream-SWFRecomp relationships;
+  the D4 note (`CLAUDE.md` is the agent manual; the session record is in the history repo).
+- **Headline numbers, read fresh** (`corpus_status_diff.py 63ccc2516 WORKTREE`, 0 moves): 4,927 graded rows, 4,763
+  pass, 131 rm, 33 failing. The published tables mix two runs, and the README says so: the five classic suites come
+  from `46170120039` (`d387fcee5`), and from_avmplus + misc from the 2026-11-28 `full` run `46111106971`
+  (`3dfab1277`). Only cleanup commits lie between them. Pixels: 564/701 (s30 `images=true`, 2026-11-27), from
+  `PROJECT_STATE.md`.
+- **`GETTING_STARTED.md` (new):** prerequisites, the recompiler build, `download_tests.sh avm1 avm2`, AVM1 `add` and
+  AVM2 `hello_world` with `verify_output.py`, optional graphics mode (prebuilt Dawn or `build_dawn.sh`), where
+  results and CI live, and a dated "last fresh-clone check" table.
+- **Component READMEs rewritten** (`SWFRecomp/`, `SWFModernRuntime/`, `ruffle-tests/`). Gone: the 2025 quick starts
+  (`git clone PeerInfinity/SWFRecomp`), the dead `swfrecomp.github.io` demo links, the 2025 feature tables and the
+  "Ruffle AVM1 only" framing. They now carry source maps that match the tree, the three build modes, and the harness
+  layout and statuses. `ruffle-tests/tests/swfs/_investigation/ENVIRONMENT_SETUP.md` (2026-02, stale paths) got a
+  "superseded by GETTING_STARTED" banner.
+
+### Deviation: Ruffle attribution (a brief delta, flag for Robert)
+
+The README draft said "we copy no Ruffle code". That is **false**: about 30 runtime files (`avm2/` ×23,
+`actionmodern/` ×3, `libswf/` ×2, `rendering/` ×1, `SWFRecomp/src/abc/` ×1) carry functions marked as ports of
+Ruffle source. Examples: `f64_to_string`, the avmplus qsort, ByteArray, BitmapData, timers, the h263 deblock.
+`THIRD_PARTY_NOTICES.md` had no Ruffle row. S4 added one, plus Ruffle's MIT text at
+`SWFModernRuntime/third_party/ruffle/LICENSE-MIT.txt` (Ruffle is MIT OR Apache-2.0; we chose MIT to match `LICENSE`).
+The README now says plainly that behaviours were ported. This is docs only, but it is a licensing statement, so
+**Robert should confirm the MIT choice and the wording.** A per-file audit (which functions, which Ruffle commit) was
+not done.
+
+### The fresh-clone check (plan §3 S4 done-line)
+
+| # | Session | Where | Guide | No-graphics `add` / `hello_world` | Graphics |
+|---|---|---|---|---|---|
+| 1 | `session_018CoDi3TqLnVixMvHy4vGuF` | cloud default env | `beb2daeee` | PASS / PASS | not run |
+| 2 | `session_018CoDi6uNaspruPSt4SUSiF` | "SWFRecomp fan-out" env (Dawn preinstalled; used via `DAWN_INSTALL`) | `beb2daeee` | PASS / PASS | PASS / PASS |
+| 3 | `session_018CoDi6ryUHMjHL2SEUoTxh` | **bare `ubuntu:24.04` Docker image** (92 packages at start) inside a Full-network cloud session | `d62ed2bd0` | PASS / PASS | PASS / PASS (Dawn downloaded per §6.2) |
+
+- Checks 1 and 2 passed verbatim, but their images had preinstalled `-dev` packages. Check 2 traced the closure:
+  **`zlib1g-dev` was a missing prerequisite**. The runtime links `-lz`, and the recompiler bundles its own zlib, so
+  the build hid it. CI's ubuntu-24.04 runner image has it too. Check 3 ran with `zlib1g-dev`, `ca-certificates` and
+  `curl` added, on a truly bare image, and needed no workaround.
+- Other fixes from the checks: real first-run times (AVM1 about 40–45 s, AVM2 about 60–73 s, graphics about 50 s);
+  the one expected GCC `-Wstringop-overflow` warning at `SWFRecomp/src/swf.cpp:292` (a false positive: `m` is
+  `double[4][5]` and `sizeof(m)` is 160); the real expected output; the `flash-fix APPLIED` lines and the
+  found/installed count; Dawn's `../dawn-install` vs the tarball MANIFEST's `~/CC`; Pillow through apt (PEP 668); a
+  single "drop `sudo` if root" note; disk (about 350 MB, plus about 1 GB of apt packages).
+- Not fixed (code or harness wording, outside a docs slice):
+  - the `-Wstringop-overflow` false positive itself;
+  - `download_tests.sh` printing its summary block twice;
+  - `verify_output.py`'s missing-Dawn error, which names neither `DAWN_INSTALL` nor the prebuilt.
+- The prebuilt Dawn download was NOT blocked in check 3. The 2026-09-28 classifier denial (memory
+  `cloud-session-launch-cli`) did not recur when the task was a documented setup step.
+- The delivery branches `fanout/s4-check-{nographics,graphics,bare}` are left on origin. Their reports are archived
+  in the history repo, so S6 may delete them.
+
+### No CI
+
+Docs only. No code, CI or Pages path changed.
+
+### Next slice
+
+**S5: docs entry point and ARCHITECTURE** (§3 S5). `README.md` links `SWFRecompDocs/README.md`, which still lists 2025
+content; S5 rewrites it and must add the ARCHITECTURE link to the README. Also open for Robert: confirm the Ruffle
+attribution above. S6 is independent; S7 must still precede the next fan-out.
