@@ -48,7 +48,7 @@ can take.
 BOTH TAGS ARE IN ONE FRAME -- ORIGINALLY OUT OF NECESSITY, NOW ON PURPOSE
 ------------------------------------------------------------------------
 UPDATE 2026-09-03: the necessity below is GONE. A loaded child's timeline now
-advances (SWFRecompDocs/status/child-timeline-advance.md, anchored by
+advances (SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md, anchored by
 regression/avm1_child_timeline_advance), so a cross-frame Modify would run.
 The test is deliberately left as it is: place-then-Modify in ONE frame is a
 real shape worth pinning, and re-pointing a test that guards the transform
@@ -81,7 +81,7 @@ Three distinguishable states, all measured:
 `typeof` and `_name` are kept as controls: they read correctly in all three
 states, so a failure that moves them is a different bug.
 
-See SWFRecompDocs/status/child-placed-clip-uninit.md for the full write-up.
+See SWFRecomp-CC-history:SWFRecompDocs/status/child-placed-clip-uninit.md for the full write-up.
 """
 import struct
 import subprocess

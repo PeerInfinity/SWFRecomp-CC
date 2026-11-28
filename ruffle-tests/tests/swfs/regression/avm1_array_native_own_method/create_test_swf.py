@@ -12,7 +12,7 @@ MovieClip-v8 check at MovieClip.as:1194 (`_root.filters` array) is the corpus
 instance. Two rows: an array literal (`lit`) and a `_root.filters` array.
 
 Expected output: Ruffle exporter (local build, 0ddd12b6a) --frames 1 trace
-(session24-fanout-reports/w1-attach-order-oracle/).
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session24-fanout-reports/w1-attach-order-oracle/).
 
 Usage: create_test_swf.py <out.swf>
 """

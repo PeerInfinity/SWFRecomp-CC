@@ -66,7 +66,7 @@ answer to "what could go wrong with game-first development"):
   Graded by: 31 trace-gradeable bitmap candidates
   (`avm2/_investigation/STAGE7_CANDIDATES.txt`). Exit: >=22 of 31 +
   zero regressions. Session prompt:
-  `SWFRecompDocs/prompts/avm2-stage7-bitmapdata.md`.
+  `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-stage7-bitmapdata.md`.
 - **Stage 8 — input harness + input bridge** — **DONE 2026-07-12**
   (commit `ee2107860`; ~42/71 input.json candidates). verify_output.py
   injects Ruffle's input.json into the AVM2 build; the runtime got

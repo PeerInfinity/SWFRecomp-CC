@@ -2,7 +2,7 @@
 
 Machine-extracted from results_graphics.json at the first-ever baseline
 (871/1574 effective, 55.3%). Input for the feature-priority-map session
-(SWFRecompDocs/prompts/avmplus-feature-priority-map.md).
+(SWFRecomp-CC-history:SWFRecompDocs/prompts/avmplus-feature-priority-map.md).
 
 ## Empty-actual mismatches (287) — suspected shared driver failure
 

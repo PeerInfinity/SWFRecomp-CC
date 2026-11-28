@@ -8,7 +8,7 @@ OPAQUE white 80x80 target at destPoint (20,20) -- attaches the two targets at
 stage (10,10) and (100,10), and traces the return values and 14 getPixel32
 probes. Built by s27 w2-applyfilter-cm (fixtures + bridge, cceb5133a); landed by
 s27 w2b-avm1-applyfilter-flash with the coordinator's FP32 captures
-(session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/<name>/flash.{txt,png})
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/<name>/flash.{txt,png})
 as output.txt / output.expected.png. Flash rules they pin (action.c
 bitmapDataApplyFilter, avm1_filter_kernels.c):
   - an OPAQUE target refuses Glow / DropShadow / Bevel / GradientGlow /

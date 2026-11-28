@@ -3,7 +3,7 @@
 
 GOLDEN: output.expected.png is Flash Player 32's own render (LNX 32,0,0,465,
 AS3 draw() wrapper of the stage, coordinator-run s27; archived at
-SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
+SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
 w2-jpeg-flash-decode/avm1_bitmap_nearest_tie_stage/flash.png). It equals the
 ties-UP prediction at 0 px (ties-down: 80 px). Fixed by s27 w2b-jpeg-refine:
 render_webgpu.c bitmap_nearest_clamp / bitmap_nearest_repeat (textureLoad of

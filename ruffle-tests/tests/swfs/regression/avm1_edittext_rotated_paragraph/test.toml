@@ -1,6 +1,6 @@
 # s29 w2-text-coverage-land: 200-glyph rotated paragraph, the coverage-run
 # budget stress (see create_test_swf.py). Golden: FP32 LNX HIGH capture (s29
-# coordinator, F1; draw() == --screen), session29-fanout-reports/w1-local-oracles/
+# coordinator, F1; draw() == --screen), SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/
 # w2-text-coverage-land/. CI interim #2 (run 45914277386) measured 0 outliers at tol 128
 # (max diff 112): the budget stays 0.
 num_ticks = 1

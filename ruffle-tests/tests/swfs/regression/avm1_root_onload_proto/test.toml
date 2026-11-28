@@ -4,5 +4,5 @@
 # _level0 via getURL, and Flash fires NO frame-1 onLoad for a replaced _level0
 # (w1-local-oracles/w1-drift/root_onload.pinned.txt is empty), so a pinned
 # capture of this row is invalid. Capture archived at
-# SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-drift/.
+# SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-drift/.
 num_ticks = 4

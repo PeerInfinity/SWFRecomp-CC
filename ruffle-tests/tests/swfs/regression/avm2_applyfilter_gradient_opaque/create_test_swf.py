@@ -161,7 +161,7 @@ CASES = [
 
 # s27 w2b-filter-kernels-residual: the regression/ copy HOLDS these cases back
 # (their Flash rows are 1-2 levels off a still-unresolved bevel sample, see
-# session27-fanout-reports/w2b-filter-kernels-residual-report.md). Every case
+# SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2b-filter-kernels-residual-report.md). Every case
 # runs on fresh objects, so dropping one leaves the others' Flash lines as
 # captured; output.txt is the Flash capture minus the held cases' lines.
 # Set HELD = () to rebuild the full Flash probe. s28 w2-filter-residuals-land

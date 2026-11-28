@@ -494,7 +494,7 @@ get closed unless the Gnash test is itself updated upstream.
 
 ### sound (misc-swfc.all) — RESOLVED s26 (was: interactive Flash session trace, no sound-position simulation)
 
-**RESOLVED (s26, `SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §1):** the reason below was wrong. With position 0 the frame-6 condition is TRUE, so a faithful player loops forever (the expected output's truncation). We fell through because `gotoandPlay` (SWF6, case-insensitive) missed the case-sensitive nav arm in `actionCallFunction`. Fixed; the row passes in both modes and is out of the suite ignore list.
+**RESOLVED (s26, `SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §1):** the reason below was wrong. With position 0 the frame-6 condition is TRUE, so a faithful player loops forever (the expected output's truncation). We fell through because `gotoandPlay` (SWF6, case-insensitive) missed the case-sensitive nav arm in `actionCallFunction`. Fixed; the row passes in both modes and is out of the suite ignore list.
 
 **Source:** `gnash/testsuite/misc-swfc.all/sound.sc`. The test loads an
 audio file, calls `snd.start(0,0)`, then enters a frame-6 loop that calls
@@ -542,7 +542,7 @@ to `from_gnash/misc-swfc.all/ignored_tests.txt`.
 > Flash's sparse-sort own-property sets exactly (SWF6 `{4,15,16}`, SWF7+
 > `{0,1,2,4,16}` — `array.as:253`, which the s20 report had called an
 > unidentified mechanism) and testCmp's 7 calls. array-v6/-v7/-v8 promote with
-> it. Report: `SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md`.
+> it. Report: `SWFRecomp-CC-history:SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md`.
 > The "bubble-family" lead named below was a false lead: no bubble sort was
 > needed once the write-back rule was isolated.
 
@@ -577,7 +577,7 @@ trade a Flash-correct line (317) for two Ruffle-correct ones — net Flash-drift
 a *genuine Ruffle-vs-Flash conflict*, which project policy resolves in Flash's
 favour. Reproducing Flash on BOTH 317 and 324/325 remains open, but the long-standing
 "Flash-exact in-place avmplus quicksort" framing is **RETIRED** (session 20,
-`SWFRecompDocs/plans/session20-fanout-reports/w2-arraysort-report.md` §2).
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/w2-arraysort-report.md` §2).
 `adobe/avmplus` is Tamarin — the **AVM2** VM — and contains no ActionScript-1
 Array at all, while these are SWF 5-8 (AVM1). `ArraySort::qsort`
 (`ArrayClass.cpp:637`) was transcribed verbatim and driven by a popping
@@ -677,7 +677,7 @@ test drives MovieClip transforms (`_x`, `_y`, `_xscale`, `_width`,
 `_height`) to extreme values that land on the integer boundaries of the
 twips fixed-point representation, then reads them back.
 
-**Oracle (corrected s26, `SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §3):**
+**Oracle (corrected s26, `SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §3):**
 the graded file is `output.fp10.txt` (`verify_output.py` picks the highest
 `player_options.version`). Both `output.fp9.txt` and `output.fp10.txt` are
 **Flash** captures (one Ruffle subtest per Flash version), not Gnash's own

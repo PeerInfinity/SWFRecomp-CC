@@ -3,7 +3,7 @@
 Reference for the recompiled **N** ("the way of the ninja", Metanet) substrate.
 Decoded from the JPEXS decompile of `N.swf` and verified byte-identical on Ruffle
 and SWFRecomp native. Companion to
-`SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md` (how it was decoded)
+`SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md` (how it was decoded)
 and the JS model in `ruffle-tests/tests/swfs/_swfbridge/livetest/n_loader/gen/`
 (`nLevel.js` = level codec, `nDemo.js` = demo codec).
 

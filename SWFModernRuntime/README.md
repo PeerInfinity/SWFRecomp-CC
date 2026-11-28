@@ -101,7 +101,7 @@ This runtime is used by [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) when
 - **Memory Management**: Proper heap allocation and cleanup
 - **Ownership Tracking**: No memory leaks or dangling pointers
 
-See the [branch differences document](../SWFRecompDocs/deprecated/merge/swfmodernruntime-branch-differences.md) (historical, November 2025) for the details of that first divergence.
+See the [branch differences document](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/deprecated/merge/swfmodernruntime-branch-differences.md) (historical, November 2025) for the details of that first divergence.
 
 ## Upstream
 

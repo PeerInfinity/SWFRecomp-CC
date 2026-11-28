@@ -9,7 +9,7 @@ Owner: tag.c tagDrainGotoInitActions / tagFlushGotoInitsAtCallReturn, called
 from action.c actionCallFunction / actionCallMethod.
 
 s27 w2b-timers-tail. GOLDEN = real Flash Player 32 (LNX 32,0,0,465) DIRECT
-trace of this SWF, coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
+trace of this SWF, coordinator-run (SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/
 w2-local-oracles/w2-timers-land/goto_skipped_init_call/flash.direct.txt).
 Ruffle is NOT an oracle here: it runs DoInitActions at preload.
 

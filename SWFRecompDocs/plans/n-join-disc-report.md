@@ -1,7 +1,7 @@
 # n-join-disc: Flash's cap / corner rule on snapped strokes, and the signed noScale width (2026-11-25)
 
 One-task session (LOCAL) after `n-drawapi-stroke-snap` (`n-drawapi-stroke-snap-report.md`, code `e81d27317`),
-launched by `s28-coordinator`. Brief: `session28-fanout-reports/n-join-disc-prompt.md` (goal list in the launch prompt).
+launched by `s28-coordinator`. Brief: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/n-join-disc-prompt.md` (goal list in the launch prompt).
 
 **Summary**
 - **The brief's premise is overturned (§1.3):** the predecessor's "join disc painted outside a W = 3 band" is not a

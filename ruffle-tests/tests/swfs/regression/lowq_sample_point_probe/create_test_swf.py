@@ -2,7 +2,7 @@
 """Regenerate test.swf for lowq_sample_point_probe (s28 w2-lowq-sample-point).
 
 A static-timeline (AVM1, SWF 8) re-expression of the s28 w1 Flash probe
-`session28-fanout-reports/w1-avm2-vector-flash-fixtures/lowq_sample_point/Test.as`
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-avm2-vector-flash-fixtures/lowq_sample_point/Test.as`
 (the AS3 SWF the coordinator captured in Flash 32 is not archived in the repo,
 and the cloud has no AS3 compiler). Every cell has the same geometry, in
 twips, as the AS3 Drawing-API original; the stage is 240x160, white, and the

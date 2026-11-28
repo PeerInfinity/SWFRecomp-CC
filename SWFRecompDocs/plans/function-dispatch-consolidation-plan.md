@@ -42,7 +42,7 @@ the end of §4.
 **REMAINING (parked 2026-07-11, all lower-value):** the pass-(b) remainder —
 master-list items 5–7, the root-enterFrame/root-var-map version switch, and the
 `lv_url_encode` migration. Session brief:
-`SWFRecompDocs/prompts/dispatch-consolidation-stage4.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/prompts/dispatch-consolidation-stage4.md`.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.

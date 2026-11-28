@@ -149,7 +149,7 @@ compounds with quality. No single model passes both goldens. Ours is the integer
 reproduces `blur_fractional`, `avm2/bitmapdata_applyfilter_destpoint_edges` and `avm2/bitmapdata_filter_sourcerect`
 exactly (max diff 0–1). The old pass was Ruffle's quantised weight accidentally reproducing the even-size bias, inside
 the upstream tolerance of 6. Evidence:
-`SWFRecompDocs/plans/session26-fanout-reports/w2-applyfilter-edge-growth-report.md` §3.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w2-applyfilter-edge-growth-report.md` §3.
 
 **Decision:** keep the Flash-consistent model. The trace row still passes and is NOT ignored. **Prune criterion:** a
 fresh Flash capture of either test re-decides which golden is wrong.
@@ -161,7 +161,7 @@ fresh Flash capture of either test re-decides which golden is wrong.
 
 The golden is therefore not "internally inconsistent"; it is simply not Flash. The disposition now lives in
 `RUFFLE_VS_FLASH_DIFFERENCES.md` §"`visual/filters/blur_quality` (image): the golden is not Flash". This entry is kept
-for the s26 mechanism analysis only. Evidence: `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`.
+for the s26 mechanism analysis only. Evidence: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`.
 
 ## Category 3: Flash Implementation Quirks We Do Not Replicate
 
@@ -380,12 +380,12 @@ the 293-line test causes this 4-line known-failure test to fail.
 > `ignored_tests.txt`. The HOLD note below is kept for history.
 
 > **s29 HOLD (2026-11-26, `w2-disposition-land`).** The "irreconcilable" premise is wrong in a new
-> way: FP32 reproduces THIS golden byte-exact (pinned and `--no-pin`; `session29-fanout-reports/
+> way: FP32 reproduces THIS golden byte-exact (pinned and `--no-pin`; `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/
 > w1-local-oracles/w1-disposition-audit/tab_edge_corpus.*.flash.txt`), yet the MTASC SWF6/7/8
 > fixtures `L3b_tabindex{,_v7,_v8}` (`var r:Object = _root; r.tabIndex = "s"`, first set) all
 > COERCE to `-2147483648` in FP32. So neither the w1 "first string set is sticky raw" rule nor our
 > current "NaN keeps the previous value" rule (we print `undefined, undefined, 5, 5`) is Flash's.
-> The discriminator is open: 13 single-variable fixtures (`session29-fanout-reports/
+> The discriminator is open: 13 single-variable fixtures (`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/
 > w2-disposition-land-oracle/tabindex/`) await an FP32 run. Stays ignored until a rule predicts
 > both the corpus row and the L3b captures.
 
@@ -409,7 +409,7 @@ known_failure.panic = "attempt to add with overflow"
 `w1-trace-tail-audit`). The remaining 20 diff lines are the `pixelDissolve`
 return value and the dest pixel positions chosen by the permutation.
 
-**Mechanism (corrected s26, `SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §2):**
+**Mechanism (corrected s26, `SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §2):**
 Flash's dissolve permutation is not Ruffle's guessed Feistel: plain integer
 seeds diverge too, and Flash returns indices our permutation cannot reach.
 (The earlier text blamed coercion of non-integer seeds — `null`, `undefined`,
@@ -446,7 +446,7 @@ stroke tessellation accuracy. 334/338 lines pass (s30 w2-drift-smalls-land fixed
 geometry, 171–177 Noto glyph boundaries, 296 morph boundary; was 9 — corrected s26 `w1-trace-tail-audit` §5, first flagged s24
 `w1-avm1-tail` lead 3) are at exact geometric boundaries where our implementation
 disagrees with Ruffle's golden AND with real Flash: the s28 FP32 capture
-(`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/movieclip_hittest_shapeflag.pinned.txt`)
+(`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/movieclip_hittest_shapeflag.pinned.txt`)
 prints the golden's value on all 6 lines, so they are our own inaccuracy, not a
 Ruffle-vs-Flash question. (FP32 differs from the Ruffle golden only on lines
 35/37/39, the same-frame stale-bounds quirk; see the s28 `w2-hittest-shape-stale`
@@ -530,7 +530,7 @@ crate and VP6 (codecs 4/5) with `nihav`; we use libavcodec (`flv1`, `vp6f`,
 > **`sws_scale`'s YUV→RGB conversion** in `video_codec.c::decode_via_libavcodec`,
 > which interpolates chroma and rounds differently from Ruffle. Measured by
 > reconstructing both paths offline against the goldens
-> (`SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-charid0.md` §5):
+> (`SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-charid0.md` §5):
 >
 > | test | via `sws_scale` (old) | via Ruffle's exact BT.601 integer conversion |
 > |---|---:|---:|
@@ -598,11 +598,11 @@ already supplies to `scripts/image_triage.py` via the scope marker above.
 > block, not libjpeg-turbo's triangle filter) followed by a **truncating** per-term YCbCr->RGB. That
 > pipeline returns `200d04` here exactly, is bit-exact on the Flash golden of `bitmapdata-clone`, and takes
 > `pixelbender_dithering` from 9413 to 27 outliers. It landed as `SWFRecomp/src/jpeg_flash.cpp`. Ignore
-> entry pruned (its own prune criterion). Report: `SWFRecompDocs/plans/session27-fanout-reports/w2-jpeg-flash-decode-report.md`.
+> entry pruned (its own prune criterion). Report: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-jpeg-flash-decode-report.md`.
 
 <!-- image-axis: none -->
 
-Added s26 (`SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md`
+Added s26 (`SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md`
 §6; recommended by s24 `w1-avm1-tail` and s22 `w1-trace-tail` §10, standing NO-GO
 "a disposition, not a fix" since s19/s20). Same family as the video rows above — a
 still-image decoder this time, not a video codec.
@@ -798,7 +798,7 @@ was integer-twip quantization of computed vertices in the recompiler (Levien
 curve points truncated, libtess2 fill output `lround`ed). Keeping the sub-twip
 remainder (`Vertex::fx_frac/fy_frac`, `SWFRecomp/src/swf.cpp`
 `addCurvedEdgeLevien` / `tessellateContours(keep_float)`) renders both
-comparisons at **0 outliers**. Diagnosis: `SWFRecompDocs/plans/session22-fanout-reports/w1-stroke-staircase-report.md`.
+comparisons at **0 outliers**. Diagnosis: `SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/w1-stroke-staircase-report.md`.
 The image-axis exclusion is withdrawn; the history below is kept for reference.
 
 **This is NOT mask work. Do not book it in a mask session.** The two comparisons
@@ -810,7 +810,7 @@ re-surfaced them at the top of the top cluster and every mask session re-costed
 them.
 
 Session 12's mask agent rendered `masks` at HEAD and diffed it pixel-by-pixel
-(`session12-fanout-reports/w2-gfx-masks-report.md` §4):
+(`SWFRecomp-CC-history:SWFRecompDocs/plans/session12-fanout-reports/w2-gfx-masks-report.md` §4):
 
 ```
 1686 outlier channels = 776 mismatching pixels
@@ -922,7 +922,7 @@ After session 15 rewrote `bd_apply_filter`'s box kernel (821 415 → 30 844
 outliers, mean 30.3 → 1.21, run `31748059158`), the whole residual is the glyph
 band: in the **unfiltered** cell — which no filter touches — all 534 residual
 outliers lie in `y ∈ [96, 104]`, the text band, and nowhere else
-(`session15-fanout-reports/w2-gfx-blur-report.md` §1.5). Re-measured
+(`SWFRecomp-CC-history:SWFRecompDocs/plans/session15-fanout-reports/w2-gfx-blur-report.md` §1.5). Re-measured
 independently in session 16 (`w1-gfx-shapes-morph`, local `--mode=graphics
 --images`, reproducing CI's 30 844 / max 246 exactly): the 10 853 mismatching
 pixels of the 550×700 image occupy **four narrow horizontal bands and nothing
@@ -974,7 +974,7 @@ Both print `URLVariables.toString()`, which joins in `for (p in this)` order (`b
 `firstName=Tom&lastName=Jones` decoded from `lastName=Jones&firstName=Tom`; `loader_load:81`:
 `cccc=true&aaa=bbb`). The s29 coordinator ran an AS3 for-in fixture (Object, URLVariables and
 decoded URLVariables over 7 key sets) twice in FP32
-(`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-disposition-audit/forin_order/flash.r{1,2}.txt`):
+(`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-disposition-audit/forin_order/flash.r{1,2}.txt`):
 the order is hash-scattered, insertion order is irrelevant (`a,b` and `b,a` both give `b,a` in r1),
 and **4 of the 7 key sets reorder between the two runs** (`aaa,cccc` gives `cccc,aaa` in r1 and
 `aaa,cccc` in r2). Both goldens are therefore ONE FP32 run's order; no deterministic implementation
@@ -1179,7 +1179,7 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 
 The golden (an older FP32 capture) puts `Testing _global.System.capabilities.manufacturer` after `os`
 (line 582). Every fresh FP32 32,0,0,465 **LNX** capture puts it after `language` (line 579): the s30
-pre-launch capture plus two more runs, `session30-fanout-reports/w1-local-oracles/w1-native-table/
+pre-launch capture plus two more runs, `SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-native-table/
 global_proto_decls_delete.v15.lnx.r{2,3}.txt`, 3/3 byte-identical. So it is not run-to-run noise on one
 host: it is the host. `manufacturer` is a host string ("Adobe Linux" / "Adobe Windows"), the WIN and LNX
 players disagree on this row, and the `global_proto_decls` capabilities section (both captures) agrees

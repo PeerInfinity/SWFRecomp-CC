@@ -244,7 +244,7 @@ at 1:1 from its frame 1. The Windows projector (no X tree) is released after a f
 - **The README's validation goldens.** The two rows below were validated against upstream goldens NEWER than our
   mirror. Ruffle re-baked them as Flash references on 2026-11-23 (`5128d3943`, `7facc1fcc`). Against our mirror's
   older goldens, Flash is 22 953 px / 23 380 px off. (CI is unaffected: it downloads upstream master at run time.)
-- Results of the full sweep: `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`.
+- Results of the full sweep: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`.
 
 ## Files
 

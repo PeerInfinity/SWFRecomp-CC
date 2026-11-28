@@ -3,7 +3,7 @@
 SAMPLE OFFSET, graded against FLASH PLAYER 32.
 
 Landed by s28 w2-filter-residuals-land from the s28 w1-filter-residuals
-isolation probe (session28-fanout-reports/w1-filter-residuals-fixtures/
+isolation probe (SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-filter-residuals-fixtures/
 avm2_bevel_sample_isolation_probe); output.txt is the coordinator's FP32 LNX
 capture (w1-local-oracles/w1-filter-residuals/
 avm2_bevel_sample_isolation_probe.flash32.txt), the lines of the cases kept

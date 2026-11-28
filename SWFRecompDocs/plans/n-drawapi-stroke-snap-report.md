@@ -1,7 +1,7 @@
 # n-drawapi-stroke-snap: the timeline snap's perf check + Flash's stroke rule for Drawing-API strokes (2026-11-25)
 
 One-task session (LOCAL) after `n-stroke-snap` (`n-stroke-snap-report.md`, code `09b2c9130`), launched by
-`s28-coordinator`. Brief: `session28-fanout-reports/n-drawapi-stroke-snap-prompt.md`.
+`s28-coordinator`. Brief: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/n-drawapi-stroke-snap-prompt.md`.
 
 **Summary**
 - **Perf (§1): the timeline snap is NOT a material cost.** Measured inside the wasm on real-GPU Windows Chrome, the

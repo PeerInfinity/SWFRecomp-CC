@@ -1,7 +1,7 @@
 """avm1_native_instance_layout — s30 w2-native-instance + w2b-native-residues.
 
 Golden = FP32 LNX 32,0,0,465 direct pinned capture (coordinator, 2026-11-27,
-session30-fanout-reports/w1-local-oracles/w2-native-instance/fp32.lnx.txt).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-native-instance/fp32.lnx.txt).
 Line 12 (Sound instance for..in after unhide = []) closed by w2b-native-residues.
 
 Pins the native-instance layout changes of s30 w2-native-instance:

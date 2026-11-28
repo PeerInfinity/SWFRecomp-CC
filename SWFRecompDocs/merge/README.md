@@ -25,7 +25,7 @@ sync was still the goal, and the July 2026 decision that ended it.
 - `SWFRecomp-objects-and-functions*.md`, `SWFModernRuntime-objects-and-functions*.md` —
   December 2025 / January 2026 reviews of LittleCube's `feature/objects-and-functions`
   PR branches, written while they were open. Merged upstream July 2, 2026.
-- [`../deprecated/merge/`](../deprecated/merge/) — the October–November 2025
+- [`../deprecated/merge/`](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/deprecated/merge/) — the October–November 2025
   records of the original fork creation and the `wasm-support` branch merges.
 
 ## Repository map (as of September 2026)
@@ -45,4 +45,4 @@ sync was still the goal, and the July 2026 decision that ended it.
 - **[../upstream-comparison/](../upstream-comparison/)** — the living comparison
   analyses (what each architecture does better, "what would X buy us?"
   evaluations, the warnings doc for upstream)
-- **[../status/](../status/)** — implementation status and summaries
+- **[../status/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/status/)** — implementation status and summaries

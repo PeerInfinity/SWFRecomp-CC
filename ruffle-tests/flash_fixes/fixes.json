@@ -5,7 +5,7 @@
     "upstream_sha256": "ea95bff701d8acb1198b973d4b8b215e1df9b5fc961dce236e20061493745a94",
     "fix": "visual/simple_shapes/strokes/scale/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/visual__simple_shapes__strokes__scale__output.png (s27 golden-provenance round 2, goal 4)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/visual__simple_shapes__strokes__scale__output.png (s27 golden-provenance round 2, goal 4)",
     "reason": "Linux == Windows == root capture. The golden is not FP32 output on either OS (3589 px over tol vs Flash). Ours vs Flash: 7797 px.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
     "added": "2026-11-24"
@@ -16,7 +16,7 @@
     "upstream_sha256": "fdad28e3dc89021ea36d89e4da7a9cf8d34d67a95edd2a225d2b549b61ab8a5e",
     "fix": "avm2/graphics_draw_path/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__graphics_draw_path__output.png (s27 golden-provenance round 2, goal 4)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__graphics_draw_path__output.png (s27 golden-provenance round 2, goal 4)",
     "reason": "Linux == Windows (AVM2 quality=low, so wrapper capture only). Golden 28 px off Flash; ours 387 px.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
     "added": "2026-11-24"
@@ -27,7 +27,7 @@
     "upstream_sha256": "64d77094c4f6643aa68f56ad784ddc4511118ca2b7dfd7cbce846b23d9e4c42b",
     "fix": "avm2/bitmapdata_opaque/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__bitmapdata_opaque__output.png (s27 golden-provenance round 2, goal 4)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__bitmapdata_opaque__output.png (s27 golden-provenance round 2, goal 4)",
     "reason": "Linux == Windows. Golden 2 px off Flash; ours 4 px (tol 0).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
     "added": "2026-11-24"
@@ -38,7 +38,7 @@
     "upstream_sha256": "dedbfa9f2b40773c39b73d0848bfd6715c4f0f5e768299ee1583d8aee7670eb8",
     "fix": "avm2/blend_scroll/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__blend_scroll__output.png (s27 golden-provenance round 2, goal 4)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/avm2__blend_scroll__output.png (s27 golden-provenance round 2, goal 4)",
     "reason": "Linux == Windows. Golden 87 px off Flash; ours 195 px.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
     "added": "2026-11-24"
@@ -49,7 +49,7 @@
     "upstream_sha256": "54334e53063f5bb4de21238528a9bf1196a7a665341297da2f54ff1fb4d5b3ec",
     "fix": "visual/definefont4/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/visual__definefont4__output.png (s27 golden-provenance round 2, goal 4)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/visual__definefont4__output.png (s27 golden-provenance round 2, goal 4)",
     "reason": "Linux == Windows; embedded DefineFont4. Golden 6331 px off Flash; ours 5325 px (we are closer to Flash than the golden).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s27 golden swaps",
     "added": "2026-11-24"
@@ -60,7 +60,7 @@
     "upstream_sha256": "47c3531ee1336ed94fef41d559ead837f790bf30899cf52406b1664b6598b8f5",
     "fix": "avm1/goto_rewind_movieclip_replace/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__goto_rewind_movieclip_replace.{r1,r2,np1,L1,win1}.txt (s28 trace-provenance)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__goto_rewind_movieclip_replace.{r1,r2,np1,L1,win1}.txt (s28 trace-provenance)",
     "reason": "Linux pinned x2, --no-pin, 20 s cap and Windows all agree: FP32 does not re-run \"Child A frame 1\" after the frame-3 gotoAndStop(1) rewind (the golden's last line). FP32 == output.ruffle.txt == our output.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
     "added": "2026-11-25"
@@ -71,7 +71,7 @@
     "upstream_sha256": "471626e6071f4f73a7223c72f37de8c8d02dc1c79ef44baf4bcd573ff05c349d",
     "fix": "avm1/movieclip_hittest_shapeflag/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__movieclip_hittest_shapeflag.{r1,r2,np1,L1,win1}.txt (s28 trace-provenance)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__movieclip_hittest_shapeflag.{r1,r2,np1,L1,win1}.txt (s28 trace-provenance)",
     "reason": "Linux pinned x2, --no-pin, 20 s cap and Windows all agree: hitTest(400,500,true), (500,400,true), (400,300,true) are false in FP32 (golden says true). Ours vs FP32: 7 lines.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
     "added": "2026-11-25"
@@ -82,7 +82,7 @@
     "upstream_sha256": "6a566ea04675e27aa8bc024f368812b98aae1a204db36152c750443f3eb9457b",
     "fix": "avm1/watch_recursion_swf6/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__watch_recursion_swf6.r1.txt (s28 trace-provenance); w1b-rm-avm1-misc B8",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__watch_recursion_swf6.r1.txt (s28 trace-provenance); w1b-rm-avm1-misc B8",
     "reason": "FP32 prints '  o2.prop: ' with a trailing space; the upstream golden had trailing spaces stripped. Ours is byte-identical to FP32.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
     "added": "2026-11-25"
@@ -93,7 +93,7 @@
     "upstream_sha256": "dc82945d983ee8c29a1a27d577972b7771d14638f20eb26ba87c93dd9c804205",
     "fix": "avm1/watch_recursion_double_swf6/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__watch_recursion_double_swf6.r1.txt (s28 trace-provenance); w1b-rm-avm1-misc B8",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__watch_recursion_double_swf6.r1.txt (s28 trace-provenance); w1b-rm-avm1-misc B8",
     "reason": "FP32 prints '  o2.prop: ' with a trailing space; the upstream golden had trailing spaces stripped. Ours is byte-identical to FP32.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 trace-provenance",
     "added": "2026-11-25"
@@ -104,7 +104,7 @@
     "upstream_sha256": "2fbaa0f1c39ed9c76a67130e37803503ab63ae445bbcb8048bc87b7fbf400f0d",
     "fix": "avm1/mcl_unloadclip/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_unloadclip.win.txt (Windows, == this file) and mcl_unloadclip.lnx.txt (Linux) (s28 coordinator)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_unloadclip.win.txt (Windows, == this file) and mcl_unloadclip.lnx.txt (Linux) (s28 coordinator)",
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
@@ -115,7 +115,7 @@
     "upstream_sha256": "7dc692b0f02f48a8eaf70da041b054a282367d17b2fcb495fcbec967450e9ecb",
     "fix": "avm1/mcl_loadclip/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_loadclip.win.txt (Windows, == this file) and mcl_loadclip.lnx.txt (Linux) (s28 coordinator)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_loadclip.win.txt (Windows, == this file) and mcl_loadclip.lnx.txt (Linux) (s28 coordinator)",
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
@@ -126,7 +126,7 @@
     "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
     "fix": "avm1/mcl_target_png/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_png.win.txt (Windows, == this file) and mcl_target_png.lnx.txt (Linux) (s28 coordinator)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_png.win.txt (Windows, == this file) and mcl_target_png.lnx.txt (Linux) (s28 coordinator)",
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
@@ -137,7 +137,7 @@
     "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
     "fix": "avm1/mcl_target_jpg/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_jpg.win.txt (Windows, == this file) and mcl_target_jpg.lnx.txt (Linux) (s28 coordinator)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_jpg.win.txt (Windows, == this file) and mcl_target_jpg.lnx.txt (Linux) (s28 coordinator)",
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
@@ -148,7 +148,7 @@
     "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
     "fix": "avm1/mcl_target_gif87a/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_gif87a.win.txt (Windows, == this file) and mcl_target_gif87a.lnx.txt (Linux) (s28 coordinator)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_gif87a.win.txt (Windows, == this file) and mcl_target_gif87a.lnx.txt (Linux) (s28 coordinator)",
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
@@ -159,7 +159,7 @@
     "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
     "fix": "avm1/mcl_target_gif89a/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_gif89a.win.txt (Windows, == this file) and mcl_target_gif89a.lnx.txt (Linux) (s28 coordinator)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_target_gif89a.win.txt (Windows, == this file) and mcl_target_gif89a.lnx.txt (Linux) (s28 coordinator)",
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
@@ -170,7 +170,7 @@
     "upstream_sha256": "933de0688022d42e5ef25255fe0d12cf0c195957be0a7f669973d6c77e3f70b4",
     "fix": "avm1/mcl_mislabeled_target/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 traces SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_mislabeled_target.win.txt (Windows, == this file) and mcl_mislabeled_target.lnx.txt (Linux) (s28 coordinator)",
+    "evidence": "Flash Player 32 traces SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-loaded-shell-land-E/mcl_mislabeled_target.win.txt (Windows, == this file) and mcl_mislabeled_target.lnx.txt (Linux) (s28 coordinator)",
     "reason": "Flash fires onLoadProgress twice per MCL load (bytesLoaded == bytesTotal both times); the golden has one. Windows FP32 == this file (trailing blank line trimmed); Linux FP32 adds one more per 4096-byte read (host I/O artifact, not modelled) and agrees otherwise.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-loaded-shell-land",
     "added": "2026-11-25"
@@ -181,7 +181,7 @@
     "upstream_sha256": "a00127670c9e62ea1cb1a7b65124344f2038b7562c154a1c1284b68ffe5553f7",
     "fix": "from_gnash/misc-ming.all/place_object_test/test.toml",
     "kind": "toml",
-    "evidence": "SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/place_object_test.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
+    "evidence": "SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/place_object_test.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
     "reason": "Corpus convention mismatch: Ruffle's runner defaults log_warnings=true (ErrorReporting on), but this gnash golden is Flash with ErrorReporting off. Set log_warnings=false so Flash's debug-warning lines are stripped from our output, as Ruffle does for such rows.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-occupied-depth",
     "added": "2026-11-25"
@@ -192,7 +192,7 @@
     "upstream_sha256": "3ec2bea767cbe6fc88e029ea64d1e0986de82e1d72931bfe1f3116dfb596724d",
     "fix": "from_gnash/misc-ming.all/place_object_test2/test.toml",
     "kind": "toml",
-    "evidence": "SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/place_object_test2.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
+    "evidence": "SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/place_object_test2.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
     "reason": "Corpus convention mismatch: Ruffle's runner defaults log_warnings=true (ErrorReporting on), but this gnash golden is Flash with ErrorReporting off. Set log_warnings=false so Flash's debug-warning lines are stripped from our output, as Ruffle does for such rows.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-occupied-depth",
     "added": "2026-11-25"
@@ -203,7 +203,7 @@
     "upstream_sha256": "3ec2bea767cbe6fc88e029ea64d1e0986de82e1d72931bfe1f3116dfb596724d",
     "fix": "from_gnash/misc-ming.all/path_format_test/test.toml",
     "kind": "toml",
-    "evidence": "SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/path_format_test.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
+    "evidence": "SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/path_format_test.logwarn.txt: FP32 with ErrorReportingEnable == output.txt + 'Warning:' lines (the gnash golden was captured without it); FP32 without it == output.txt (w1-local-oracles/w1-render-flash-headroom)",
     "reason": "Corpus convention mismatch: Ruffle's runner defaults log_warnings=true (ErrorReporting on), but this gnash golden is Flash with ErrorReporting off. Set log_warnings=false so Flash's debug-warning lines are stripped from our output, as Ruffle does for such rows.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 w2-occupied-depth",
     "added": "2026-11-25"
@@ -214,7 +214,7 @@
     "upstream_sha256": "9457577c0e2657edb6d76242a52918083c264e6b05f4aeddcba8c98b5c868f57",
     "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame1.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame1.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame1.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
     "reason": "Linux == Windows; no text. The golden is not FP32 output: 242 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
     "added": "2026-11-25"
@@ -225,7 +225,7 @@
     "upstream_sha256": "fafe6f25840c65c9933dca081b615d0bd7095bb14489865fdac26548dd422455",
     "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame2.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame2.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame2.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
     "reason": "Linux == Windows; no text. The golden is not FP32 output: 482 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
     "added": "2026-11-25"
@@ -236,7 +236,7 @@
     "upstream_sha256": "b8192efdd14b10301621acabc363709a9769f81dbe8cf8114fb8919b2f638b9d",
     "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame3.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame3.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame3.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
     "reason": "Linux == Windows; no text. The golden is not FP32 output: 722 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
     "added": "2026-11-25"
@@ -247,7 +247,7 @@
     "upstream_sha256": "9457577c0e2657edb6d76242a52918083c264e6b05f4aeddcba8c98b5c868f57",
     "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame5.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame5.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame5.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
     "reason": "Linux == Windows; no text. The golden is not FP32 output: 242 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
     "added": "2026-11-25"
@@ -258,7 +258,7 @@
     "upstream_sha256": "fafe6f25840c65c9933dca081b615d0bd7095bb14489865fdac26548dd422455",
     "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame6.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame6.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame6.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
     "reason": "Linux == Windows; no text. The golden is not FP32 output: 482 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
     "added": "2026-11-25"
@@ -269,7 +269,7 @@
     "upstream_sha256": "b8192efdd14b10301621acabc363709a9769f81dbe8cf8114fb8919b2f638b9d",
     "fix": "from_gnash/misc-ming.all/loop/simple_loop_test/frame7.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame7.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/from_gnash__misc-ming.all__loop__simple_loop_test__frame7.png (draw() wrapper, quality=low; .win.png identical, 0 px)",
     "reason": "Linux == Windows; no text. The golden is not FP32 output: 722 channels over tol 1 vs Flash (hairline stroke rows one pixel off). Since n-stroke-snap 09b2c9130 ours == Flash exactly (0 channels), so the row went pass -> fail against the Ruffle golden only. Frame 4's golden already equals Flash and is left alone.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 snap-pixel-audit",
     "added": "2026-11-25"
@@ -280,7 +280,7 @@
     "upstream_sha256": "61e874ea95d2e1cd29de18ff8a2b6d3cec962c16887c79f422bf3f3e6ba7c7db",
     "fix": "avm2/displayobject_mask/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__displayobject_mask__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__displayobject_mask__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 56 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 56, with the w2-lowq-sample-point model 38.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -291,7 +291,7 @@
     "upstream_sha256": "ded41d1837cccfbaf75b1922936576667c62a2c4a069a71cc73781408e3769b4",
     "fix": "avm2/displayobject_scrollrect/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__displayobject_scrollrect__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__displayobject_scrollrect__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 428 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 428, with the w2-lowq-sample-point model 152.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -302,7 +302,7 @@
     "upstream_sha256": "57ca7a640859a08e34a943c91adf7055e0d6f831bd0d94d52afc1255ceebd3ec",
     "fix": "avm2/graphics_bad_direct_commands/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__graphics_bad_direct_commands__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__graphics_bad_direct_commands__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 588 channels over tol 1 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 588, with the w2-lowq-sample-point model 273.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -313,7 +313,7 @@
     "upstream_sha256": "95d5847c13f11b532e577704e426bd8d7c36ddda9e85e95d04a0783f0fdbe29e",
     "fix": "avm2/loader_loadbytes_events/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__loader_loadbytes_events__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__loader_loadbytes_events__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 188 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 188, with the w2-lowq-sample-point model 102.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -324,7 +324,7 @@
     "upstream_sha256": "f2ac0f3c903b5b63006b380da4d1bd4f7e367c5aea51e5f27ca0d4d3e5585046",
     "fix": "avm2/mouse_pick_dobj_mask/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__mouse_pick_dobj_mask__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__mouse_pick_dobj_mask__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 177 channels over tol 1 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 177, with the w2-lowq-sample-point model 99.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -335,7 +335,7 @@
     "upstream_sha256": "fbf9ee13f46c6ea362ff33798a798d15b6bf3a711efb7f910bab5ad73f88ed22",
     "fix": "avm2/mouse_pick_non_interactive_dobj_mask/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__mouse_pick_non_interactive_dobj_mask__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/avm2__mouse_pick_non_interactive_dobj_mask__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 168 channels over tol 1 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 168, with the w2-lowq-sample-point model 90.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -346,7 +346,7 @@
     "upstream_sha256": "a2863d38a26ddf6ab4ac5ad549b815d3066fd73f077d6b088eaffae5bb2a9e28",
     "fix": "from_gnash/misc-ming.all/morph_test1/frame1.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame1.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame1.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 393 channels over tol 5 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 393, with the w2-lowq-sample-point model 193.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -357,7 +357,7 @@
     "upstream_sha256": "ec067376161e496e459a211cea15002fa082f8a2e2f09e97ed4cd875758161a6",
     "fix": "from_gnash/misc-ming.all/morph_test1/frame2.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame2.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame2.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1563 channels over tol 5 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1563, with the w2-lowq-sample-point model 1530.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -368,7 +368,7 @@
     "upstream_sha256": "e0c82ff953a8177e158571f7017ee5efc12738113ae5fb3fd72ab80b98dbd26f",
     "fix": "from_gnash/misc-ming.all/morph_test1/frame3.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame3.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame3.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1563 channels over tol 5 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1563, with the w2-lowq-sample-point model 1530.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -379,7 +379,7 @@
     "upstream_sha256": "768bf7b0c490d26ce9e19a524f8f37ddffdb2f68dc91026d59c741d69873764e",
     "fix": "from_gnash/misc-ming.all/morph_test1/frame4.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame4.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame4.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1563 channels over tol 5 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1563, with the w2-lowq-sample-point model 1530.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -390,7 +390,7 @@
     "upstream_sha256": "9f2c12c0452856ea18a1f506db03250c455b15440bb3b9b1c1c310f9abf768c0",
     "fix": "from_gnash/misc-ming.all/morph_test1/frame5.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame5.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame5.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1563 channels over tol 5 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1563, with the w2-lowq-sample-point model 1530.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -401,7 +401,7 @@
     "upstream_sha256": "3015ef17ff68246064d265f001c275e9a0431626eb3a05439511e7fb0f7485c9",
     "fix": "from_gnash/misc-ming.all/morph_test1/frame6.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame6.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/from_gnash__misc-ming.all__morph_test1__frame6.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 760 channels over tol 5 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 760, with the w2-lowq-sample-point model 727.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -412,7 +412,7 @@
     "upstream_sha256": "3af62136d6a84efdb5b016a4008637f117009f72cf471b5efdbf09362a25c1c6",
     "fix": "visual/blend_modes/add/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__add__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__add__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 5465 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 5718, with the w2-lowq-sample-point model 3978.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -423,7 +423,7 @@
     "upstream_sha256": "68e6a1ab865873e37285e91cbf3040d54e80bae2a3fdfb4d4cd7da389fcc0a83",
     "fix": "visual/blend_modes/darken/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__darken__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__darken__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 8513 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 6966, with the w2-lowq-sample-point model 6160.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -434,7 +434,7 @@
     "upstream_sha256": "01fb402e81e96e35227ae3948754f3fff01955ba470c7b2e4beced90749923e8",
     "fix": "visual/blend_modes/difference/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__difference__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__difference__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 7535 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 8574, with the w2-lowq-sample-point model 5030.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -445,7 +445,7 @@
     "upstream_sha256": "8bd24a270dc305bcbc9c7c5561cd5f1d75350b617993ac28cf127f5ddf07511a",
     "fix": "visual/blend_modes/hardlight/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__hardlight__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__hardlight__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 11610 channels over tol 4 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 10636, with the w2-lowq-sample-point model 8812.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -456,7 +456,7 @@
     "upstream_sha256": "ded7a04a808212943a111b87da6728e332a005a1473b84e3834bce6720c1179d",
     "fix": "visual/blend_modes/invert/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__invert__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__invert__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 12800 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 11141, with the w2-lowq-sample-point model 10040.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -467,7 +467,7 @@
     "upstream_sha256": "882883e43bf0a7aeef70a962c15312c4d54a15fe561d343d1b2bd8d7139ddf04",
     "fix": "visual/blend_modes/lighten/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__lighten__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__lighten__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 5980 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 7252, with the w2-lowq-sample-point model 4346.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -478,7 +478,7 @@
     "upstream_sha256": "0e3e29d2cac7125c03f5b05fc4038e7732f91b1ffa9f90aa21e86856921520a8",
     "fix": "visual/blend_modes/multiply/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__multiply__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__multiply__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 8659 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 7227, with the w2-lowq-sample-point model 6324.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -489,7 +489,7 @@
     "upstream_sha256": "c213c1d7af3e14f8b4fc013c226873b2b2830c30719fc2b8e3e1fa01499ed91a",
     "fix": "visual/blend_modes/overlay/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__overlay__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__overlay__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 10463 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 9558, with the w2-lowq-sample-point model 8096.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -500,7 +500,7 @@
     "upstream_sha256": "2ff39cc8effa6e5111cb86b90517e55c3f895c375feeced175fcd1ed5cd2370a",
     "fix": "visual/blend_modes/screen/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__screen__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__screen__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 5839 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 6049, with the w2-lowq-sample-point model 4180.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -511,7 +511,7 @@
     "upstream_sha256": "607c41ed0ff037db5ba75f3189c2092c1cf312a2bc992698105e41ead0300973",
     "fix": "visual/blend_modes/subtract/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__subtract__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__subtract__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 5797 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 6406, with the w2-lowq-sample-point model 4037.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -522,7 +522,7 @@
     "upstream_sha256": "55c8a23f384f5bbc47cb5ff203e486f33bc1ec9c0db55e6da05b84aaf7813dc9",
     "fix": "visual/blend_modes/alpha_no_layer/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__alpha_no_layer__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__alpha_no_layer__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
     "reason": "Flash LOW (Linux --screen capture (non-LAYER blend; Windows has no screen path, its draw() == Linux draw() exactly), deterministic x2). Golden is 12301 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 10751, with the w2-lowq-sample-point model 9586.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -533,7 +533,7 @@
     "upstream_sha256": "55c8a23f384f5bbc47cb5ff203e486f33bc1ec9c0db55e6da05b84aaf7813dc9",
     "fix": "visual/blend_modes/erase_no_layer/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__erase_no_layer__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__erase_no_layer__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
     "reason": "Flash LOW (Linux --screen capture (non-LAYER blend; Windows has no screen path, its draw() == Linux draw() exactly), deterministic x2). Golden is 11990 channels over tol 3 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 10154, with the w2-lowq-sample-point model 9320.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -544,7 +544,7 @@
     "upstream_sha256": "87f5d2dd2155ced8b804fae703185808aaa6065046d04844b8893175516f6201",
     "fix": "visual/blend_modes/layer_alpha/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__layer_alpha__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__layer_alpha__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
     "reason": "Flash LOW (Linux --screen capture (non-LAYER blend; Windows has no screen path, its draw() == Linux draw() exactly), deterministic x2). Golden is 13763 channels over tol 2 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 12322, with the w2-lowq-sample-point model 11067.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -555,7 +555,7 @@
     "upstream_sha256": "e0418fb3cfa90fa14ff68a60c1768a2c989fcbad2aaf827ff4416e6b76d54982",
     "fix": "visual/blend_modes/layer_erase/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__layer_erase__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__blend_modes__layer_erase__output.screen.low.png (s28 lowq-recapture, quality=low, --screen)",
     "reason": "Flash LOW (Linux --screen capture (non-LAYER blend; Windows has no screen path, its draw() == Linux draw() exactly), deterministic x2). Golden is 11579 channels over tol 3 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 9786, with the w2-lowq-sample-point model 9032.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -566,7 +566,7 @@
     "upstream_sha256": "a4ce7a8f9dcc028ce39a856729f6fb5729eaba88019543b590994acc1a55cd1d",
     "fix": "visual/cache_as_bitmap/drawing_api/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__cache_as_bitmap__drawing_api__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__cache_as_bitmap__drawing_api__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1798 channels over tol 1 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1798, with the w2-lowq-sample-point model 603.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -577,7 +577,7 @@
     "upstream_sha256": "d6e91705b859d20799a0a399e06b2e7c0b7e1483f272b5c74f47cc86758ee745",
     "fix": "visual/cache_as_bitmap/nested_rotation/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__cache_as_bitmap__nested_rotation__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__cache_as_bitmap__nested_rotation__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 387 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 387, with the w2-lowq-sample-point model 96.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -588,7 +588,7 @@
     "upstream_sha256": "b23fab29efba9867de049f0ae1bb16cdfe703441670c6ece10c40535e586fa61",
     "fix": "visual/drawing_api/gradient_focal_point/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__drawing_api__gradient_focal_point__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__drawing_api__gradient_focal_point__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 28805 channels over tol 13 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 28809, with the w2-lowq-sample-point model 28747.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -599,7 +599,7 @@
     "upstream_sha256": "82438ee7859619e24ead31f20f5c0f18cc3cbc9015ebdc784def61d2aaa94029",
     "fix": "visual/filters/color_matrix/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__filters__color_matrix__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__filters__color_matrix__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 16717 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 16707, with the w2-lowq-sample-point model 16674.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -610,7 +610,7 @@
     "upstream_sha256": "f480a924338ea7bb76dd8d613a6d44059fa120ec34c56896b6bb24b131f5063e",
     "fix": "visual/fonts/glyph/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__fonts__glyph__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__fonts__glyph__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1656 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1656, with the w2-lowq-sample-point model 1470.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -621,7 +621,7 @@
     "upstream_sha256": "797df64e649fe7f5322ad115f25508e376b23de4e7fe9c9b4758eb4b86064f04",
     "fix": "visual/simple_shapes/gradients/focal_radial/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__focal_radial__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__focal_radial__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 10366 channels over tol 13 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 3, with the w2-lowq-sample-point model 0 (PASS).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -632,7 +632,7 @@
     "upstream_sha256": "073e512f4a90a29c0348aff7bcb119d1eb8996a3f976af2ef5ce67a3cfee5679",
     "fix": "visual/simple_shapes/layers/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__layers__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__layers__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() within the test tolerance, Linux deterministic x2). Golden is 1759 channels over tol 0 vs Flash LOW (not FP32 at the row's quality). Ours vs Flash: origin/master 1756, with the w2-lowq-sample-point model 1754.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -643,7 +643,7 @@
     "upstream_sha256": "368269ddb52fdd3c6223ffdb2fd48bb972373a56c5fa7f167bf53a49dbd7aaac",
     "fix": "visual/simple_shapes/gradients/gradients/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__gradients__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__gradients__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 6959 channels over tol 1 vs Flash LOW. Ours vs Flash: master 5874, with the s28 lowq-corner-rule model 3 (s28 lowq-corner-rule swap).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -654,7 +654,7 @@
     "upstream_sha256": "ca27636699ca3f05d330f3974b213d9867b10a208e1c5d31c36a961b82489c9b",
     "fix": "visual/simple_shapes/gradients/reflect/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__reflect__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__reflect__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 644343 channels over tol 1 vs Flash LOW. Ours vs Flash: master 645528, with the s28 lowq-corner-rule model 5628 (s28 lowq-corner-rule swap).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -665,7 +665,7 @@
     "upstream_sha256": "ff4a4e8aa607b4d16f4edbb2202203b42617cb9c3815c593f502e9a2ff4163b3",
     "fix": "visual/simple_shapes/gradients/repeat/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__repeat__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__simple_shapes__gradients__repeat__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 649083 channels over tol 1 vs Flash LOW. Ours vs Flash: master 649083, with the s28 lowq-corner-rule model 5628 (s28 lowq-corner-rule swap).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -676,7 +676,7 @@
     "upstream_sha256": "ad390a26fa486ee5547ba2db140ec0d1e7aea04dbcd942bfea71abd18994bdf8",
     "fix": "visual/opaque_background/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__opaque_background__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__opaque_background__output.low.png (s28 lowq-recapture, quality=low, wrapper draw())",
     "reason": "Flash LOW (Linux == Windows draw() exactly, Linux deterministic x2). Golden is 6248 channels over tol 1 vs Flash LOW. Ours vs Flash: master 3474, with the s28 lowq-corner-rule model 1956 (s28 lowq-corner-rule swap).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s28 lowq-recapture (quality=LOW golden swaps)",
     "added": "2026-11-25"
@@ -687,7 +687,7 @@
     "upstream_sha256": "33840d2058e77411b8afe35defb2257a97ef47b9e8b17d7d5b0912165126b1f1",
     "fix": "from_shumway/invalidClipDepth/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule/flash_rest/from_shumway__invalidClipDepth__output.low.png (s28 lowq-corner-rule, Linux, quality=low, wrapper draw()); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/from_shumway__invalidClipDepth.win.low.png byte-identical (s29 coordinator)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule/flash_rest/from_shumway__invalidClipDepth__output.low.png (s28 lowq-corner-rule, Linux, quality=low, wrapper draw()); Windows FP32 SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/from_shumway__invalidClipDepth.win.low.png byte-identical (s29 coordinator)",
     "reason": "Flash LOW, Linux == Windows byte for byte. Golden differs from Flash by max 1 per channel (tolerance 0 row). Ours (s28 LOW model) == FP32: 1800 -> 0 channels (lowq-corner-rule §6).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW swap candidates (Windows check)",
     "added": "2026-11-26"
@@ -698,7 +698,7 @@
     "upstream_sha256": "d4783ec2c59a4bffde181d90cb38dcd9e7308cb1d4d7acf7a156b82da488b624",
     "fix": "from_shumway/acid/acid-filter/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule/flash_rest/from_shumway__acid__acid-filter__output.low.png (s28 lowq-corner-rule, Linux, quality=low, wrapper draw()); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/from_shumway__acid__acid-filter.win.low.png 0 outliers at tol 0 (s29 coordinator)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule/flash_rest/from_shumway__acid__acid-filter__output.low.png (s28 lowq-corner-rule, Linux, quality=low, wrapper draw()); Windows FP32 SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/from_shumway__acid__acid-filter.win.low.png 0 outliers at tol 0 (s29 coordinator)",
     "reason": "Flash LOW, Linux == Windows exactly. Golden is 268 px over tol 3 (max 255) from Flash. Ours vs FP32 with the s28 LOW model: 104 (was 536).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW swap candidates (Windows check)",
     "added": "2026-11-26"
@@ -709,7 +709,7 @@
     "upstream_sha256": "8a560703303501c347fec258addb1711cd8f3a3119069c2be191c74f4c414948",
     "fix": "avm2/dependent_strings/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__dependent_strings.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__dependent_strings.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
     "reason": "Ruffle's golden prints the result of ruffle::isDependent() (a Ruffle-internal debug hook, not a Flash API); FP32 traces \"\" for every such call. Our output == FP32 (no code change). mm -> pass.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-disposition-land",
     "added": "2026-11-26"
@@ -720,7 +720,7 @@
     "upstream_sha256": "fea57d93a65052f6a50ea4cd4b83b4b4bd7b75f50487158085d5240d0deeddd3",
     "fix": "avm2/loader_applicationDomain/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__loader_applicationDomain.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__loader_applicationDomain.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
     "reason": "FP32 refuses a URLLoader fetch whose URLRequest.digest is set (signed-RSL .swz): 'Error #2044: Unhandled securityError:. text=Error #2046: The loaded file did not have a valid signature.' + 2-frame stack (Linux == Windows). Ruffle loads the SWZ and lists its classes. Lands with the s29 w2-disposition-land digest -> #2046 path: ours == FP32 byte-exact, mm -> pass.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-disposition-land",
     "added": "2026-11-26"
@@ -731,7 +731,7 @@
     "upstream_sha256": "2e9e8caecb1d7ae1a610e5b2035e8b5a72989fcb6e80bf87c23f86152f449846",
     "fix": "avm2/swz/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__swz.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__swz.r1.txt (s28 trace-provenance; Linux == Windows per trace-provenance.md)",
     "reason": "Same FP32 #2046 securityError path as loader_applicationDomain (Linux == Windows); Ruffle loads the SWZ and lists its asset classes. With the s29 w2-disposition-land patch we print line 1 exactly; the 2 stack lines lack FP's [file:line] debug suffixes (ABC debugline, open lead L1). Stays mm (1/3).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-disposition-land",
     "added": "2026-11-26"
@@ -742,7 +742,7 @@
     "upstream_sha256": "245bbbe565caebe7a88c40ba7120563d8d3a2cb57e4fd75c20c6bd7d6144b137",
     "fix": "visual/simple_shapes/text_field_mask/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.low.png (s29 coordinator, Linux LNX 32,0,0,465, quality=low, tick 1, new stub); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.win.low.png byte-identical (0 ch at tol 0)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.low.png (s29 coordinator, Linux LNX 32,0,0,465, quality=low, tick 1, new stub); Windows FP32 SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/text_field_mask.win.low.png byte-identical (0 ch at tol 0)",
     "reason": "Flash LOW, Linux == Windows exactly. Golden (Ruffle) differs from Flash by 1189 px / 2378 ch at tol 0 (max 255), all in the big embedded-font 'W' glyphs. Ours vs FP32 (s29 w2-pixel-gaps-land): master 2404 ch -> 1336 ch with the LOW glyph pen -> whole device px rule (tag.c tf_glyph_quarter_snap).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-pixel-gaps-land golden swaps (text_field_mask, gradientTransform)",
     "added": "2026-11-26"
@@ -753,7 +753,7 @@
     "upstream_sha256": "e5c1b6995d46ddd9300b0c248c547178996dbc6f500ebd7dc51fa13c9ece6c31",
     "fix": "from_shumway/gradientTransform/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.low.png (s29 coordinator, Linux, quality=low as test.toml runs it, new stub); Windows FP32 SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.win.low.png byte-identical; SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.high.png == upstream golden exactly (the golden is Flash at HIGH)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.low.png (s29 coordinator, Linux, quality=low as test.toml runs it, new stub); Windows FP32 SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.win.low.png byte-identical; SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/gradientTransform.high.png == upstream golden exactly (the golden is Flash at HIGH)",
     "reason": "The upstream golden is Flash at quality HIGH (0 px vs FP32 HIGH at tol 3) but the row runs at quality LOW. FP32 LOW differs from it by 3 px / 9 ch over tol 3 (max 15); Linux == Windows. Grade the LOW row against Flash LOW.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-pixel-gaps-land golden swaps (text_field_mask, gradientTransform)",
     "added": "2026-11-26"
@@ -929,7 +929,7 @@
     "upstream_sha256": "ad5e505a91c21ae4fb00a29a18a00063873e3df0fb86db01dcd03a16788fbcb2",
     "fix": "avm2/try_catch_typed/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-rm-avm2/try_catch_typed.fp32.txt (s29 coordinator, LNX debug projector, direct pinned)",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-rm-avm2/try_catch_typed.fp32.txt (s29 coordinator, LNX debug projector, direct pinned)",
     "reason": "The SWF carries DebugFile/DebugLine ops and the FP32 debug player (the only player with getStackTrace) prints the [file:line] suffixes: '\\tat Test()[Z:\\\\tests\\\\tests\\\\swfs\\\\avm2\\\\try_catch_typed\\\\Test.as:33]' and '\\tat test_fla::MainTimeline/frame1()[test_fla.MainTimeline::frame1:1]'. The upstream golden (Ruffle, no suffixes) is not FP32 output. Ours (with s29 debug line info, bucket P) == FP32.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-rm-avm2-land FP debug-player [file:line] suffixes",
     "added": "2026-11-26"
@@ -940,7 +940,7 @@
     "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "fix": "avm2/slot_holes_fail/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__slot_holes_fail.r1.txt (s28 trace-provenance)",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__slot_holes_fail.r1.txt (s28 trace-provenance)",
     "reason": "The upstream golden is EMPTY by Ruffle convention (its test.toml: uncaught errors are not compared). FP32 rejects the ABC at load (avmplus Traits::buildBindings: slot_id > the trait block's nameCount) and logs VerifyError #1107. Ours does not implement the check yet (O3): stays failing vs Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-rm-avm2-land slot-id VerifyError #1107",
     "added": "2026-11-26"
@@ -951,7 +951,7 @@
     "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "fix": "avm2/slot_id_exceeds_trait_count/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__slot_id_exceeds_trait_count.r1.txt (s28 trace-provenance)",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__slot_id_exceeds_trait_count.r1.txt (s28 trace-provenance)",
     "reason": "The upstream golden is EMPTY by Ruffle convention (its test.toml: uncaught errors are not compared). FP32 rejects the ABC at load (avmplus Traits::buildBindings: slot_id > the trait block's nameCount) and logs VerifyError #1107 + ReferenceError #1065 (document class SlotTest never defined). Ours does not implement the check yet (O3): stays failing vs Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 w2-rm-avm2-land slot-id VerifyError #1107",
     "added": "2026-11-26"
@@ -962,7 +962,7 @@
     "upstream_sha256": "67b5143aecdf4a1f414da538ef2bc8d431ade68f706cfe2ff53d00d6b13c1bf9",
     "fix": "from_shumway/acid/acid-color/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-color.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "evidence": "Flash Player 32 LOW capture SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-color.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
     "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
     "added": "2026-11-27"
@@ -973,7 +973,7 @@
     "upstream_sha256": "5f2cfe4e68fe5ae749b2321d106a237e41cb2d88706cfcdebb1c1bc933441ce5",
     "fix": "from_shumway/acid/acid-color/frame1.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-color__frame1.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "evidence": "Flash Player 32 LOW capture SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-color__frame1.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
     "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
     "added": "2026-11-27"
@@ -984,7 +984,7 @@
     "upstream_sha256": "20be0aa92b173f732ca3da9144281e66d3b94f01cb9a9d7be4c71663c2998d4b",
     "fix": "from_shumway/acid/acid-gc/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-gc.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "evidence": "Flash Player 32 LOW capture SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-gc.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
     "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
     "added": "2026-11-27"
@@ -995,7 +995,7 @@
     "upstream_sha256": "18852694407f302d4de5bd028386f3eac4bc817bed3031220e98a0ab2fbd9858",
     "fix": "from_shumway/acid/acid-gradient-1/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-gradient-1.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
+    "evidence": "Flash Player 32 LOW capture SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/from_shumway__acid__acid-gradient-1.low.png (s29 coordinator, --quality low, wrapper draw(); Windows LOW byte-identical; == the s27 golden-provenance capture)",
     "reason": "Golden is not Flash LOW. FP32 LOW is platform-stable (WIN == LNX, 0 px) and equals the s27 capture. With s29 TSNAP (1fcf2b1c1) ours == this capture (w2-lowq-tsnap report §5).",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW TSNAP golden swaps",
     "added": "2026-11-27"
@@ -1006,7 +1006,7 @@
     "upstream_sha256": "22c1e56f57c0d1d32fdccef95bce46947a07a7dd2e853dc22ab1fb00bf4800d4",
     "fix": "visual/drawing_api/drawing_order/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__drawing_api__drawing_order__output.low.png (s28 lowq-recapture LNX LOW == WIN LOW (0 px, re-checked s29))",
+    "evidence": "Flash Player 32 LOW capture SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/visual__drawing_api__drawing_order__output.low.png (s28 lowq-recapture LNX LOW == WIN LOW (0 px, re-checked s29))",
     "reason": "ours (s29 TSNAP + LOW stroke raster) 3016 ch vs this capture; was 12784. Golden is a Ruffle LOW render.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW stroke raster golden swaps",
     "added": "2026-11-27"
@@ -1017,7 +1017,7 @@
     "upstream_sha256": "91a1d1a5edf4cb11dae0b79c08770f80b676e875bbf9be4660ee28324ff7525c",
     "fix": "visual/drawing_api/cursor/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 LOW capture SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2b-lowq-stroke/cursor.low.png (s29 coordinator LNX LOW == WIN LOW == s27 golden-provenance capture (0 px))",
+    "evidence": "Flash Player 32 LOW capture SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2b-lowq-stroke/cursor.low.png (s29 coordinator LNX LOW == WIN LOW == s27 golden-provenance capture (0 px))",
     "reason": "ours (s29 LOW stroke raster) 2 ch vs this capture; golden is 399 px off Flash. Golden is a Ruffle LOW render.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s29 LOW stroke raster golden swaps",
     "added": "2026-11-27"
@@ -1028,7 +1028,7 @@
     "upstream_sha256": "86ea6d0357486bba508e8c58efc2ae5041c272dfb0db3331f3474e83f1499a53",
     "fix": "from_shumway/acid/acid-large/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/pre-launch-oracles/from_shumway__acid__acid-large.lnx.low.png (s29 coordinator pre-s30 pass, Linux, quality=low, 500 ticks, wrapper draw()); Windows FP32 from_shumway__acid__acid-large.win.low.png byte-identical",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/pre-launch-oracles/from_shumway__acid__acid-large.lnx.low.png (s29 coordinator pre-s30 pass, Linux, quality=low, 500 ticks, wrapper draw()); Windows FP32 from_shumway__acid__acid-large.win.low.png byte-identical",
     "reason": "Flash LOW, Linux == Windows byte for byte. Golden (Ruffle-made) is 178 720 channels over tol 11 from Flash; ours (s29 FINAL, TSNAP + LOW stroke raster) 138 478. Stays fail, now graded against Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 acid-large FP32 LOW swap",
     "added": "2026-11-27"
@@ -1039,7 +1039,7 @@
     "upstream_sha256": "944d4304b9de960378dd7ab3827e8135415482470fb930713db41441ad77cf9d",
     "fix": "from_shumway/timeline/nav/clipDepth/test.toml",
     "kind": "toml",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/from_shumway_timeline_nav_clipDepth.f6.lnx.txt (s30 coordinator, LNX debug projector, direct pinned, 6 frames) == the 8-line golden exactly, nothing after it",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/from_shumway_timeline_nav_clipDepth.f6.lnx.txt (s30 coordinator, LNX debug projector, direct pinned, 6 frames) == the 8-line golden exactly, nothing after it",
     "reason": "The golden (Shumway's FP capture) covers 4 ticks: frame 4's script does gotoAndStop(1), which prints the last 2 lines. Ruffle's num_ticks = 3 cuts it at 6 lines. num_ticks = 4 prints exactly the golden.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-rm-avm2-land clipDepth getObjectsUnderPoint clip layers",
     "added": "2026-11-27"
@@ -1050,7 +1050,7 @@
     "upstream_sha256": "47b3ab24ed48b61e97bfcd099600cdf7fae4423bd71a60a297ae8ffe177311ce",
     "fix": "avm2/swf_9_goto_in_construct_frame/output.txt",
     "kind": "trace",
-    "evidence": "Flash Player 32 trace SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/avm2_swf_9_goto_in_construct_frame.f6.lnx.txt and .f6r2.lnx.txt (s30 coordinator, LNX, direct pinned, 6 frames; both captures identical over the first 19 lines)",
+    "evidence": "Flash Player 32 trace SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/avm2_swf_9_goto_in_construct_frame.f6.lnx.txt and .f6r2.lnx.txt (s30 coordinator, LNX, direct pinned, 6 frames; both captures identical over the first 19 lines)",
     "reason": "The 20-line golden ends mid-tick: its last line 'MyContainer enterFrame' opens a third tick whose next line in FP32 is 'MyOtherChild onEnterFrame' (FP's steady state is a 6-line cycle that starts at enterFrame). The fix is the FP32 capture cut at the clean tick boundary after line 19 (= the golden's first 19 lines), which is what num_ticks = 3 covers (Ruffle's own output.ruffle.txt also stops before that enterFrame). num_ticks unchanged.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-rm-avm2-land SWF<=9 goto-placed children constructed in the frame-script walk",
     "added": "2026-11-27"
@@ -1061,7 +1061,7 @@
     "upstream_sha256": "d0e85fedbc37983ca8956ac3083557f42d8e93760465eeaebfceca09dc896e30",
     "fix": "from_shumway/acid/acid-scale/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/from_shumway_acid_acid-scale.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, wrapper draw(); --screen capture within 3 channels); Windows FP32 from_shumway_acid_acid-scale.win.low.png identical (0 channels)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/from_shumway_acid_acid-scale.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, wrapper draw(); --screen capture within 3 channels); Windows FP32 from_shumway_acid_acid-scale.win.low.png identical (0 channels)",
     "reason": "Flash LOW, Linux == Windows. golden (Ruffle) 11 240 ch (t0) from Flash; ours s30 before 1 690, after w2-lowq-land 1 850. Stays fail (limit 0), now graded against Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-lowq-land FP32 LOW grading",
     "added": "2026-11-27"
@@ -1072,7 +1072,7 @@
     "upstream_sha256": "fc2a3c1a1a1f60ea37c559c82bd888164f2bd7c6e201738a680c3663a28d62ea",
     "fix": "visual/simple_shapes/overlaps/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/visual_simple_shapes_overlaps.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, wrapper draw(); --screen capture within 3 channels); Windows FP32 visual_simple_shapes_overlaps.win.low.png identical (0 channels)",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/visual_simple_shapes_overlaps.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, wrapper draw(); --screen capture within 3 channels); Windows FP32 visual_simple_shapes_overlaps.win.low.png identical (0 channels)",
     "reason": "Flash LOW, Linux == Windows. golden (Ruffle) 1 795 ch (t0) from Flash; ours s30 before 1 091, after w2-lowq-land 747. Stays fail (limit 0), now graded against Flash.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-lowq-land FP32 LOW grading",
     "added": "2026-11-27"
@@ -1083,7 +1083,7 @@
     "upstream_sha256": "a5b9b76fd3d2f391182fb2b17876a7057cfa7705bded5fc86473ecfcc04ad544",
     "fix": "visual/simple_shapes/heavy_tesselation/output.expected.png",
     "kind": "image",
-    "evidence": "Flash Player 32 capture SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/visual_simple_shapes_heavy_tesselation.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, --screen run; draw() png); Windows FP32 .win.low.png within 42 channels",
+    "evidence": "Flash Player 32 capture SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-lowq-land/screen/visual_simple_shapes_heavy_tesselation.lnx.low.png (s30 coordinator, Linux, quality=low, 1 tick, --screen run; draw() png); Windows FP32 .win.low.png within 42 channels",
     "reason": "Flash LOW, host-stable (WIN vs LNX 42 ch). Golden (Ruffle) 69 352 ch from Flash; ours at interim #2 (a18a0e033) 44 486. Its interim #2 move (+20% vs the Ruffle golden, w2-lowq-land tie rule) was unpriced; graded against Flash from now on. Stays fail.",
     "rvf": "RUFFLE_VS_FLASH_DIFFERENCES.md: s30 w2-lowq-land FP32 LOW grading",
     "added": "2026-11-27"
@@ -1094,7 +1094,7 @@
     "upstream_sha256": "f0cb87e153b80348231a7794d56ae6818c90e01a34dfbf1196453a4e77581e53",
     "fix": "avm1/global_instance_decls/test.toml",
     "kind": "toml",
-    "evidence": "Golden = FP32 LNX table (session30-fanout-reports/pre-launch-oracles/README.md §6: 0 diff apart from the TZ line); it prints 'Sat Apr 4 00:00:00 GMT+0200 2020'. w2b-native-residues measured the line == golden under this mock_timezone",
+    "evidence": "Golden = FP32 LNX table (SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/pre-launch-oracles/README.md §6: 0 diff apart from the TZ line); it prints 'Sat Apr 4 00:00:00 GMT+0200 2020'. w2b-native-residues measured the line == golden under this mock_timezone",
     "reason": "The golden's host TZ was +0200 in April 2020 (CEST; any +2 zone prints the same single line). Our default NPT pin prints +0545. Row stays output_mismatch (161 other lines).",
     "rvf": "",
     "added": "2026-11-27"

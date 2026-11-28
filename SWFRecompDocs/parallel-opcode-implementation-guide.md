@@ -749,7 +749,7 @@ cd SWFRecomp/tests/trace_swf_4
   ./validate.py
 ```
 
-**For detailed information about the test system design**, see `SWFRecompDocs/plans/completed/test-system-redesign-plan.md`
+**For detailed information about the test system design**, see `SWFRecomp-CC-history:SWFRecompDocs/plans/completed/test-system-redesign-plan.md`
 
 ## Opcode Categories and Complexity
 
@@ -1036,7 +1036,7 @@ void assertRefcount(ASObject* obj, u32 expected) {
 4. **Create validate.py** - Copy from `templates/validate.py.template` and implement validation
 5. **Test validation** - Run `cd .. && ./all_tests.sh` to verify
 
-**Prompt-based approach**: For each prompt in `SWFRecompDocs/prompts/completed/`:
+**Prompt-based approach**: For each prompt in `SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/`:
 - The prompt contains test cases and expected outputs
 - Create `test_info.json` based on opcode metadata in prompt
 - Create `validate.py` based on expected outputs in prompt
@@ -1411,7 +1411,7 @@ The combined repository structure eliminates integration complexity, and the wel
 6. Document any edge cases encountered
 
 **For adding validation to existing tests**:
-1. Check `SWFRecompDocs/prompts/completed/` for test specifications
+1. Check `SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/` for test specifications
 2. Navigate to existing test directory
 3. Create test_info.json from template
 4. Create validate.py based on expected outputs in prompt

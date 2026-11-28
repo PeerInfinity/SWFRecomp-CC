@@ -2,7 +2,7 @@
 
 One-task session after `n-trap-stroke` (`n-trap-stroke-report.md` §5), launched by `s27-coordinator`.
 Baseline: master `ea61076e1` (pulled to `e4275bc4e`). Brief:
-`SWFRecompDocs/plans/session27-fanout-reports/n-ragdoll-strokes-prompt.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/n-ragdoll-strokes-prompt.md`.
 
 **Summary**
 - **Goal 1, shot-1560 "ragdoll thin strokes": the premise was wrong, and the bug was ours (§1, §2).**

@@ -3,7 +3,7 @@
 Companion to [`performance-optimizations.md`](performance-optimizations.md): every
 shipped optimization in that catalog, classified by its relationship to Ruffle.
 Analysis session 2026-07-22, prompted by
-[`../prompts/perf-optimizations-ruffle-applicability.md`](../prompts/perf-optimizations-ruffle-applicability.md).
+[`SWFRecomp-CC-history:SWFRecompDocs/prompts/perf-optimizations-ruffle-applicability.md`](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/perf-optimizations-ruffle-applicability.md).
 
 **Ruffle revision read:** `be11d7e89` (local checkout `~/CC/ruffle`, read-only;
 carries our uncommitted oracle/perf patches, none of which touch the code cited
@@ -820,7 +820,7 @@ Marked per the prompt's rule that uncertainty is a legitimate verdict.
 - Catalog being annotated: [`performance-optimizations.md`](performance-optimizations.md)
 - Per-lever A/B evidence: `tools/divergence/perf/RWK_AB_STATUS.md`,
   `tools/divergence/perf/SEEDLING_AB_STATUS.md`
-- Session prompt: [`../prompts/perf-optimizations-ruffle-applicability.md`](../prompts/perf-optimizations-ruffle-applicability.md)
+- Session prompt: [`SWFRecomp-CC-history:SWFRecompDocs/prompts/perf-optimizations-ruffle-applicability.md`](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/perf-optimizations-ruffle-applicability.md)
 - Ruffle checkout recovery: [`ruffle-local-patches.md`](ruffle-local-patches.md)
 - Memory: [[swfrecomp-purpose-beat-ruffle-perf]],
   [[rwk-ruffle-gap-is-1_3x-not-11x]], [[avm2-goto-catchup-walk-gate]],

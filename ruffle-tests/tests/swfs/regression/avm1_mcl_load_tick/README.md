@@ -39,7 +39,7 @@ So this fixture uses a **one-frame** loader, for which `loadClip` takes the
 the two-bucket deferral (`builtin_mcl_loadClip`'s `defer_to_next_tick` +
 `actionPromotePendingMCLLoads`). A two-frame-loader fixture would encode
 Ruffle's delivery tick and must not be created. Analysis:
-`SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md` §4.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md` §4.
 
 ## The shape
 

@@ -1,6 +1,6 @@
 // s27 w1-text-glyph-fidelity item 4 (AVM2 side); landed by s27
 // w2-draw-cx-text. Build: build_swf.sh (mxmlc; test.swf is the coordinator's
-// build archived under SWFRecompDocs/plans/session27-fanout-reports/
+// build archived under SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/
 // w1-local-oracles/w1-text-glyph-fidelity/avm2_bitmapdata_draw_edittext_box/).
 // output.txt is FLASH PLAYER 32's trace (flash.txt there). Flash: the box IS
 // drawn, but neither the draw ct (A) nor the field's own cx (B) tints it,

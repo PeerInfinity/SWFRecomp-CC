@@ -34,7 +34,7 @@ same architecture Archipelago-CC's Bounce Demo uses for Doodle Jump.
   blue/brown/catch/keys). N's analog already exists: `n_loader/gen/nProbe.js` +
   `calibrate.mjs` + `nTelemetry.js` (per-frame `NF` traces).
 
-Related: `SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`,
+Related: `SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`,
 `SWFRecompDocs/reference/n-level-and-demo-format.md`,
 `SWFRecompDocs/plans/n-level-generator-plan.md` (§2 "N has a dual oracle").
 

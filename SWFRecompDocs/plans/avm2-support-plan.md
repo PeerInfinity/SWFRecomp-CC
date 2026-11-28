@@ -389,7 +389,7 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   edge-semantics / button event-order).
 - **Stage 6 — TextField/EditText engine (+ Stage-5 stragglers)** —
   **DONE 2026-07-12** (`45a507da5`..`415205ed7` + docs; prompt
-  `SWFRecompDocs/prompts/avm2-stage6-text.md`): all 13 Stage-5
+  `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-stage6-text.md`): all 13 Stage-5
   stragglers first (instance scope = class scope + [class object] for
   static-slot writes, SimpleButton event-order/naming/set_state_child
   semantics, nextScene/prevScene fallback, per-type goto Replace,

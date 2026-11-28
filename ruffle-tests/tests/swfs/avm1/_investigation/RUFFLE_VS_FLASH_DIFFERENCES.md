@@ -380,7 +380,7 @@ with both tests unlisted, `loader_load` (gap 2) and `bom` (gap 3) were the two
 cheapest-looking rows in the entire 4400-test corpus and headed *every* near-pass
 regeneration. The session-13 board audit re-costed them from scratch before
 noticing they were already ruled unwinnable here
-(`SWFRecompDocs/plans/session13-fanout-reports/wave1-board-audit.md` §4.3(c)).
+(`SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/wave1-board-audit.md` §4.3(c)).
 
 - **Suite-local** (`ruffle-tests/tests/swfs/avm2/ignored_tests.txt`): **added**
   2026-08-06, following the s11 precedent for `loader_applicationDomain` / `swz`
@@ -658,7 +658,7 @@ There is no Flash render of the two tests above themselves, so the evidence for 
 golden (an optional Flash capture of `bitmapdata_opaque` pixel (9,9) would settle it first-hand).
 
 **Ours** (session 22 `w2-draw-bigcap-aa`, CPU `draw()` 4x-sample AA): always anti-aliases, as Flash. The
-alternative (`session22-fanout-reports/w2-draw-bigcap-aa-qualitygate.patch`, AA off at LOW) would keep both
+alternative (`SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/w2-draw-bigcap-aa-qualitygate.patch`, AA off at LOW) would keep both
 rows passing and leave `_quality_low` failing — i.e. match Ruffle against Flash's own golden.
 
 **Decision**: match Flash (user ruling 2026-09-29). Net pixel effect: +3 (`acid-bitmap-draw_quality_high`,
@@ -746,7 +746,7 @@ criterion:** Ruffle's `replace_text` inherits the run format at index 0.
 ## AVM1 `BitmapData.applyFilter` onto an OPAQUE target, and live PlaceObject3 ColorMatrix caches (s27 w2b-avm1-applyfilter-flash)
 
 **Tests** (all `regression/`, Flash Player 32 goldens captured by the coordinator, archived under
-`SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/`):
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/`):
 `avm1_applyfilter_{blur,glow,bevel,convolution}` (trace + image), `avm1_po3_color_matrix_live{,_nested}` (image).
 
 **Flash** (what we now implement; Ruffle at `1e604fa87` does none of it):
@@ -780,7 +780,7 @@ channels over tolerance 6, max diff 0. The upstream golden is 342 229 px off Fla
 `visual/filters/blur_fractional` golden is Flash-exact. That settles s26's "the two goldens contradict each other": the
 `blur_quality` golden is the wrong one. Its upstream history begins at `5f840bf103` "tests: Add a visual test for blur
 filter quality" (2023-07-24) and has no Flash-reference commit. Evidence:
-`SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md` (table row plus the re-priced board), Flash PNG
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md` (table row plus the re-priced board), Flash PNG
 `golden-provenance/visual__filters__blur_quality__output.png`.
 
 **Decision:** match Flash (user ruling: Flash over Ruffle). The image row stays failing against the Ruffle golden,
@@ -806,7 +806,7 @@ quality low).
 YCbCr→RGB, i.e. stb-like. That is why stb sat on the golden.
 
 **Flash** (Flash Player 32 LNX 32,0,0,465 capture of this SWF, quality low; draw() wrapper,
-`SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-jpeg-flash-decode/acid-color-0/flash.png`) decodes
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-jpeg-flash-decode/acid-color-0/flash.png`) decodes
 the way IJG v7+ does: chroma upsampled by a 16×16 IDCT, truncating colour (bit-exact on the Flash golden of
 `bitmapdata-clone`). On the 15 836 footprint pixels where the two decoders differ (same box, lavapipe, s27
 `w2b-jpeg-refine`):
@@ -832,7 +832,7 @@ checked against our render), or Ruffle adopting a DCT-scaled decoder.
 <!-- image-axis: visual/definefont4 output -->
 
 **Tests (pixel axis):** the five rows below. Their upstream `output.expected.png` is not Flash Player 32 output on
-either OS. The s27 golden-provenance sweep (round 2, goal 4; `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`)
+either OS. The s27 golden-provenance sweep (round 2, goal 4; `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`)
 captured each one with the real FP32 debug projector. The Linux and Windows captures are pixel-identical, and for
 `strokes/scale` the root capture also equals the wrapper capture.
 
@@ -865,10 +865,10 @@ when upstream changes the golden; then re-capture with Flash.
 
 ## s28 trace-provenance: Ruffle trace goldens checked against Flash Player 32 (2026-11-25)
 
-The s28 trace-provenance sweep (`SWFRecompDocs/plans/session28-fanout-reports/trace-provenance.md`) ran the real FP32 debug
+The s28 trace-provenance sweep (`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance.md`) ran the real FP32 debug
 projector (`tools/flash-oracle/run_trace.py`, pinned direct mode, cross-checked `--no-pin`, a 20 s cap and the Windows
 projector) over every non-passing and `ruffle_matched` trace row at results `e1425f417`. The Ruffle≠Flash trace
-differences it confirmed are below. FP32 captures are in `session28-fanout-reports/trace-provenance/`.
+differences it confirmed are below. FP32 captures are in `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/`.
 
 **Golden ≠ Flash, fixed through `ruffle-tests/flash_fixes/`** (Linux pinned ×2 == `--no-pin` == Windows):
 
@@ -939,7 +939,7 @@ regression goldens swapped to Flash).
 
 | test | Flash vs golden | ours vs FP32 | decision |
 |---|---|---|---|
-| `avm1/watch_recursion_swf6` | FP32 prints `  o2.prop: ` with a trailing space (1 line); the golden's trailing whitespace was stripped | **0** (byte-identical) | flash_fixes entry (golden = FP32 capture `session28-fanout-reports/trace-provenance/avm1__watch_recursion_swf6.r1.txt`); expected `ruffle_matched` → pass |
+| `avm1/watch_recursion_swf6` | FP32 prints `  o2.prop: ` with a trailing space (1 line); the golden's trailing whitespace was stripped | **0** (byte-identical) | flash_fixes entry (golden = FP32 capture `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm1__watch_recursion_swf6.r1.txt`); expected `ruffle_matched` → pass |
 | `avm1/watch_recursion_double_swf6` | same, 4 lines | **0** | same; expected `ruffle_matched` → pass |
 
 ## gnash action_execution_order_test12 (fp10): onEnterFrame of a clip removed later in the same tick
@@ -968,7 +968,7 @@ Flash also runs a clip's onClipEvent(enterFrame) in the same exec-list walk as t
 corroborated by gnash `actionscript.all/HitTest-v6/v7/v8` (`HitTest.as:66/67/73/140/141/142`, Flash-derived
 expectations Ruffle fails).
 **Evidence:** FP32 LNX debug projector, direct, pinned (== no-pin for the 640x520 probe):
-`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-leads/`.
 
 **Flash:** in the frame where `_root._x`, `_root._xscale` or the clip's own `_x` changes, `clip.hitTest(x, y, true)`
 first rejects the (root-local → global, live `_root` matrix) point against the clip's world bounds as of the last
@@ -1007,7 +1007,7 @@ composer. The whole pixels are folded into the blur's pre-shift (floor), and the
 remainder goes through the composite's LINEAR sampler.
 
 **Priced losses (Ruffle goldens; graded on the pixels the change moves, vs the archived
-FP32 captures in session28-fanout-reports/w1-local-oracles):**
+FP32 captures in SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles):**
 
 | row | moved px | vs FP32 direct capture: Σ\|err\| before → after | px closer after / before |
 |---|---|---|---|
@@ -1031,7 +1031,7 @@ default font, so they stay far from FP32 in text either way.
 - frame4 passes, as before.
 
 **Flash:** ours now equals the s27 golden-provenance Flash Player 32 captures **exactly** on all six frames (0 px over
-max diff 1; `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/from_gnash__misc-ming.all__loop__simple_loop_test__frameN.png`).
+max diff 1; `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance/from_gnash__misc-ming.all__loop__simple_loop_test__frameN.png`).
 Those six goldens were already graded "not Flash" (121/241/361 px off Flash, max 255). frame4's golden is Flash-exact
 and still passes. The cause is Flash's thin-stroke rule:
 - axis-aligned strokes of ≤ 1 px, 2 px or 3 px device width are drawn solid on whole pixels;
@@ -1049,7 +1049,7 @@ re-triage the stroke snap.
 
 **Update (s28 snap-pixel-audit, 2026-11-25):** the six goldens are now swapped for the Flash Player 32 captures through
 `ruffle-tests/flash_fixes/` (re-captured: draw() wrapper at quality low, Linux == Windows at 0 px,
-`SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/`). Master (`00b35fa5e`) still equals them
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit/flash/png/`). Master (`00b35fa5e`) still equals them
 exactly, so the six rows return to pass. This entry stays as the record of why the goldens differ.
 
 ## s28 stroke snap at quality LOW: 31 image comparisons lose a Ruffle golden while moving toward Flash (s28 snap-pixel-audit)
@@ -1079,7 +1079,7 @@ Whole-image outlier channels vs Flash, before → after: `add` 6344 → 5718, `d
 
 Neutral rows: `drawing_order` (1492 vs 1501 changed px within 2), `masks` ×2 (2/2), `displacement_map` (387/397) and
 `layers` (1 px). `drawing_order`'s remaining gap is a separate geometry one: Flash's 3-px rect stroke is 2 px narrower
-on each axis. Full table: `SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit-report.md`.
+on each axis. Full table: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/snap-pixel-audit-report.md`.
 
 **Not covered here:**
 - the default-font `visual/filters/*` rows (`bevel` ×4, `drop_shadow`, `glow` ×3): host fonts make them ungradable;
@@ -1097,7 +1097,7 @@ re-triage the stroke code).
 
 ## Unfiltered cacheAsBitmap: no pixel snap at quality HIGH (s28 w2-lowq-sample-point)
 
-**Capture:** Flash Player 32 LNX, `session28-fanout-reports/w1-local-oracles/w1-avm2-vector-flash/lowq_sample_point.high.png`
+**Capture:** Flash Player 32 LNX, `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-avm2-vector-flash/lowq_sample_point.high.png`
 (AS3 probe `w1-avm2-vector-flash-fixtures/lowq_sample_point/Test.as`, cell x 0-40 / y 120-160): a 25x25 shape with
 `cacheAsBitmap = true`, no filters, at (7.5, 127.5).
 - **HIGH:** columns 7 and 32 and rows 127 and 152 are half coverage (`(128, 213, 255)` over white): the cached bitmap is
@@ -1121,7 +1121,7 @@ chunking; the same Linux-only artifact as shumway `loader-events` in the s28 tra
 
 | evidence | count |
 |---|---|
-| gnash `actionscript.all/MovieClipLoader-v7/v8`, **Windows** FP32 (`session28-fanout-reports/trace-provenance/*.win1.txt`) | `Number of onLoadProgress runs: 4` over 2 loads (vars.txt, 4387-byte green.jpg); Linux r1: 5 |
+| gnash `actionscript.all/MovieClipLoader-v7/v8`, **Windows** FP32 (`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/*.win1.txt`) | `Number of onLoadProgress runs: 4` over 2 loads (vars.txt, 4387-byte green.jpg); Linux r1: 5 |
 | `avm1/mcl_replace_root_swf7_to_swf5/6` golden (Flash per trace-provenance) | 2 × `loaded=97 total=97` |
 | `avm1/mcl_unloadclip`, Linux FP32 (`w1-local-oracles/w1-loaded-shell-residuals/mcl_unloadclip.flash32.txt`; 118-byte target, below one chunk, so Linux == Windows) | 2 (golden: 1) |
 | `avm1/mcl_target_png`, Linux FP32 (4534-byte target) | 3 (golden: 1); Windows predicted 2 |
@@ -1130,7 +1130,7 @@ chunking; the same Linux-only artifact as shumway `loader-events` in the s28 tra
 **Ours (since s28 w2-loaded-shell-land):** 2 for every load (`actionFirePendingLoadInits` Phase 1). This
 matches Windows FP32 and every Linux capture below 4096 bytes. **Golden ≠ Flash, flash_fixes candidates** (our
 output, = golden + one more `onLoadProgress` per load, is archived as the predicted golden in
-`session28-fanout-reports/w2-loaded-shell-land-predicted-goldens/`): `avm1/mcl_unloadclip` (Flash capture ==
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w2-loaded-shell-land-predicted-goldens/`): `avm1/mcl_unloadclip` (Flash capture ==
 ours, byte-exact), `avm1/mcl_loadclip` (68-byte target, 5 loads), `avm1/mcl_target_png`, `_jpg`, `_gif87a`,
 `_gif89a` and `avm1/mcl_mislabeled_target` (> 4096 bytes: need a WINDOWS capture). Until fixed these 7 rows grade
 pass → `output_mismatch` against the Ruffle golden.
@@ -1169,14 +1169,14 @@ max_outliers 500), so a regression to Ruffle's untinted rect fails by ~12x the b
   it even on the SWF-5 keep-both path). Ruffle-authored goldens are captured that way (`log_warnings` defaults true);
   gnash goldens were captured WITHOUT ErrorReporting (they also lack Flash's other warnings). We keep printing it, and
   the 3 gnash rows get `log_warnings = false` via `flash_fixes` (test.toml) so it is stripped there.
-- Evidence: `SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/` and
+- Evidence: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w2-occupied-depth/` and
   `…/w1-render-flash-headroom/` (2026-11-25). An earlier s28 note ("Flash never prints it") was a harness artifact
   (captures without ErrorReporting).
 
 ### s28 w2b-gnash-holds: gnash hidden-gap HOLDs answered by FP32 (2026-11-25)
 
 Oracle: FP32 LNX direct traces of `regression/avm1_gnash_flash_probes{,_v6,_v5}` (SWF 8/6/5; captures in
-`SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/`), plus the FP32 gnash goldens. Ruffle
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/`), plus the FP32 gnash goldens. Ruffle
 fails every gnash row below (`known_failure`, `output.ruffle.txt` = Ruffle's own lines); we now match Flash.
 
 | mechanism | Flash (FP32) | Ruffle | rows |
@@ -1217,7 +1217,7 @@ only on `PAD` and the stage size, not on font metrics. Flash does not render the
 Oracle: Flash Player 32 at `--quality low`, using the wrapper's `draw()`, or `--screen` for the non-LAYER blends
 `alpha_no_layer`, `erase_no_layer`, `layer_alpha` and `layer_erase`. Linux captures were byte-identical over 2 runs.
 Windows `draw()` == Linux within each row's tolerance.
-Captures: `SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/`. Report: `…/lowq-recapture-report.md`.
+Captures: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-recapture/png/`. Report: `…/lowq-recapture-report.md`.
 
 The Ruffle goldens below are Ruffle renders at quality low: GPU pixel-centre sampling and the hardware-lerp
 gradient ramp. FP32 LOW samples slanted fill edges at the scanline TOP. Its horizontal and vertical edges follow
@@ -1260,7 +1260,7 @@ We keep these rows' goldens (test.toml says low; see the report, §5).
 `regression/lowq_gradient_orient_probe` (Flash 32 LOW golden, 71 cells).
 
 **Flash 32 at quality LOW** (probe fits, pixel-exact except fixed-point ties; report
-`SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule-report.md`):
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule-report.md`):
 - gradient paint is evaluated at the pixel's TOP-LEFT corner, for every linear orientation, mirror, skew and
   placement, and for radials;
 - linear ramps read entry floor(256 t); radial and focal ramps read round(256 t);
@@ -1285,7 +1285,7 @@ goldens sit 640k+ channels away from FP32 (ours with the rules: 5 628).
 s28 lowq-corner-rule named five quality=low rows whose Ruffle goldens differ from the Linux FP32 LOW capture while our
 LOW model is close to it (invalidClipDepth 0, gradient 16, acid-gradient-0 61, acid-gradient 1 686, acid-filter 104).
 The Windows FP32 projector (`run_image.py --windows --quality low`, wrapper draw()) decides which are platform-stable.
-Captures: `SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/`.
+Captures: `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/swapcheck-win/`.
 
 | test | WIN vs LNX FP32 (tol 0) | golden vs WIN / LNX (tol 3) | decision |
 |---|---|---|---|
@@ -1308,7 +1308,7 @@ FP32 host.
 Ruffle's AVM2 `paletteMap` builds each channel LUT with `arg.get_enumerant_value(i)`. For an `ArrayObject` that is the
 enumerant `i-1` (`core/src/avm2/object/array_object.rs`, `get_enumerant_value`: `index.checked_sub(1)`), so Ruffle's
 `lut[i] = arr[i-1]` and `lut[0]` reads undefined → 0. Real Flash Player 32 (LNX 32,0,0,465, coordinator capture
-`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-drift/palettemap_avm2_index.fp32.txt`) reads `arr[i]`:
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-drift/palettemap_avm2_index.fp32.txt`) reads `arr[i]`:
 
 ```
 identity arrays opaque: 0xFF102030            (Ruffle's arr[i-1] predicts 0xFF0F1F2F)
@@ -1336,7 +1336,7 @@ px and composes glyph translations unrounded (rot30 glyph bottom 69.75 px; Ruffl
 `render/src/matrix.rs` `Mul`, gives 70.0). Flash's HIGH quality coverage is 4 sub-scanlines per row at y + j/4 with
 exact horizontal coverage, n = round(16 cov), written as floor((dst (16 - n) + c n) / 16) with the exact colour byte;
 Ruffle (and our old path) uses the GPU's MSAA. Evidence and fits:
-`SWFRecompDocs/plans/session29-fanout-reports/w1-text-pixels-report.md` §2,
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-text-pixels-report.md` §2,
 `w2-text-coverage-land-report.md`.
 
 Example (`edittext_border_transform` .04, vs Ruffle golden): px > 2 181 -> 86, still pass (limit 20 outliers at its
@@ -1352,7 +1352,7 @@ adopts an exact-coverage rasteriser, or a Flash capture contradicts the rule.
 ## s29 w1-disposition-audit / w2-disposition-land: corrections and new Ruffle≠Flash entries (2026-11-26)
 
 - **avm2/dependent_strings:** FP32 has no `ruffle::isDependent()`; each call traces `""` (capture
-  `SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__dependent_strings.r1.txt`). We match FP32
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__dependent_strings.r1.txt`). We match FP32
   exactly. flash_fixes swap → pass 83/83 (was mm 46/84 vs the Ruffle golden).
 - **avm2/swz, avm2/loader_applicationDomain:** FP32 refuses a URLLoader fetch whose `URLRequest.digest` is set:
   `Error #2044: Unhandled securityError:. text=Error #2046: The loaded file did not have a valid signature.` + stack
@@ -1361,7 +1361,7 @@ adopts an exact-coverage rasteriser, or a Flash capture contradicts the rule.
   `ul_deliver` dispatch `SecurityErrorEvent` #2046 and print the #2044 report when unhandled)
   `loader_applicationDomain` passes 3/3; `swz` matches line 1 and misses FP's `[file:line]` stack suffixes (1/3).
 - **avm2/bom, avm2/loader_load:** CORRECTION to "AVM2 dynamic-property enumeration order": FP32 order is
-  nondeterministic; the golden is one run. The s29 coordinator's AS3 for-in fixture (`session29-fanout-reports/
+  nondeterministic; the golden is one run. The s29 coordinator's AS3 for-in fixture (`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/
   w1-local-oracles/w1-disposition-audit/forin_order/flash.r{1,2}.txt`) shows a hash-scattered order that changes
   between two FP32 runs of the same SWF (4 of 7 key sets reorder) and ignores insertion order. Neither Ruffle's
   hashbrown order nor our insertion order is "Flash's order"; the rows are re-dispositioned as Flash-nondeterministic
@@ -1379,7 +1379,7 @@ adopts an exact-coverage rasteriser, or a Flash capture contradicts the rule.
 
 **Tests:** `visual/simple_shapes/text_field_mask`, `from_shumway/gradientTransform` (both `quality = "low"`).
 **Evidence:** coordinator FP32 captures, new stub, Linux LNX 32,0,0,465 and Windows, byte-identical across hosts:
-`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/{text_field_mask,gradientTransform}{,.win}.low.png`
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-pixel-flash-gaps/{text_field_mask,gradientTransform}{,.win}.low.png`
 and `gradientTransform.high.png` (README in the same directory).
 
 | test | golden → FP32 LOW | ours → FP32 LOW, master | ours → FP32 LOW, w2-pixel-gaps-land |
@@ -1399,8 +1399,8 @@ and `gradientTransform.high.png` (README in the same directory).
 upstream ships a Flash LOW golden (the entry then prints `UPSTREAMED`).
 ## AVM2 rm pool landed: Date capture host, debug `[file:line]`, freestanding `super`, interface aliases, `scrollV` (s29 w2-rm-avm2-land, 2026-11-26)
 
-Diagnosis: `SWFRecompDocs/plans/session29-fanout-reports/w1-rm-avm2-report.md`. Landing report:
-`SWFRecompDocs/plans/session29-fanout-reports/w2-rm-avm2-land-report.md`.
+Diagnosis: `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-rm-avm2-report.md`. Landing report:
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w2-rm-avm2-land-report.md`.
 
 1. **Date capture host (15 avmplus `ecma3/Date` rows).** The goldens are FP32 output on a US-Pacific Windows host
    (current US DST rule applied to every year, e.g. `Fri Apr 3 17:00:00 GMT-0700 1970`), captured 2025-07-23 ~22:00 PDT.
@@ -1423,7 +1423,7 @@ Diagnosis: `SWFRecompDocs/plans/session29-fanout-reports/w1-rm-avm2-report.md`. 
 5. **`scrollV` survives a TextField `height =`** (clamped to maxScrollV) (`avm2/edittext_getcharboundaries_culling`):
    the golden's scroll-4 block starts at line 3 for every height; Ruffle's `relayout` resets it. Match Flash.
 6. **Slot-id VerifyError #1107** (`avm2/slot_holes_fail`, `avm2/slot_id_exceeds_trait_count`): upstream goldens are
-   EMPTY by Ruffle convention (uncaught errors not compared). FP32 (`session28-fanout-reports/trace-provenance/avm2__slot_*.r1.txt`)
+   EMPTY by Ruffle convention (uncaught errors not compared). FP32 (`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance/avm2__slot_*.r1.txt`)
    rejects the ABC (avmplus `Traits::buildBindings`: raw slot id > the trait block's `nameCount`) and logs
    `VerifyError: Error #1107…` (+ `ReferenceError: Error #1065: Variable SlotTest is not defined.`). flash_fixes
    `output.txt` swaps to the captures; we do not implement the check yet (lead O3), so both stay failing vs Flash.
@@ -1438,7 +1438,7 @@ Flash Player 32 at quality LOW snaps each placed object's device translation to 
 ties to even (s29 `w2-lowq-tsnap`, `1fcf2b1c1`; fixture `regression/lowq_tsnap_tie_probe`, FP32 golden). With it our
 LOW render of these four comparisons equals the FP32 LOW capture at 0 channels. The Ruffle goldens (GPU pixel-centre
 LOW, no translation snap) are 2 to 3 792 outliers away. Fresh FP32 LOW captures (LNX == WIN, 0 px; identical to the
-s27 golden-provenance captures) in `SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/`.
+s27 golden-provenance captures) in `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-lowq-tsnap/`.
 
 **Decision:** match Flash; goldens swapped through `flash_fixes` (4 entries). Prune criterion: Ruffle's LOW renderer
 adopts the translation snap, or upstream re-bakes these goldens from Flash.
@@ -1446,7 +1446,7 @@ adopts the translation snap, or upstream re-bakes these goldens from Flash.
 ## s29 w2b-tabindex: `_root.tabIndex` raw-property mode (2026-11-27)
 
 - **avm1/tab_ordering_properties_tab_index_edge_case** (`known_failure`): FP32 prints `asdf asdf2 5 asdf3` (raw; capture
-  `SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-disposition-audit/tab_edge_corpus.flash.txt`); Ruffle
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-disposition-audit/tab_edge_corpus.flash.txt`); Ruffle
   prints `-2147483648 -2147483648 5 -2147483648` (`output.ruffle.txt`, its i32 setter always runs). Rule fitted on 13
   single-variable FP32 fixtures + 3 MTASC captures (`w1-local-oracles/w2-disposition-land/`, `L3b_tabindex*`): the
   timeline root has no native tabIndex accessor until a name lookup on the root misses its own properties (a read
@@ -1459,7 +1459,7 @@ adopts the translation snap, or upstream re-bakes these goldens from Flash.
 **Tests:** `from_gnash/misc-swfc.all/gotoFrameFromInterval`, `gotoFrameFromInterval2`
 (both `known_failure = true` upstream; FLASH `output.txt`); regression fixtures
 `avm1_goto_target_child_order_{normal,gotoscript,interval}` (FP32 goldens, s29
-coordinator capture `session29-fanout-reports/w1-local-oracles/w1-timers-goto/goto_*.r1.txt`).
+coordinator capture `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-timers-goto/goto_*.r1.txt`).
 
 A root goto (from a frame script or from a setInterval callback) whose target
 frame is `DoAction A / PlaceObject2 c1, c2 (sprites with frame-1 scripts) /
@@ -1483,7 +1483,7 @@ target-frame child's deferred init at its own tag position
 **Tests:** `from_gnash/actionscript.all/MovieClip-v5..v8`, `from_gnash/misc-ming.all/matrix_test` (FP32 goldens, all
 `ruffle_matched` before: Ruffle's `output.ruffle.txt` carries the same wrong lines); `regression/avm1_mc_super_native_probe`
 and `regression/avm1_rotation_matrix_fixed` (FP32 captures,
-`SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-rm-avm1-gnash/`).
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-rm-avm1-gnash/`).
 
 FP32 differs from Ruffle on six MovieClip rules (evidence: `w1-rm-avm1-gnash-report.md`, `w2-rm-avm1-gnash-land-report.md`):
 1. `super(v)` from a plain function called on a clip calls `this.__proto__.__constructor__` with the clip as `this`
@@ -1523,7 +1523,7 @@ these rules, or upstream re-bakes the goldens from Flash.
 **Test:** `from_shumway/acid/acid-large` (quality LOW, 500 ticks, tolerance 11).
 
 FP32 LOW (wrapper `draw()`, LAYER-only content) on Linux and Windows is byte-identical
-(`session30-fanout-reports/pre-launch-oracles/from_shumway__acid__acid-large.{lnx,win}.low.png`). The upstream golden is
+(`SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/pre-launch-oracles/from_shumway__acid__acid-large.{lnx,win}.low.png`). The upstream golden is
 Ruffle-made and is 178 720 channels over tolerance from Flash; ours at `2d40d3799` (TSNAP + LOW stroke raster) is
 138 478. The row went pass → fail in s29 when TSNAP moved us toward Flash (priced).
 
@@ -1543,7 +1543,7 @@ Ruffle's exporter render (the old golden) is 13 763 / 11 979 channels (tol 2) fr
 ## s30 w2-rm-avm2-land: eight AVM2 rules from `w1-rm-avm2`, plus pixelBounds, clip layers, two golden fixes (2026-11-27)
 
 All goldens below are FP32 (s28 trace-provenance or the s30 coordinator captures in
-`SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/`). Every row is `known_failure` upstream: Ruffle
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/`). Every row is `known_failure` upstream: Ruffle
 prints `output.ruffle.txt`, we now print Flash. Decision for each: **match Flash** (landed, s30
 `w2-rm-avm2-land`). Prune criterion for each: Ruffle adopts the rule, or a Flash capture contradicts it.
 
@@ -1598,7 +1598,7 @@ prints `output.ruffle.txt`, we now print Flash. Decision for each: **match Flash
 **Tests:** `avm2/array_sort_swf10_32bit` (pass), `avm2/array_sort_swf10_64bit` (`ruffle_matched`). The two `test.swf`
 are byte-identical (md5 `92e259984ee6…`).
 
-FP32 (`session30-fanout-reports/w1-local-oracles/w1-rm-avm2/avm2_array_sort_swf10_32bit.r1.{lnx,win}.txt`): the Linux
+FP32 (`SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm2/avm2_array_sort_swf10_32bit.r1.{lnx,win}.txt`): the Linux
 x86_64 projector prints the `_64bit` golden, the Windows projector prints the `_32bit` golden. The numeric sort compare
 of a SWF10 Array depends on avmplus's atom width, so the result is a property of the player build, not a Ruffle≠Flash
 difference. Ruffle fakes the 32-bit form and marks `_64bit` known_failure.
@@ -1611,7 +1611,7 @@ criterion: none (a genuine Flash host split).
 ## s30 w2-lowq-land FP32 LOW grading (coordinator, 2026-11-27)
 
 The LOW vertex-tie bias + field-local pen rule (`w2-lowq-land`) move six already-failing rows away from their
-Ruffle goldens. Graded against FP32 LOW captures (`SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/
+Ruffle goldens. Graded against FP32 LOW captures (`SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/
 w2-lowq-land/README.md` §2):
 - `visual/filters/bevel`, `glow`, `drop_shadow_angles`: our render moves TOWARD Flash (LNX). Flash's own filter
   output is host-dependent (WIN ≠ LNX by 176–46 243 channels), so the goldens are kept (no swap).

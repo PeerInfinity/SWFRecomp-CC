@@ -2,7 +2,7 @@
 
 Status: **IMPLEMENTED + BROWSER-RIG VALIDATED (2026-07-21).** Levers 2A + 1A + 4
 shipped and confirmed on real-GPU Windows Chrome. Session prompt:
-`SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
 
 **FLEET DEPLOYED (2026-07-21, recorded here because docs2 is untracked):** all
 five AVM2 demos (fresh recompile — the four Flixel titles stamp intrinsic id 4

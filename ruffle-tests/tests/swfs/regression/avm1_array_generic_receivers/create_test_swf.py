@@ -11,7 +11,7 @@ undefined binds _global, Ruffle function.rs `call`), and member writes on
 undefined being no-ops. Kept as generated so the bytes match the oracle SWF.
 
 Expected output: Ruffle exporter 0ddd12b6a --frames 1
-(session25-fanout-reports/w0-local-oracles/array_generic_receivers.ruffle-0ddd12b6a.txt).
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session25-fanout-reports/w0-local-oracles/array_generic_receivers.ruffle-0ddd12b6a.txt).
 Generator: s24 w2-attach-order-v8 report (make_l1.py).
 
 Usage: create_test_swf.py <out.swf>

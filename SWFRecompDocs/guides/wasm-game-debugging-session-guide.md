@@ -32,7 +32,7 @@ deploy debugging targets there.)
 
 `.fla` source (ActionScript, inspectable but not recompilable) lives under
 `~/CC/glaiel/` — see the AS-extraction recipe in
-`SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`.
 
 ### Scope: AVM1 only — exclude AVM2/AS3 SWFs
 
@@ -81,8 +81,8 @@ is easier to localize. Sizes (run `ls -laS ~/CC/flasharchive/*.swf` to refresh):
    broken". (Note: results predating the tracer fix `6a08f06aa` are invalid for
    `_root.onEnterFrame`-driven games — see PROGRESS.md.)
 3. **`SWFRecompDocs/games/FLASHARCHIVE_BUILD_RESULTS.md`** — which games build.
-4. **`SWFRecompDocs/status/<date>-<game>-*.md`** — per-game investigation logs
-   (Doodle Jump and Snake have extensive histories; grep `SWFRecompDocs/status/`
+4. **`SWFRecomp-CC-history:SWFRecompDocs/status/<date>-<game>-*.md`** — per-game investigation logs
+   (Doodle Jump and Snake have extensive histories; grep `SWFRecomp-CC-history:SWFRecompDocs/status/`
    for the game name).
 5. **Auto-memory (`MEMORY.md`)** — load-bearing runtime gotchas. The
    game-relevant clusters: MovieClip timeline control, graphics/tag
@@ -387,7 +387,7 @@ Read first (session start):
 - SWFRecompDocs/guides/wasm-game-debugging-session-guide.md (this guide)
 - tools/divergence/PROGRESS.md (where we left off + gotchas)
 - tools/divergence/RESULTS.md (per-game divergence board)
-- <relevant SWFRecompDocs/status/*.md and MEMORY.md entries>
+- <relevant SWFRecomp-CC-history:SWFRecompDocs/status/*.md and MEMORY.md entries>
 
 Reproduce:
 - Diverge: python3 tools/divergence/divergence_test.py "<swf>" --frames 16

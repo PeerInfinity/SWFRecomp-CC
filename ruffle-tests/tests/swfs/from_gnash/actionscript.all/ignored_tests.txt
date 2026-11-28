@@ -54,4 +54,4 @@ argstest-v8
 #  changed (identity permutation under `pop(); return -1` -> nothing written,
 #  length 0; rotation under `pop(); return +1` -> all four written, length 4,
 #  "2,3,4,1"). Historical detail: _investigation/ACCEPTED_DIFFS.md and
-#  SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md.)
+#  SWFRecomp-CC-history:SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md.)

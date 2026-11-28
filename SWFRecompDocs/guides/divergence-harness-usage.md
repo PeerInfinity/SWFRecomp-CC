@@ -5,7 +5,7 @@ and reports the first point at which they disagree — either in `trace()`
 output or in the rendered image.
 
 Background and design decisions:
-`SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`.
 
 ## One-time setup
 

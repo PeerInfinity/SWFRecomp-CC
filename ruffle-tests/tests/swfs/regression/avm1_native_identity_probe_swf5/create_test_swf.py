@@ -2,7 +2,7 @@
 """avm1_native_identity_probe_swf5 — s30 w2-native-table-land probe, SWF5.
 
 Golden = FP32 LNX 32,0,0,465 direct pinned capture (coordinator, 2026-11-27,
-session30-fanout-reports/w1-local-oracles/w2-native-table-land/v5.lnx.txt).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w2-native-table-land/v5.lnx.txt).
 The last residues (ASnative has no __proto__/constructor, SWF5 hasOwnProperty is
 absent on function receivers, SWF5 RemoteLSOUsage.getURLPageSupport) closed by
 s30 w2b-native-residues.

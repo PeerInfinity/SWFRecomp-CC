@@ -1,6 +1,6 @@
 # AVM2 (AS3) SWFs through the in-browser recompiler — assessment (2026-09-02)
 
-Brief: `SWFRecompDocs/prompts/avm2-in-browser-investigation-prompt.md`. Companion to
+Brief: `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-in-browser-investigation-prompt.md`. Companion to
 `in-browser-recompiler-refresh-assessment.md` §7–§9 (how the AVM1 in-browser build
 works). This slice answered the brief's five questions with measurements taken in
 Windows Chrome (real GPU, Playwright from WSL) against the in-browser clang, plus a
@@ -118,7 +118,7 @@ in-browser recompile):
 Corpus forced-on (`tu_split=4096`, so even a small test really splits): zero
 transitions across 4482 tests, run 33710882328; default run at the same commit
 likewise (33710871686). Full write-up:
-`SWFRecompDocs/status/avm2-tu-split-emission.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/status/avm2-tu-split-emission.md`.
 
 ## 2. Data path (Q2)
 
@@ -146,7 +146,7 @@ through the wasmer virtual FS, and the bundle's own `draws.c` compile.
 > **Superseded 2026-09-02 — do not start from this section.** Its cheap-win bullet
 > shipped (§6.4) and took most of what the blob was for with it. The blob ITSELF is
 > ruled out on the post-slice numbers; the verdict, with the then/now table, is
-> `SWFRecompDocs/status/avm2-dead-payload-skip.md` §"Is the payload blob still worth
+> `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-dead-payload-skip.md` §"Is the payload blob still worth
 > it?". Re-measure before reopening. The design below is kept as the record of what
 > was considered.
 Emit the byte payloads as a binary file the page hands to the host directly; keep the
@@ -274,7 +274,7 @@ env override `SWF_TRY_HELPER=1`), OFF by default — with it off the emitted C i
 byte-identical to before the option existed (verified by recompiling a mixed
 AVM1/AVM2 set with the pre-change and post-change binaries and `diff -r`).
 What landed differs from the sketch below in three places; see
-`SWFRecompDocs/status/avm2-try-helper-emission.md` for the full design:
+`SWFRecomp-CC-history:SWFRecompDocs/status/avm2-try-helper-emission.md` for the full design:
 - the try frame's storage is an **opaque runtime-defined blob**
   (`Avm2TryFrameStorage`, `AVM2_TRY_FRAME_STORAGE` = 512 bytes, `op_index`
   hoisted out of it so the body keeps updating it with a plain store), not an
@@ -351,7 +351,7 @@ recommendation and (c') the fallback.
 | try-helper emission mode (§4.1) | done | AVM1 try/catch in the page (§7.3 of the stage-2 doc) — also done |
 | TU-splitting flag (§1.3) | done | 1.6× faster in-browser compile; Snailiad-class titles compile at all; bundle path parallel builds; gcc-ICE guard for giant TUs |
 | Skip the AVM1 bitmap/sound payload for AS3 SWFs (§2.2) | done | bundle path (−68.7 s, −2.23 GiB gcc RAM for Seedling), −138.7 MB C, −20.7 MB static; in-page compile 414.1 → 277.4 s |
-| Payload blob (§2.2) | **ruled out** | the three things it bought are now 3–10× smaller and none is near a ceiling — verdict + then/now table in `SWFRecompDocs/status/avm2-dead-payload-skip.md` |
+| Payload blob (§2.2) | **ruled out** | the three things it bought are now 3–10× smaller and none is near a ceiling — verdict + then/now table in `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-dead-payload-skip.md` |
 | Runtime-set `SWF_URL`/sizes for the host (§3) | ~0.5 day | origin-gated titles (RWF/RWIC) |
 | Host variant + loader + pipeline (§3) | done | — |
 
@@ -378,7 +378,7 @@ lockstep, so `tagInit` stays valid C rather than reachable-but-wrong. The arrays
 are still DEFINED, in the one-element empty form an SWF with no such content
 already produces, so `main.c`'s `sizeof(bitmap_data)` wiring and
 `guest_main_graphics.c`'s exports keep linking untouched. Numbers above and in
-the full write-up: `SWFRecompDocs/status/avm2-dead-payload-skip.md`.
+the full write-up: `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-dead-payload-skip.md`.
 
 ### 6.3 TU-split emission mode (2026-09-02, follow-up slice) — SHIPPED
 Recompiler option `tu_split` (§1.3), off by default: each DoABC tag's method
@@ -389,7 +389,7 @@ target: zero transitions across 4482 tests (run 33710882328); default run at the
 same commit likewise (33710871686). In the page, Snailiad now compiles and
 renders (1717.5 s) where its methods TU previously never finished, and Seedling's
 compile drops 668.8 s → 414.1 s. Full write-up:
-`SWFRecompDocs/status/avm2-tu-split-emission.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/status/avm2-tu-split-emission.md`.
 
 ### 6.1 Try-helper emission mode (2026-09-02, follow-up slice) — SHIPPED
 Recompiler option `try_helper` (§4.1), off by default. AVM2 method bodies with
@@ -403,7 +403,7 @@ page: `avm2/try_catch` and `avm1/try_catch_finally` now match their
 `output.txt` byte for byte, `avm2/graphics_draw_path` traces through every
 throw, Seedling still renders its title screen. Full write-up (including the
 two defects the first in-page AVM1 run surfaced):
-`SWFRecompDocs/status/avm2-try-helper-emission.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/status/avm2-try-helper-emission.md`.
 
 ### 6.2 The AVM2 host variant slice
 

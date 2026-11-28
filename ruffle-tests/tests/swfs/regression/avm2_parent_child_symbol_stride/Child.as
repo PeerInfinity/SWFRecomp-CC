@@ -40,7 +40,7 @@ package {
             // The embedded PNG is 4x3. Reading its DIMENSIONS (not just its
             // class name) is the child-bitmap lock: the pixels live in the
             // CHILD movie's bitmap table, and until
-            // SWFRecompDocs/status/child-embedded-asset-lookup.md
+            // SWFRecomp-CC-history:SWFRecompDocs/status/child-embedded-asset-lookup.md
             // embedded_bitmap_for_char scanned only the MAIN movie's, so this
             // read came back 0x0 here and 4x3 when the same SWF is the root.
             trace("child:pix:" + o.width + "x" + o.height);

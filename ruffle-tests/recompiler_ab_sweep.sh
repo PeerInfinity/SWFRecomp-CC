@@ -13,14 +13,14 @@
 # (~25 min for the whole corpus at `-P 2`).
 #
 # Three s16/s17 agents each re-wrote this ad hoc before it was promoted here:
-#   * session16-fanout-reports/w2-gfx-flatten-legC-report.md  (`sweep.sh`
+#   * SWFRecomp-CC-history:SWFRecompDocs/plans/session16-fanout-reports/w2-gfx-flatten-legC-report.md  (`sweep.sh`
 #     + `boundscheck.sh` — the full-corpus A/B and the shape-bounds projection
 #     that REFUTED the premise the leg had been held on: 418 tests' C changed,
 #     0 bounds arguments moved)
-#   * session16-fanout-reports/w2-gfx-gradient-report.md      (same pattern)
-#   * session17-fanout-reports/w2-scope-opt-report.md         (4493-SWF marker
+#   * SWFRecomp-CC-history:SWFRecompDocs/plans/session16-fanout-reports/w2-gfx-gradient-report.md      (same pattern)
+#   * SWFRecomp-CC-history:SWFRecompDocs/plans/session17-fanout-reports/w2-scope-opt-report.md         (4493-SWF marker
 #     sweep + a 139-test byte A/B: exact answer "1 test affected")
-#   * session17-fanout-reports/w2-avm2-smalls-report.md       (single-binary
+#   * SWFRecomp-CC-history:SWFRecompDocs/plans/session17-fanout-reports/w2-avm2-smalls-report.md       (single-binary
 #     audit sweep driven by an env var — the `--audit-env` mode below)
 #
 # WHAT IT DOES

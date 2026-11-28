@@ -11,12 +11,12 @@ bring-up.
 adopt, which its architecture forecloses, and which are AOT-only — see
 [`performance-optimizations-vs-ruffle.md`](performance-optimizations-vs-ruffle.md)
 (analysis session prompted by
-[`../prompts/perf-optimizations-ruffle-applicability.md`](../prompts/perf-optimizations-ruffle-applicability.md)).
+[`SWFRecomp-CC-history:SWFRecompDocs/prompts/perf-optimizations-ruffle-applicability.md`](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/perf-optimizations-ruffle-applicability.md)).
 
 **Where the detailed records live:** per-lever A/B logs with full method are
 `tools/divergence/perf/RWK_AB_STATUS.md` (RWK/AVM2 base-compute arc) and
 `tools/divergence/perf/SEEDLING_AB_STATUS.md` (Seedling/AVM2 arc); AVM1-era
-work is in dated docs under `SWFRecompDocs/status/`. This file is the index
+work is in dated docs under `SWFRecomp-CC-history:SWFRecompDocs/status/`. This file is the index
 and summary; the logs are the evidence.
 
 **Bottom line (2026-07-20):** all five AVM2 demo titles clear 30 fps
@@ -62,7 +62,7 @@ than the game's own arithmetic. Layer legend: **[RT]** runtime
 | coerce-class memo | `e05a8fe0d` | [RT] memoize `avm2_class_for_mn` per (file, mn_idx) in `coerce_class_memo[]`; caches non-NULL only (names are transiently unresolvable during their own cinit) | ~6 ms (~12%) |
 | blit SIMD | `8cc2f5440` | [RT] `bd_copy_pixels`/`bd_draw` dispatch whole rows as 4-px WASM-SIMD spans (`blend_over`/`copy_force_opaque`/memcpy); byte-exact via `(x*32897)>>23 == floor(x/255)`; `-msimd128` in `build_wasm_avm2.sh`; scalar fallback | ~1.4 ms (~6%), fastest in 11/11 paired rounds |
 | Rectangle slot fast path | `88f6f4ad6` | [RT] `rect_to_xywh` reads `slots[1..4]` directly when `cls == g_rectangle_class` (was 4 multiname resolves per copyPixels, ~279/frame) | ~1.1 ms (~5%) |
-| IC slot-hit inline (2026-09-16) | `2973513c4` | [RT] a GetPropertyStatic IC hit on a SLOT entry is a bare `slots[i]` load inlined into the generated code (`Avm2InlineCache.slot_plus1`); was out of line through `avm2_value_vtable` + `avm2_mn_name` + a zeroed `Resolved` + `resolved_get`'s branch chain. Diagnosed by counters: FlashPunk's one-shot `Tile.check` collide pass did 53.9 M IC gets in one frame at **99.97 % hits** — the IC was applying, the hit was the cost. Toggle `-DAVM2_NO_IC_SLOT_INLINE` (= the pinned bytes), verify `-DAVM2_IC_SLOT_VERIFY`. Record: `status/seedling-collide-hotloop.md` | level-load frame (k=544) **12.2 → 8.7 s (1.41x)**, p4d boot 1.17 → 1.07 s (1.09x); steady frames unchanged; headless logic-only, 5 interleaved rounds, byte-identical frame digests |
+| IC slot-hit inline (2026-09-16) | `2973513c4` | [RT] a GetPropertyStatic IC hit on a SLOT entry is a bare `slots[i]` load inlined into the generated code (`Avm2InlineCache.slot_plus1`); was out of line through `avm2_value_vtable` + `avm2_mn_name` + a zeroed `Resolved` + `resolved_get`'s branch chain. Diagnosed by counters: FlashPunk's one-shot `Tile.check` collide pass did 53.9 M IC gets in one frame at **99.97 % hits** — the IC was applying, the hit was the cost. Toggle `-DAVM2_NO_IC_SLOT_INLINE` (= the pinned bytes), verify `-DAVM2_IC_SLOT_VERIFY`. Record: `SWFRecomp-CC-history:SWFRecompDocs/status/seedling-collide-hotloop.md` | level-load frame (k=544) **12.2 → 8.7 s (1.41x)**, p4d boot 1.17 → 1.07 s (1.09x); steady frames unchanged; headless logic-only, 5 interleaved rounds, byte-identical frame digests |
 
 ### RWK arc — levers 1-7 (2026-07-18/20, `RWK_AB_STATUS.md`)
 

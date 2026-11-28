@@ -15,11 +15,11 @@ Four cases (the s26 w1 probe `cm_offdiag`, 200x150, SWF 10, no script):
             Flash: 110..169 x 80..119 at the full (255,127,127), rim included
             (alpha is read from unpremultiplied colour); Ruffle snaps to 111..169
 Golden (both this test and _nested): FLASH PLAYER 32, coordinator capture
-SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/
+SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-applyfilter-cm/
 avm1_po3_color_matrix_live/flash.png (s27 w2b-avm1-applyfilter-flash; tag.c
 obj_live_cm_only / cm_cache_rect_px, render_webgpu.c render_webgpu_set_cm_bias_rect).
 It replaced the s26 Ruffle-exporter golden (0ddd12b6a, archived as
-SWFRecompDocs/plans/session26-fanout-reports/w1-local-oracles/layer-colour/
+SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-local-oracles/layer-colour/
 cm_offdiag.exporter-0ddd12b6a.png), which differs in quadrants 2 and 4 (1000 px).
 The _nested twin puts the same four placements inside one DefineSprite placed
 at the origin (the sprite arm's tagSetColorMatrixLive); it reuses the root

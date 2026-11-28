@@ -13,7 +13,7 @@ skewed matrices (including `visual/simple_shapes/gradients/gradients`' reflect m
 stage translation.
 
 The rule it pins (fit with `fit_paint_point.py output.expected.png`; full write-up
-`SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule-report.md`):
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/lowq-corner-rule-report.md`):
 
 - paint is evaluated at the pixel's TOP-LEFT corner, every orientation, mirror, skew and placement;
 - linear ramps read entry floor(256 t), radial and focal ones round(256 t);

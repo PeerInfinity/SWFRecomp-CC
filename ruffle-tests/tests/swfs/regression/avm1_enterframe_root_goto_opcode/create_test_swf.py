@@ -4,7 +4,7 @@ a function defined on _root) issued from _root.onEnterFrame on a stopped root.
 Pins: the root playhead moves INLINE inside the handler (`after cf=3`), and
 frame 3's DoAction runs right after the handler returns (`f3 cf=3`), as in
 Flash Player 32 (direct-mode capture, s28 browser-attached-goto goal 4:
-SWFRecompDocs/plans/session28-fanout-reports/browser-attached-goto-fixtures/
+SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/browser-attached-goto-fixtures/
 avm1_enterframe_root_goto_opcode/flash32.trace.txt; output.txt = its first 7
 lines, the 5-tick span). Before the fix, actionGotoFrame returned early under
 g_inside_enterframe_dispatch (Dejagnu-era rule, fc0f8e4fd5) and printed

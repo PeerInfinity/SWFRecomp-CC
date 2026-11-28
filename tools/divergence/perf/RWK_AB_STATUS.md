@@ -11,7 +11,7 @@ TAS (`_rwk_tas`), TZ=NPT-5:45.
 
 ## ★ SESSION 2026-07-20d — extend the collision intrinsic to the 2.35 titles (RWF / RWIC)
 
-Prompt `SWFRecompDocs/prompts/avm2-flixel-235-extension.md`. Extends the native
+Prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-flixel-235-extension.md`. Extends the native
 `org.flixel` collision intrinsic (lever 7, below) from the two Flixel-2.21
 titles to the two Flixel-2.35 titles. **Verification-led**: prove the 2.35
 obfuscated collision bytecode is semantically served by the native impl, bake
@@ -164,7 +164,7 @@ RWIC 14.7 ms p50 (1.10x; lighter quadtree share, per the honest-sizing clause
 
 ## ★ SESSION 2026-07-20c — native intrinsic org.flixel collision classes (lever 7)
 
-Prompt `SWFRecompDocs/prompts/avm2-flixel-native-collision-intrinsic.md`. Builds
+Prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-flixel-native-collision-intrinsic.md`. Builds
 the lever the 2026-07-20b gate priced at ~24.1 ms. **Shipped.** Native
 wall-clock **2.593x**; rig verdict in §5 below.
 
@@ -239,7 +239,7 @@ hash alike, and that is precisely the substitution the gate exists to refuse.
 recursive normalized closure-body + signature hashing (depth-capped,
 fail-safe). Constants re-baked (FlxQuadTree `2c1994f2e30e0642`; FlxList
 unchanged), RWK==RWP re-verified, emitted output byte-neutral, probe evidence
-per hole. See `SWFRecompDocs/prompts/avm2-fingerprint-gate-holes.md` §3 for
+per hole. See `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-fingerprint-gate-holes.md` §3 for
 the verification suite and the memory `avm2-fingerprint-gate-holes-closed`.
 The text below is retained as the historical record of the gap:
 
@@ -386,7 +386,7 @@ Two honest side-notes:
   re-run could move; it moved.
 
 
-Prompt `SWFRecompDocs/prompts/avm2-playability-scoreboard-and-quadtree-gate.md`.
+Prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-playability-scoreboard-and-quadtree-gate.md`.
 Measurement + gate decision; **no lever shipped, by design**. Objective is
 **30 fps = 33 ms**, not parity with Ruffle. Raw: `/mnt/c/playwright/pb_2026-07-20/`
 (rig), session scratchpad (callgrind). All five demos were **recompiled and
@@ -582,7 +582,7 @@ such flag, so it needs its own FRESH build.
 
 ## ⛔ VERDICT 2026-07-20 — the "11x Ruffle gap" never existed. Arc goal changed.
 
-Session prompt `SWFRecompDocs/prompts/avm2-title-inversion-diagnosis.md`
+Session prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-title-inversion-diagnosis.md`
 (diagnosis, no lever shipped). Raw: `/mnt/c/playwright/ti_2026-07-20/`;
 drivers `ti_rwk_ruffle.py` (corrected Ruffle) + `ti_perf.py` + `rw_ab.py`.
 **Everything below supersedes the "Ruffle plays this at 6.4 ms" anchor quoted
@@ -721,7 +721,7 @@ Use instead:
 
 ## Headline — lever 6 (alloc/ctor: slot-default template + setup_locals memset, 2026-07-19)
 
-Session prompt `SWFRecompDocs/prompts/avm2-rwk-alloc-ctor.md`, commit
+Session prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-rwk-alloc-ctor.md`, commit
 `93299b884`. Target: the 11.4% alloc/ctor cluster lever 5's profile named
 (`slots_init_defaults` 4.76 + `setup_locals` 4.10 + `o1heapAllocate` 2.58).
 **Two of the three levers ship; the third was implemented, measured and
@@ -843,7 +843,7 @@ separate session), and `AVM2_GC_SWEEP_BUDGET` tuning (untried, pure config).
 
 ## Headline — lever 5 (typed-value emission: compare→branch fusion + inline fast arms, 2026-07-19)
 
-Session prompt `SWFRecompDocs/prompts/avm2-rwk-typed-values.md`, commit
+Session prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-rwk-typed-values.md`, commit
 `a35afa7b8`. Target: the ~26% coerce/compare cluster the post-lever-3+4
 profile named (to_number 4.67 + to_class 2.79 + to_type_mn 2.75 + to_boolean
 2.36 + to_primitive 2.09, abstract_eq 3.64 + abstract_lt 3.19,
@@ -990,7 +990,7 @@ every call; that is a pure per-method memo.
 
 ## Headline — GC tier 2 (collector per-object cost: bitmap + epochs + lazy sweep, 2026-07-19)
 
-Session prompt `SWFRecompDocs/prompts/avm2-gc-collector-cost.md`. The base-compute
+Session prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-gc-collector-cost.md`. The base-compute
 arc took RWK gameplay to 69 ms/frame while the GC pause stayed put, so the
 collect became ~30-40% of wall-clock. Three levers, each measured on its own
 with the new per-collect phase timer (`AVM2_GC_TIME=1`, now permanent in

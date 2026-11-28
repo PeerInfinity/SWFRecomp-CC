@@ -93,7 +93,7 @@ static int g_next_timer_id = 1;
 //   MAX_TICKS = 10 fires per update ("for sanity", timer.rs) and pulls the
 //   clock back; Flash Player 32 does not: 70 one-shot setTimeout(fn, 10)
 //   created in frame 1 had ALL fired before frame 2 at 10 fps
-//   (session27-fanout-reports/w1-local-oracles/w1-timers-robustness/
+//   (SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-timers-robustness/
 //   caps_timers, regression/avm1_timer_overflow). Every timer due before the
 //   clock fires, and a repeating one catches up (a 10 ms interval fires ~10x
 //   per 100 ms frame, as Flash's real-time interval does). The loop is

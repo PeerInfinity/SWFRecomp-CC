@@ -804,7 +804,7 @@ text-sibling → HUD numbers.
 ## 9. Deliverables of this planning session
 
 1. This doc.
-2. Tranche-1 session prompt: `SWFRecompDocs/prompts/avm2-vector-render-t1-solid-timeline-shapes.md`.
+2. Tranche-1 session prompt: `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-vector-render-t1-solid-timeline-shapes.md`.
 3. `avm2-elephant-quest.md` gap #10 updated with this plan's ruling (Dawn is
    Bitmap-only for AVM2 too; the fix is this track; T1 unblocks the preloader; T5
    resolves the headless dump) + cross-link.

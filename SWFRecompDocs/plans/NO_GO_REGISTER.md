@@ -13,12 +13,12 @@ row carries a reopen criterion. Since the 2026-11-24 ruling, the target is **Fla
 whose reason was "it costs a Ruffle-golden pass" is suspect wherever the golden is not Flash.
 
 **Statuses** come from the FINAL s29 results on master (`51ab63688`, run `45938113471`, graphics; NG `63bcc2dd8`). "rm" means
-`ruffle_matched`. **Golden provenance** comes from `session28-fanout-reports/trace-provenance.md` (TP).
+`ruffle_matched`. **Golden provenance** comes from `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/trace-provenance.md` (TP).
 
 **Abbreviations**
 - Arc: `polish-sweep-arc.md`
 - PB: `graphics-fanout-playbook.md`
-- s28/…: `session28-fanout-reports/…`
+- s28/…: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/…`
 - KF: `known_failure`
 - RvF: `RUFFLE_VS_FLASH_DIFFERENCES.md`
 
@@ -94,6 +94,7 @@ whose reason was "it costs a Ruffle-golden pass" is suspect wherever the golden 
 | Raising the fixed caps that are NO-GO | `MAX_PENDING_DIALOGS` 16 / `MAX_FILEREF_OPS` 8, `SWF_LOG_FETCH_MAX_QUEUED` 64, `MAX_LEVEL_ADVANCE` 128 / `MAX_DEFERRED_SHELL_CLEARS` 64, `WORKER_PENDING_MAX`, `MAX_WATCH_FIRING`, `MAX_SOUND_CHANNELS` 32 (= Flash's own), `MAX_PLAYING_SOUNDS`, `MAX_ACTIVE_NETSTREAMS` | NO-GO: unreachable in practice, harness-log-only, non-silent, or deliberate resource caps | s28/w1-leads (robustness table) | A row or game hits the cap. Other caps (`MAX_SCROLL_CROPS`, `TIMERS`, …) are still *open* robustness items, not NO-GO |
 | FileReference `download()`/`upload()`/`postData` | AVM1/AVM2 FileReference (23 rows pass) | NO-GO, nothing to do: AVM1 is a full Ruffle-mirroring implementation, and Ruffle's AVM2 versions are stubs too | s28/w1-leads #3 | A graded row or a game that needs it. Arc §28.4 still listed it as a "small leftover", so this verdict supersedes that |
 | Harness `G-d` tick emulation (`num_ticks` when runtime `stage.frameRate` ≠ header) | harness | HOLD until a row proves a gain | Arc §24.4 | A failing row whose diff is that tick mismatch |
+| Rename `master` → `main` (repo cleanup D7) | every workflow and script that names the branch | DECLINED (Robert, 2026-11-28): Ruffle itself uses `master` (`ruffle-rs/ruffle`, checked 2026-11-28), so the audience gains nothing. A rename touches 43 workflows and scripts, `CLAUDE.md`, `.claude/pipeline-handoff.md`, memories, every worktree and cloud env, and the Pages config | `repo-cleanup-plan.md` §2 D7 | Ruffle renames its default branch, or a host/tool the project depends on requires `main` |
 
 ### 1d. Cancelled by user decision
 

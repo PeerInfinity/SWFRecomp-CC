@@ -13,7 +13,7 @@ The fix is the same `g_child_movies` fall-through that `char_info`,
 `timeline_for_char`, `class_for_char`, `statictext_for`, `shape_geom_for_in`
 and `avm2_display_char_is_defined` already carry.
 
-Diagnosed in `SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md`
+Diagnosed in `SWFRecomp-CC-history:SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md`
 §2. No corpus test grades it: the only child SWF in the whole corpus with a
 `DefineButton2` is `from_shumway/as3-loader/LoaderTest2/Loadee2.swf`, which
 traces nothing about buttons (the only other hit,

@@ -4,7 +4,7 @@
 `parallel-fanout-wave-pattern`): how to run a corpus session on the PIXEL axis
 with the same one-line kickoff the trace sessions use. Built by session 9
 (2026-08-01, the graphics *setup* session — wave reports in
-`session9-graphics-setup-reports/`), which shipped the three instruments this
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session9-graphics-setup-reports/`), which shipped the three instruments this
 doc orchestrates:
 
 - `scripts/image_triage.py` — mechanism clustering + the ranked board
@@ -134,7 +134,7 @@ exactly these markers plus the global `ignored_tests.txt`.
 | `visual/video/colorconversion/h263 output` | Spark IDCT precision | 10 808 channels, max 2 |
 | `visual/video/deblocking output` | Spark IDCT precision, one Cb level | 104 channels, max 4 |
 | `avm1/netstream_play_flv output` | Sorenson Spark pixel parity | 44 channels, max 3 |
-| ~~`visual/simple_shapes/masks output` + `…/masks_equal_clipdepth output`~~ | **RETIRED s22 (`w2-float-verts`): not a tie — integer-twip vertex quantization in the recompiler; both render 0 outliers with the sub-twip remainder kept (`session22-fanout-reports/w1-stroke-staircase-report.md`).** History: **NARROWED s16** — was "1-sample rasteriser tie" for all 1738 channels; 1474 of them were our mask stencil rasterising the masker's STROKE (fixed s16). | now scoped to the **359 interior** channels measured after the fix (1738 → 359, mean 0.4927 → 0.0940; curve flattening / AA). A residual materially above ~359 is NOT covered. |
+| ~~`visual/simple_shapes/masks output` + `…/masks_equal_clipdepth output`~~ | **RETIRED s22 (`w2-float-verts`): not a tie — integer-twip vertex quantization in the recompiler; both render 0 outliers with the sub-twip remainder kept (`SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/w1-stroke-staircase-report.md`).** History: **NARROWED s16** — was "1-sample rasteriser tie" for all 1738 channels; 1474 of them were our mask stencil rasterising the masker's STROKE (fixed s16). | now scoped to the **359 interior** channels measured after the fix (1738 → 359, mean 0.4927 → 0.0940; curve flattening / AA). A residual materially above ~359 is NOT covered. |
 | `avm2/bitmapdata_applyfilter_blur output` | **RE-DISPOSITIONED s26/s27 (RvF, `RUFFLE_VS_FLASH_DIFFERENCES.md` §`bitmapdata_applyfilter_blur`)**: the golden is Ruffle's own blur, cropped at the sourceRect; Flash grows the output (Flash capture `flash-oracle-captures/bitmapdata_applyfilter_blur/flash.png`). Ours == Flash outside the text bands (0 px over 1); the bands are Flash's device serif vs Ruffle's default font. (History: s16 text-band entry, RESOLVED s21 w2-noto-d1.) | ~47.5 k outliers vs the Ruffle golden, max 238 (s27 `cceb5133a`). Above that, or any ours-vs-flash.png diff over 1 outside rows 87–104 / 305–323 / 523–545 ⇒ re-triage the blur path. |
 
 **Explicitly NOT dispositioned (do not add):**
@@ -143,7 +143,7 @@ exactly these markers plus the global `ignored_tests.txt`.
   "goldens disagree by 1 LSB → band ceiling" does not survive: the baseline is
   166 986 outliers at **max diff 9 against tolerance 6**, a 3-level overshoot
   compounded over 9 passes, not a tie. The 1-LSB fact
-  (`session15-fanout-reports/wave1-gfx-blur-morphratio.md` §2.6) is about
+  (`SWFRecomp-CC-history:SWFRecompDocs/plans/session15-fanout-reports/wave1-gfx-blur-morphratio.md` §2.6) is about
   `blur_quality` and `blur_fractional`'s goldens disagreeing *with each other*;
   it bounds the achievable precision, it does not explain a 9-unit gap. And
   **neither test is `known_failure` upstream**, so current Ruffle clears both at
@@ -220,6 +220,14 @@ a single agent working alone whose diff does not touch `SWFRecomp/`.
 
 ## 5a. Cloud workers (added s21, 2026-09-28)
 
+> **Since 2026-11-28 (repo-cleanup S1, decision D3) reports live in the history repo.** The session dir
+> `SWFRecompDocs/plans/sessionN-fanout-reports/` is created, committed and pushed in
+> `PeerInfinity/SWFRecomp-CC-history` (checkout `~/CC/SWFRecomp-CC-history`), never in the main repo. Workers
+> clone it to read their briefs; they still deliver on `fanout/<slug>` in the main repo, at the same relative path,
+> and the coordinator lands code with `tools/coord/land_branch.sh` and archives reports with
+> `tools/coord/archive_branch.sh`. Brief template: `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md`. Older sections of
+> this playbook that say "archive to master" mean the history repo now.
+
 A wave-2 slot can run as a Claude Code **cloud session** instead of a local
 worktree subagent. First used for `w2-edittext-filters` in s21, when a 100-test
 render A/B was going to take ~3 h on the shared 8-core box. Mechanics, verified
@@ -250,9 +258,9 @@ local→cloud SendMessage is held. A one-routine-per-target recipe exists (see
 the memory) but is fiddly, so write the prompt as the whole brief. The cloud
 clone sees only **pushed** commits, so:
 1. Archive whatever the worker needs into
-   `SWFRecompDocs/plans/sessionN-fanout-reports/` **on master and push**: the
-   brief, any WIP patch, measurements, canary list. Local scratchpad paths are
-   invisible to it.
+   `SWFRecompDocs/plans/sessionN-fanout-reports/` **in the history repo and push
+   it** (D3; before S1 this was master): the brief, any WIP patch, measurements,
+   canary list. Local scratchpad paths are invisible to it.
 2. The prompt must include:
    - `git fetch origin && git checkout -B fanout/<slug> origin/master` (this
      avoids the stop hook's "unpushed commits on claude/<slug>" nag);
@@ -260,7 +268,9 @@ clone sees only **pushed** commits, so:
    - `download_tests.sh <categories>` **without `--clean`** (only `regression`
      is in git);
    - `SWFRECOMP_COMPILE_TIMEOUT=2400` and `-P 2`;
-   - a pointer to `BRIEFS_COMMON.md`, noting that its shared-machine and
+   - `git clone --depth 1 https://github.com/PeerInfinity/SWFRecomp-CC-history /root/history`
+     (the headers in `tools/coord/templates/` carry this line);
+   - a pointer to `BRIEFS_COMMON.md` (in that clone), noting that its shared-machine and
      worktree rules don't apply, but everything else does;
    - the task;
    - the verification bar;
@@ -272,7 +282,8 @@ clone sees only **pushed** commits, so:
 `fanout/<slug>` **only**, never master. This is the one exception to trunk-only,
 and it applies to cloud workers alone. The worker commits:
 - its source changes;
-- `sessionN-fanout-reports/<slug>.patch`, i.e.
+- `SWFRecompDocs/plans/sessionN-fanout-reports/<slug>.patch` (the history-repo path; the branch is never
+  merged, so nothing lands in the main repo's docs), i.e.
   `git diff origin/master -- <source dirs> ruffle-tests/render_canary_tests.txt`;
 - `<slug>-report.md`.
 
@@ -290,12 +301,14 @@ Check the first minute of `RemoteTrigger get_run_log session_id=session_…` for
 "Setup script … OK" and the branch checkout. Record the session id in
 `AGENT_LAUNCH_ORDER.md`.
 
-**Merge.** `git fetch origin fanout/<slug>`, then take the patch file from the
-branch. Land it through the same serial per-patch headline re-check as any
-local patch, and stage by name. Delete `fanout/<slug>` afterwards (in the
-approved plan). **Moving a running local slot:** TaskStop the agent, confirm its
+**Merge.** `git fetch origin fanout/<slug>`, then land the code with
+`tools/coord/land_branch.sh` (or take the patch file from the branch) through the
+same serial per-patch headline re-check as any local patch, and stage by name.
+Archive the report with `tools/coord/archive_branch.sh` and push the history
+repo. Delete `fanout/<slug>` afterwards (in the approved plan), once
+`archive_branch.sh` prints 0 NEW / 0 CHANGED for it. **Moving a running local slot:** TaskStop the agent, confirm its
 detached capture processes are gone (`ps` filtered by its worktree hash), and
-archive its newest WIP patch plus a status table to master. Then brief the
+archive its newest WIP patch plus a status table to the history repo. Then brief the
 cloud worker to start from that WIP rather than from scratch.
 
 **Cloud-first mode — user directive 2026-10-16 (supersedes the hybrid mode below for s22).** "Any
@@ -305,7 +318,7 @@ too, delivering report-only branches. Local work is limited to merging, CI dispa
 accounting, and the exporter oracle. Workers put exporter needs under `## LOCAL ORACLE REQUESTS`
 instead of blocking on them. Cloud graphics runs Dawn on mesa lavapipe, the CI rasterizer family,
 so a worker can grade a row absolutely after proving its before-render byte-identical to CI's
-actual PNG for that row. Common brief: `session22-fanout-reports/BRIEFS_COMMON.md`.
+actual PNG for that row. Common brief: `SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/BRIEFS_COMMON.md`.
 
 **Hybrid session mode — user directive for s22 (2026-09-29): diagnose locally, implement in the
 cloud, one CPU-heavy local task at a time, Opus everywhere, same total size as s21.**
@@ -325,8 +338,8 @@ cloud, one CPU-heavy local task at a time, Opus everywhere, same total size as s
   background queue. `-P 1` inside the lock.
 - **Wave 2 (implementation + canary) runs in the CLOUD** whenever the slot needs nothing that
   only exists locally. The procedure is §5a above plus `scripts/fanout_cloud_worker.sh`. Before
-  launching, the coordinator archives the wave-1 report plus any oracle outputs to master and
-  PUSHES. A slot that needs a fresh Ruffle-exporter run, our local Ruffle edits, or a Windows /
+  launching, the coordinator archives the wave-1 report plus any oracle outputs (to master then; to the
+  history repo since S1) and PUSHES. A slot that needs a fresh Ruffle-exporter run, our local Ruffle edits, or a Windows /
   real-GPU browser probe stays local, under the lock. Cloud workers can read upstream Ruffle
   source via `git clone --depth 1 https://github.com/ruffle-rs/ruffle`.
 - **Opus for everything**: coordinator, local agents (`model: "opus"`), cloud workers (the account
@@ -418,7 +431,7 @@ halo_penumbra 16/15 · row_banded 13/13 · rest ≤6 each.
 
 **Closeout run `30713776612` at `c4496a4c8`: 217/566 (38.3%), +45, zero
 regressions on either axis** (from 172/566 at `feb8882b0`). Full ledger:
-`polish-sweep-arc.md` §11; reports `session10-fanout-reports/`.
+`polish-sweep-arc.md` §11; reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session10-fanout-reports/`.
 
 Corrections to §8's leads, measured this session:
 
@@ -464,7 +477,7 @@ Corrections to §8's leads, measured this session:
 **Closeout run `31075033086` at `6de650432`: 257/566 (45.4%), +40, zero
 regressions, bands improved 73 / worsened 0** (from 217/566 at
 `c4496a4c8`). Ledger: `polish-sweep-arc.md` §12; reports
-`session11-fanout-reports/`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session11-fanout-reports/`.
 
 - **quality-aware MSAA is the headline mechanism** (24 flips): goldens
   exported at `quality="low"` are 1-sample; `MSAA_SAMPLES` macro (default
@@ -504,7 +517,7 @@ regressions, bands improved 73 / worsened 0** (from 217/566 at
 **Closeout run `31090651530` at `1f8396f57`: 286/567 (50.4%), +28, zero
 regressions, bands improved 38 / worsened 0** (from 258/567 at `6de650432`;
 note pass-count restated 257→258 and denominator 566→567 by upstream drift).
-Ledger: `polish-sweep-arc.md` §13; reports `session12-fanout-reports/`.
+Ledger: `polish-sweep-arc.md` §13; reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session12-fanout-reports/`.
 
 - **Headline mechanism: AVM2 clipDepth masking existed nowhere** — the acid
   ×16 "gradient ramp" cluster was actually mask-union-instead-of-intersection.
@@ -541,7 +554,7 @@ Ledger: `polish-sweep-arc.md` §13; reports `session12-fanout-reports/`.
 
 **Closeout run `31130292354` at `fb36ba110`: 301/567 (53.1%), +15, zero
 regressions, bands improved 15 / worsened 5 (all fail→fail).** Ledger:
-`polish-sweep-arc.md` §14; reports `session13-fanout-reports/`.
+`polish-sweep-arc.md` §14; reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/`.
 
 - **Embedded video renders.** Recompiler video-scoped char-id-0 alias
   (id 0→0x4000, gated on video presence) + Ruffle-exact BT.601 fixed-point
@@ -577,7 +590,7 @@ regressions, bands improved 15 / worsened 5 (all fail→fail).** Ledger:
 
 **Closeout run `31647430265` at `bf585e448`: 310/569 (54.5%), +9, zero
 regressions, bands improved 7 / worsened 0.** Ledger:
-`polish-sweep-arc.md` §15; reports `session14-fanout-reports/`.
+`polish-sweep-arc.md` §15; reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session14-fanout-reports/`.
 
 - **Nested-mask stencil model landed** (Ruffle Equal/IncrementClamp +
   DecrementClamp full-screen-quad pop; `mask_ref` = nesting level). The
@@ -614,7 +627,7 @@ regressions, bands improved 7 / worsened 0.** Ledger:
 
 **Closeout run `31748059158` at `3db858cbc`: 324/569 (56.9%), +14, zero
 regressions, bands improved 13 / worsened 0, drift 0/0.** Ledger:
-`polish-sweep-arc.md` §16; reports `session15-fanout-reports/`.
+`polish-sweep-arc.md` §16; reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session15-fanout-reports/`.
 
 - **s16→s32 shape deltas landed** (17-bit SB fields; both acid-blend flips).
   §13's "blend-layer alpha" row and §11's "B-channel halving" row are
@@ -653,7 +666,7 @@ regressions, bands improved 13 / worsened 0, drift 0/0.** Ledger:
 **Closeout run `31874872388` at `86434112a`: 324 → 337/569 (59.2%; +13 = 14 gains − 1 regression fixed post-run), 2 real regressions both fixed in the follow-up commit (avm2/verify_method_info_oob: load-rejected ABC must ignore DoABC2 LAZY_INITIALIZE; visual/define_bits_lossless2_rgb15: bitmap smoothing only exists from SWF 8 — Ruffle read.rs) and re-graded by run 31877239992 at `aeebf9ede` (results merge `c7b284034`): both rows back to pass, 0 regressions either axis → final trace **4317/4453 eff** (denominator +10 upstream arrivals: avm1/sound_load_* ×7, avm2/matrix3d_* ×3) and pixels **338/569 (59.4%)**,
 bands 32 improved / 2 worsened (acid-scale 302→320, strokes/scale 66243→70119, both <7%), drift 0 new / 0 gone in the graded intersection; upstream master has since added avm1/sound_load_* ×7 + avm2/matrix3d_* ×3 and rewritten from_gnash Sound-v6/7/8 output.ruffle.txt (loadSound/onSoundComplete — new AVM1 Sound lead).** Baseline into the session was 324/569
 (56.9 %) at `3db858cbc`; **predicted +12**. Ledger:
-`polish-sweep-arc.md` §17; reports `session16-fanout-reports/`.
+`polish-sweep-arc.md` §17; reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session16-fanout-reports/`.
 
 - **Gradient ramps are now Ruffle's texel walk** (`gradient_ramp.h`, shared by
   the recompiler and both VMs): one cursor step per texel, `alpha = 0` pinned on
@@ -799,7 +812,7 @@ path must honour Ruffle's BitmapCache size rule), then the follow-up
 `w2-gfx-edittext-bg` (+5) landed; verification run `32267473014` at
 `a946ee183`: 352 -> **359/569 (63.1 %)**, +7 (edittext-bg ×5 + too_big ×2), 0 regressions, 1 band worsened (acid-color-0).** Baseline into the session 338/569 (59.4 %) at
 `aeebf9ede`; **predicted +14 then +5.** Ledger: `polish-sweep-arc.md` §18.2;
-reports `session17-fanout-reports/`.
+reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session17-fanout-reports/`.
 
 - **cacheAsBitmap `PixelSnapping::Always` landed** (`BitmapCache` flag carried
   to the display entry; cached entries AND their container slot snap world
@@ -876,7 +889,7 @@ that matched CI on every row measured this session); the final
 graphics/full/images run `33945288707` at `8376eb700` graded them: **381/577
 (66.0 %)**, +6 flips / 0 regressions / 10 bands improved — session total **+17
 pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
-`session18-fanout-reports/`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session18-fanout-reports/`.
 
 - **Round-join branch cut (recompiler `drawLineJoin`)**: a corner whose normals
   straddle ±π swept the 270° reflex arc (uncovered outer quadrant + redundant
@@ -929,7 +942,7 @@ pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
   1-sample (quality=low) run-edge ties, deterministic, NOT lavapipe AA
   (**§3-E "45° 1-sample ties" NO-GO REFUTED s22**: they were recompiler
   vertex quantization — Levien truncation + libtess2 `lround` — and flip with
-  `w2-float-verts`; `session22-fanout-reports/w1-stroke-staircase-report.md` §5);
+  `w2-float-verts`; `SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/w1-stroke-staircase-report.md` §5);
   `morph_test1` ×6 is the "- xtrace enabled" status-bar text, not morph
   geometry; `bitmapbuttons` (618 042) is NOT parked — four `0x43` clipped-bitmap
   fill characters render nothing; `Bitmap.pixelSnapping` is unimplemented (3 831).
@@ -946,14 +959,14 @@ pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
   the golden means hiding content Flash draws; blast radius exactly this one
   comparison. **Won't-fix (Ruffle divergence), not a bug of ours.**~~
   **STRUCK (s22):** the SWF hides those cells with PlaceObject3 `Visible = 0`, a
-  bug of ours, fixed — `session22-fanout-reports/w2-filter-fixes-report.md`.
+  bug of ours, fixed — `SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/w2-filter-fixes-report.md`.
 
 ## 18. Session-19 state of the board (2026-09-11/12)
 
 Baseline: images run `34645805030` at `0ccafbc4e`, **381 / 580**. Final images
 run `34666689502` at `d8da5a18c`: **392 / 580 (67.6 %)** = **+22 flips, 16 band
 moves improved / 0 worsened**, against 11 pass→fail rows that are upstream
-tolerance drift and not ours (see below). Reports: `session19-fanout-reports/`.
+tolerance drift and not ours (see below). Reports: `SWFRecomp-CC-history:SWFRecompDocs/plans/session19-fanout-reports/`.
 
 **+21 pixel flips priced and locally verified** (Stage3D 13, text 5, geometry 2,
 bitmap 1), plus four band moves: `graphics_simple_shapes` 230 → 154,
@@ -1018,7 +1031,7 @@ fingerprint is `max_diff` unchanged while `outliers` moves; check the upstream
 Baseline: images run `34666689502` at `d8da5a18c`, **393 / 587** — six days stale by
 construction, since `images=false` is the per-change default. Final images run
 `35423176371` at `d6bcfa56c`: **413 / 587 (70.4 %)** = **+20 flips, 4 band moves improved /
-1 worsened, ZERO pass→fail**. Reports: `session20-fanout-reports/`.
+1 worsened, ZERO pass→fail**. Reports: `SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/`.
 
 **+19 priced, +20 measured.** The extra is `avm1/edittext_stylesheet`, uncredited
 collateral from the EditText border-corner fix.
@@ -1066,7 +1079,7 @@ collateral from the EditText border-corner fix.
   bold/italic ladder = 15, against a budget of 3.** The ladder is **99.89 %** of A1's
   residual — so A1 is not a band arc, it is **five pixels** from flipping `device-font`.
   The prototype is still unlanded at
-  `session19-fanout-reports/UNLANDED-devicefont-prototype.patch`.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/session19-fanout-reports/UNLANDED-devicefont-prototype.patch`.
   **Do not over-read this**: the Stage3D text rows (`stage3d_texture`, `stage3d_fractal`)
   need A1 and are unaffected by the ladder — measured with the ladder in base,
   `stage3d_texture` still grades 206968, byte-for-byte its pre-ladder number. Those rows
@@ -1125,14 +1138,14 @@ multi-check pass -> fail rows `[ANY->ALL, render unchanged]`.
 **Price: 413 -> 408 (-5), a baseline correction, not a regression.** Each local render matched
 CI's stored `max_diff` and `diff_channels` exactly. The five: `from_shumway/acid/acid-clip`,
 `acid/acid-bitmapData-draw`, `acid/acid-shapes`, `acid/acid-small [output.01]`, and
-`visual/cache_as_bitmap/text`. Detail: `session21-fanout-reports/w2-image-semantics-report.md`.
+`visual/cache_as_bitmap/text`. Detail: `SWFRecomp-CC-history:SWFRecompDocs/plans/session21-fanout-reports/w2-image-semantics-report.md`.
 
 ## 20. Session-21 state of the board (2026-09-28/29)
 
 Baseline: images run `35423176371` at `d6bcfa56c`, **413 / 587**. Final images run
 `36515003936` at `02df69d28`: **433 / 587 (73.8 %)** = **+25 flips, every one predicted by a
 patch ledger; −5 pass→fail that are a GRADING CORRECTION; bands 23 improved / 0 worsened.**
-Reports: `session21-fanout-reports/`. Trace side: `polish-sweep-arc.md` §22.
+Reports: `SWFRecomp-CC-history:SWFRecompDocs/plans/session21-fanout-reports/`. Trace side: `polish-sweep-arc.md` §22.
 
 | patch | flips | comparisons |
 |---|---:|---|
@@ -1214,7 +1227,7 @@ Reports: `session21-fanout-reports/`. Trace side: `polish-sweep-arc.md` §22.
 Baseline: images run `36515003936` at `02df69d28`, **433 / 587**. Interim images run `38989007619` at
 `939652298`: **468** (+36 gains, all ledgered; −1 `acid-small .05` predicted). Final images run `38995363802` at
 `38cf9b1a0`: **490 / 587 (83.5 %) = +59 flips, every one predicted by a patch ledger; −2 pass→fail by DECISION
-(Flash-over-Ruffle, below); 0 unexplained.** Reports: `session22-fanout-reports/`. Trace side:
+(Flash-over-Ruffle, below); 0 unexplained.** Reports: `SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/`. Trace side:
 `polish-sweep-arc.md` §23. All pixel work ran in cloud sessions on lavapipe, byte-identical to CI's actual PNGs.
 
 | patch | flips | comparisons |
@@ -1539,7 +1552,7 @@ Trace side: `polish-sweep-arc.md` §27.
 | interim #3 → final | band | `bitmapbuttons` 52 → 39 (a_epsilon) |
 | everything else (layer/group alpha, applyFilter AVM1, holder drawing, text, N, browser) | 0 corpus | 35 fixture comparisons, among them 12 group-alpha (AVM1 + AVM2) and 6 AVM1 applyFilter/CM from Flash captures |
 
-### s27 golden provenance (rounds 1 + 2: `session27-fanout-reports/golden-provenance.md`)
+### s27 golden provenance (rounds 1 + 2: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`)
 
 > **s27 golden provenance, round 2.** Direct-mode runs are now **pinned to 1:1**. A root stub (`capture/PinStub.swf`)
 > loads the test into `_level0` only once the X window has settled. The test then runs as the real root from its
@@ -1601,7 +1614,7 @@ mechanism in `image_triage.py` or the runner (S–M; design first).
   - `--screen` for non-LAYER blends, because `draw()` is wrong for them;
   - the exporter is a fallback only.
   - The binaries never go to the cloud. The coordinator runs the capture requests locally and archives them under
-    `session27-fanout-reports/*-local-oracles/`.
+    `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/*-local-oracles/`.
 - **A Flash-correct model can lose a Ruffle-golden row.** Price the loss in the brief before landing, disposition it
   (RvF + image-axis marker), and keep the model (`acid-color-0`, `bitmapdata_applyfilter_blur`).
 

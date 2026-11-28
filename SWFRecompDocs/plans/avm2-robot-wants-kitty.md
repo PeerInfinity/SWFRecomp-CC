@@ -167,7 +167,7 @@ there is no missing-class cliff.
    (localStorage-backed .sol).
 
 Audio rides the parallel audio-output session
-(`prompts/avm2-audio-output.md`) — FlxSound sits on Sound/SoundChannel, so RWK
+(`SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-audio-output.md`) — FlxSound sits on Sound/SoundChannel, so RWK
 gets sound for free once that lands.
 
 ## 3. Proposed stages

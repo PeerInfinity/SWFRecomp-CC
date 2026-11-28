@@ -16,7 +16,7 @@ avm1_edittext_placed_cxform_script for the font), each holding black "II":
   f4  setNewTextFormat({color:red}); text = "II"    -> red (assignment takes newfmt)
 
 Expected PNG: Ruffle exporter (LOCAL ORACLE REQUEST in
-SWFRecompDocs/plans/session26-fanout-reports/w2-avm1-text-resolve-report.md).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w2-avm1-text-resolve-report.md).
 Usage: create_test_swf.py <out.swf>
 """
 import os

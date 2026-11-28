@@ -2,7 +2,7 @@
 
 The avm1_edittext_rotated_glyphs layout (90 deg, rot30, shear 0.5 fields + a 2nd 90 deg field)
 with text colour 0xCC3300 and a 0x808080 rect (90..200, 20..140 px) behind the rot30 field.
-Golden output.expected.png = FP32 LNX capture (session29-fanout-reports/w1-local-oracles/
+Golden output.expected.png = FP32 LNX capture (SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/
 w1-text-pixels/W1_color/flash.png). Run: python3 create_test_swf.py  (writes test.swf here).
 """
 import pathlib, struct, sys, math

@@ -8,7 +8,7 @@ geometry: the exact hit test, the CPU raster, and the GPU render walk.
 
 `ng_buildMovieRenderTables()` concatenates every linked movie's geometry and
 style arrays into one set and fills in each `MovieEntry`'s bases. Until
-`SWFRecompDocs/status/avm2-child-render-arm.md` its only two call sites were
+`SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-render-arm.md` its only two call sites were
 `swf.c::swfStart` and `swf_core.c::runSWF` — **both AVM1 entry points**. An AS3
 root boots through `avm2_main.c::runSWF_avm2`, which called neither, so on the
 AVM2 path no combined table was ever built: `ng_movieRenderTablesActive()` was

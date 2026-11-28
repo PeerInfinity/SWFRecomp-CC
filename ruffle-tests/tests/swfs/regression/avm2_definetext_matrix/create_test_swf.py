@@ -8,7 +8,7 @@ unscaled/unrotated (3400 px vs the analytic golden, s27 measurement). Fixed in
 s27 w2-avm2-text-tail: Avm2StaticTextData carries the TextMatrix (has_matrix)
 and avm2_render_statictext / avm2_cpu_raster_statictext draw world * T.
 output.expected.png (analytic) is pixel-identical (RGBA) to FLASH Player 32's draw()
-capture (session27-fanout-reports/w1-local-oracles/w1-text-glyph-fidelity/
+capture (SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-text-glyph-fidelity/
 avm2_definetext_matrix/flash.png).
 The converter's original docstring follows.
 
@@ -29,7 +29,7 @@ placements reach the AVM2 timeline (the avm2_layer_group_alpha recipe; mxmlc
 is not in the cloud box). Ruffle renders a script-free timeline identically
 under AVM1 and AVM2, so output.expected.png is the AVM1 fixture's Ruffle
 0ddd12b6a golden (confirmation requested as a LOCAL ORACLE REQUEST in
-SWFRecompDocs/plans/session27-fanout-reports/w1-text-glyph-fidelity-report.md).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w1-text-glyph-fidelity-report.md).
 """
 import pathlib, struct, sys, zlib
 HERE = pathlib.Path(__file__).resolve().parent

@@ -40,7 +40,7 @@ WHAT EACH ROW DISCRIMINATES
     than one loaded frame and an End tag, which every SWF file has). It does
     not, because a wrap has to clear the movie's own display children and a
     clip target's children are interleaved with the parent's in the global
-    display_list -- see SWFRecompDocs/status/child-timeline-advance.md §2.2.
+    display_list -- see SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md §2.2.
     **Those rows are a lock on known-incomplete behaviour**: when the wrap
     lands they must flip to `cf:1 ax:10`, deliberately.
 
@@ -49,7 +49,7 @@ NEGATIVE CONTROL
 Reverting the child-timeline change puts the movie back at frame 1 forever:
 `L1` alone, `cf:1` and `ax:10` on every tick.
 
-See SWFRecompDocs/status/child-timeline-advance.md for the full write-up.
+See SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md for the full write-up.
 """
 import struct
 import subprocess

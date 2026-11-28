@@ -234,7 +234,7 @@ also wrong but happens to match what we baselined).
   three categories, plus "WebGPU init failed"). Determines whether
   the browser bug is in the browser arm of the runtime or in
   page-side wiring.
-- **Output**: a short follow-up doc in `SWFRecompDocs/status/` with
+- **Output**: a short follow-up doc in `SWFRecomp-CC-history:SWFRecompDocs/status/` with
   the diagnosis, similar to the divergence-harness findings doc.
 - **Time estimate**: 1-2 hours.
 
@@ -377,7 +377,7 @@ The smallest useful step is Phase 0 + Phase 1, plus the Pong
 diagnosis doc. After those:
 
 - `tools/browser-test/inspect.py <demo>` — exists, works locally.
-- `SWFRecompDocs/status/2026-MM-DD-pong-browser-diagnosis.md` —
+- `SWFRecomp-CC-history:SWFRecompDocs/status/2026-MM-DD-pong-browser-diagnosis.md` —
   documents *why* Pong hangs in browser, and the relationship (or
   lack thereof) to the OFFSCREEN_RENDER fix from this session.
 - No CI integration, no determinism hook, no runtime changes yet.

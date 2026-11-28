@@ -726,7 +726,7 @@ void tagMain(SWFAppContext* app_context)
 		// order untouched. Graded by
 		// regression/avm1_root_identity_and_playhead's `cf:` column, which only
 		// a browser build can flip (see
-		// SWFRecompDocs/status/browser-root-side-gaps.md).
+		// SWFRecomp-CC-history:SWFRecompDocs/status/browser-root-side-gaps.md).
 		//
 		// Keep root _currentframe in sync with the natural advance. Mirrors
 		// swf_core.c lines ~1425/1431 (which update at the END of each tick).

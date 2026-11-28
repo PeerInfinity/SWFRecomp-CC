@@ -6,7 +6,7 @@ the AVM2 child-render arm.
 
 ## Why it exists
 
-`SWFRecompDocs/status/avm2-child-render-arm.md` §2 landed
+`SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-render-arm.md` §2 landed
 `avm2_display_static_glyphs_for()`: a registry keyed on the
 `Avm2StaticTextData*` pointer itself, which points into exactly one movie's
 `statictexts` array and so answers *which* `static_glyphs` array this run's

@@ -19,7 +19,7 @@ delete it to force a recompile.
 
 Despite the name it also builds a **childless** fixture — any regression test,
 or a scratch directory passed as the second argument (repo-relative). That is
-how the root-side gaps in `SWFRecompDocs/status/browser-root-side-gaps.md` were
+how the root-side gaps in `SWFRecomp-CC-history:SWFRecompDocs/status/browser-root-side-gaps.md` were
 measured: a plain single-movie SWF with no `loadMovie` at all. `HAS_CHILD_MOVIES`
 is defined only when the child walk actually emitted a `movie_registry.c`;
 defining it for a childless build leaves `findMovieEntry` / `getMovieEntryAt`
@@ -63,6 +63,6 @@ probes, **never** for frame rates (CLAUDE.md; real-GPU recipe in
 
 ## What it was built for
 
-`SWFRecompDocs/status/browser-wasm-loaded-child-parity.md` — the measurement
+`SWFRecomp-CC-history:SWFRecompDocs/status/browser-wasm-loaded-child-parity.md` — the measurement
 that showed browser-WASM never loaded a child movie at all, and the two fixes
 that closed it.

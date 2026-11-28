@@ -6,7 +6,7 @@ Usage: create_test_swf.py [out.swf]   (default: test.swf beside this script)
 
 This is a no-mxmlc TWIN of Test.as (the s27 w2-draw-cx-text oracle request,
 kept beside this script). Flash Player 32 traced the mxmlc build of Test.as
-(session27-fanout-reports/w2-local-oracles/w2-draw-cx-text/
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-draw-cx-text/
 avm2_bitmapdata_draw_text_glyph_cx/flash.direct.txt); that SWF was not
 archived and the cloud has no mxmlc, so this script emits the same API calls
 in the same order from a hand-assembled script-init ABC.

@@ -30,7 +30,7 @@ Two SWFs from this generator (same content):
                     MovieClip wrappers (actionIterateTextFields / ...Glyphs)
 
 Expected PNG: Ruffle exporter (LOCAL ORACLE REQUEST in
-SWFRecompDocs/plans/session26-fanout-reports/w2-text-cx-jpeg3-report.md).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w2-text-cx-jpeg3-report.md).
 """
 import pathlib, struct, sys
 

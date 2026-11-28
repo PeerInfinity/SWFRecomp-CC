@@ -26,7 +26,7 @@ re-writing a one-off Playwright probe.
 Background and rationale:
 [`browser-wasm-testing-plan.md`](../plans/browser-wasm-testing-plan.md);
 the Phase 0 spike that motivated this harness:
-[`status/2026-05-25-pong-browser-diagnosis.md`](../status/2026-05-25-pong-browser-diagnosis.md).
+[`SWFRecomp-CC-history:SWFRecompDocs/status/2026-05-25-pong-browser-diagnosis.md`](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/2026-05-25-pong-browser-diagnosis.md).
 
 ## One-time setup
 
@@ -217,7 +217,7 @@ don't need PNGs, just pass `--no-canvas`.
 
 See the memory note `browser_wasm_test_capture.md` for additional
 detail, and the Phase 0 doc
-[`2026-05-25-pong-browser-diagnosis.md`](../status/2026-05-25-pong-browser-diagnosis.md)
+[`2026-05-25-pong-browser-diagnosis.md`](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/2026-05-25-pong-browser-diagnosis.md)
 for how this was discovered.
 
 ## Diffing outputs

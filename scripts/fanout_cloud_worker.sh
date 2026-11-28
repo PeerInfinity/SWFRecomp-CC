@@ -4,6 +4,13 @@
 # the prebuilt Dawn at /root/CC/dawn-install). See
 # SWFRecompDocs/plans/graphics-fanout-playbook.md §5a for the whole procedure.
 #
+# Reports (D3, repo cleanup S1 2026-11-28): the session dir
+# SWFRecompDocs/plans/sessionN-fanout-reports/ lives in the history repo
+# PeerInfinity/SWFRecomp-CC-history (checkout: ../SWFRecomp-CC-history, or
+# $SWFRECOMP_HISTORY). The worker clones it to read its briefs and delivers on
+# fanout/<slug> in THIS repo at the same relative path; archive with
+# tools/coord/archive_branch.sh. Start prompts from tools/coord/templates/.
+#
 # usage: scripts/fanout_cloud_worker.sh <task-slug> <prompt-file> [logfile]
 #   <task-slug>   names the delivery branch: fanout/<task-slug>
 #   <prompt-file> the complete brief (the launch prompt is the ONLY input
@@ -23,6 +30,17 @@ grep -q "fanout/$SLUG" "$PROMPT" || { echo "prompt must name its delivery branch
 git fetch -q origin
 if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/master)" ]; then
   echo "warning: local HEAD != origin/master — unpushed commits are invisible to the cloud worker" >&2
+fi
+# Briefs live in the history repo: the prompt must tell the worker to clone it, and it must be pushed.
+if grep -qE 'sessionN?[0-9]*-fanout-reports' "$PROMPT" && ! grep -q 'SWFRecomp-CC-history' "$PROMPT"; then
+  echo "warning: prompt cites a fanout-reports dir but never names SWFRecomp-CC-history — the worker won't find its briefs (see tools/coord/templates/)" >&2
+fi
+HIST=${SWFRECOMP_HISTORY:-$(git rev-parse --show-toplevel)/../SWFRecomp-CC-history}
+if [ -d "$HIST/.git" ]; then
+  git -C "$HIST" fetch -q origin 2>/dev/null || true
+  if [ -n "$(git -C "$HIST" status --porcelain)" ] || [ "$(git -C "$HIST" rev-parse HEAD)" != "$(git -C "$HIST" rev-parse origin/master 2>/dev/null)" ]; then
+    echo "warning: $HIST has uncommitted or unpushed changes — the cloud worker sees only what is pushed" >&2
+  fi
 fi
 TMP=$(mktemp)
 cat > "$TMP" <<INNER

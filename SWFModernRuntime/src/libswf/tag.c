@@ -1104,7 +1104,7 @@ static MovieClip* g_attached_advance_mc = NULL;
 // (advance_nested_sprite_frames) intentionally DOES advance a nested clip on the
 // tick it was placed by a parent's frame script (execution_order4's clip1.child),
 // so the placed-this-tick skip is restricted to the goto catch-up path. See
-// SWFRecompDocs/status/2026-06-21-riddle-school-nested-clip-placed-this-tick-advance.md.
+// SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-21-riddle-school-nested-clip-placed-this-tick-advance.md.
 int g_in_manual_nav_catchup_recurse = 0;
 
 // When 1, advance_sprite_frames BUILDS just-allocated nested sprites (runs their
@@ -4893,7 +4893,7 @@ static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data);
 // The only DisplayObject* touched is `mc->display_obj`, RE-READ at every use —
 // storing one would dangle across ng_spriteDLRealloc / ng_freeSpriteDL and
 // silently re-target on depth reuse. Design + the UAF that killed the previous
-// sketch: SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
+// sketch: SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
 #define AVM1_MASK_PAINT_MAX 64
 
 // Non-NULL only while draw_mc_mask_geometry replays ONE text field's glyphs

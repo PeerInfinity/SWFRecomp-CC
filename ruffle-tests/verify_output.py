@@ -1063,7 +1063,7 @@ STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
 # and action.c's button-MC probes (every build). A 10000 stride would put the
 # FIRST child's characters past 8192 and read back as "no such character".
 # The cost is a cap of 999 characters per child movie; raising it means fixing
-# those checks first. See SWFRecompDocs/status/child-charid-stride-unify.md.
+# those checks first. See SWFRecomp-CC-history:SWFRecompDocs/status/child-charid-stride-unify.md.
 CHILD_CHAR_ID_STRIDE = 1000
 
 # append, not insert(0): stdlib must keep winning if a future scripts/

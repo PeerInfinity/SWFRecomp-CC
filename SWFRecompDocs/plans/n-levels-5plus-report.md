@@ -1,7 +1,7 @@
 # N "levels 5+": episodes 1–2 native vs the oracles, the textWidth tab metric, and unit-scale EditText box snapping (2026-11-24)
 
 One-task session after `n-l2l4-pixel-pass` (`n-l2l4-pixel-pass-report.md` §7), launched by `s27-coordinator`.
-Brief: `SWFRecompDocs/plans/session27-fanout-reports/n-levels-5plus-prompt.md`.
+Brief: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/n-levels-5plus-prompt.md`.
 
 **Summary**
 - **Brief §Goal 1 premise was wrong: episode 0 has only levels 0–4.** `START_LEVEL=5` wraps to level id 0 (the probe

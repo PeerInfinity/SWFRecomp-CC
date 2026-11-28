@@ -14,7 +14,7 @@
 // far finer than lyon's on mid-size arcs and far coarser on large ones. Since
 // our chords are inscribed, "finer" means the filled polygon is systematically
 // LARGER than Ruffle's, which shows up as one-directional edge pixels at
-// MSAA 1. See SWFRecompDocs/plans/session15-fanout-reports/w2-gfx-flatten-report.md.
+// MSAA 1. See SWFRecomp-CC-history:SWFRecompDocs/plans/session15-fanout-reports/w2-gfx-flatten-report.md.
 
 #include <math.h>
 

@@ -102,7 +102,7 @@ struct MovieClip {
 	// NEVER store a DisplayObject* for mask pairing — MovieClip structs are
 	// immortal (tombstoned at depth == INT_MIN, never freed), display-list
 	// entries are relocatable and reclaimable. See
-	// SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
+	// SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
 	void* maskee_mc;
 	// MovieClip.scrollRect (AVM1). Ruffle core/src/avm1/globals/movie_clip.rs
 	// set_scroll_rect: ANY object value sets has_scroll_rect, and the rect is

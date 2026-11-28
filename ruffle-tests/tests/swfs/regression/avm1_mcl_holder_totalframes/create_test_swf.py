@@ -52,7 +52,7 @@ Oracle: RUFFLE_LOCAL_FETCH_DIR=<dir> RUFFLE_MOVIE_URL=https://armorgames.com/tes
         local-fetch navigator the exporter cannot load child.swf at all (both
         holders stay tf:1 fl:1 bt:0).
 
-Closeout: SWFRecompDocs/status/avm1-mcl-holder-totalframes.md
+Closeout: SWFRecomp-CC-history:SWFRecompDocs/status/avm1-mcl-holder-totalframes.md
 """
 import struct
 import subprocess

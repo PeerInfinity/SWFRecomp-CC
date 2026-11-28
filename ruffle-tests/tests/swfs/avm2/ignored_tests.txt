@@ -196,7 +196,7 @@ freestanding_superclass
 #    removed. Do NOT re-add it for the replacements: after 7e8e2de8a only
 #    `/swf13` is still `known_failure`, and the other three are legitimately
 #    visible. The cluster is live work — see SWFRecompDocs/plans/
-#    session20-fanout-reports/w1-drift-report.md ss2.)
+#    SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/w1-drift-report.md ss2.)
 graphics_draw_path
 simplebutton_childevents_multichild
 simplebutton_childevents_script_order
@@ -235,7 +235,7 @@ swz
 # would buy nothing and mislabel the pixel board.
 #
 # loader_load, bom: FLASH-NONDETERMINISTIC (s29 coordinator FP32 runs,
-#   session29-fanout-reports/w1-local-oracles/w1-disposition-audit/forin_order:
+#   SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-disposition-audit/forin_order:
 #   FP32's AVM2 for-in order is hash-scattered AND differs between two runs of the
 #   same SWF; insertion order is irrelevant). URLVariables.toString joins in
 #   `for (p in this)` order, so the golden is ONE FP32 run's order. Same category

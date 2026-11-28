@@ -28,15 +28,15 @@ Step-by-step implementation guides for various components:
 
 High-level project planning documents:
 
-- **[wasm-project-plan.md](plans/completed/wasm-project-plan.md)** - Overall WebAssembly project architecture and roadmap
-- **[streamline-test-builds.md](plans/completed/streamline-test-builds.md)** - Proposal for streamlining the test build process to reduce duplication and leverage SWFModernRuntime
+- **[wasm-project-plan.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/plans/completed/wasm-project-plan.md)** - Overall WebAssembly project architecture and roadmap
+- **[streamline-test-builds.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/plans/completed/streamline-test-builds.md)** - Proposal for streamlining the test build process to reduce duplication and leverage SWFModernRuntime
 
 ### Status
 
-Current project status and progress tracking (see [status/README.md](status/README.md) for details):
+Current project status and progress tracking (see [SWFRecomp-CC-history:SWFRecompDocs/status/README.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/README.md) for details):
 
-- **[project-status.md](status/project-status.md)** - Current status of the SWFRecomp project
-- **[2025-11-01-string-variable-implementation.md](status/2025-11-01-string-variable-implementation.md)** - String variable storage and optimization implementation summary
+- **[project-status.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/project-status.md)** - Current status of the SWFRecomp project
+- **[2025-11-01-string-variable-implementation.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/status/2025-11-01-string-variable-implementation.md)** - String variable storage and optimization implementation summary
 
 ### Upstream Relationship
 
@@ -44,7 +44,7 @@ How SWFRecomp-CC relates to the upstream SWFRecomp org repositories (see [merge/
 
 - **[merge/upstream-relationship-2026-07.md](merge/upstream-relationship-2026-07.md)** - The July 2026 decision: permanent friendly fork, knowledge exchange, no code merges; §7 is the running status check
 - **[upstream-comparison/](upstream-comparison/README.md)** - What each architecture does better, "what would X buy us?" analyses, and the trap map maintained for upstream (`warnings-for-upstream.md`)
-- **[deprecated/merge/](deprecated/merge/)** - Historical: the 2025 `wasm-support` branch comparisons and merge analyses from the original fork creation
+- **[deprecated/merge/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/deprecated/merge/)** - Historical: the 2025 `wasm-support` branch comparisons and merge analyses from the original fork creation
 
 ### Reference
 
@@ -68,10 +68,10 @@ Official Adobe Flash and ActionScript specifications (see [specs/README.md](spec
 
 ### Deprecated
 
-Older documentation that may still be useful for historical reference (see [deprecated/README.md](deprecated/README.md) for details):
+Older documentation that may still be useful for historical reference (see [SWFRecomp-CC-history:SWFRecompDocs/deprecated/README.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/deprecated/README.md) for details):
 
 - Various implementation plans and analyses that have been superseded by current approaches
-- See [deprecated/](deprecated/) directory for full list
+- See [deprecated/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/deprecated/) directory for full list
 
 ### Scripts
 

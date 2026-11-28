@@ -4,7 +4,7 @@ regression/avm1_parent_as3_child_payload, and drive MTASC for test.swf.
 
 WHAT THIS PINS DOWN
 -------------------
-The dead-payload skip (`skip_avm1_payload`, SWFRecompDocs/status/
+The dead-payload skip (`skip_avm1_payload`, SWFRecomp-CC-history:SWFRecompDocs/status/
 avm2-dead-payload-skip.md) drops draws.c's bitmap_data / sound_data /
 video_data — and the tagInit calls that reference them — for any SWF whose
 FileAttributes carries the AS3 bit. The option shipped gated on `is_as3`,

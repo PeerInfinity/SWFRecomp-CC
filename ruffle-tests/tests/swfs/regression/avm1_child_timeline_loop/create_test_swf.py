@@ -75,7 +75,7 @@ NEGATIVE CONTROL
 Reverting the wrap puts both movies back on their last frame forever:
 `f1` pinned at 3 with a, b and c all `movieclip`, `f2` pinned at 2.
 
-See SWFRecompDocs/status/per-movie-display-list-ownership.md for the write-up.
+See SWFRecomp-CC-history:SWFRecompDocs/status/per-movie-display-list-ownership.md for the write-up.
 """
 import struct
 import subprocess

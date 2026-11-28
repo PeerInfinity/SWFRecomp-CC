@@ -34,7 +34,7 @@
 // linearRGB back to sRGB, and the runtime's +0.5 rounding / u8-quantised linear
 // endpoints) are separate legs with their own blast radius.
 //
-// See SWFRecompDocs/plans/session16-fanout-reports/w2-gfx-gradient-report.md.
+// See SWFRecomp-CC-history:SWFRecompDocs/plans/session16-fanout-reports/w2-gfx-gradient-report.md.
 
 #include <math.h>
 #include <string.h>

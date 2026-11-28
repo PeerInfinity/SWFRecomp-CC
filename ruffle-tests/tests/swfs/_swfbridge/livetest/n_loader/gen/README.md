@@ -3,7 +3,7 @@
 Portable, self-contained JS (ES modules, no deps) for generating **solvable**
 levels for recompiled N, verified against the real-N Ruffle oracle in the parent
 `n_loader/` harness. Plan: `SWFRecompDocs/plans/n-level-generator-plan.md`.
-Format facts: `SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`.
+Format facts: `SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`.
 
 ## Phase 0 (done): encoder + golden round-trip
 

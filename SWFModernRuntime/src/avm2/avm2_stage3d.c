@@ -382,7 +382,7 @@ static Avm2Texture3DExt* texture_ext(Avm2Activation* act)
 //
 // It is a CPU implementation on purpose. Ruffle's own goldens are produced by
 // lavapipe, so an exact-pixel match is not automatic either way; what IS
-// measured (SWFRecompDocs/plans/session19-fanout-reports/w1-gfx-stage3d-report.md
+// measured (SWFRecomp-CC-history:SWFRecompDocs/plans/session19-fanout-reports/w1-gfx-stage3d-report.md
 // §4) is that this four-part model reproduces `avm2/stage3d_triangle`'s golden
 // to max channel diff 1 with zero channels over tolerance:
 //

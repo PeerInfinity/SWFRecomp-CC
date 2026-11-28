@@ -221,7 +221,7 @@ follow-up material, same family as making prototype ownership explicit).
   wrap + the browser-WASM dead-slot reclaim pass now runs in CI modes
   (`actionReclaimDeadChildMCSlots`). The 3000-tick board workload now runs to
   MAX_FRAMES with flat memory and no overflow message. Session prompt (now
-  executed): `SWFRecompDocs/prompts/looping-sprite-child-identity-churn.md`.
+  executed): `SWFRecomp-CC-history:SWFRecompDocs/prompts/looping-sprite-child-identity-churn.md`.
   Discovered during verification, PRE-EXISTING (reproduced identically at
   HEAD `a18e181b9`, out of scope): N under ASAN (no input, 3000 frames)
   aborts on a heap-UAF — `actionGetMember` reads a 27,648-byte sprite child
@@ -230,7 +230,7 @@ follow-up material, same family as making prototype ownership explicit).
   scrub. Repro: scratchpad `asan_build_run.sh N` after a
   `profile_game_native.sh flasharchive/N 500 no-graphics --build-only` stage.
   **FIXED 2026-07-05 (own session, prompt
-  `SWFRecompDocs/prompts/n-goto-backward-clear-uaf.md`).** Root cause: the
+  `SWFRecomp-CC-history:SWFRecompDocs/prompts/n-goto-backward-clear-uaf.md`).** Root cause: the
   surviving alias was the attached clip's own STANDALONE `display_obj` (the
   calloc'd DisplayObject ng_attachMovie creates outside any DL) — the
   CI-mode registration entry in the parent's list holds a COPY of the same

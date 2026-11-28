@@ -6,7 +6,7 @@ in the root domain. Ruffle: `movie_clip.rs` `preload_symbol_class` looks every
 row up in `library_for_movie(self.movie()).avm2_domain()`, and every load builds
 a fresh `SwfMovie`, so the key is (movie instance, character id).
 
-Closeout: `SWFRecompDocs/status/avm2-child-symbolclass-binding.md`. The corpus
+Closeout: `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-symbolclass-binding.md`. The corpus
 test that motivated it is `avm2/loader_duplicate_class`.
 
 ## The shape

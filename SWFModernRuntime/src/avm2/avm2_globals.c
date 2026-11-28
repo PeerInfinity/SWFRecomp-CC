@@ -2056,7 +2056,7 @@ static Avm2Value global_describe_type_utils(Avm2Activation* act)
 // from_avmplus/regress/bug_539328 compares the raw toString(), and because
 // ATTRIBUTE order is never normalized by the tests' normalizeXML() helper.
 //
-// Not modelled yet (see SWFRecompDocs/plans/session13-fanout-reports/
+// Not modelled yet (see SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/
 // wave1-t7-describetype.md): ABC trait metadata (P3) and a typed descriptor
 // for the flash.* builtin surface (P4). Builtin members therefore report
 // returnType/type "*" and no parameters, which is why the avm2/all_classes/*

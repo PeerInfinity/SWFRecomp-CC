@@ -18,7 +18,7 @@ entry point and the same placements reach the AVM2 timeline
 cloud box; this is the oracle-free route. output.expected.png is upstream's
 layer_erase golden (Ruffle renders a script-free timeline identically under
 AVM1 and AVM2; confirmation requested as a LOCAL ORACLE REQUEST in
-SWFRecompDocs/plans/session25-fanout-reports/w2-avm2-layer-groups-report.md).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session25-fanout-reports/w2-avm2-layer-groups-report.md).
 """
 import pathlib, struct, zlib
 HERE = pathlib.Path(__file__).resolve().parent

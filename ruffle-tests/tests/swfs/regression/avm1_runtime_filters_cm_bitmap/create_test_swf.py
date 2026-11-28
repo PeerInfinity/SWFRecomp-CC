@@ -15,7 +15,7 @@ Pins three render paths, one frame, SWF 8:
 Traces read the getter back (A 1 / B 20 / D.n 2 / D.0.blurX 10 / D.1.matrix.n 20).
 
 Expected trace and output.expected.png: local Ruffle exporter at 0ddd12b6a
-(session25-fanout-reports/w1-avm1-filters-complete-oracle). Our render matches
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session25-fanout-reports/w1-avm1-filters-complete-oracle). Our render matches
 it at 0 differing pixels. Regenerate byte-identically: `python3 create_test_swf.py`
 (writes test.swf next to this file; CASES=ABD is the fixture cut; the probe's
 other cases C/E/G need the dynamic-clip colour-transform channel, F has no oracle).

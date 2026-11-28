@@ -7,7 +7,7 @@ coordinator owns turning these into fixtures, goldens and dispositions.
 under `xvfb-run` on WSL2 (Linux 6.18). Each run gets a temp `HOME`, `mm.cfg` = `TraceOutputFileEnable=1` +
 `SuppressDebuggerExceptionDialogs=1` (no `ErrorReportingEnable`), and `LC_ALL=C`. Where noted, the result was
 cross-checked on the Windows projector `WIN 32,0,0,465`. All commands are run from the repo root, with
-`H=SWFRecompDocs/plans/session26-fanout-reports`.
+`H=SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports`.
 
 | Capture | Command | Stability / notes |
 |---|---|---|

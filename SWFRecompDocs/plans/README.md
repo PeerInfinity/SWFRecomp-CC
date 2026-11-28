@@ -2,7 +2,9 @@
 
 Index established by the 2026-07-04 audit. Conventions:
 
-- **Finished or superseded plans move to [`completed/`](completed/)** with an
+- **Finished or superseded plans move to `SWFRecompDocs/plans/completed/` in the history repo
+  [`SWFRecomp-CC-history`](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/plans/completed/)**
+  (since 2026-11-28, repo-cleanup S1; fan-out report dirs live there too, see [`fanout-reports.md`](fanout-reports.md)) with an
   `AUDIT OUTCOME` (or equivalent) banner at the top stating what landed and the
   key commit(s). Negative results (executed-but-refuted) also go there — the
   refutation is the value.
@@ -93,7 +95,7 @@ Grounded in the [upstream comparison analyses](../upstream-comparison/):
 
 ## Completed
 
-30 finished/superseded plans in [`completed/`](completed/), each with an outcome
+30 finished/superseded plans in [`completed/`](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/plans/completed/), each with an outcome
 banner (what landed, key commits). Highlights: WASM + WebGPU project plans,
 bounds-engine unification, device fonts, textfield variable binding, input-event
 injection, audio, demo system, the display editors, Archipelago Phases 0–2, and

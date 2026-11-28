@@ -30,7 +30,7 @@ THE SHAPE
     lead in the w2 report. Flash: 30 and 10.
 
 GOLDEN: output.txt is PREDICTED; see LOCAL ORACLE REQUESTS in
-SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
+SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
 """
 import sys
 from pathlib import Path

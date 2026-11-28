@@ -952,9 +952,9 @@ source ~/tools/emsdk/emsdk_env.sh
 
 ## Related Documentation
 
-- **Implementation Status:** `status/2025-11-04-no-graphics-mode-implementation.md`
+- **Implementation Status:** `SWFRecomp-CC-history:SWFRecompDocs/status/2025-11-04-no-graphics-mode-implementation.md`
 - **Original Design:** `plans/swfmodernruntime-no-graphics-mode.md`
-- **Build System Plan:** `plans/completed/streamline-test-builds.md`
+- **Build System Plan:** `SWFRecomp-CC-history:SWFRecompDocs/plans/completed/streamline-test-builds.md`
 - **WASM Generation:** `reference/trace-swf4-wasm-generation.md`
 
 ---

@@ -14,7 +14,7 @@ centre of an opaque blue (0x0000FF) 40x20 BitmapData.
                                                           expect 65535 (0x00FFFF)
   5. draw(c1) of the tinted child ITSELF (its own transform is ignored) 16711680
 LANDED (s27 w2b-draw-text-tint): output.txt is Flash Player 32's trace
-(session27-fanout-reports/w2-local-oracles/w2-draw-cx-text/). Line 3: Flash
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2-draw-cx-text/). Line 3: Flash
 composites the child at its _alpha over the OPAQUE target, with the fixed-8
 cx alpha 255*128>>8 = 127 (red 0x7F, blue 0x80).
 Usage: create_test_swf.py [path to regression/_lib]   (writes test.swf here)

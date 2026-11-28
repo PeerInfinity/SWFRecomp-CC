@@ -2,9 +2,9 @@
 
 Injected-AS feasibility probe for Doodle Jump (DJ), driving the
 `flashSubstrate` capability questions in
-`SWFRecompDocs/plans/completed/archipelago-doodle-jump-feasibility.md`. The findings are
+`SWFRecomp-CC-history:SWFRecompDocs/plans/completed/archipelago-doodle-jump-feasibility.md`. The findings are
 written up in
-`SWFRecompDocs/status/2026-06-01-doodle-jump-flashsubstrate-feasibility.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-01-doodle-jump-flashsubstrate-feasibility.md`.
 
 This is **probe scaffolding kept for reuse** (not a CI test). It demonstrates
 the injected-AS approach against a *real* AVM1 game and is the starting point for
@@ -71,7 +71,7 @@ dj_probed.swf && ./run_ruffle.sh <secs>` (`STEER_KEYS=1` for keys).
 `parse_measure.py <trace> <exp> <tier> <run_id> <out.json>` converts a trace
 to the spec's JSON; `finalize_measurements.py` stamps setup/notes prose and
 writes `measurements/json/dj_constants_summary.json`. Results delivered
-2026-06-11; see `SWFRecompDocs/status/2026-06-11-dj-physics-measurements.md`.
+2026-06-11; see `SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-11-dj-physics-measurements.md`.
 Caveat: blue/brown *animation children* don't run in graphics-native after a
 forced goto (nested-child enterFrame gap) — Ruffle runs are ground truth there.
 

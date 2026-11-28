@@ -1435,7 +1435,7 @@ success). avm1 687→690, avm2 1095→**1107** (+12), from_avmplus
 1553→**1560** (+7), from_shumway 196→197. Histogram: `pass` 3909→3932,
 `output_mismatch` 268→246, **`runtime_error` 2→1**, `ruffle_matched` flat
 at 244, `recomp_fail` 1. **Final: zero regressions, zero other status
-moves.** Raw agent reports: `session8-fanout-reports/`.
+moves.** Raw agent reports: `SWFRecomp-CC-history:SWFRecompDocs/plans/session8-fanout-reports/`.
 
 **Method: the §9 two-wave fan-out, repeated.** Wave 1 = five read-only
 diagnosis agents (triage regen + the §9.2 board) with the already-scoped
@@ -1527,7 +1527,7 @@ Baseline `feb8882b0` (4176/4424 trace, 172/566 pixels) → `c4496a4c8`:
 **trace 4188/4424 (94.7%)**, **pixels 217/566 (38.3%)**. ONE CI run
 `30713776612` (graphics/`categories=full`/`images=true`) graded both axes.
 **Zero regressions on either axis, zero other status moves.** 8 commits
-`734a0fc2f`..`c4496a4c8`; raw reports `session10-fanout-reports/` (8 wave-1
+`734a0fc2f`..`c4496a4c8`; raw reports `SWFRecomp-CC-history:SWFRecompDocs/plans/session10-fanout-reports/` (8 wave-1
 + 8 wave-2). First session drawing targets from BOTH boards
 per the user's dual-axis direction; the two-wave shape held unchanged.
 
@@ -1604,7 +1604,7 @@ other status moves)**, **pixels 257/566 (45.4%, +40, 0 regressions, bands
 improved 73 / worsened 0)**. ONE CI run `31075033086`
 (graphics/`categories=full`/`images=true`). 8 wave-1 + 8 wave-2 Opus agents,
 9 commits `bed9d894b`..`6de650432` + results merge. Reports:
-`session11-fanout-reports/`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session11-fanout-reports/`.
 
 ### 12.1 Ledger
 
@@ -1673,7 +1673,7 @@ results merge `9c7a2dcb2`): trace effective **4204 → 4229 intersection (+25,
 vs ~+25 predicted)**, pixels **258 → 286/567 (50.4%, +28)**, **zero
 regressions and zero worsened bands on both axes**, 38 bands improved.
 7 wave-1 + 9 wave-2 + 1 rider + 1 reconciliation agent; 11 patches, reports
-in `session12-fanout-reports/`.
+in `SWFRecomp-CC-history:SWFRecompDocs/plans/session12-fanout-reports/`.
 
 Per-patch trace yield: w2-xs +8 (8/8 exact-pin singles), w2-errframes +8
 (T1 stack-trace frames, 41% of live mismatched lines), w2-avclasses +5,
@@ -1730,7 +1730,7 @@ merge from run `31130292354` (graphics/full/images=true). Trace effective
 4229→**4237** (+8, intersection 4427, histogram clean — no new crash
 statuses). Pixels 286→**301/567 (53.1%)** (+15, denominator stable).
 6 wave-1 + 9 wave-2 + 1 hygiene agent; reports in
-`session13-fanout-reports/`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/`.
 
 ### 14.1 Ledger
 
@@ -1799,7 +1799,7 @@ Commits `f552cf8af..bf585e448` (9 code patches + hygiene, 10 commits), CI run
 upstream tests (denominator 4427→4443). Pixels **301/567 → 310/569 (54.5%)**:
 +8 intersection flips + the new `regression/mask_nested_intersect` passing;
 bands improved 7 / worsened 0. 7 wave-1 + 10 wave-2 agents; reports in
-`session14-fanout-reports/`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session14-fanout-reports/`.
 
 ### 15.1 Ledger
 
@@ -1864,7 +1864,7 @@ Trace effective **4269 → 4298 / 4443** (+29 intersection, 29 gains, 0
 regressions, histogram clean; +3 bonus ruffle_matched→pass upgrades:
 int/uint_toprecision, e15_7_4_7_1). Pixels **310 → 324 / 569 (56.9%)**:
 +14 flips, 0 regressions, bands improved 13 / worsened 0, drift 0/0.
-7 wave-1 + 12 wave-2 agents; reports in `session15-fanout-reports/`.
+7 wave-1 + 12 wave-2 agents; reports in `SWFRecomp-CC-history:SWFRecompDocs/plans/session15-fanout-reports/`.
 
 ### 16.1 Ledger (trace +29)
 
@@ -1916,7 +1916,7 @@ have no backing disposition entries (w2-watch-order-report.md §6) — audit.
 
 Pixels: flattening leg C HELD for a SOLO dispatch (recompiler lyon port:
 masks 1738→1497, −25-38% vertices, bounds shrink ~1 twip trace effect —
-never bundle; patch archived in session15-fanout-reports/); AVM2 filters
+never bundle; patch archived in SWFRecomp-CC-history:SWFRecompDocs/plans/session15-fanout-reports/); AVM2 filters
 Route 2 = offscreen/composite arc (~250-350 lines, five traps incl.
 object-sized FilterSource vs our stage-sized textures); morph
 end-color per-character offset (tag.c:6966 + avm2 twin :3197 index from c
@@ -1941,7 +1941,7 @@ and pixels **324 / 569 (56.9 %)** from run `31748059158` at `3db858cbc`.
 **Predicted: trace +19, pixels +12.** Measured: trace **4298 → 4313/4443 eff (+15 intersection = 19 gains − 4 effective→fail, of which 3 are upstream drift on gnash Sound-v6/7/8 and 1 is a real regression fixed post-run)**,
 pixels **324 → 337/569 (59.2%; +13 = 14 gains − 1 regression fixed post-run)**, 2 real regressions both fixed in the follow-up commit (avm2/verify_method_info_oob: load-rejected ABC must ignore DoABC2 LAZY_INITIALIZE; visual/define_bits_lossless2_rgb15: bitmap smoothing only exists from SWF 8 — Ruffle read.rs) and re-graded by run 31877239992 at `aeebf9ede` (results merge `c7b284034`): both rows back to pass, 0 regressions either axis → final trace **4317/4453 eff** (denominator +10 upstream arrivals: avm1/sound_load_* ×7, avm2/matrix3d_* ×3) and pixels **338/569 (59.4%)**, bands 32 improved / 2 worsened (acid-scale 302→320, strokes/scale 66243→70119, both <7%), drift 0 new / 0 gone in the graded intersection; upstream master has since added avm1/sound_load_* ×7 + avm2/matrix3d_* ×3 and rewritten from_gnash Sound-v6/7/8 output.ruffle.txt (loadSound/onSoundComplete — new AVM1 Sound lead).
 7 wave-1 + 11 wave-2 agents; reports and patches in
-`session16-fanout-reports/`.
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session16-fanout-reports/`.
 
 Merge order (each merged as its own commit with a per-patch ledger in the
 message): w2-ignore-bucket · w2-all-classes-display · w2-gfx-filters · w2-geom ·
@@ -2438,7 +2438,7 @@ the new alpha-mask path ignored Ruffle's BitmapCache size rule (SWF ≤ 9 both
 sides < 2880 px; SWF ≥ 10 < 8191 and area < 16 777 215; oversize objects are
 not cached so their masks stay stencil, `7f6d5daad`). Verification run:
 trace 4354/4453 intersection (4358/4463 with 10 new upstream names), 0 regressions, getouterscope back to pass; pixels 352 -> 359/569 (+7: the five edittext-bg rows + the two too_big rows), 0 regressions -> final trace **+37** and pixels **+21 = 338 -> 359/569 (63.1 %)**, 16 bands improved / 1 worsened (from_shumway/acid/acid-color-0 20 014 -> 44 817, an EditText-interleave side effect, new board item). 4 wave-1 + 17 wave-2 agents (14 early/board-derived + 3
-follow-up); reports and patches in `session17-fanout-reports/`.
+follow-up); reports and patches in `SWFRecomp-CC-history:SWFRecompDocs/plans/session17-fanout-reports/`.
 
 Merge order: w2-scope-opt · w2-avm2-smalls · w2-sound-load · w2-crossvm-legE ·
 w2-gfx-smalls · w2-gfx-filters-cut2 · w2-avm2-display · w2-gfx-drawgraphicsdata ·
@@ -2567,7 +2567,7 @@ edittext_device_transform_basic` GONE upstream (was fail).
 
 Commits `e3474d611..8376eb700` on master (18 wave-2 merges + 1 post-run fix,
 each carrying its agent's patch, report and brief under
-`session18-fanout-reports/`). Baseline was trace **4373 ±1 / 4498** (results
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session18-fanout-reports/`). Baseline was trace **4373 ±1 / 4498** (results
 `f00041501`, run `33902348100`) and pixels **364 / 572 (63.6 %)** (`659153865`,
 run `33857494837`). Grading runs: graphics/full/images `33939123188` at
 `cdafe1be9` (14 patches) — trace **4376 → 4406 / 4501 eff (+30 = 31 gains,
@@ -2678,7 +2678,7 @@ results`, dispatched at closeout).
 
 **Trace.**
 - `hitarea_sweep` / `hitarea_remove_owner_drag` — shape-based (not AABB) picking + a single topmost pick (every AABB-containing button-mode clip fires today, in creation order). Second arc, `w2-avm1-hitarea-report.md`.
-- ~~`loader_duplicate_class` 32/48~~ **LANDED 2026-09-11 (48/48, both modes), with the diagnosis CORRECTED:** the lookup was not main-movie-only. `class_for_char` already fell through to the child's `symbol_classes` and found the row. It resolved the NAME in the ROOT domain, and the child had loaded into a fresh one. Fix: the placing movie INSTANCE's domain rides on each display object (`Avm2DisplayObjectExt.movie_scope`). Closeout: `SWFRecompDocs/status/avm2-child-symbolclass-binding.md`; anchored by `regression/avm2_parent_child_symbolclass_domain`. CI graphics `34614830360` / no-graphics `34621152628`: +1 on the code, but the headline effective reads -1 / -2 because three upstream test changes landed after the baselines (`avm2/geom_transform` needs `DisplayObject.z`, `ecma3/JSON/adhoc`'s `output.ruffle.txt` moved, `avm1/bitmapdata_custom_rectangle` grew 34->42 lines). Those are drift and fresh targets, not regressions (closeout §7).
+- ~~`loader_duplicate_class` 32/48~~ **LANDED 2026-09-11 (48/48, both modes), with the diagnosis CORRECTED:** the lookup was not main-movie-only. `class_for_char` already fell through to the child's `symbol_classes` and found the row. It resolved the NAME in the ROOT domain, and the child had loaded into a fresh one. Fix: the placing movie INSTANCE's domain rides on each display object (`Avm2DisplayObjectExt.movie_scope`). Closeout: `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-symbolclass-binding.md`; anchored by `regression/avm2_parent_child_symbolclass_domain`. CI graphics `34614830360` / no-graphics `34621152628`: +1 on the code, but the headline effective reads -1 / -2 because three upstream test changes landed after the baselines (`avm2/geom_transform` needs `DisplayObject.z`, `ecma3/JSON/adhoc`'s `output.ruffle.txt` moved, `avm1/bitmapdata_custom_rectangle` grew 34->42 lines). Those are drift and fresh targets, not regressions (closeout §7).
 - `number_convert_errors` → pass needs the static-type int/uint outer frame = recompiler early binding (`abc_emit.cpp` has TK_INT/TK_UINT); 0 headline movement.
 - `matrix3d_append_rotation` rm → pass in ~10 LOC (Flash's NaN pivot path is a real 4×4 product); `matrix3d_recompose_edge_cases` #2004 predicate undiagnosed.
 - `missing_frame_scripts` S3/S4 = main-timeline advance/removal, NOT orphan-phase (relabelled); `links_in_scrolled_text` s16 patch still 0 flips; leg-F focus family; LoaderInfo `unload`; instance-name counter (A/B first).
@@ -2692,7 +2692,7 @@ results`, dispatched at closeout).
 
 Commits `bd5027f69..fe79e0c79` on master (23 code commits + doc/disposition
 commits, each carrying its agent's patch, report and brief under
-`session19-fanout-reports/`). Baseline was trace **4412 effective / 4518
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session19-fanout-reports/`). Baseline was trace **4412 effective / 4518
 intersection** (results `627830f2a`, run `34648878013` at `254145a5b`) and
 pixels **381 / 580** (images run `34645805030`). 8 wave-1 + 11 wave-2 agents,
 all on Opus, coordinator included.
@@ -2844,7 +2844,7 @@ the first call was silently dropped), and the AVM2 `mouseWheelEnabled` default
 ## 21. Session 20 (2026-09-18/19) — dual-axis fan-out #12: trace +10 (4449/4527 eff), pixels +20 (413/587, 70.4 %), ZERO regressions in either axis or either mode
 
 Commits `574207007..0ba87d056` on master (11 code commits + doc/disposition commits,
-each carrying its agent's patch, report and brief under `session20-fanout-reports/`).
+each carrying its agent's patch, report and brief under `SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/`).
 Baseline read fresh off `origin/ruffle-test-results`: trace **4439 effective / 4527**
 (graphics results `6c1329197`, run `35163868554`; no-graphics `6bf7f3c30`, run
 `35166754380`), pixels **393 / 587** (images run `34666689502` at `d8da5a18c`, six days
@@ -2963,7 +2963,7 @@ either as yield.
   need M3 **plus** `array.as:253` for +2 more. **Hard gate: reproduce BOTH legs in
   `search.c` before touching `action.c`.** Strongest lead is an in-place bubble family over
   a **non-clearing `pop()`**; every quicksort variant is a measured dead end. Full brief:
-  `session20-fanout-reports/w2-arraysort-report.md` §6.5.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/w2-arraysort-report.md` §6.5.
 - ~~**`geturl` is one platform constant from +1**~~ — **CLOSED 2026-09-22 (`19ba53372`),
   +1 effective, graded in run `35780999591` with zero regressions.** Recorded here because
   the framing this board inherited was wrong, not merely stale: "a project-identity
@@ -2998,7 +2998,7 @@ either as yield.
 ## 22. Session 21 (2026-09-28/29) — dual-axis fan-out #13: trace +21 (4476/4539 eff), pixels +25 flips / −5 grading correction (433/587, 73.8 %), ZERO regressions in either axis or either mode
 
 Commits `263427d08..02df69d28` on master (20 code commits + doc commits; every agent's patch and
-report under `session21-fanout-reports/`). Baseline read fresh: trace **4452 effective** (graphics
+report under `SWFRecomp-CC-history:SWFRecompDocs/plans/session21-fanout-reports/`). Baseline read fresh: trace **4452 effective** (graphics
 run `35780999591`, results `5c3bf1d80`; no-graphics weekly `36305576918`, results `1d9975c60`),
 pixels **413/587** (images run `35423176371`). Upstream synced at session start: `~/CC/ruffle`
 `f2aaf0703 → 0dacba55f` (local exporter edits re-applied cleanly, exporter rebuilt), corpus
@@ -3122,7 +3122,7 @@ from the brief re-pays build and diagnosis.
 ## 23. Session 22 (2026-10-16/17) — dual-axis fan-out #14, CLOUD-FIRST: trace +26 (4502/4562 eff), pixels +57 (490/587, 83.5 %), ZERO code regressions in either axis or either mode
 
 Commits `be8f4b621..` on master (21 code commits + docs; every report and patch under
-`session22-fanout-reports/`). **First cloud-first session** (user directive 2026-10-16: every step that can
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session22-fanout-reports/`). **First cloud-first session** (user directive 2026-10-16: every step that can
 run in the cloud does): all 8 wave-1 diagnosis slots and all 21 wave-2 implementation slots ran as Claude Code
 cloud sessions (env "SWFRecomp fan-out", Opus), delivering on `fanout/<slug>` branches. Local CPU was spent only
 on the upstream sync, merges (`git apply --3way`, `--check -R` proof) and three incremental recompiler builds /
@@ -3214,7 +3214,7 @@ view). Build: optional JPEG-XR dependency (`libjxr-dev`, user-approved) wired in
 ## 24. Session 23 (2026-11-21) — dual-axis fan-out #15, CLOUD-FIRST: trace +65 (4580/4642 intersection eff; 4584/4645 overall), pixels +27 ours (532/612, 86.9 %), ZERO code regressions in either axis or either mode
 
 Commits `08709f658..` on master (24 code commits + docs; every report and patch under
-`session23-fanout-reports/`). Cloud-first again (user directive 2026-10-16, re-confirmed 2026-11-21): 8 wave-1 + 18
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session23-fanout-reports/`). Cloud-first again (user directive 2026-10-16, re-confirmed 2026-11-21): 8 wave-1 + 18
 wave-2 cloud sessions (env "SWFRecomp fan-out", Opus), ≤ 8 live, all delivered on `fanout/<slug>` branches, 0 lost.
 Local CPU: git/merges, two incremental recompiler builds, `gcc -fsyntax-only` on shared TUs, `py_compile`, one
 exporter run (the attached-clip probe).
@@ -3332,7 +3332,7 @@ no-graphics builds carry no libavcodec by design. One known, predicted row.
 ## 25. Session 24 (2026-11-21/22) — dual-axis fan-out #16, CLOUD-FIRST: trace +19 (4608/4655 intersection eff) + 5 new fixtures, pixels +5 (539/613), ZERO regressions in either axis or either mode
 
 Commits `c2f9e695b..9561027db` on master (8 code commits + docs; every report, patch and probe under
-`session24-fanout-reports/`). Cloud-first (user directive 2026-10-16, re-confirmed 2026-11-21): 6 wave-1 + 6 wave-2
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session24-fanout-reports/`). Cloud-first (user directive 2026-10-16, re-confirmed 2026-11-21): 6 wave-1 + 6 wave-2
 cloud sessions (env "SWFRecomp fan-out", Opus), all delivered on `fanout/<slug>` branches, 0 lost. Wave 1 was sized at
 6, not 8, because s23 took the cheap wins ("expect diminishing returns" in `BRIEFS_COMMON.md`); 2 of the 6 wave-1
 prototypes were measured and landed directly. One parallel LOCAL one-task session (`n-perf-ab`, real-GPU N frame-rate
@@ -3395,7 +3395,7 @@ patch ledger by name, 0 pass→fail, 0 other status moves; plus 5 new `regressio
 - **A new per-frame feature needs a real-GPU A/B.** `161ecf124` (browser attached-clip pump) was trace-perfect and
   still cost N +1.5 ms/frame (O(n²) insertion sort over ~900 attached roots, visible only as `runSWF` SELF time because
   binaryen inlines the pump). Found by the parallel `n-perf-ab` session, fixed at parity. Record:
-  `session23-fanout-reports/browser-attached-timeline-report.md` §6.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/session23-fanout-reports/browser-attached-timeline-report.md` §6.
 - **The local main checkout is a `blob:none` partial clone**: `git gc` "bad tree object" was missing local trees, not
   corruption (fix in memory `git-partial-clone-gc-bad-tree`).
 - **Local oracle turnaround works mid-wave**: the coordinator ran the attach-order exporter probes (root, non-root,
@@ -3432,7 +3432,7 @@ patch ledger by name, 0 pass→fail, 0 other status moves; plus 5 new `regressio
 ## 26. Session 25 (2026-11-22) — dual-axis fan-out #17, CLOUD-FIRST, full size: trace +9 (4622/4662 intersection eff), pixels +22 (561/613; 572/624 with 11 new fixture comparisons), ZERO regressions in either axis or either mode; N playable in the browser
 
 Commits `ca14fe02f..3bc8372fb` on master (19 code commits + docs; every report, patch, probe and oracle under
-`session25-fanout-reports/`). Cloud-first (user directive 2026-10-16, re-confirmed 2026-11-22), **full size by user
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session25-fanout-reports/`). Cloud-first (user directive 2026-10-16, re-confirmed 2026-11-22), **full size by user
 direction** (fan-outs also use expiring credits; memory `fanout-credits-diminishing-returns-ok`): 8 wave-1 + 14 wave-2
 cloud sessions (env "SWFRecomp fan-out", Opus), all delivered, 0 lost; 5 wave-1 prototypes landed directly. In parallel,
 a ladder of LOCAL one-task sessions on N: `n-play-game` → `n-gold-residue` → `n-tile-color-hud` → `n-level-complete`
@@ -3547,7 +3547,7 @@ coordinator-run, or an upstream golden proven equivalent): `avm1_attached_clip_t
 
 ## 27. Session 26 (2026-11-23) — dual-axis fan-out #18, CLOUD-FIRST, full size: trace +4 by name, pixels +11 by name (593/636, 2 priced and dispositioned losses), 0 code regressions after the final-run fixes; N levels 2–4 routes byte-identical
 
-Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-ladder commits and 2 coordinator fixes, plus docs. Every report, patch, probe and oracle is under `session26-fanout-reports/`. The fan-out was cloud-first and full size: 9 wave-1 slots plus 13 wave-2 slots (env "SWFRecomp fan-out", Opus). All 22 delivered and none were lost; 7 wave-1 prototypes landed directly. In parallel, the local N one-task ladder ran: `n-pixel-pass` → `n-collector-uaf` → `n-exec-order` → `n-levels` → `n-gold-streaks`, then `n-browser-pfx` (`005bea42a`: an obsolete name-gated browser `pfx` one-shot hack removed; RNG hasher signed-overflow UB fixed so emcc and gcc draw the same sequence; level 1 route exporter = native = browser). Its successor `n-trap-stroke` was launched at closeout. Each slice's REPORT BACK was checked against disk before the next slice launched.
+Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-ladder commits and 2 coordinator fixes, plus docs. Every report, patch, probe and oracle is under `SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/`. The fan-out was cloud-first and full size: 9 wave-1 slots plus 13 wave-2 slots (env "SWFRecomp fan-out", Opus). All 22 delivered and none were lost; 7 wave-1 prototypes landed directly. In parallel, the local N one-task ladder ran: `n-pixel-pass` → `n-collector-uaf` → `n-exec-order` → `n-levels` → `n-gold-streaks`, then `n-browser-pfx` (`005bea42a`: an obsolete name-gated browser `pfx` one-shot hack removed; RNG hasher signed-overflow UB fixed so emcc and gcc draw the same sequence; level 1 route exporter = native = browser). Its successor `n-trap-stroke` was launched at closeout. Each slice's REPORT BACK was checked against disk before the next slice launched.
 
 **Baselines read fresh.** Trace: the s25 FINAL `45078991452` (results `9277f3799`): 4636 eff / 4677 rows, 41 failing. No-graphics: `45079002150` (`dffc41cf2`). Pixels: 572/624 (561/613 on the s24 comparison set). Upstream drift `3ac8dcb07..3e98d9ba6` (5 commits).
 
@@ -3661,7 +3661,7 @@ Commits `c380aecd5..005bea42a` on master: 22 cloud-slot code commits, 8 local N-
 
 ## 28. Session 27 (2026-11-24) — dual-axis fan-out #19, CLOUD-FIRST, full size, FLASH-ORACLE FIRST: trace 4684 → 4781 eff (4722 → 4819 rows; 97 new rows, all pass), pixels 592 → 626 pass (+2 corpus by name, 35 new fixture comparisons), 1 trace regression vs Flash 32 (gnash test12; booked Flash-ward at closeout, corrected by a Flash 32 capture) and 1 priced Flash-over-Ruffle loss
 
-Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slots), 12 local one-task-session commits (N ladder and browser ladder), 2 golden-provenance rounds, plus docs. Every report, patch, probe and oracle capture is under `session27-fanout-reports/`. The 32 `fanout/*` branches were pruned at closeout, after their report and patch blobs were checked identical on master. Cloud slots: 10 wave-1 diagnosis, 13 wave-2, 7 wave-2b, 2 wave-3 (env "SWFRecomp fan-out", Opus). All 32 delivered and none were lost. Their work landed in those 16 commits, except `w1-browser-avm1-gaps`, which went to the local `browser-arms-land`.
+Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slots), 12 local one-task-session commits (N ladder and browser ladder), 2 golden-provenance rounds, plus docs. Every report, patch, probe and oracle capture is under `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/`. The 32 `fanout/*` branches were pruned at closeout, after their report and patch blobs were checked identical on master. Cloud slots: 10 wave-1 diagnosis, 13 wave-2, 7 wave-2b, 2 wave-3 (env "SWFRecomp fan-out", Opus). All 32 delivered and none were lost. Their work landed in those 16 commits, except `w1-browser-avm1-gaps`, which went to the local `browser-arms-land`.
 
 **What changed the method: a real Flash Player 32 oracle** (`tools/flash-oracle/`, Linux + Windows projectors, local only). The s26-coordinator's `flash-oracle` session built it at Robert's request. From wave 2 on, every fixture golden and every held verdict was taken from Flash, with the Ruffle exporter as a fallback. Several standing verdicts fell to it (§28.2). Robert also asked for a golden-provenance sweep of every Ruffle image golden against Flash: `golden-provenance` and `golden-provenance-2` (summary in playbook §26).
 
@@ -3671,7 +3671,7 @@ Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slot
 
 **Baselines read fresh:** the s26 record pair at `005bea42a`, graphics `45284922078` (results `df7729df2`) and no-graphics `45284938521` (`81d32b9b2`). Trace 4684 eff / 4722 rows; pixels 592 pass / 41 fail.
 
-**Grading runs** (detail: `session27-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+**Grading runs** (detail: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
@@ -3684,7 +3684,7 @@ Commits `d70f2c0aa..8f4f6e395` on master: 16 coordinator landings (32 cloud slot
 **Interim #3's three regressions** were fixed by `w3-interim3-regressions` (`8f4f6e395`), and the final run confirms every fix:
 - `avm1/globals_monkeypatch` output_mismatch → SEGFAULT: `tfCallGlobalCtorOnField` used `INV_SUPER_CTX` with a MovieClip `this`. It is back to its documented output_mismatch.
 - Fixture image `avm1_attached_clip_selfgoto_child_parent` FAIL: `ng_apply_pending_sprite_self_gotos` minted `_root`-parented orphans. It passes, 0 outliers.
-- gnash `action_execution_order_test12` ruffle_matched → output_mismatch: It came from w2b-timers-tail's goto-queued init flush at the call return, and it was predicted. Our output is now byte-identical to Flash's `output.fp9.txt`, and the graded golden is the fp10 one. At closeout this was booked as "Flash-ward". **Corrected after closeout, 2026-11-24:** real Flash 32 (direct, pinned) prints `output.fp10.txt` byte for byte. Capture: `session27-fanout-reports/flash-oracle-captures/action_execution_order_test12/flash32.lnx.direct.txt`. So the graded golden IS modern Flash, and this row is a real 1-line gap. Line 19 (`asOrder`) now matches Flash 32 (the init flush fixed it). Line 17 (`enterFrameOrder`) does not: FP10+ runs enterFrame once on clips 4 and 5, and we, Ruffle and FP9 don't. It is the only row that falls vs the baseline. The code lead is on the s28 board.
+- gnash `action_execution_order_test12` ruffle_matched → output_mismatch: It came from w2b-timers-tail's goto-queued init flush at the call return, and it was predicted. Our output is now byte-identical to Flash's `output.fp9.txt`, and the graded golden is the fp10 one. At closeout this was booked as "Flash-ward". **Corrected after closeout, 2026-11-24:** real Flash 32 (direct, pinned) prints `output.fp10.txt` byte for byte. Capture: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/flash-oracle-captures/action_execution_order_test12/flash32.lnx.direct.txt`. So the graded golden IS modern Flash, and this row is a real 1-line gap. Line 19 (`asOrder`) now matches Flash 32 (the init flush fixed it). Line 17 (`enterFrameOrder`) does not: FP10+ runs enterFrame once on clips 4 and 5, and we, Ruffle and FP9 don't. It is the only row that falls vs the baseline. The code lead is on the s28 board.
 
 **Final vs baseline, by name.**
 - Trace on the 4722-row intersection:
@@ -3780,7 +3780,7 @@ Commits `7c3cfdcb7..bfa47037b` on master: 87 non-results commits. There are 31 c
 - `snap-pixel-audit`;
 - the lowq arc `lowq-recapture` → `lowq-corner-rule`.
 
-Every report, patch, probe and local Flash capture is under `session28-fanout-reports/`. The slot table and every grading run are in its `AGENT_LAUNCH_ORDER.md`. The 31 `fanout/*` branches were pruned at closeout after a blob check against master. Three branches had final reports or patches newer than the interim copies on master, and one had 2 logs missing from master. All of them were archived to master first.
+Every report, patch, probe and local Flash capture is under `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/`. The slot table and every grading run are in its `AGENT_LAUNCH_ORDER.md`. The 31 `fanout/*` branches were pruned at closeout after a blob check against master. Three branches had final reports or patches newer than the interim copies on master, and one had 2 logs missing from master. All of them were archived to master first.
 
 Pages REAL deploy: `45898148485` (Deploy step ran). Two earlier attempts built and uploaded the artifact, but `deploy-pages@v4` failed to list it ("No artifacts named github-pages"; GitHub showed no incident). Re-running the failed job in the same run then found 2 artifacts. A FRESH dispatch is the retry, not `gh run rerun`.
 
@@ -3792,7 +3792,7 @@ Pages REAL deploy: `45898148485` (Deploy step ran). Two earlier attempts built a
 - graphics `45547012629` at `7c3cfdcb7` (results `e1425f417`): trace 4781 eff / 4819 rows (4522 pass + 259 rm, 38 failing); pixels 629 pass / 39 fail by status sum;
 - no-graphics `2e286cf2f`: 4779 eff.
 
-**Grading runs** (detail: `session28-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+**Grading runs** (detail: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
@@ -3884,14 +3884,14 @@ Commits `ee14c39f9..535412159` on master: 65 non-results commits. 20 cloud slots
 (diagnosis), 10 wave-2/2b (implementation), 1 wave-3 (`w3-interim3-residuals`). All 20 delivered, none lost. 4 local
 one-task sessions ran too: the N ladder `n-seam-caps`, and the browser ladder `browser-gotoandstop-current` →
 `browser-dj-freeze` → `browser-attach-order`. Every report, patch and local Flash capture is under
-`session29-fanout-reports/` (captures in `w1-local-oracles/<slot>/`); the slot table and every grading run are in its
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/` (captures in `w1-local-oracles/<slot>/`); the slot table and every grading run are in its
 `AGENT_LAUNCH_ORDER.md`. The 20 `fanout/*` branches were pruned at closeout after a full blob check against master
 (no report/patch/log differed; 2 w1-drift fixture sources were missing and were archived first, `7c190b744`).
 
 **Baselines read fresh** (2026-11-26): graphics `45878805896` at `bfa47037b` (results `014124ed5`): 4827 eff / 4864
 (4642 pass + 185 rm, 37 failing); pixels 548 pass / 140 fail / 6 ignored / 3 skip by status sum. No-graphics `336b83183`: 4825 eff.
 
-**Grading runs** (detail: `session29-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+**Grading runs** (detail: `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
@@ -3999,14 +3999,14 @@ Commits `2d40d3799..HEAD` on master: 34 non-results commits. 18 cloud slots, Opu
 sessions on the browser ladder: `browser-attach-child-early` → `browser-nested-swapdepths-remove` →
 `browser-timeline-self-goto` → `browser-clip-event-order` → `browser-pending-finalize`. The N ladder stayed PARKED
 and the N procgen arc CANCELLED (no slot touched either). Every report, patch and local Flash capture is under
-`session30-fanout-reports/` (captures in `w1-local-oracles/<slot>/`, `pre-launch-oracles/`); slot table, grading runs and
+`SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/` (captures in `w1-local-oracles/<slot>/`, `pre-launch-oracles/`); slot table, grading runs and
 per-interim ledgers (`interim{2,3,4}-expected-ledger.md`) are in `AGENT_LAUNCH_ORDER.md`.
 
 **Baselines read fresh**: graphics = s29 FINAL `45938113471` at `2d40d3799` (results `51ab63688`): 4860 eff / 4893
 (4704 pass + 156 rm, 33 failing); pixels 553 pass / 140 fail / 6 ignored / 3 skip on the comparison set. No-graphics
 `63bcc2dd8`: 4858 eff. Upstream Ruffle `b7ff32d93..66f9073de`: one new row (`avm2/xmldocument_tostring`).
 
-**Grading runs** (detail: `session30-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+**Grading runs** (detail: `SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
 
 | run | code | trace | pixels | no-graphics |
 |---|---|---|---|---|
@@ -4108,3 +4108,14 @@ Pages: dry runs `46061672559`, `46078822038` green; REAL deploy at closeout (§3
 - LOW glyph chord rule (recompiler, M), the morph_test1 xtrace glyph residue after the 3rd glyph.
 - `acid-scale` (+160 vs FP32), `scroll_rect_scaled`, `acid-small` (timeline flatten, priced).
 **Browser ladder**: the held branch LANDED 2026-11-28 as `3dfab1277` (graded = ledger: G `46111106971`, NG `46119474607`; +1 new regression pass, 0 other moves). Next: the browser PlaceObject2/Ratio REPLACE-preservation and SetInstanceName name-change ports (fixture first).
+
+### 31.5 Where session 31+ reports go (repo cleanup S1, 2026-11-28)
+
+Decision D3 (`repo-cleanup-plan.md`): fan-out reports, briefs, ledgers and oracle captures go to the public history
+repo `PeerInfinity/SWFRecomp-CC-history` (checkout `~/CC/SWFRecomp-CC-history`), at
+`SWFRecompDocs/plans/sessionN-fanout-reports/`. Every s7–s30 session dir already lives there at the same path;
+citations read `SWFRecomp-CC-history:<path>`. The main repo keeps this arc, the playbook, `PROJECT_STATE.md` and
+`NO_GO_REGISTER.md`. Coordinator tools live at `tools/coord/` (do not copy them into the session dir); start the
+coordinator brief from `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md` and the worker headers from `tools/coord/templates/`.
+Workers still deliver on `fanout/<slug>` in the main repo (the only repo a cloud session pushes); the coordinator lands
+code with `land_branch.sh` and archives the report with `archive_branch.sh` (playbook §5a).

@@ -59,7 +59,7 @@ Before committing to large-scale parallel opcode implementation, these experimen
 - **Issues found**: Math library linking (fixed with `-lm`), stack order in test creation
 - **Outcome**: Workflow is production-ready, documentation is sufficient
 
-**Full Report**: See `status/experiment-02-minimal-opcode-results.md`
+**Full Report**: See `SWFRecomp-CC-history:SWFRecompDocs/status/experiment-02-minimal-opcode-results.md`
 
 **Why**: Validates the workflow time estimates and identifies documentation gaps
 
@@ -120,7 +120,7 @@ Before committing to large-scale parallel opcode implementation, these experimen
 - **Memory**: Perfect (0 leaks, 0 errors)
 - **Status**: Production-ready for object opcodes
 
-**Full Report**: See `status/experiment-04-refcount-poc-results.md`
+**Full Report**: See `SWFRecomp-CC-history:SWFRecompDocs/status/experiment-04-refcount-poc-results.md`
 
 **Why**: The object model is complex and shared by many opcodes (~30% according to the guide). Validating it early prevents downstream problems.
 

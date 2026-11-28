@@ -20,7 +20,7 @@ Last updated: **2026-09-18 (s20) — CLOSED at `ruffle_matched`.**
 > The 28/175 baseline in the table below is four months stale — the row went
 > 28 → 124/175 (s17-s19) → `ruffle_matched` (s20).
 >
-> Full account: `SWFRecompDocs/plans/session20-fanout-reports/w2-masks-hittest-report.md`.
+> Full account: `SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/w2-masks-hittest-report.md`.
 
 <!-- PLAN_META
 id: MASKS_TEST_PLAN

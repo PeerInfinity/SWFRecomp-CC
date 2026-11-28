@@ -9,7 +9,7 @@ stable-prefix variant (frames 2-9 empty) is retired now that timer.c drops
 the cap (s27 w2b-timers-tail).
 
 GOLDEN = real Flash Player 32 (LNX 32,0,0,465) trace of this SWF,
-coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
+coordinator-run (SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/
 w1-local-oracles/w1-timers-robustness/caps_timers/flash.wrapped.txt,
 identical to flash.direct.txt), verbatim. Ruffle is NOT an oracle here: its
 exporter fires no timers.

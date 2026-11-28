@@ -27266,7 +27266,7 @@ static void avm1FireFormDataEvents(SWFAppContext* app_context)
 //
 // What this table does NOT do is own a display list, which is why a loaded
 // movie parks on its last frame instead of wrapping. See section 2.2 of
-// SWFRecompDocs/status/child-timeline-advance.md.
+// SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md.
 typedef struct {
 	MovieClip* mc;
 	MovieEntry* entry;
@@ -29034,7 +29034,7 @@ static void actionFirePendingDirectLoadsImpl(SWFAppContext* app_context, int fir
 		// DisplayObject, and merely ALLOCATING one for it (with no list swap at
 		// all) breaks avm1/movieclip_invalid_get_bounds_1..8; swapping the list
 		// on top of that additionally breaks avm1/swf{5_to_6,6_to_5}_cross_call.
-		// Both measured. See SWFRecompDocs/status/child-timeline-advance.md.
+		// Both measured. See SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md.
 		DisplayObject* _shell = NULL;
 		int _rootdl_tok = 0;
 		if (!loads[i].is_level && (_shell = actionChildMovieShell(app_context, mc, 1)) != NULL) {
@@ -36278,7 +36278,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 			// so a single-movie build is unchanged (including its long-standing
 			// exposure to dynamic_xform_slot, a GPU-only slot past the end of
 			// the CPU array — see the Drawing-API note in
-			// SWFRecompDocs/status/child-placed-clip-uninit.md).
+			// SWFRecomp-CC-history:SWFRecompDocs/status/child-placed-clip-uninit.md).
 			GEN_EXTERN_TRANSFORM_DATA;
 			const float (*_comb)[16] = ng_combinedTransformData();
 			float a, b, c, d;
@@ -36366,7 +36366,7 @@ void actionDrawingUnionTris(float** verts, unsigned* count)
 // mask code touches is `mc->display_obj`, read fresh at the point of use (it is
 // the one entry pointer the realloc/free funnels already maintain).
 //
-// Design: SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §3.
+// Design: SWFRecomp-CC-history:SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §3.
 #define AVM1_MASK_MAX_PAIRS 64
 typedef struct { MovieClip* maskee; MovieClip* masker; } Avm1MaskPair;
 static Avm1MaskPair g_avm1_mask_pairs[AVM1_MASK_MAX_PAIRS];
@@ -50701,7 +50701,7 @@ static void ensureArrayConstructorStatic(SWFAppContext* app_context)
 
 // s30 W2-c: inert FP32 natives we do not implement, so presence / typeof / for..in match
 // avm1/global_proto_decls. Each is a no-op native. Version gate = the lowest FP32 dump that
-// lists it (session30-fanout-reports/w1-local-oracles/w1-native-table: present at SWF 6, 7, 8
+// lists it (SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-native-table: present at SWF 6, 7, 8
 // and the SWF15 golden; SWF5 is unmeasured and `_global` is unreachable there anyway).
 static ASFunction g_avm1stub_getDiskUsage, g_avm1stub_purge, g_avm1stub_getURLPageSupport;
 static void avm1StubFn(SWFAppContext* app_context, ASObject* holder, ASFunction* f,
@@ -52658,7 +52658,7 @@ static void swf5TextFieldRefToClip(SWFAppContext* app_context)
 }
 
 // ---- s29 w2b-tabindex: FP32 `_root.tabIndex` raw-property mode ----------
-// FP32 captures (session29-fanout-reports/w1-local-oracles/w2-disposition-land
+// FP32 captures (SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w2-disposition-land
 // t00..t12 + w1-disposition-audit/L3b_tabindex*): on the timeline-placed ROOT
 // the native MovieClip tabIndex accessor is not there until some name lookup
 // on the root misses its own properties (a read of `this.tabIndex`, an
@@ -75969,7 +75969,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 		// Ruffle writes back EVERY position (hence length 4 on :317 and a
 		// fully-own sparse array); an in-place sort over the live array reads
 		// the popped state and gets :324/:325 wrong. Harness of record:
-		// SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md.
+		// SWFRecomp-CC-history:SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md.
 		{
 			ActionVar* _qbuf = (ActionVar*) HALLOC(n * sizeof(ActionVar));
 			u32* _qorig = (u32*) HALLOC(n * sizeof(u32));

@@ -215,4 +215,4 @@ ActionLess2 follows ECMA-262 Section 11.8.5 abstract relational comparison:
 
 - `greater_swf_4/` - Test using same opcode (0x48) but was incorrectly labeled
 - `SWFRecompDocs/specs/swf-spec-19.txt` - Official ActionLess2 specification
-- `SWFRecompDocs/prompts/opcode-less2-0x48.md` - Implementation task description
+- `SWFRecomp-CC-history:SWFRecompDocs/prompts/opcode-less2-0x48.md` - Implementation task description

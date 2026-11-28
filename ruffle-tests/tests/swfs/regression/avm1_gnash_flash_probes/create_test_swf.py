@@ -5,7 +5,7 @@ mechanisms behind gnash `ruffle_matched` rows. One SWF per version.
 Landed s28 w2b-gnash-holds as regression/avm1_gnash_flash_probes (SWF8),
 _v6 and _v5 (same generator, version arg). Every output.txt is a real
 Flash Player 32 (LNX, direct pinned) trace captured by the coordinator
-(session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/). Pins: XMLNode
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/). Pins: XMLNode
 name/value exclusivity (P1, B1), the `with` nesting cap at frame level and
 inside DefineFunction/DefineFunction2 per SWF version (P2, B2),
 Selection.setFocus select-all + setSelection arg-count rule (P3, B10), NaN

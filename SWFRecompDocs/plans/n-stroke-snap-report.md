@@ -1,7 +1,7 @@
 # n-stroke-snap: Flash Player 32 thin-stroke pixel snapping (2026-11-25)
 
 One-task session (LOCAL) after `n-levels-5plus` (§4 of `n-levels-5plus-report.md`), launched by `s28-coordinator`.
-Brief: `SWFRecompDocs/plans/session28-fanout-reports/n-stroke-snap-prompt.md`.
+Brief: `SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/n-stroke-snap-prompt.md`.
 
 **Summary**
 - **Rule pinned with the Flash oracle (§1)**, 13 capture sets under `n-stroke-snap-captures/`. Flash quantises stroke

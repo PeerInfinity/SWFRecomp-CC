@@ -17,7 +17,7 @@
 # write -> apply -> re-report grade (Seedling needed a separate teleport build).
 #
 # Prereqs (this script does NOT regenerate them — they are multi-minute builds;
-# see SWFRecompDocs/prompts/avm2-rwk-ap-handoff.md session log):
+# see SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-rwk-ap-handoff.md session log):
 #   ~/CC/rwk_ap_build/recompiled/            SWFRecomp output for the injected SWF
 #   SWFRecomp/build_wasm_avm2/rwk_ap/        build_wasm_avm2.sh output
 #   docs2/examples/avm2/rwk_ap/game.html     deploy_wasm_avm2.sh output

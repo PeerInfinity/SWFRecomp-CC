@@ -48,7 +48,7 @@ NEGATIVE CONTROLS
     is the test that discriminates against the baseline and this one is the
     test that discriminates against the over-correction.
 
-See SWFRecompDocs/status/child-timeline-advance.md for the full write-up.
+See SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md for the full write-up.
 """
 import struct
 import subprocess

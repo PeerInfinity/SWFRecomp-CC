@@ -596,7 +596,7 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   timeline shapes) unblocks the frame1 preloader render on the GPU/Dawn sink;
   T5 (ported `RASTER_TRI*` CPU rasterizer) resolves the headless `AVM2_CPU_DUMP`
   render.** First-session prompt:
-  `prompts/avm2-vector-render-t1-solid-timeline-shapes.md`. Highest-risk unknown is
+  `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-vector-render-t1-solid-timeline-shapes.md`. Highest-risk unknown is
   the baked `FRAME_HEIGHT-y` Y-flip in `shape_data` (Risk R1), front-loaded into T1.
 - **This renderer is its own deliberately-scheduled track, PARALLEL to the EQ
   boot-chain** (EQ-2 click-injection / `agi` stub / `init2()` are trace-gradeable and

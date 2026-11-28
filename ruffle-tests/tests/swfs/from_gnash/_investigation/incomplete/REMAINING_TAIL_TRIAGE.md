@@ -665,7 +665,7 @@ wins:
 4. ~~**`swf4opcode`**~~ — promoted to ruffle_matched 2026-05-02 (Group A defer).
 5. **`matrix_test`** (6-9 hours, standalone-worthy) — three independent geometry / FP issues; promote to its own plan when work begins.
 6. **`NetStream-SquareTest`** (4-6 hours, standalone-worthy) — netstream timing.
-7. ~~**`masks_test`**~~ — **CLOSED at `ruffle_matched` (s20, 2026-09-18).** NOT verifier scope: the "needs a synthetic keypress mechanism / promote to a standalone plan" reading here was wrong and would have sent a session into `verify_output.py`. The real blockers were runtime bugs — s19 fixed `actionNextFrame`'s deferred-goto arm on a stopped root, and s20 fixed a one-line AVM1 `hitTest` bounding-box arity bug on maskers. See `SWFRecompDocs/plans/session20-fanout-reports/w2-masks-hittest-report.md`.
+7. ~~**`masks_test`**~~ — **CLOSED at `ruffle_matched` (s20, 2026-09-18).** NOT verifier scope: the "needs a synthetic keypress mechanism / promote to a standalone plan" reading here was wrong and would have sent a session into `verify_output.py`. The real blockers were runtime bugs — s19 fixed `actionNextFrame`'s deferred-goto arm on a stopped root, and s20 fixed a one-line AVM1 `hitTest` bounding-box arity bug on maskers. See `SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/w2-masks-hittest-report.md`.
 
 Then (after the cluster plans land and recovery is measured):
 

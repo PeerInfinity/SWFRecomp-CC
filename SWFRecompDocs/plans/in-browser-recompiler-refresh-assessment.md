@@ -267,7 +267,7 @@ at a host-chosen address (`--global-base` = a static 96 MB arena in the host).
 ### 7.3 Known limitations
 - ~~**AVM1 try/catch:**~~ **FIXED 2026-09-02** by the try-helper emission mode
   (`avm2-in-browser-assessment.md` §4.1, status doc
-  `SWFRecompDocs/status/avm2-try-helper-emission.md`). The page recompiles with
+  `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-try-helper-emission.md`). The page recompiles with
   `try_helper = true`, so each try body is a lifted function the runtime calls
   through ITS setjmp and generated code performs none. `avm1/try_catch_finally`
   now traces all 119 lines in the page, byte-identical to its `output.txt`.

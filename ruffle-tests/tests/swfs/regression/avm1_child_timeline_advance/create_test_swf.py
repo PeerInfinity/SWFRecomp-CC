@@ -55,7 +55,7 @@ NEGATIVE CONTROL
 Reverting the runtime change puts the child back at frame 1 forever:
 `c1` alone, `cf:1` on every tick, `ax:10`, `b:undefined` throughout.
 
-See SWFRecompDocs/status/child-timeline-advance.md for the full write-up.
+See SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md for the full write-up.
 """
 import struct
 import subprocess

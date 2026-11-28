@@ -11,7 +11,7 @@ twice per wrap (from line 28 on).
 
 Expected output: Ruffle exporter 0ddd12b6a --frames 8, byte-identical to
 avm1_attached_clip_tagorder/output.txt
-(session25-fanout-reports/w0-local-oracles/attach_tagorder_ratio.ruffle-0ddd12b6a.txt).
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session25-fanout-reports/w0-local-oracles/attach_tagorder_ratio.ruffle-0ddd12b6a.txt).
 
 Original fixture docstring follows.
 
@@ -21,7 +21,7 @@ own frame 1 first.
 
 Same clips as avm1_attached_clip_natural_timeline, with each attached clip's
 frame 1 flipped to `PlaceObject(child); DoAction` (the s23 w2 attached-timeline
-probe, `session23-fanout-reports/w2-attached-timeline-probe/make_probe_swf.py`,
+probe, `SWFRecomp-CC-history:SWFRecompDocs/plans/session23-fanout-reports/w2-attached-timeline-probe/make_probe_swf.py`,
 md5 82368d06 for the root variant). Expected attach tick:
 `kid anim f1, kid2 anim f1, s stopper f1, kid3 anim f1, m multi f1`.
 
@@ -37,7 +37,7 @@ container `c`.
 
 Expected output: Ruffle exporter (local build, 0ddd12b6a) --frames 8 trace;
 root and non-root variants are byte-identical in Ruffle
-(session24-fanout-reports/w1-attach-order-oracle/).
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session24-fanout-reports/w1-attach-order-oracle/).
 
 Usage: create_test_swf.py <out.swf> [nonroot]
 """

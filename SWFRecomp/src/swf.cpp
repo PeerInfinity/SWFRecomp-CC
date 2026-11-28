@@ -11694,7 +11694,7 @@ namespace SWFRecomp
 								// from_gnash morph_test1: vert_count 90 against a
 								// morph_end_shape_data[6][2], 84 entries OOB on every
 								// rendered frame). Diagnosed in
-								// session15-fanout-reports/wave1-gfx-blur-morphratio.md
+								// SWFRecomp-CC-history:SWFRecompDocs/plans/session15-fanout-reports/wave1-gfx-blur-morphratio.md
 								// §3.4 cause 2 and w2-morph-legb-report.md §5.
 								//
 								// The end position is the stroke corner translated by

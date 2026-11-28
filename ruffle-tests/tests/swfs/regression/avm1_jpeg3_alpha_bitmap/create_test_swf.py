@@ -22,7 +22,7 @@ whole-pixel offset over a solid blue rectangle, so no sampling filter is
 involved (premultiplied-vs-straight bilinear is a separate, unlanded step).
 
 Expected PNG: Ruffle exporter (LOCAL ORACLE REQUEST in
-SWFRecompDocs/plans/session26-fanout-reports/w2-text-cx-jpeg3-report.md).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w2-text-cx-jpeg3-report.md).
 Needs Pillow to regenerate (JPEG encoder); the committed test.swf is the
 source of truth.
 """

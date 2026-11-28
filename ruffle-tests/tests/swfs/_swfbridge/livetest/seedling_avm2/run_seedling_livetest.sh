@@ -10,7 +10,7 @@
 #      getItemQueue property write hasSword=true).
 #
 # Prereqs (this script does NOT regenerate them — they are multi-minute
-# builds; see SWFRecompDocs/prompts/avm2-external-interface.md session log):
+# builds; see SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-external-interface.md session log):
 #   ~/CC/seedling_ap_build/Seedling_ap.swf      inject.py output (verified
 #                                               clean via SWFRecomp --check-abc)
 #   ~/CC/seedling_ap_build/recompiled/          SWFRecomp output for it

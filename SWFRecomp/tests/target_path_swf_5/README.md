@@ -133,4 +133,4 @@ All tests should pass with validation showing:
 
 - SWF Specification: `SWFRecompDocs/specs/swf-spec-19.txt` (lines 6268-6287)
 - Implementation guide: `SWFRecompDocs/complete-implementation-guide.md`
-- Opcode specification: `SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md`
+- Opcode specification: `SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md`

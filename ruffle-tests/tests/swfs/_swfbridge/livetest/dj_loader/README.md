@@ -7,7 +7,7 @@ logic-verified bounceDemo `'dj'` levels from Archipelago-CC, fulfilling the
 renderer reference page `Archipelago-CC/frontend/modules/bounceDemo/game/main.js`).
 
 Spec: `~/CC/Archipelago-CC/NewDocs/plans/procedural-generation/dj-loader-integration-spec.md`.
-Status/results: `SWFRecompDocs/status/2026-06-11-dj-level-loader-first-increment.md`.
+Status/results: `SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-11-dj-level-loader-first-increment.md`.
 
 ## How it works
 

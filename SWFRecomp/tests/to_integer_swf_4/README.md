@@ -121,7 +121,7 @@ SWF Runtime Loaded (Native Build)
 ## References
 
 - Implementation guide: `SWFRecompDocs/parallel-opcode-implementation-guide.md`
-- Task specification: `SWFRecompDocs/prompts/opcode-to-integer-0x18.md`
+- Task specification: `SWFRecomp-CC-history:SWFRecompDocs/prompts/opcode-to-integer-0x18.md`
 - SWF Specification: `SWFRecompDocs/specs/swf-spec-19.txt`
 
 ## Success Criteria

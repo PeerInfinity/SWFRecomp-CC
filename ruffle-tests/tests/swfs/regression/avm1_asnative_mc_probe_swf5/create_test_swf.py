@@ -3,7 +3,7 @@
 pins ASnative(900/901, n) = the MovieClip.prototype natives (s30 w1-rm-avm1-gnash R1),
 the SWF5 SetMember-clears-hide-flag rule (section B)
 (s30 w2-rm-avm1-gnash-land). Golden = FP32 LNX direct pinned
-(session30-fanout-reports/w1-local-oracles/w1-rm-avm1-gnash/avm1_asnative_mc_probe/swf5.lnx.txt).
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/w1-rm-avm1-gnash/avm1_asnative_mc_probe/swf5.lnx.txt).
 
 Original probe docstring: avm1_asnative_mc_probe: s30 w1-rm-avm1-gnash. ASnative(900/901, n) =
 MovieClip.prototype natives, called bare / as a method / after assignment to

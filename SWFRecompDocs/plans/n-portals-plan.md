@@ -11,7 +11,7 @@ Doodle Jump portal work. Recommended as its **own session** (see §Why separate)
 ## The DJ precedent (read first)
 
 DJ already does exactly this — portals with direction arrows:
-- **`SWFRecompDocs/status/2026-06-12-dj-loader-increment-3.md` §3.2 "Portal doors —
+- **`SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-12-dj-loader-increment-3.md` §3.2 "Portal doors —
   host-riding + direction arrows"**: each door is drawn once via drawing API with a
   **white direction triangle** per the goal's `side` (N/E/S/W); verified W (left
   arrow) and E (right arrow). Doors live on `_root`, positioned per tick; dim to

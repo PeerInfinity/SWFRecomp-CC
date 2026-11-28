@@ -332,7 +332,7 @@ topology, APQuest as the new test fixture, and a 4-slice execution plan). The
 sketch below is the original seed; the dedicated doc supersedes it.
 
 - **AS injection** via the **prelude-SWF** mechanism already prototyped in
-  `SWFRecompDocs/plans/completed/runtime-swf-injection-demos.md` (Demo 4,
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/completed/runtime-swf-injection-demos.md` (Demo 4,
   `demos/runtime-swf/prelude_swf/`). The prelude defines the `ITEM`/`LOCATION`
   enums and the randomizer glue in `_global`, recompiled **before** the game SWF.
 - Game-specific hooks: jump-gating, platform/pickup randomization, item receipt,
@@ -369,4 +369,4 @@ sketch below is the original seed; the dedicated doc supersedes it.
   `:37244` (REG block); handler typedef `include/actionmodern/action.h:399`.
 - Native build/link: `SWFRecomp/scripts/build_test.sh` (`:350` C++ link pattern,
   `:357` gcc link); `SWFModernRuntime/CMakeLists.txt` (`:116` lib, `:167` link).
-- AS injection prior art: `SWFRecompDocs/plans/completed/runtime-swf-injection-demos.md`.
+- AS injection prior art: `SWFRecomp-CC-history:SWFRecompDocs/plans/completed/runtime-swf-injection-demos.md`.

@@ -6,7 +6,7 @@ Goal: load a **specific level** into real N and **detect when it is completed**,
 as the first step toward an Archipelago-style procgen substrate.
 
 Full investigation + decoded internals:
-`SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`.
+`SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`.
 
 ## How it works
 

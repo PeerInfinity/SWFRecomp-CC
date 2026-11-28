@@ -1,7 +1,7 @@
 # N L2/L4 native pixel pass: console tabs, f32 `_xscale`, and attached-clip self-gotos (2026-11-23)
 
 One-task session after `n-ragdoll-strokes` (`n-ragdoll-strokes-report.md` §7), launched by `s27-coordinator`.
-Brief: `SWFRecompDocs/plans/session27-fanout-reports/n-l2l4-pixel-pass-prompt.md`.
+Brief: `SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/n-l2l4-pixel-pass-prompt.md`.
 
 **Summary**
 - **Goal 1, L2/L4 frame-locked native vs exporter (§1–§3).** Telemetry (`NF`/`ND`, incl. `h=`/`o=`) is

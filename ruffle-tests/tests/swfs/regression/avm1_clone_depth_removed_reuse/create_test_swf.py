@@ -10,7 +10,7 @@ immediate arms of action.c actionRemoveSprite / MovieClip.removeMovieClip.
 s27 w2-timers-land. GOLDEN IS ANALYTIC (Flash depth semantics: a clone only
 replaces the occupant of ITS depth); a Flash Player capture is requested under
 LOCAL ORACLE REQUESTS in
-SWFRecompDocs/plans/session27-fanout-reports/w2-timers-land-report.md.
+SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-timers-land-report.md.
 
 Usage: create_test_swf.py <out.swf>
 """

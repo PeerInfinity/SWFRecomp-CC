@@ -17,7 +17,7 @@ placements reach the AVM2 timeline (the avm2_layer_group_alpha recipe; mxmlc
 is not in the cloud box). Ruffle renders a script-free timeline identically
 under AVM1 and AVM2, so output.expected.png is the AVM1 fixture's Ruffle
 0ddd12b6a golden (confirmation requested as a LOCAL ORACLE REQUEST in
-SWFRecompDocs/plans/session27-fanout-reports/w1-text-glyph-fidelity-report.md).
+SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w1-text-glyph-fidelity-report.md).
 """
 import pathlib, struct, sys, zlib
 HERE = pathlib.Path(__file__).resolve().parent

@@ -12,7 +12,7 @@ CI run 31130292354): test5 is **PASS 35/35**; test11 is **26/32** `output_mismat
 — both figures were stale; the 27/32 was a local 2026-05-08 measurement that was never
 reconciled with CI. Phases 1-3 plus the 2026-05-08 flat clip-event dispatch landed;
 the remaining test11 diff is NOT LIFO-ordering.
-CURRENT DIAGNOSIS OF RECORD: SWFRecompDocs/plans/session14-fanout-reports/wave1-avm1-tick.md
+CURRENT DIAGNOSIS OF RECORD: SWFRecomp-CC-history:SWFRecompDocs/plans/session14-fanout-reports/wave1-avm1-tick.md
 — it splits test11's two failing assertions into (D1) per-clip enterFrame+advance
 adjacency and (D2) flat-global vs per-subtree LIFO in `advance_nested_sprite_frames`,
 prices the whole arc at +1 test, and recommends DEFER. Read it before reopening this

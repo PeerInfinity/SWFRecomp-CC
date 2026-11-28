@@ -17,7 +17,7 @@ opaque blue BitmapData (0x0000FF = 255):
   3. bd.draw(h)   h > c (Color(c).setRGB(0x00FF00)) > field
                                        -> 16711680 (NOT tinted)
 output.txt is FLASH PLAYER 32's trace (s27 coordinator oracle,
-SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/
+SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/
 w1-text-glyph-fidelity/avm1_bitmapdata_draw_edittext/flash.txt): in draw()
 neither the draw colorTransform nor an ancestor's Color tints a TextField's
 background. The w1 by-construction golden (and Ruffle's exporter, oracle.txt)

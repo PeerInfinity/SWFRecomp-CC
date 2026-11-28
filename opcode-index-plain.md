@@ -533,7 +533,7 @@ void actionNextFrame(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_NEXT_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md](SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-next-frame-0x04.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4310)
@@ -559,7 +559,7 @@ void actionPrevFrame(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_PREV_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md](SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-prev-frame-0x05.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4324)
@@ -586,7 +586,7 @@ void actionPlay(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_PLAY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-play-0x06.md](SWFRecompDocs/prompts/completed/opcode-play-0x06.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-play-0x06.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-play-0x06.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4338)
@@ -619,7 +619,7 @@ void actionStop(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_STOP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-stop-0x07.md](SWFRecompDocs/prompts/completed/opcode-stop-0x07.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-stop-0x07.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-stop-0x07.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4354)
@@ -645,7 +645,7 @@ void actionToggleQuality(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_TOGGLE_QUALITY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md](SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-toggle-quality-0x08.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4368)
@@ -671,7 +671,7 @@ void actionStopSounds(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_STOP_SOUNDS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md](SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-stop-sounds-0x09.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4379)
@@ -704,7 +704,7 @@ void actionAdd(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_ADD)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-add-0x0a.md](SWFRecompDocs/prompts/completed/opcode-add-0x0a.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-add-0x0a.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-add-0x0a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4670)
@@ -730,7 +730,7 @@ void actionSubtract(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_SUBTRACT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md](SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-subtract-0x0b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4693)
@@ -756,7 +756,7 @@ void actionMultiply(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_MULTIPLY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md](SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-multiply-0x0c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4714)
@@ -785,7 +785,7 @@ void actionDivide(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_DIVIDE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md](SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-divide-0x0d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4737)
@@ -811,7 +811,7 @@ void actionEquals(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_EQUALS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md](SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-equals-0x0e.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4761)
@@ -838,7 +838,7 @@ void actionLess(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_LESS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-less-0x0f.md](SWFRecompDocs/prompts/completed/opcode-less-0x0f.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-less-0x0f.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-less-0x0f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4786)
@@ -868,7 +868,7 @@ void actionAnd(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_AND)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-and-0x10.md](SWFRecompDocs/prompts/completed/opcode-and-0x10.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-and-0x10.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-and-0x10.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4808)
@@ -894,7 +894,7 @@ void actionOr(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_OR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-or-0x11.md](SWFRecompDocs/prompts/completed/opcode-or-0x11.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-or-0x11.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-or-0x11.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4829)
@@ -920,7 +920,7 @@ void actionNot(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_NOT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-not-0x12.md](SWFRecompDocs/prompts/completed/opcode-not-0x12.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-not-0x12.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-not-0x12.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4853)
@@ -947,7 +947,7 @@ void actionStringEquals(SWFAppContext* app_context, char* a_str, char* b_str);
 - parseActions (case SWF_ACTION_STRING_EQUALS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md](SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-string-equals-0x13.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4882)
@@ -973,7 +973,7 @@ void actionStringLength(SWFAppContext* app_context, char* v_str);
 - parseActions (case SWF_ACTION_STRING_LENGTH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md](SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-string-length-0x14.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4903)
@@ -999,7 +999,7 @@ void actionStringExtract(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_STRING_EXTRACT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md](SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-string-extract-0x15.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4942)
@@ -1026,7 +1026,7 @@ void actionStringExtract(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_POP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-pop-0x17.md](SWFRecompDocs/prompts/completed/opcode-pop-0x17.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-pop-0x17.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-pop-0x17.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4651)
@@ -1052,7 +1052,7 @@ void actionToInteger(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_TO_INTEGER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md](SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-to-integer-0x18.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5031)
@@ -1090,7 +1090,7 @@ void actionGetVariable(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_GET_VARIABLE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md](SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-get-variable-0x1c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5218)
@@ -1127,7 +1127,7 @@ void actionSetVariable(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_SET_VARIABLE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md](SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-set-variable-0x1d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5240)
@@ -1153,7 +1153,7 @@ void actionSetTarget2(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_SET_TARGET2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md](SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-settarget2-0x20.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5405)
@@ -1184,7 +1184,7 @@ void actionStringAdd(SWFAppContext* app_context, char* a_str, char* b_str);
 - parseActions (case SWF_ACTION_STRING_ADD)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md](SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-string-add-0x21.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4921)
@@ -1210,7 +1210,7 @@ void actionGetProperty(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_GET_PROPERTY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md](SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-get-property-0x22.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5423)
@@ -1236,7 +1236,7 @@ void actionSetProperty(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_SET_PROPERTY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md](SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-set-property-0x23.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5541)
@@ -1262,7 +1262,7 @@ void actionCloneSprite(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_CLONE_SPRITE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md](SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-clone-sprite-0x24.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5561)
@@ -1288,7 +1288,7 @@ void actionRemoveSprite(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_REMOVE_SPRITE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md](SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-remove-sprite-0x25.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5583)
@@ -1427,7 +1427,7 @@ void actionTrace(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_TRACE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-trace-0x26.md](SWFRecompDocs/prompts/completed/opcode-trace-0x26.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-trace-0x26.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-trace-0x26.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5682)
@@ -1456,7 +1456,7 @@ void actionStartDrag(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_START_DRAG)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md](SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-start-drag-0x27.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5601)
@@ -1482,7 +1482,7 @@ void actionEndDrag(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_END_DRAG)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md](SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-end-drag-0x28.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5641)
@@ -1508,7 +1508,7 @@ void actionStringLess(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_STRING_LESS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md](SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-string-less-0x29.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4964)
@@ -1535,7 +1535,7 @@ void actionThrow(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_THROW)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md](SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-throw-0x2a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7289)
@@ -1561,7 +1561,7 @@ void actionCastOp(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_CAST_OP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md](SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-cast-op-0x2b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7141)
@@ -1587,7 +1587,7 @@ void actionImplementsOp(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_IMPLEMENTS_OP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md](SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-implements-op-0x2c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7164)
@@ -1613,7 +1613,7 @@ void actionRandomNumber(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_RANDOM_NUMBER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md](SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-random-number-0x30.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5721)
@@ -1639,7 +1639,7 @@ void actionMbStringLength(SWFAppContext* app_context, char* v_str);
 - parseActions (case SWF_ACTION_MB_STRING_LENGTH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md](SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-mb-string-length-0x31.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4986)
@@ -1665,7 +1665,7 @@ void actionCharToAscii(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_CHAR_TO_ASCII)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md](SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-ascii-to-char-0x32.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5053)
@@ -1691,7 +1691,7 @@ void actionAsciiToChar(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_ASCII_TO_CHAR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md](SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x33.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5072)
@@ -1717,7 +1717,7 @@ void actionGetTime(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_GET_TIME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md](SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-get-time-0x34.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5703)
@@ -1743,7 +1743,7 @@ void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_MB_STRING_EXTRACT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md](SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-mb-string-extract-0x35.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5006)
@@ -1769,7 +1769,7 @@ void actionMbCharToAscii(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_MB_CHAR_TO_ASCII)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md](SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-mb-char-to-ascii-0x36.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5094)
@@ -1797,7 +1797,7 @@ void actionMbAsciiToChar(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_MB_ASCII_TO_CHAR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md](SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-mbasciitochar-0x37.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5115)
@@ -1823,7 +1823,7 @@ void actionDelete(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_DELETE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md](SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-delete-0x3a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6007)
@@ -1849,7 +1849,7 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_DELETE2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md](SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-delete2-0x3b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6025)
@@ -1875,7 +1875,7 @@ void actionDefineLocal(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_DEFINE_LOCAL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md](SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-definelocal-0x3c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5969)
@@ -1905,7 +1905,7 @@ void actionStackSwap(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_CALL_FUNCTION)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md](SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-duplicate-0x3d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5796)
@@ -1936,7 +1936,7 @@ void actionReturn(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_RETURN)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-return-0x3e.md](SWFRecompDocs/prompts/completed/opcode-return-0x3e.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-return-0x3e.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-return-0x3e.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6643)
@@ -1962,7 +1962,7 @@ void actionModulo(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_MODULO)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md](SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-modulo-0x3f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6438)
@@ -1988,7 +1988,7 @@ void actionNewObject(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_NEW_OBJECT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md](SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-new-object-0x40.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6216)
@@ -2014,7 +2014,7 @@ void actionDeclareLocal(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_DECLARE_LOCAL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md](SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-declare-local-0x41.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5990)
@@ -2040,7 +2040,7 @@ void actionInitArray(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_INIT_ARRAY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md](SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-init-array-0x42.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6124)
@@ -2077,7 +2077,7 @@ void actionInitObject(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_INIT_OBJECT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md](SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-init-object-0x43.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6153)
@@ -2107,7 +2107,7 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_TYPEOF)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md](SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-typeof-0x44.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6380)
@@ -2133,7 +2133,7 @@ void actionTargetPath(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_TARGET_PATH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md](SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-target-path-0x45.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6268)
@@ -2159,7 +2159,7 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_ENUMERATE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md](SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-enumerate-0x46.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6044)
@@ -2185,7 +2185,7 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_ADD2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-add2-0x47.md](SWFRecompDocs/prompts/completed/opcode-add2-0x47.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-add2-0x47.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-add2-0x47.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6393)
@@ -2211,7 +2211,7 @@ void actionLess2(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_LESS2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-greater-0x48.md](SWFRecompDocs/prompts/completed/opcode-greater-0x48.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-greater-0x48.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-greater-0x48.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6414)
@@ -2237,7 +2237,7 @@ void actionEquals2(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_EQUALS2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md](SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-equals2-0x49.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6068)
@@ -2263,7 +2263,7 @@ void actionToNumber(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_TO_NUMBER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md](SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-to-number-0x4a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6320)
@@ -2289,7 +2289,7 @@ void actionToString(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_TO_STRING)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md](SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-to-string-0x4b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6342)
@@ -2322,7 +2322,7 @@ void actionDuplicate(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_DUPLICATE)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md](SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6627)
@@ -2352,7 +2352,7 @@ void actionStackSwap(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_STACK_SWAP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md](SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-stack-swap-0x4d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6660)
@@ -2386,7 +2386,7 @@ void actionGetMember(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_GET_MEMBER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md](SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-get-member-0x4e.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6090)
@@ -2416,7 +2416,7 @@ void actionSetMember(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_SET_MEMBER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md](SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-set-member-0x4f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6248)
@@ -2442,7 +2442,7 @@ void actionIncrement(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_INCREMENT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-increment-0x50.md](SWFRecompDocs/prompts/completed/opcode-increment-0x50.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-increment-0x50.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-increment-0x50.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6605)
@@ -2468,7 +2468,7 @@ void actionDecrement(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_DECREMENT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md](SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-decrement-0x51.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6586)
@@ -2495,7 +2495,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_CALL_METHOD)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md](SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-call-method-0x52.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5831)
@@ -2521,7 +2521,7 @@ void actionNewMethod(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_NEW_METHOD)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md](SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-new-method-0x53.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6184)
@@ -2547,7 +2547,7 @@ void actionInstanceOf(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_INSTANCEOF)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md](SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-instanceof-0x54.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6782)
@@ -2573,7 +2573,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer);
 - parseActions (case SWF_ACTION_ENUMERATE2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md](SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-enumerate2-0x55.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6806)
@@ -2599,7 +2599,7 @@ void actionBitAnd(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_BIT_AND)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md](SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-bit-and-0x60.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6457)
@@ -2625,7 +2625,7 @@ void actionBitOr(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_BIT_OR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md](SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-bit-or-0x61.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6497)
@@ -2651,7 +2651,7 @@ void actionBitXor(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_BIT_XOR)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md](SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-bit-xor-0x62.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6563)
@@ -2677,7 +2677,7 @@ void actionBitLShift(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_BIT_LSHIFT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md](SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-bit-lshift-0x63.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6476)
@@ -2703,7 +2703,7 @@ void actionBitRShift(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_BIT_RSHIFT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md](SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-bit-rshift-0x64.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6517)
@@ -2729,7 +2729,7 @@ void actionBitURShift(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_BIT_URSHIFT)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md](SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-bit-urshift-0x65.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6541)
@@ -2758,7 +2758,7 @@ void actionStrictEquals(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_STRICT_EQUALS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md](SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-strict-equals-0x66.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6829)
@@ -2784,7 +2784,7 @@ void actionGreater(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_GREATER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-greater-0x67.md](SWFRecompDocs/prompts/completed/opcode-greater-0x67.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-greater-0x67.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-greater-0x67.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6848)
@@ -2810,7 +2810,7 @@ void actionStringGreater(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_STRING_GREATER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md](SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-string-greater-0x68.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6870)
@@ -2836,7 +2836,7 @@ void actionExtends(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_EXTENDS)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-extends-0x69.md](SWFRecompDocs/prompts/completed/opcode-extends-0x69.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-extends-0x69.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-extends-0x69.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7120)
@@ -2865,7 +2865,7 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame);
 - parseActions (case SWF_ACTION_GOTO_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md](SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-gotoframe-0x81.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4258)
@@ -2891,7 +2891,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 - parseActions (case SWF_ACTION_GET_URL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md](SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-geturl-0x83.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4281)
@@ -2917,7 +2917,7 @@ void actionStoreRegister(SWFAppContext* app_context, u8 register_num);
 - parseActions (case SWF_ACTION_STORE_REGISTER)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md](SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-store-register-0x87.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6678)
@@ -2940,7 +2940,7 @@ void actionStoreRegister(SWFAppContext* app_context, u8 register_num);
 - parseActions (case SWF_ACTION_CONSTANT_POOL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md](SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-constant-pool-0x88.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5868)
@@ -2960,7 +2960,7 @@ void actionStoreRegister(SWFAppContext* app_context, u8 register_num);
 - parseActions (case SWF_ACTION_WAIT_FOR_FRAME)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md](SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-waitforframe-0x8a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4393)
@@ -2986,7 +2986,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name);
 - parseActions (case SWF_ACTION_SET_TARGET)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md](SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-settarget-0x8b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4437)
@@ -3012,7 +3012,7 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label);
 - parseActions (case SWF_ACTION_GOTO_LABEL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md](SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-gotolabel-0x8c.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4449)
@@ -3032,7 +3032,7 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label);
 - parseActions (case SWF_ACTION_WAIT_FOR_FRAME2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md](SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-waitforframe2-0x8d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5655)
@@ -3062,7 +3062,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 - parseActions (case SWF_ACTION_DEFINE_FUNCTION2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md](SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-define-function2-0x8e.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6949)
@@ -3082,7 +3082,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 - parseActions (case SWF_ACTION_TRY)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-try-0x8f.md](SWFRecompDocs/prompts/completed/opcode-try-0x8f.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-try-0x8f.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-try-0x8f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 7191)
@@ -3102,7 +3102,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 - parseActions (case SWF_ACTION_WITH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-with-0x94.md](SWFRecompDocs/prompts/completed/opcode-with-0x94.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-with-0x94.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-with-0x94.md)
 
 **Notes:**
 - Official SWF specification name (spec line 6289)
@@ -3237,7 +3237,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 - parseActions (case SWF_ACTION_PUSH)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-push-0x96.md](SWFRecompDocs/prompts/completed/opcode-push-0x96.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-push-0x96.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-push-0x96.md)
 
 **Notes:**
 - Official SWF specification name (spec line 4556)
@@ -3257,7 +3257,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 - parseActions (case SWF_ACTION_JUMP)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-jump-0x99.md](SWFRecompDocs/prompts/completed/opcode-jump-0x99.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-jump-0x99.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-jump-0x99.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5139)
@@ -3283,7 +3283,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 - parseActions (case SWF_ACTION_GET_URL2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md](SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-geturl2-0x9a.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5262)
@@ -3303,7 +3303,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 - parseActions (case SWF_ACTION_DEFINE_FUNCTION)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md](SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-define-function-0x9b.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5894)
@@ -3324,7 +3324,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 - parseActions (case SWF_ACTION_IF)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-if-0x9d.md](SWFRecompDocs/prompts/completed/opcode-if-0x9d.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-if-0x9d.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-if-0x9d.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5163)
@@ -3350,7 +3350,7 @@ void actionCall(SWFAppContext* app_context);
 - parseActions (case SWF_ACTION_CALL)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-call-0x9e.md](SWFRecompDocs/prompts/completed/opcode-call-0x9e.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-call-0x9e.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-call-0x9e.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5195)
@@ -3376,7 +3376,7 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias);
 - parseActions (case SWF_ACTION_GOTO_FRAME2)
 
 **Documentation:**
-- [SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md](SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md)
+- [SWFRecomp-CC-history:SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/completed/opcode-gotoframe2-0x9f.md)
 
 **Notes:**
 - Official SWF specification name (spec line 5344)

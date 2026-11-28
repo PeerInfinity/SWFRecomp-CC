@@ -9,4 +9,4 @@ This directory contains planning documents for significant changes to SWFRecomp-
 ## Related Documentation
 
 - **[../merge/](../merge/)** - Merge analysis and planning for upstream/downstream sync
-- **[../status/](../status/)** - Current project status and implementation tracking
+- **[../status/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/status/)** - Current project status and implementation tracking

@@ -2,7 +2,7 @@
 // Loads a SPECIFIC level and DETECTS completion. Pipeline like ../dj_probe:
 // MTASC -> extract_bytecode.py -> inject_tracer.py -> recompile.
 // Full design + decoded level/demo formats + the __swfBridge contract: README.md
-// and SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md.
+// and SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md.
 // (Keep this header short: MTASC v8's SWF writer overflows zlib on long
 //  comments - "zlib_deflate_end". Detail goes in the README, not here.)
 class NLoader {

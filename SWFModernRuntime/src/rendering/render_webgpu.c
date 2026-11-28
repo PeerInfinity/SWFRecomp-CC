@@ -104,7 +104,7 @@ EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, d
 // ---------------------------------------------------------------------------
 
 // s28 w2-lowq-sample-point: Flash Player's quality=LOW vector rasteriser
-// (Flash 32 captures: session28-fanout-reports/w1-local-oracles/
+// (Flash 32 captures: SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/
 // w1-avm2-vector-flash/lowq_sample_point.low.png and
 // n-stroke-snap-captures/fill_edges/flash_low.png; regression fixtures
 // lowq_sample_point_probe and lowq_fill_edges).
@@ -862,7 +862,7 @@ static void on_device_ready(WGPURequestDeviceStatus status,
 // The browser can take the device away at any time. Headless Chromium on
 // SwiftShader does it at the FIRST canvas present of every page (the GPU
 // process finds no shared-image backing for the WebGPU swapchain when the
-// compositor runs on ANGLE-SwiftShader GL; SWFRecompDocs/status/
+// compositor runs on ANGLE-SwiftShader GL; SWFRecomp-CC-history:SWFRecompDocs/status/
 // browser-webgpu-device-lost.md). A lost device is not an error state for the
 // API: every call on it stays valid and does nothing, so the render walk keeps
 // running and keeps its side effects. What breaks is anything that WAITS on the
@@ -5599,7 +5599,7 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, const u8* pixels,
 	// vertices are not in the vertex buffer either (it is uploaded once from
 	// the root's shape_data), and the bitmap index baked into a child's fill
 	// style is movie-local. The whole feature is per-movie render tables --
-	// SWFRecompDocs/status/child-embedded-asset-lookup.md, section
+	// SWFRecomp-CC-history:SWFRecompDocs/status/child-embedded-asset-lookup.md, section
 	// "Half B: what it actually needs".
 	if (ctx->current_bitmap >= ctx->bitmap_count) return;
 

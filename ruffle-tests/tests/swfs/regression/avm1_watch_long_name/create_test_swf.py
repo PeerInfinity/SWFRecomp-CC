@@ -8,7 +8,7 @@ compared it by full length at set time, so the watcher never fired
 s27 w2-timers-land. GOLDEN IS ANALYTIC (watch semantics: the handler runs on
 each assignment with (prop, old, new) and its return value is stored); a Flash
 Player capture is requested under LOCAL ORACLE REQUESTS in
-SWFRecompDocs/plans/session27-fanout-reports/w2-timers-land-report.md.
+SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-timers-land-report.md.
 
 Usage: create_test_swf.py <out.swf>
 """

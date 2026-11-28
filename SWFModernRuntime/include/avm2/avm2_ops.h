@@ -127,7 +127,7 @@ Avm2Value avm2_op_getproperty_static_ic_slow(Avm2Activation* act, Avm2Value recv
 void avm2_ic_slot_verify_fail(Avm2Activation* act, uint32_t mn_idx, Avm2Value fast,
                               Avm2Value slow);
 #endif
-// Seedling hot-loop lever (SWFRecompDocs/status/seedling-collide-hotloop.md):
+// Seedling hot-loop lever (SWFRecomp-CC-history:SWFRecompDocs/status/seedling-collide-hotloop.md):
 // the out-of-line IC hit — two calls, a zeroed Resolved and resolved_get's
 // branch chain before `slots[i]` — cost ~60 % of a FlashPunk collide pass, and
 // 99.97 % of its 54 M gets per frame were hits on SLOT entries. Here, a hit

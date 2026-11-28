@@ -5,7 +5,7 @@ the queued init actions, then the target frame runs; no-graphics used to never
 run the target DoAction: swf_core.c ng_runPendingRootGoto).
 
 s27 w2-timers-land. GOLDEN = real Flash Player 32 (LNX 32,0,0,465) trace of
-this SWF, coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
+this SWF, coordinator-run (SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/
 w1-local-oracles/w1-timers-robustness/goto_skipped_init_timer/flash.wrapped.txt). Ruffle is NOT an
 oracle here: its exporter fires no timers and runs DoInitActions at preload.
 

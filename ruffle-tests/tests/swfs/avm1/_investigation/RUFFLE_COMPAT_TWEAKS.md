@@ -142,7 +142,7 @@ user's call (2026-09-22) was to report the real OS and pin it for tests, exactly
 
 **Latent bug fixed alongside:** the version literal's `str_size` was `13` for a 12-unit
 string, counting the NUL and emitting a stray trailing unit — the `"WIN 32,0,0,0 "` seen
-in `SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`. Now `PLAYER_VER_LEN`.
+in `SWFRecomp-CC-history:SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`. Now `PLAYER_VER_LEN`.
 
 **Follow-up not taken:** in the Emscripten build the real host is the *browser's* OS,
 which C cannot see; it defaults to Linux (matching Ruffle-web) until this reads

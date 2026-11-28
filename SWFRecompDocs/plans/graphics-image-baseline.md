@@ -38,7 +38,7 @@ after them still describe the 2026-07-31 characterisation run.
 at `659153865`): 364/572 pass (63.6%), up from 359/569 at run `32267473014`.
 0 regressions; +2 on the 568-comparison intersection, +1 band improvement, and
 4 comparisons that are new since that run.** A loaded child movie's shapes now reach the GPU with
-per-movie index bases (`SWFRecompDocs/status/per-movie-render-tables.md`).
+per-movie index bases (`SWFRecomp-CC-history:SWFRecompDocs/status/per-movie-render-tables.md`).
 
 **Attribution matters more than usual on this one and was measured, not
 assumed.** The previous `images=true` run is `32267473014` from 2026-08-19, so
@@ -69,7 +69,7 @@ at `8376eb700`): 381/577 pass (66.0%), up from 364/572. +17 flips, 0
 regressions across three graded runs; 36 bands improved / 1 worsened
 (`avm2/graphics_gradients` 299 → 469, a round-join side effect on gradient
 strokes). Mechanisms and the session-19 board: `graphics-fanout-playbook.md`
-§17; per-patch ledgers in `session18-fanout-reports/`.**
+§17; per-patch ledgers in `SWFRecomp-CC-history:SWFRecompDocs/plans/session18-fanout-reports/`.**
 
 **Update 2026-09-29, session 21 fan-out (run
 [36515003936](https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/36515003936)

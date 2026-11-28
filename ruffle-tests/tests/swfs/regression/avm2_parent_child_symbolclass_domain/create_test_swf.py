@@ -15,7 +15,7 @@ bare MovieClip and its class constructor never ran. Two rows:
              Inner and must resolve it in the class's own movie's domain
 
 Fixed in avm2_display.c (Avm2DisplayObjectExt.movie_scope) — see
-SWFRecompDocs/status/avm2-child-symbolclass-binding.md.
+SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-symbolclass-binding.md.
 
 mxmlc cannot author a DefineSprite symbol that places another symbol, so the
 child is compiled normally (it links Inner/Outer into its ABC) and then this

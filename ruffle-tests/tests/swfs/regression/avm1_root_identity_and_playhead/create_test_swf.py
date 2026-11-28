@@ -39,7 +39,7 @@ fixture is graded in the browser harness
 (`tools/browser-test/child_probe/`) and runs green in the corpus as a
 non-regression guard on the headless side.
 
-See SWFRecompDocs/status/browser-root-side-gaps.md.
+See SWFRecomp-CC-history:SWFRecompDocs/status/browser-root-side-gaps.md.
 """
 import struct
 from pathlib import Path

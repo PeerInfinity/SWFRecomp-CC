@@ -3,7 +3,7 @@
 // A level for N ("the way of the ninja", Metanet) is a 31x23 tile grid plus a
 // list of typed objects, serialized as `mapStr "|" objStr` and handed to N's
 // own `App_LoadLevel_Raw(levStr, cb)`. Format facts (decoded; see
-// SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md):
+// SWFRecomp-CC-history:SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md):
 //
 //   - Grid is COLS=31 (X) by ROWS=23 (Y).
 //   - mapStr: one char per tile, COLS*ROWS = 713 chars, COLUMN-MAJOR with X

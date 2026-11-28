@@ -1,3 +1,3 @@
 # Same generator as ../avm1_gnash_flash_probes: create_test_swf.py test.swf 6
-# output.txt = FP32 capture (session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/test_v6.flash32.txt)
+# output.txt = FP32 capture (SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1b-rm-gnash/test_v6.flash32.txt)
 num_ticks = 2

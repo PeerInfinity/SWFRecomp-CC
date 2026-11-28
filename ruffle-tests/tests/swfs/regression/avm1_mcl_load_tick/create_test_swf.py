@@ -23,7 +23,7 @@ is FLASH's order — `from_shumway/avm1/moviecliploader` grades it (its Flash
 `output.txt` puts `loader frame 2` before `onLoadStart`, its
 `output.ruffle.txt` does not), and we pass it. So this fixture uses a ONE-FRAME
 loader, whose Ruffle order is reachable without touching delivery at all.
-See SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md §4.
+See SWFRecomp-CC-history:SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md §4.
 
 The loader is MTASC-compiled; the 3-frame child is hand-assembled (each frame
 is one DoAction: Push "cN", Trace; then ShowFrame), because a compiler-built

@@ -9,7 +9,7 @@ num_ticks = 1
 # only the bottom-right one partially — the rule tag.c::textfield_render_cb
 # follows (s20, edittext_caret_empty & 10 more at 0 outliers). Independent of
 # the colour transform; see
-# SWFRecompDocs/plans/session26-fanout-reports/w2-edittext-border-cx-report.md.
+# SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w2-edittext-border-cx-report.md.
 [image_comparisons.output]
 tolerance = 2
 max_outliers = 19

@@ -7,7 +7,7 @@ on that one number.
 
 ## Why it exists
 
-Until `SWFRecompDocs/status/child-charid-stride-unify.md` there were **two**
+Until `SWFRecomp-CC-history:SWFRecompDocs/status/child-charid-stride-unify.md` there were **two**
 strides for the same child. `verify_output.py` handed the recompiler
 `char_id_base = movie_id * 10000`, which reached only the ABC/AVM2 emissions
 (the SymbolClass registry and the AVM2 timeline tables); the tag side of the
@@ -59,7 +59,7 @@ CHILD movie defines:
 | `child:snd:1044` | `[Embed]`ed MP3 -> `Sound.length` (ms) | `0` |
 
 Each was a **two-layer** miss, not one (see
-`SWFRecompDocs/status/child-embedded-asset-lookup.md`):
+`SWFRecomp-CC-history:SWFRecompDocs/status/child-embedded-asset-lookup.md`):
 
 1. `g_symbol_map` (class -> char id) is built once at stage build from the MAIN
    movie's SymbolClass rows, so a child-defined asset class resolved to char

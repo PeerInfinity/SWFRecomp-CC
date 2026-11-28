@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build test.swf for mask_nested_intersect.
 
-Authored by session 11 (`session11-fanout-reports/w2-masks-defectA`, section
+Authored by session 11 (`SWFRecomp-CC-history:SWFRecompDocs/plans/session11-fanout-reports/w2-masks-defectA`, section
 "Regression tests"), held back until the nesting work existed; dropped in by
 session 14's `gfx-stencil` patch, which is the change it pins.
 

@@ -8,7 +8,7 @@ Open follow-ups (§6): Ice Cream / Fishy PlayState is unmeasured in-browser
 (probe-click limitation) and their wasm heap headroom is thin; gameplay-level
 parity was not done (menus only).
 
-Session prompt: `SWFRecompDocs/prompts/avm2-robot-wants-sequels.md`.
+Session prompt: `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-robot-wants-sequels.md`.
 Template followed: `SWFRecompDocs/plans/avm2-robot-wants-kitty.md`.
 
 ## Headline
@@ -246,7 +246,7 @@ event files are the opposite — those ARE in internal coordinates.)
    basically fine), rwf ~51 ms (~18 fps); rwp ~160 ms (~6 fps) and rwk
    ~446 ms (~2 fps) were the bad ones — root cause was the GC gross-byte
    watermark × Flixel quadtree churn, fixed by the adaptive watermark
-   (commit fd5931661; see SWFRecompDocs/prompts/avm2-gc-collector-cost.md
+   (commit fd5931661; see SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-gc-collector-cost.md
    for the measured cost model + tier-2 handoff). Raw distributions:
    /mnt/c/playwright/rw_perf_2026-07-18/*.json.
    Original text (context for the heap worry, now largely cleared):
@@ -276,7 +276,7 @@ event files are the opposite — those ARE in internal coordinates.)
 
 ## 6b. Perf update 2026-07-19 — base-compute lever 1 landed (helps all RW games)
 
-The RWK base-compute session (`SWFRecompDocs/prompts/
+The RWK base-compute session (`SWFRecomp-CC-history:SWFRecompDocs/prompts/
 avm2-rwk-base-compute-profile.md`, log `tools/divergence/perf/
 RWK_AB_STATUS.md`) landed the findpropstrict scope-hit inline cache
 (`8caf10e4e`): RWK gameplay 219→165 ms p50 on the rig (1.33x), native 1.54x.

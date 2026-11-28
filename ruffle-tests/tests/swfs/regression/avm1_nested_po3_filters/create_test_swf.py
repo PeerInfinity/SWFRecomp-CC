@@ -14,7 +14,7 @@ entry's own filter_chain. After, the nested row (y 0-160) is pixel-identical to
 the root row (y 160-320), as in Ruffle.
 
 Expected trace and output.expected.png: local Ruffle exporter at 0ddd12b6a
-(session25-fanout-reports/w1-avm1-filters-complete-oracle; render 1 frame, the
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session25-fanout-reports/w1-avm1-filters-complete-oracle; render 1 frame, the
 content is static from frame 1). Generator from s24 w1-avm1-tail-probe/mkl1.py.
 Regenerate byte-identically: `python3 create_test_swf.py` (writes test.swf here).
 """

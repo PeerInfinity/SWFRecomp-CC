@@ -4,7 +4,7 @@
 Boots the page in headless Chromium (SwiftShader), presses Start / Run SWF,
 waits, and checks that the WebGPU renderer neither hangs the frame loop nor
 floods the page with errors. Written for the device-lost slice
-(SWFRecompDocs/status/browser-webgpu-device-lost.md).
+(SWFRecomp-CC-history:SWFRecompDocs/status/browser-webgpu-device-lost.md).
 
 Two Chromium configurations, because they behave differently:
 

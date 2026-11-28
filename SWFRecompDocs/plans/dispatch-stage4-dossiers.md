@@ -2,7 +2,7 @@
 
 **Date:** July 10, 2026 (analysis fan-out, 8 parallel read-only agents)
 **Parent plan:** [`function-dispatch-consolidation-plan.md`](function-dispatch-consolidation-plan.md)
-**Session prompt:** [`../prompts/dispatch-consolidation-stage4.md`](../prompts/dispatch-consolidation-stage4.md)
+**Session prompt:** [`SWFRecomp-CC-history:SWFRecompDocs/prompts/dispatch-consolidation-stage4.md`](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/prompts/dispatch-consolidation-stage4.md)
 
 Each dossier below was produced by a read-only analysis agent primed with the
 core's flag semantics (`InvokeOpts` block ~line 2635, `invokeFunctionValue`

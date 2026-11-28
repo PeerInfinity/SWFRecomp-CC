@@ -150,7 +150,7 @@ static void gc_configure(void)
 
 // Per-collect phase timing (AVM2_GC_TIME=1). One clock read per phase per
 // collect — the collector's own cost model (the tier-2 lever ledger in
-// SWFRecompDocs/prompts/avm2-gc-collector-cost.md) is measured with this, so
+// SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-gc-collector-cost.md) is measured with this, so
 // it lives here rather than being re-patched in each session.
 static double gc_now_ms(void)
 {

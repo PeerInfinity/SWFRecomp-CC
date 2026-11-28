@@ -26,7 +26,7 @@ import sys
 # and every AIR_* version maps to `VM_INTERNAL` under a Flash Player runtime,
 # i.e. the member is hidden at EVERY SWF version rather than rounded up to the
 # next one.  Verified empirically against the six all_classes/display expected
-# files (see session16-fanout-reports/wave1-all-classes-display.md 2.4).
+# files (see SWFRecomp-CC-history:SWFRecompDocs/plans/session16-fanout-reports/wave1-all-classes-display.md 2.4).
 HIDE = 255  # AIR-only: never visible to a Flash Player runtime
 
 _ORD_BELOW_12 = {

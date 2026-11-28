@@ -17,9 +17,9 @@ This is the recompiler half of [SWFRecomp-CC](https://github.com/PeerInfinity/SW
 The recompiler's documentation lives in the combined repo's [`SWFRecompDocs/`](../SWFRecompDocs/README.md) directory (the per-repo guide files that used to sit here moved there when the repositories were flattened in November 2025):
 
 - **[trace-swf4-wasm-generation.md](../SWFRecompDocs/reference/trace-swf4-wasm-generation.md)** - Complete walkthrough of the SWF → C → WebAssembly pipeline
-- **[status/](../SWFRecompDocs/status/)** and **[plans/](../SWFRecompDocs/plans/README.md)** - Project status and plans
+- **[status/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/status/)** and **[plans/](../SWFRecompDocs/plans/README.md)** - Project status and plans
 - **[guides/](../SWFRecompDocs/guides/)** - Implementation guides (AS3/ABC, fonts, game debugging)
-- **[deprecated/](../SWFRecompDocs/deprecated/)** - Superseded plans kept for history
+- **[deprecated/](https://github.com/PeerInfinity/SWFRecomp-CC-history/tree/master/SWFRecompDocs/deprecated/)** - Superseded plans kept for history
 
 **Build System:**
 - `scripts/` holds the build scripts (`build_test.sh`, `deploy_example.sh`, `deploy_wasm_demo.sh`, ...)

@@ -4,7 +4,7 @@
 variant is taken from the directory name.
 
 Each is the s27 w2-layer-alpha-group probe scene
-(SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
+(SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-layer-alpha-group-fixtures/
 mkprobes_groups.py, byte-identical for the AVM1 variants): sprite 10 holds an
 opaque red rect (20,20,80,60) under an opaque blue rect (60,40,80,70); it is
 placed on a white 200x150 stage with a different TRANSPARENCY-GROUP trigger:
@@ -22,11 +22,11 @@ At the overlap (80,50) grouped = (128,128,255) (blue only; layer_aadd reads
      shadow lands at a FRACTIONAL offset (8.485 px): Flash reads the blurred
      layer there bilinearly (Ruffle snaps to the nearest texel), and the
      group alpha keeps the shadow from showing through the rect. Golden:
-     session27-fanout-reports/w2-local-oracles/w2b-group-alpha-triggers/
+     SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/w2b-group-alpha-triggers/
      w2b_shadow_shape_a50/flash.screen.png.
 
 GOLDEN = Flash Player 32 (LNX 32,0,0,465) `run_image.py --screen`, num_ticks
-1, quality high: SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
+1, quality high: SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2-local-oracles/
 w2-layer-alpha-group/n3g_<probe>/flash.screen.png (screen == draw() for all).
 The AVM2 twins (FileAttributes.ActionScript3 + a minimal DoABC, the
 avm2_layer_group_alpha recipe) use the same golden: a script-free timeline

@@ -14,7 +14,7 @@ per-child model (and Ruffle, whose render_base pushes the cxform before
 capturing the blend's commands) shows red under blue: (127,63,191).
 
 The SWF is byte-identical to the s26 probe
-SWFRecompDocs/plans/session26-fanout-reports/w1-pixel-layer-colour-fixtures/probes/n3_layer_alpha.swf
+SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-pixel-layer-colour-fixtures/probes/n3_layer_alpha.swf
 (generator: mkprobes.py there, `n3(2)`).
 
 GOLDEN = Flash Player 32 (LNX 32,0,0,465) capture of that probe at quality

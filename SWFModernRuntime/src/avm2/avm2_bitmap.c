@@ -4430,7 +4430,7 @@ static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* r
 // gave ff060d23; fitted on that one pixel, every channel exact). That form
 // would turn an untouched white texel (a = 0) into 0xFE, so a fully
 // transparent grid texel leaves the opaque target as it is (unmeasured;
-// session27-fanout-reports/w2b-filter-kernels-residual-fixtures/
+// SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/w2b-filter-kernels-residual-fixtures/
 // avm2_applyfilter_opaque_target_probe asks Flash).
 static void fb_write_grid(Avm2BitmapDataExt* dst, const uint32_t* grid, int w, int h,
                           int64_t x0, int64_t y0)

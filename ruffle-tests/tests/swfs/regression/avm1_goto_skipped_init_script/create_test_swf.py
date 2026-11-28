@@ -6,7 +6,7 @@ Owner: the recompiler DoInitAction emission (SWF::interpretTag, now
 tagDoInitActionFrame) + tag.c goto-init queue (tagDrainGotoInitActions).
 
 s27 w2-timers-land. GOLDEN = real Flash Player 32 (LNX 32,0,0,465) trace of
-this SWF, coordinator-run (SWFRecompDocs/plans/session27-fanout-reports/
+this SWF, coordinator-run (SWFRecomp-CC-history:SWFRecompDocs/plans/session27-fanout-reports/
 w1-local-oracles/w1-timers-robustness/goto_skipped_init_script/flash.wrapped.txt). Ruffle is NOT an
 oracle here: its exporter fires no timers and runs DoInitActions at preload.
 

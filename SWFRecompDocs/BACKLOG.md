@@ -44,10 +44,10 @@ first).
   on every device (black canvas); now the rows clamp and the gradients past
   the last row draw as garbage (black or blue blobs in its preloader). Fix:
   pack N ramps per row (`sample_gradient`'s textureLoad coordinate + the static
-  and dynamic uploads). `status/bitmap-pool-layer-cap.md` §8. (2026-09-11)
+  and dynamic uploads). `SWFRecomp-CC-history:SWFRecompDocs/status/bitmap-pool-layer-cap.md` §8. (2026-09-11)
 - **Stage-sized render targets, the displacement-map texture and `flashbang.c`
   are not planned against the device's texture limits.** Everything else is
-  (`status/bitmap-pool-layer-cap.md` §3). A canvas over
+  (`SWFRecomp-CC-history:SWFRecompDocs/status/bitmap-pool-layer-cap.md` §3). A canvas over
   `maxTextureDimension2D` (8192 by default) would still make invalid targets.
   After an unforeseen creation failure, the downstream invalid-object errors
   still flood natively; they are capped at 8 lines in the browser. Swapping in
@@ -63,7 +63,7 @@ first).
   runs in CI (`tools/browser-test/webgpu_headless_smoke.py` is the check to
   wire). Also still open: the 1–4 unhandled rejections at the moment of loss are
   emdawnwebgpu's glue (upstream text in
-  `status/browser-webgpu-device-lost.md` §8). (2026-09-11)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/browser-webgpu-device-lost.md` §8). (2026-09-11)
 - **Attached-clip morph shapes can't ratio-interpolate per-instance.**
   Morph interpolation is a per-CHARACTER pre-pass into a SHARED vertex
   buffer run over the ROOT display_list only (`tag.c` ~5802);
@@ -180,7 +180,7 @@ first).
   12.2 → 8.7 s (1.41x, same-session headless A/B). Still open, each ~2.2 s of
   the remaining frame and counted: `add` of Number+int (19.96 M per frame,
   none take `add_values`' same-kind arms) and `coerce Entity` (11.93 M at
-  superclass depth 1). `SWFRecompDocs/status/seedling-collide-hotloop.md` §7.
+  superclass depth 1). `SWFRecomp-CC-history:SWFRecompDocs/status/seedling-collide-hotloop.md` §7.
 - **`Sound.play` decodes the whole mp3 synchronously on the main
   thread.** `sound_play` (`SWFModernRuntime/src/avm2/avm2_media.c:663`) →
   minimp3 (`src/audio/audio.c`): the music starting in Seedling's first
@@ -210,7 +210,7 @@ first).
   regexes **offset char id 0**, turning every Modify `PlaceObject2` in a loaded
   child into a place of character 1000 — 0 is the "no character" sentinel and
   is now excluded. Closeout:
-  `SWFRecompDocs/status/child-movie-charid-wrapper.md`. (2026-09-03)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/child-movie-charid-wrapper.md`. (2026-09-03)
 - ~~**The AVM1 and AVM2 child-character-id strides disagree.**~~
   **DONE 2026-09-03.** One stride, owned by the recompiler. `charId()`
   (`SWFRecomp/src/swf.cpp`) adds `Config::char_id_base` to every character id
@@ -224,7 +224,7 @@ first).
   `regression/avm2_parent_child_symbol_stride` (a lock — no trace-visible
   repro of the disagreement exists, since AVM2 never reads the AVM1
   dictionary) and `regression/avm1_parent_child_modify_place`. Closeout:
-  `SWFRecompDocs/status/child-charid-stride-unify.md`. (2026-09-03)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/child-charid-stride-unify.md`. (2026-09-03)
 - **The dictionary bound is checked against a CONSTANT in places, and against
   the growable variable in others.** `tag.c` grows `dictionary` with
   `ENSURE_SIZE(..., dictionary_capacity, ...)` and mostly bounds-checks
@@ -257,7 +257,7 @@ first).
   of the lookup are already the class's own movie. `import_assets` 3/3 and
   gnash `attachImported`/`attachExtImported` confirmed unmoved. Anchored by
   three new rows in `regression/avm2_parent_child_symbol_stride`. Closeout:
-  `SWFRecompDocs/status/child-embedded-asset-lookup.md`. (2026-09-03)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/child-embedded-asset-lookup.md`. (2026-09-03)
 - ~~**A loaded AS3 child's timeline-placed characters never get their
   SymbolClass class** (`avm2/loader_duplicate_class` 32/48).~~ **DONE
   2026-09-11**, and the cause was not the MAIN-only `g_symbol_map` that session 18's
@@ -274,7 +274,7 @@ first).
   script-created symbol instance). 48/48 in both modes. Anchored by
   `regression/avm2_parent_child_symbolclass_domain`, whose `script:` rows grade
   the arm the corpus test does not. Closeout:
-  `SWFRecompDocs/status/avm2-child-symbolclass-binding.md`. (2026-09-11)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-symbolclass-binding.md`. (2026-09-11)
 - **A loaded child's `SimpleButton` has no states.** `button_data_for_char`
   (`avm2_display.c`) scans `avm2_generated_buttons` only. It has no
   `g_child_movies` fall-through, although `Avm2MovieTables` carries `buttons`.
@@ -292,7 +292,7 @@ first).
   (`DisplayObject::place_transform_data`) and the readers go through
   `ng_entryTransformData`. `regression/avm1_parent_child_modify_place` pins
   `_x`/`_y` and now DISCRIMINATES on the char-id-0 sentinel as well. Closeout:
-  `SWFRecompDocs/status/child-placed-clip-uninit.md`. (2026-09-03)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/child-placed-clip-uninit.md`. (2026-09-03)
 - ~~**A loaded child movie's timeline never advances past frame 0.**~~
   **DONE 2026-09-03**, and the entry's own framing was half wrong. The per-tick
   child-movie playhead already existed (`g_level_advance` /
@@ -320,7 +320,7 @@ first).
   AVM1 only; AVM2 `Loader.load` was never frozen (its AVM1 children run on
   `g_avm1u2`, which already loops). **Looping is NOT part of this** -- see the
   next entry. Closeout:
-  `SWFRecompDocs/status/child-timeline-advance.md`. (2026-09-03)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/child-timeline-advance.md`. (2026-09-03)
 - ~~**A loaded movie does not LOOP, because it does not own its display
   children.**~~ **DONE 2026-09-03** -- and it did NOT need per-movie display
   lists. A loaded movie now wraps from its last frame to its frame 1 (Ruffle
@@ -346,7 +346,7 @@ first).
   in BOTH modes at `82f27e5f9`, `categories=full`, `images=false` -- graphics
   run `33833019835` (4365 effective, +0, every bucket unmoved) and no-graphics
   run `33835560435` (4366, +0); `regression` 81/81 in both. Closeout:
-  `SWFRecompDocs/status/per-movie-display-list-ownership.md`. (2026-09-03)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/per-movie-display-list-ownership.md`. (2026-09-03)
 - **Per-movie display-list ownership (Route 1) is a SUB-ARC, and its shape is
   now measured.** The brief's decisive question -- what
   `avm1/movieclip_invalid_get_bounds_1..8` actually read from `display_obj` --
@@ -372,7 +372,7 @@ first).
   either name resolution takes its list from the clip being resolved against,
   or the swap is pushed down to the placement/lookup sites. `_levelN` has
   carried the same hazard all along, ungraded. Detail:
-  `SWFRecompDocs/status/per-movie-display-list-ownership.md` §1-2. (2026-09-03)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/per-movie-display-list-ownership.md` §1-2. (2026-09-03)
 - **Our MovieClipLoader load completes a tick later than Flash's.** A loaded
   movie used to run TWO of its frames on its load tick (the loader calls
   `frame_funcs[0]`; the per-tick driver runs in the same tick right after it).
@@ -431,7 +431,7 @@ first).
   `ImportAssets` character is DEFINED by the child, so it hits the same
   `tagDefineShape` re-base a `loadMovie`'d one does — the `import_assets` suite
   is a standing canary for this mechanism. Closeout:
-  `SWFRecompDocs/status/per-movie-render-tables.md`; what it does NOT cover is
+  `SWFRecomp-CC-history:SWFRecompDocs/status/per-movie-render-tables.md`; what it does NOT cover is
   §5 there and the next four entries here. (2026-09-04)
 - ~~**Static text and morph shapes in a loaded child still draw the root's
   glyphs.**~~ DONE 2026-09-04 (multi-SWF slice 8). `text_data`,
@@ -458,7 +458,7 @@ first).
   no-graphics `33868110233` (4370->4370); totals 4494->4496 graded, the +2
   being the two fixtures, `regression` 84/84 -> 86/86. Local sweep of the 348
   tests that bundle a second SWF: 0 regressions, 0 gains. Closeout:
-  `SWFRecompDocs/status/child-static-text-and-morphs.md`. (2026-09-04)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/child-static-text-and-morphs.md`. (2026-09-04)
 - ~~**An AVM2 (Loader-loaded AS3) child's shapes still do not render.**~~
   **DONE 2026-09-04** (multi-SWF slice 9). The reason was bigger than a missing
   base: `ng_buildMovieRenderTables` had exactly two call sites,
@@ -506,7 +506,7 @@ first).
   closeout's §8, not as a regression. Also: a `-f single_test=empty` dispatch
   FAILS for an unrelated reason — that job resolves a bare name against `avm1/`
   only, and this test lives in `from_shumway/as3-loader/bug1157243/`. Closeout:
-  `SWFRecompDocs/status/avm2-child-render-arm.md`; ~~§7 there is what it does
+  `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-render-arm.md`; ~~§7 there is what it does
   NOT cover (AVM2 static text is implemented but ungraded — its fixture needs
   the `avm2_static_text/build_statictext.py` splice run against
   `child.swf`)~~ — **graded 2026-09-04 by slice 10, see the next entry; §7
@@ -550,7 +550,7 @@ first).
   output_mismatch -> pass — the intermittent slice 9 adjudicated, moving as its
   472 local runs predicted. **The graphics corpus total is intermittent-dependent
   by ±1**; re-read the results branch rather than carrying a number forward.
-  Closeout: `SWFRecompDocs/status/avm2-child-static-text-grade.md`.
+  Closeout: `SWFRecomp-CC-history:SWFRecompDocs/status/avm2-child-static-text-grade.md`.
 - **A loaded child whose stage HEIGHT differs from the root's renders shifted.**
   The recompiler bakes the y-flip into every vertex as `FRAME_HEIGHT - y`, per
   movie, so a 200-high child loaded into a 400-high parent is 200 px off. Both
@@ -581,7 +581,7 @@ first).
   behaviours of the ten-slice arc now reach browser-WASM, four of them
   pixel-identical to their Ruffle goldens. Both edits are preprocessor-identical
   in both CI modes (proven with `cpp`). Closeout:
-  `SWFRecompDocs/status/browser-wasm-loaded-child-parity.md`. Harness:
+  `SWFRecomp-CC-history:SWFRecompDocs/status/browser-wasm-loaded-child-parity.md`. Harness:
   `tools/browser-test/child_probe/`. (2026-09-04)
 - ~~**`MovieClipLoader.loadClip` in browser-WASM is code-complete but
   unprobed**~~ — PROBED 2026-09-04, and it **works**. An MTASC parent
@@ -608,7 +608,7 @@ first).
     exporter and confirmed in `loader.rs` (`movie_clip_loaded` fires only for
     clips that have run their first frame). Fixed with the `_totalframes` entry
     below. (2026-09-11)
-  Detail: `SWFRecompDocs/status/browser-root-side-gaps.md` §6.
+  Detail: `SWFRecomp-CC-history:SWFRecompDocs/status/browser-root-side-gaps.md` §6.
 - ~~**`MovieClipLoader.loadClip` leaves the holder's `_totalframes` at 1.**~~
   **DONE 2026-09-11.** The MCL drain (`actionFirePendingLoadInits`) wrote the
   frame counts onto its target only for a ROOT replacement or an image, while
@@ -621,7 +621,7 @@ first).
   `byte_size` and were already right. Anchored by
   `regression/avm1_mcl_holder_totalframes` (with a direct-`loadMovie` holder as
   the negative control). Closeout:
-  `SWFRecompDocs/status/avm1-mcl-holder-totalframes.md`. (2026-09-11)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/avm1-mcl-holder-totalframes.md`. (2026-09-11)
 - **MovieClipLoader's `onLoadStart` does not see Ruffle's loading state.**
   Ruffle puts the target into an "initial loading" movie before `onLoadStart`
   (`loader.rs` `load_initial_loading_swf`), so the handler reads
@@ -633,7 +633,7 @@ first).
   No corpus test reads these inside `onLoadStart`. Grading it needs care:
   `from_gnash/actionscript.all/MovieClipLoader-v5..v8` assert on
   `getProgress()` bytes inside the handlers. Scratch probe and Ruffle trace:
-  `SWFRecompDocs/status/avm1-mcl-holder-totalframes.md` §2. (2026-09-11)
+  `SWFRecomp-CC-history:SWFRecompDocs/status/avm1-mcl-holder-totalframes.md` §2. (2026-09-11)
 - ~~**`_root._currentframe` reads `undefined` in browser-WASM**~~ and
   ~~**`typeof` a root-placed named bare `DefineShape` is `object`**~~ — DONE
   2026-09-04. **One owner for both, and it was neither the playhead nor
@@ -662,7 +662,7 @@ first).
   `regression/avm1_root_identity_and_playhead` (all five columns flip on
   revert, in the BROWSER harness — the corpus cannot see either defect) and by
   `avm1_parent_child_bitmap_fill`'s `ctl:` row. Closeout:
-  `SWFRecompDocs/status/browser-root-side-gaps.md`.
+  `SWFRecomp-CC-history:SWFRecompDocs/status/browser-root-side-gaps.md`.
 - **The browser-WASM arms added to `swf.c` exclude the native windowed
   player.** `#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` guards
   the loaded-movie drains and the pending-removal finalize + dead-child
@@ -689,7 +689,7 @@ first).
   parity is complete. Sibling `gotoFrameFromInterval` is workflow-excluded on
   purpose (`ruffle-tests.yml --exclude`): two 0.0001 ms setIntervals with no
   minimum-interval floor in `timer.c` — a 10 ms floor is the lead
-  (`session18-fanout-reports/w2-avm1-goto-report.md`).
+  (`SWFRecomp-CC-history:SWFRecompDocs/plans/session18-fanout-reports/w2-avm1-goto-report.md`).
 - **`$version=` is still in the divergence harness's `NOISE_PATTERNS` and no
   longer needs to be.** `tools/divergence/divergence_test.py:57` filters the line
   on the 2026-05-24 finding that it is "pure platform metadata; can never
@@ -761,4 +761,4 @@ first).
   `MSAA_SAMPLES > 1` note above was right to be doubted. `edittext_caret_multiline`
   is NOT this bug — it is a missing caret (20 px of solid black bar at three
   positions), still open and unowned. Full account: playbook §19 and
-  `session20-fanout-reports/w2-gfx-text-smalls-report.md`.
+  `SWFRecomp-CC-history:SWFRecompDocs/plans/session20-fanout-reports/w2-gfx-text-smalls-report.md`.

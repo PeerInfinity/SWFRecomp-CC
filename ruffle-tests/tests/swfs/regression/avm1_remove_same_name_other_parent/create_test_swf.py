@@ -27,7 +27,7 @@ THE SHAPE (SWF8, hand-assembled)
     entry) but the rebuilt clip has lost `v` -> v:undefined.
 
 GOLDEN: output.txt is PREDICTED; see LOCAL ORACLE REQUESTS in
-SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
+SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
 """
 import sys
 from pathlib import Path

@@ -1,10 +1,10 @@
 num_ticks = 1
 
 # s30 w2-lowq-land. LOW glyph-raster probe (df3). Golden = Flash Player 32
-# quality LOW, LNX draw() capture (session30-fanout-reports/w1-local-oracles/
+# quality LOW, LNX draw() capture (SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-local-oracles/
 # w1-lowq-residues/df3/fp32.lnx.low.png; LNX vs WIN and draw vs --screen differ
 # by 24-45 channels of host noise). The SWF sets _quality = "LOW" itself.
-# Generator: session30-fanout-reports/w1-lowq-residues-fixtures/lowq_glyph_probe/
+# Generator: SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/w1-lowq-residues-fixtures/lowq_glyph_probe/
 # create_test_swf.py. max_outliers = our measured channels at s30 w2-lowq-land
 # (it guards the LOW glyph rule; it is NOT a Flash-exact pass).
 # s30 w2-lowq-land: 15921 at master; 9024 with the field-local pen rule.

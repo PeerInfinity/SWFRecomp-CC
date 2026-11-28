@@ -1,5 +1,5 @@
 num_frames = 12
 
 # Golden: FLASH PLAYER 32 (LNX, direct pinned) capture, s28 coordinator,
-# SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-loaded-shell-residuals/avm1_loaded_goto_play_deferred.flash32.txt,
+# SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/w1-loaded-shell-residuals/avm1_loaded_goto_play_deferred.flash32.txt,
 # cut after tick 12 (direct mode keeps running past num_frames).

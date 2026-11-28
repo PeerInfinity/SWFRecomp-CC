@@ -663,7 +663,7 @@ browser at ~94 MB/min.
 ## Live-census growth — weak orphan registry (2026-07-18)
 
 **The last AVM2 Seedling leak is fixed** (prompt
-`SWFRecompDocs/prompts/avm2-live-census-growth.md`). The ~9.5 KB/tick
+`SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-live-census-growth.md`). The ~9.5 KB/tick
 Seedling-teleport idle growth was LIVE census growth: exactly **2
 TextField objects + 6 strings per tick** (2 auto `instanceN` names + 4
 empty strings) stayed reachable — the FlashPunk HUD creates temp
@@ -698,7 +698,7 @@ byte-identical default vs stress, no status changes.
 ## Raw-alloc reclamation (2026-07-17)
 
 **The census-invisible ~39.5 KB/tick RWK gameplay leak is fixed** (prompt
-`SWFRecompDocs/prompts/avm2-scratch-reclamation.md`). Measured attribution
+`SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-scratch-reclamation.md`). Measured attribution
 (RWK native, plan_k gameplay TAS, allocated delta over ticks 1560→3000):
 
 - Baseline: **39.55 KB/tick** (135.6 MB @1560 → 192.6 MB @3000).
@@ -734,7 +734,7 @@ edittext/sort/bitmapdata suite tests identical default vs stress.
 ## Collectable strings (2026-07-16)
 
 **Heap `Avm2String`s are now a swept species** (prompt
-`SWFRecompDocs/prompts/avm2-collectable-strings.md`). `Avm2String` gained
+`SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-collectable-strings.md`). `Avm2String` gained
 appended GC fields (`gc_next`, `gc_flags` — static pool entries stay
 all-zero/rodata and are never written); the two constructors
 (`avm2_string_new`/`avm2_string_concat`) enroll in a string census;
@@ -1623,7 +1623,7 @@ suite's trace tests.
     has-MovieClip nested frame + one-shot framescript order),
     TextField.text, FrameLabel/Scene/Graphics/Matrix/Transform/System
     classes. runSWF_avm2 drives the real frame lifecycle.
-  Session prompt `SWFRecompDocs/prompts/avm2-stage5-frames.md` carries
+  Session prompt `SWFRecomp-CC-history:SWFRecompDocs/prompts/avm2-stage5-frames.md` carries
   the gotcha list + the static-slot-write lead for the button misses.
   Next: input.json harness (interactive tests), flash.display.Loader /
   LoaderInfo, BitmapData, or the AVM1-interop track.

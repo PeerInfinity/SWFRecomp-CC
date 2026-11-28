@@ -14,7 +14,7 @@ attach_registration alias for nested ones; a holder with no
 sprite_display_list gets no alias, so `h.m2` rendered white.
 
 Golden output.expected.png: Ruffle exporter at 0ddd12b6a, frame 0 (archived
-as SWFRecompDocs/plans/session26-fanout-reports/w1-local-oracles/
+as SWFRecomp-CC-history:SWFRecompDocs/plans/session26-fanout-reports/w1-local-oracles/
 attached_clip_button_click.exporter-0ddd12b6a.f0.png). Pixel-aligned solid
 squares, no AA, so tolerance 1 / max_outliers 0.
 

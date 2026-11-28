@@ -1,7 +1,7 @@
 # n-seam-caps: a closed stroke seam as two caps, and pixelHinting ends (2026-11-26)
 
 One-task session (LOCAL, s29 N ladder) after `n-join-disc` (`n-join-disc-report.md`, code `03527a3f8`). Launched by
-`s29-coordinator`. Brief: `session29-fanout-reports/` (n-seam-caps), goal = n-join-disc §5 item 1 + defect (5).
+`s29-coordinator`. Brief: `SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/` (n-seam-caps), goal = n-join-disc §5 item 1 + defect (5).
 
 **Summary**
 - **Seam caps landed (§2):** all four builders now emit a closed contour's seam as two caps (round caps + round joins):

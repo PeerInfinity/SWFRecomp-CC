@@ -1,7 +1,7 @@
 num_ticks = 1
 
 # s29 w2-text-coverage-land. Golden: FLASH PLAYER 32 capture (s29 coordinator,
-# session29-fanout-reports/w1-local-oracles/w1-text-pixels/W1_color/flash.png;
+# SWFRecomp-CC-history:SWFRecompDocs/plans/session29-fanout-reports/w1-local-oracles/w1-text-pixels/W1_color/flash.png;
 # draw() == --screen, 0 px). Pins Flash's coloured coverage write
 # out = floor((dst * (16 - n) + c * n) / 16) with the EXACT colour byte (tag.c
 # tf_cov_level_rgba). Budget from the measured residual at tolerance 16:

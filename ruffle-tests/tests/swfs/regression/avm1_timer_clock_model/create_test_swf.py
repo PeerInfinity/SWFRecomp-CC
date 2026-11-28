@@ -3,7 +3,7 @@
 
 Replaces the s26/s27 analytic golden (raw per-callback traces and exact
 catch-up counts cnt=16/18/18). Three direct FP32 captures (s28,
-session28-fanout-reports/w1-local-oracles/new-timer-rows/
+SWFRecomp-CC-history:SWFRecompDocs/plans/session28-fanout-reports/w1-local-oracles/new-timer-rows/
 regression__avm1_timer_clock_model/) differ from each other: the near-tie
 callbacks of F2 reorder against the F3 boundary run to run, and F5-F7 count
 10 or 12 (Flash polls its timers every ~16-20 ms while idle; it neither

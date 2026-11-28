@@ -4,7 +4,7 @@
 # `tier=1` / `tier=2` markers below partition the list; `render_canary.py
 # --tier 1|2|all` filters on them (default: all).
 #
-# Provenance: SWFRecompDocs/plans/session9-graphics-setup-reports/
+# Provenance: SWFRecomp-CC-history:SWFRecompDocs/plans/session9-graphics-setup-reports/
 #             w1c-render-canary-loop.md §5. Every path verified to exist and
 #             to carry `[image_comparisons]`.
 #
