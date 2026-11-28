@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T16:08:12.445869+00:00",
-    "old_git_sha": "2d40d37996b8f747cd416aa6e3be871f14646291",
-    "new_timestamp": "2026-11-27T22:24:41.224978+00:00",
-    "new_git_sha": "0224aaf256324c72a214123929b4570721246fc1",
+    "old_timestamp": "2026-11-27T22:24:41.224978+00:00",
+    "old_git_sha": "0224aaf256324c72a214123929b4570721246fc1",
+    "new_timestamp": "2026-11-28T02:31:31.840407+00:00",
+    "new_git_sha": "b8671fd2f516d8f233cc425f72ea7f897be22f7d",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 74,
-    "old_ruffle_matched": 28,
-    "old_effective_pass": 102,
+    "old_pass": 76,
+    "old_ruffle_matched": 27,
+    "old_effective_pass": 103,
     "old_total": 111,
-    "old_pass_rate": 66.7,
-    "new_pass": 76,
+    "old_pass_rate": 68.5,
+    "new_pass": 77,
     "new_ruffle_matched": 27,
-    "new_effective_pass": 103,
+    "new_effective_pass": 104,
     "new_total": 111,
-    "new_pass_rate": 68.5,
-    "old_mismatched_lines": 883,
-    "new_mismatched_lines": 1080,
-    "increased_mismatches": 209,
-    "decreased_mismatches": 12,
-    "newly_passing": 2,
-    "newly_failing": 1,
-    "status_changed": 3,
-    "unchanged": 106,
+    "new_pass_rate": 69.4,
+    "old_mismatched_lines": 1080,
+    "new_mismatched_lines": 845,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 235,
+    "newly_passing": 1,
+    "newly_failing": 0,
+    "status_changed": 2,
+    "unchanged": 109,
     "added": 0,
     "removed": 0
   },
@@ -33,81 +33,33 @@
     {
       "test": "ButtonEventsTest",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 679,
-        "expected_lines": 679,
-        "matching_lines": 666
-      },
-      "new_lines": {
         "actual_lines": 679,
         "expected_lines": 679,
         "matching_lines": 458
-      }
-    },
-    {
-      "test": "action_order/PlaceAndRemove",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 45,
-        "expected_lines": 96,
-        "matching_lines": 15
       },
       "new_lines": {
-        "actual_lines": 15,
-        "expected_lines": 96,
-        "matching_lines": 15
+        "actual_lines": 679,
+        "expected_lines": 679,
+        "matching_lines": 666
       }
     },
     {
-      "test": "action_order/action_execution_order_extend_test",
+      "test": "EmbeddedFontTest",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 30,
-        "expected_lines": 32,
-        "matching_lines": 8
-      },
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 32,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "action_order/action_execution_order_test11",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
+      "old_status": "ruffle_matched",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 32,
-        "expected_lines": 32,
-        "matching_lines": 27
+        "actual_lines": 87,
+        "expected_lines": 87,
+        "matching_lines": 60
       },
       "new_lines": {
-        "actual_lines": 32,
-        "expected_lines": 32,
-        "matching_lines": 32
-      }
-    },
-    {
-      "test": "action_order/action_execution_order_test4",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 26,
-        "expected_lines": 26,
-        "matching_lines": 19
-      },
-      "new_lines": {
-        "actual_lines": 26,
-        "expected_lines": 26,
-        "matching_lines": 26
+        "actual_lines": 87,
+        "expected_lines": 87,
+        "matching_lines": 87
       }
     }
   ]

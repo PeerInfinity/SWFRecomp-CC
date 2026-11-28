@@ -1,19 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `715a5300c822` (2026-11-27T23:57:03.270608+00:00)
-**Current:** `9498e80c12e3` (2026-11-28T00:52:29.286551+00:00)
+**Previous:** `9498e80c12e3` (2026-11-28T00:52:29.286551+00:00)
+**Current:** `6441e7d5d749` (2026-11-28T01:46:36.933527+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 343 | 344 | +1 |
-| Total | 343 | 344 | +1 |
+| Passing | 344 | 346 | +2 |
+| Total | 344 | 346 | +2 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (1)
+## Added Tests (2)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm1_timeline_selfgoto_child_replace` | pass | 27/27 |
+| `avm1_asnative_mc_probe_swf5` | pass | 8/8 |
+| `avm1_asnative_mc_probe_swf6` | pass | 8/8 |

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-28 00:52 UTC
+**Date**: 2026-11-28 01:46 UTC
 
-**Git SHA**: `9498e80c12`
+**Git SHA**: `6441e7d5d7`
 
-**Run Duration**: 6m 31s
+**Run Duration**: 6m 37s
 
 **Filtered**: 0 tests ignored out of 17 available
 
@@ -27,22 +27,22 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 17.5s |  |
-| 2 | `frame_label_count_oom` | 1 | 19.3s |  |
-| 3 | `frame_script_cleanup` | 30 | 27.6s |  |
-| 4 | `frame_script_cleanup2` | 32 | 27.8s |  |
-| 5 | `frame_script_cleanup3` | 30 | 26.3s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 26.7s |  |
-| 7 | `frame_script_cleanup_goto2` | 34 | 7.8s |  |
-| 8 | `frame_script_construct` | 25 | 25.9s |  |
-| 9 | `missing_frame_scripts` | 22 | 29.0s |  |
-| 10 | `scene_count_oom` | 1 | 2.1s |  |
-| 11 | `swf_9_event_goto_frame_script` | 5 | 25.8s |  |
-| 12 | `swf_9_frame_script_button_order` | 15 | 28.2s |  |
-| 13 | `swf_9_frame_script_cleanup_goto` | 30 | 7.7s |  |
-| 14 | `swf_9_frame_script_cleanup_goto2` | 34 | 34.0s |  |
-| 15 | `swf_9_frame_script_dynamic_goto` | 34 | 23.5s |  |
-| 16 | `swf_9_frame_script_dynamic_goto_2` | 33 | 33.7s |  |
+| 1 | `clip_action_no_key_code` | 1 | 25.8s |  |
+| 2 | `frame_label_count_oom` | 1 | 19.7s |  |
+| 3 | `frame_script_cleanup` | 30 | 22.5s |  |
+| 4 | `frame_script_cleanup2` | 32 | 26.2s |  |
+| 5 | `frame_script_cleanup3` | 30 | 25.9s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 25.7s |  |
+| 7 | `frame_script_cleanup_goto2` | 34 | 10.4s |  |
+| 8 | `frame_script_construct` | 25 | 27.5s |  |
+| 9 | `missing_frame_scripts` | 22 | 34.0s |  |
+| 10 | `scene_count_oom` | 1 | 1.7s |  |
+| 11 | `swf_9_event_goto_frame_script` | 5 | 27.0s |  |
+| 12 | `swf_9_frame_script_button_order` | 15 | 27.7s |  |
+| 13 | `swf_9_frame_script_cleanup_goto` | 30 | 8.6s |  |
+| 14 | `swf_9_frame_script_cleanup_goto2` | 34 | 27.4s |  |
+| 15 | `swf_9_frame_script_dynamic_goto` | 34 | 29.6s |  |
+| 16 | `swf_9_frame_script_dynamic_goto_2` | 33 | 23.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,7 +50,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 26.9s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 33.5s |  |
 
 ## Near-Passing Tests
 
