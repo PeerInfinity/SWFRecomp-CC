@@ -1,6 +1,9 @@
 Ruffle (https://github.com/ruffle-rs/ruffle) is licensed under either the MIT license or the
 Apache License 2.0, at the licensee's option. Code in this repository ported from Ruffle's
-source (marked "port of Ruffle ..." in comments) is used under the MIT license, reproduced here.
+source (each port names its Ruffle source file in a comment; the full list is README.md in this
+directory) is used under the MIT license, reproduced here. The ruffle-rs/h263-rs and
+ruffle-rs/rust-flash-lso ports have their own copyright lines: LICENSE-MIT-h263-rs.txt and
+LICENSE-MIT-rust-flash-lso.txt.
 
 MIT License
 

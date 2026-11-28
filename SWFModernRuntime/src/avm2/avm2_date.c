@@ -667,7 +667,7 @@ static Avm2Value date_value_of(Avm2Activation* act)
 // offset, or a bare number that is a year when >= 70 and a day otherwise).
 // Setting the same field twice is an error, but a month name may overwrite an
 // earlier month name — "Sat Jan Oct 30 77" parses as October. Year, month and
-// day must all end up set. This mirrors Ruffle's parse_full_date, which was
+// day must all end up set. This mirrors Ruffle's parse_full_date (core/src/avm2/globals/date.rs), which was
 // reverse-engineered from Flash Player; the avm2 suite's `date_parse` test
 // pins every branch.
 

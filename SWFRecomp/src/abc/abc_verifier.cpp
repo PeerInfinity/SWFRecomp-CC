@@ -14,7 +14,7 @@ namespace abc
 {
 	// avmplus's text for the codes whose message carries no operands, so the
 	// wording follows from the code alone. Sourced from the same table the
-	// runtime generates from Ruffle's error_messages.rs (avm2_error.c).
+	// runtime generates from Ruffle's core/src/avm2/error_messages.rs (avm2_error.c).
 	static const char* avmplusVerifyText(int code)
 	{
 		switch (code)
@@ -449,7 +449,7 @@ namespace abc
 
 	// === per-op helpers ===
 
-	// Ops that can NOT throw (avmplus opcodes.tbl via Ruffle op_can_throw_error).
+	// Ops that can NOT throw (avmplus opcodes.tbl via Ruffle core/src/avm2/verify.rs op_can_throw_error).
 	static bool opCanThrowError(AbcOpcode op)
 	{
 		switch (op)
@@ -543,7 +543,7 @@ namespace abc
 		IrOp second;
 	};
 
-	// Translates one raw op into IR (Ruffle verify.rs translate_op).
+	// Translates one raw op into IR (Ruffle core/src/avm2/verify.rs translate_op).
 	// Branch offsets are stashed in IrOp::imm until the offset->op-index
 	// rewrite pass. Returns false with a verify error on invalid ops.
 	static bool translateOp(const AbcFile& abc, const AbcMethod& method,
@@ -1099,7 +1099,7 @@ namespace abc
 				// Split compare-and-branch into compare + IfTrue/IfFalse.
 				// The second op sits at byte start+1; its stored offset is
 				// (offset - 1) so the uniform "+4 bytes" jump adjustment
-				// lands on the same target (see verify.rs).
+				// lands on the same target (see Ruffle core/src/avm2/verify.rs).
 				bool branch_if_true;
 				IrOpcode cmp;
 				switch (raw.opcode)
@@ -1970,6 +1970,7 @@ namespace abc
 	}
 
 	// === main entry ===
+	// Modelled on Ruffle core/src/avm2/verify.rs (verify_method, ByteInfo).
 
 	enum class ByteState : u8
 	{

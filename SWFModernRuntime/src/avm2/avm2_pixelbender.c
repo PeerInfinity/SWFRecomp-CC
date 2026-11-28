@@ -13,7 +13,7 @@
 // param they belong to that param, and anything left at EOF goes to the LAST
 // param. Qualifier byte 2 = out, EVERY other value = in.
 //
-// Error mapping (shader_data.rs:31-36): a short read → EOFError #2030;
+// Error mapping (core/src/avm2/globals/flash/display/shader_data.rs:31-36): a short read → EOFError #2030;
 // everything else → ArgumentError #2004. Ruffle PANICS on unknown opcode /
 // bad metadata type / mask asserts / metadata-on-texture-param — we must not
 // copy the panics, so all of those map to #2004 as well.
@@ -1054,7 +1054,7 @@ static Avm2Value shader_set_precision(Avm2Activation* act)
 // Ruffle has NO CPU PixelBender evaluator — `run_pixelbender_shader` exists
 // only in the wgpu backend, which transpiles the PBJ program to WGSL via
 // render/naga-pixelbender. So this is a from-scratch interpreter whose
-// SEMANTICS are transliterated from that transpiler (lib.rs:857-1420), not its
+// SEMANTICS are transliterated from that transpiler (render/naga-pixelbender/src/lib.rs:857-1420), not its
 // plumbing. The model it encodes:
 //
 //   * Two register banks, vec4-f32 and vec4-i32, indexed independently. EVERY

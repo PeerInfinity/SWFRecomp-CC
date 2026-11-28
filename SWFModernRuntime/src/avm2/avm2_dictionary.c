@@ -1,5 +1,5 @@
 // flash.utils.Dictionary — port of Ruffle
-// core/src/avm2/object/dictionary_object.rs + globals/flash/utils/Dictionary.as.
+// core/src/avm2/object/dictionary_object.rs + core/src/avm2/globals/flash/utils/Dictionary.as.
 //
 // Dictionary instances are plain dynamic ScriptObjects whose expando list
 // additionally accepts OBJECT keys (identity semantics, no namespace —

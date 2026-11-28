@@ -1,4 +1,4 @@
-// Array builtin class + methods (port of Ruffle globals/array.rs semantics
+// Array builtin class + methods (port of Ruffle core/src/avm2/globals/array.rs semantics
 // where they matter for the trace tests: hole handling, avmplus sort
 // flags, splice edge cases).
 
@@ -777,7 +777,7 @@ static Avm2Value array_some(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// Sorting — exact port of Ruffle globals/array.rs (avmplus qsort, hole
+// Sorting — exact port of Ruffle core/src/avm2/globals/array.rs (avmplus qsort, hole
 // resolution, undefined-last, UNIQUESORT/RETURNINDEXEDARRAY postprocess,
 // SWF-version compare quirks)
 // ---------------------------------------------------------------------------
@@ -959,7 +959,7 @@ static void sort_swap(SortItem* a, SortItem* b)
 	*b = t;
 }
 
-// Port of Ruffle's avmplus QuickSort (globals/array.rs qsort). Shared with
+// Port of Ruffle's avmplus QuickSort (core/src/avm2/globals/array.rs qsort). Shared with
 // Vector.sort (avm2_vector.c) — Ruffle exports it for exactly that reason.
 void avm2_avmplus_qsort(void* ud, Avm2SortCmp cmp, Avm2SortItem* s, uint32_t n)
 {
@@ -1455,7 +1455,7 @@ void avm2_register_array(Avm2Context* ctx)
 	avm2_builtin_add_static_const(ctx, cls, "RETURNINDEXEDARRAY", avm2_integer(8));
 	avm2_builtin_add_static_const(ctx, cls, "NUMERIC", avm2_integer(16));
 
-	// ES3-compat layer on Array.prototype (Ruffle globals/Array.as). Ruffle
+	// ES3-compat layer on Array.prototype (Ruffle core/src/avm2/globals/Array.as). Ruffle
 	// omits insertAt/removeAt here — they are AS3-only additions, not ES3.
 	Avm2Object* proto = cls->prototype_obj;
 

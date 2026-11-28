@@ -128,7 +128,7 @@ def main():
 
     with open(out_path, 'w', encoding='utf-8') as f:
         f.write("// Auto-generated Unicode case mapping tables for Flash Player (Unicode 5.1.0)\n")
-        f.write("// Generated from Ruffle string_methods test expectations\n")
+        f.write("// Generated from Ruffle string_methods test expectations (tests/tests/swfs/avm1/string_methods/output.txt)\n")
         f.write("// Do not edit manually - regenerate with scripts/generate_case_tables.py\n")
         f.write("#pragma once\n\n")
         f.write("#include <stdint.h>\n\n")

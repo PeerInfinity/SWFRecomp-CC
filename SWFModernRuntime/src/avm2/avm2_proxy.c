@@ -1,5 +1,5 @@
 // flash.utils.Proxy — port of Ruffle core/src/avm2/object/proxy_object.rs +
-// globals/flash/utils/Proxy.as.
+// core/src/avm2/globals/flash/utils/Proxy.as.
 //
 // A Proxy-derived receiver replaces the entire "local" half of property
 // resolution: when a lookup misses the declared traits, the engine calls

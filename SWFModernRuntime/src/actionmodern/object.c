@@ -261,6 +261,7 @@ int swf_name_match(const char* a, const char* b)
 
 // Version-based property hiding masks for ASSetPropFlags
 // When (property->flash_flags & FLASH_HIDE_MASK) != 0, property is hidden from GetMember
+// SWF 5-9 masks match Ruffle core/src/avm1/property.rs (VERSION_MASKS).
 static const u16 flash_hide_masks[] = {
 	0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // SWF 0-4
 	0x7480, // SWF 5

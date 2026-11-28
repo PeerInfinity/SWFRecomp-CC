@@ -1,4 +1,4 @@
-// Class realization, flattened vtables (Ruffle vtable.rs model), scope
+// Class realization, flattened vtables (Ruffle core/src/avm2/vtable.rs model), scope
 // chains, method invocation, type checks, and function objects. SWF-defined
 // classes are built by NewClass from the emitted static data; builtins
 // (avm2_globals.c and friends) register through the same vtable mechanism.

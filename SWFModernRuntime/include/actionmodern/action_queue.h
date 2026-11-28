@@ -3,7 +3,7 @@
 #include <libswf/swf.h>
 #include <actionmodern/action.h>
 
-// Action queue priorities (match Ruffle's ActionQueue / context.rs).
+// Action queue priorities (match Ruffle's ActionQueue / ActionPriority, core/src/context.rs).
 // Higher number = higher priority. Drain scans highest-first, FIFO within.
 typedef enum {
 	AQ_PRIORITY_NORMAL     = 0,

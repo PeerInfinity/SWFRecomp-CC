@@ -189,7 +189,8 @@ static double grad_t(uint32_t style_type, double gu, double gv,
 		double x = gu * 2.0 - 1.0, y = gv * 2.0 - 1.0;
 		return grad_spread(sqrt(x * x + y * y), spread);
 	}
-	// focal (0x13) — Ruffle's focal formula (render_webgpu.c focal_radial_t).
+	// focal (0x13) — Ruffle's focal formula (render_webgpu.c focal_radial_t;
+	// Ruffle render/wgpu/shaders/gradient.wgsl find_t).
 	double fx = focal_z;
 	double ux = gu * 2.0 - 1.0, uy = gv * 2.0 - 1.0;
 	double dx = fx - ux, dy = 0.0 - uy;
@@ -988,7 +989,7 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 	if (buf == NULL || W <= 0 || H <= 0 || vert_count < 3) return;
 	if (node_alpha <= 0.0) return;
 	if (ratio < 0.0) ratio = 0.0; else if (ratio > 1.0) ratio = 1.0;
-	// Ruffle morph_shape.rs weights: b weights END, a weights START (a+b=1).
+	// Ruffle core/src/display_object/morph_shape.rs weights: b weights END, a weights START (a+b=1).
 	double b_w = ratio, a_w = 1.0 - ratio;
 
 	const uint32_t (*sd)[4] = cpu_shape_table();
@@ -1053,7 +1054,7 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 // s27 w2-draw-cx-text: CPU TextField box (background + 1px border) for
 // BitmapData.draw(), shared by AVM2 (avm2_bitmap.c text_raster_core / the
 // draw walk) and AVM1 (action.c rasterizeMovieClipToBitmap). See the header.
-// Device-font rule (Ruffle draw_device_text_box, edit_text.rs:2845-2910, the
+// Device-font rule (Ruffle draw_device_text_box, core/src/display_object/edit_text.rs:2845-2910, the
 // same snapping avm2_render_textbox's device arm uses): the transformed corners
 // are rounded to whole pixels, the background fills [x0,x0+w) x [y0,y0+h), and
 // the border is four independent 1px lines whose bottom-right corner pixel no

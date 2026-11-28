@@ -397,7 +397,7 @@ static const char* fragment_wgsl =
 "fn linear_t(v_args: vec4f) -> f32 { return apply_spread(v_args.x, v_args.w); }\n"
 "fn radial_t(v_args: vec4f) -> f32 { return apply_spread(length(v_args.xy * 2.0 - 1.0)" LOWQ_RAD_BIAS ", v_args.w); }\n"
 "fn focal_radial_t(v_args: vec4f) -> f32 {\n"
-"  // Match Ruffle's focal gradient formula exactly (gradient.wgsl)\n"
+"  // Match Ruffle's focal gradient formula exactly (render/wgpu/shaders/gradient.wgsl)\n"
 "  let f = v_args.z;\n"
 "  let uv = v_args.xy * 2.0 - 1.0;\n"
 "  var d = vec2f(f, 0.0) - uv;\n"
@@ -660,7 +660,7 @@ LOWQ_GRADIENT_LOOKUP
 "@fragment\n"
 "fn fs_main(in: FragmentInput) -> @location(0) vec4f { return shade_main(in); }\n"
 "\n"
-// s25 layer groups: ruffle's alpha/erase blend shaders `discard` where the
+// s25 layer groups: ruffle's alpha/erase blend shaders (render/wgpu/shaders/blend/{alpha,erase}.wgsl) `discard` where the
 // child's (8-bit) layer alpha is 0, leaving the group untouched there.
 "@fragment\n"
 "fn fs_alpha_layer(in: FragmentInput) -> @location(0) vec4f {\n"
@@ -2967,7 +2967,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	assert(ctx->stencil_test_pipeline != NULL);
 
 	// --- Stencil clear pipeline: lowers the clip level, no color output ---
-	// ruffle MaskState::ClearMaskStencil (pipelines.rs:406-414). Drawn as the
+	// ruffle MaskState::ClearMaskStencil (render/wgpu/src/pipelines.rs:406-414). Drawn as the
 	// full-screen NDC quad above, so it needs no vertex buffer — but it keeps
 	// the render pipeline LAYOUT, so the three bind groups the pass set at
 	// open time stay bound (a pipeline with an incompatible layout would unset
@@ -3102,7 +3102,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	}
 
 	// s25 layer groups. Alpha (11): dst *= src.a; Erase (12): dst *= 1 - src.a,
-	// on colour AND alpha (ruffle shaders/blend/{alpha,erase}.wgsl). Only ever
+	// on colour AND alpha (ruffle render/wgpu/shaders/blend/{alpha,erase}.wgsl). Only ever
 	// bound inside a LAYER group's offscreen pass (tag.c g_layer_group_depth).
 	for (int ae = 0; ae < 2; ae++)
 	{
@@ -5952,7 +5952,7 @@ static const char* blur_wgsl =
 	"  }\n"
 	"  var result = total / params.full_size;\n"
 	"  if (params.full_size > 1.0) {\n"
-	// Imitate FP's fixed-point accumulator (ruffle blur.wgsl does the same).
+	// Imitate FP's fixed-point accumulator (ruffle render/wgpu/shaders/filter/blur.wgsl does the same).
 	// Skipped for the full_size<=1 identity pass, where an 8-bit round-trip
 	// through floor() could shave a level off an already-exact copy.
 	"    result = floor(result * 255.0 + params.shift_pad * 0.0005) / 255.0;\n"
@@ -6084,7 +6084,7 @@ static const char* compose_wgsl =
 	"        color = color * alpha * dest.a + dest * (1.0 - alpha);\n"
 	"      } else {\n"
 	// Intentionally the same as knockout for inner; outer differs. Flash quirk,
-	// documented in ruffle glow.wgsl.
+	// documented in ruffle render/wgpu/shaders/filter/glow.wgsl.
 	"        color = color * alpha * dest.a;\n"
 	"      }\n"
 	"    } else {\n"
@@ -6648,7 +6648,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 	}
 
 	// --- Trivial layer composites: composite_pipeline with a different blend
-	//     state. Colour factors from ruffle blend.rs:76-105; alpha is OVER on all
+	//     state. Colour factors from ruffle render/wgpu/src/blend.rs:76-105; alpha is OVER on all
 	//     three, so an opaque backdrop stays opaque. ---
 	{
 		WGPUShaderModule sm = create_shader(ctx->device, composite_wgsl, "blend_layer_shader");

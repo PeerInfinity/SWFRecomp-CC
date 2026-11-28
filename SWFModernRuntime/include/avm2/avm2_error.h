@@ -171,7 +171,7 @@ Avm2Value avm2_error_new(Avm2Context* ctx, Avm2Class* error_class, const char* m
 _Noreturn void avm2_throw_error(Avm2Context* ctx, Avm2Class* error_class,
                                 const char* fmt, ...);
 
-// Common error constructors (exact FP strings ported from Ruffle error.rs).
+// Common error constructors (exact FP strings ported from Ruffle core/src/avm2/error.rs).
 _Noreturn void avm2_throw_null_or_undefined(Avm2Context* ctx, Avm2Value v,
                                             const char* name, uint32_t name_len);
 _Noreturn void avm2_throw_1006(Avm2Context* ctx, const char* name, uint32_t name_len);

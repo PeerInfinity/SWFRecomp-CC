@@ -118,7 +118,7 @@ static int winding_number_line(double px, double py,
 // Winding number contribution from a quadratic bezier curve.
 // P0=(ax,ay), P1=(cx,cy) control, P2=(bx,by) anchor.
 // Uses y-monotonic curve splitting for numerical stability at extrema.
-// Port of Ruffle's shape_utils.rs winding_number_curve + solve_quadratic.
+// Port of Ruffle render/src/shape_utils.rs winding_number_curve + solve_quadratic.
 static int winding_number_curve(double px, double py,
     double ax, double ay, double cx, double cy, double bx, double by)
 {
@@ -210,7 +210,7 @@ static int winding_number_curve(double px, double py,
 // ---------------------------------------------------------------------------
 
 // s30 w1-drift-smalls: the 1-px minimum stroke width, in LOCAL twips, for
-// the current ng_hitTestShapeChar call. Ruffle shape_utils.rs
+// the current ng_hitTestShapeChar call. Ruffle render/src/shape_utils.rs
 // stroke_minimum_width: 20 * max column scale of the GLOBAL->LOCAL matrix
 // (a flat 20 local twips over-widened every up-scaled clip's hairlines:
 // movieclip_hittest_shapeflag line 296, morph at x7.85, FP32 false).

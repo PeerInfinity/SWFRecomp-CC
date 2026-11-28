@@ -283,7 +283,7 @@ bool avm2_string_equals(const Avm2String* a, const Avm2String* b)
 }
 
 // ---------------------------------------------------------------------------
-// ECMA f64 → int conversions (Ruffle ecma_conversions.rs)
+// ECMA f64 → int conversions (Ruffle core/src/ecma_conversions.rs)
 // ---------------------------------------------------------------------------
 
 uint32_t avm2_f64_to_wrapping_u32(double n)
@@ -301,7 +301,7 @@ int32_t avm2_f64_to_wrapping_i32(double n)
 }
 
 // ---------------------------------------------------------------------------
-// String → number parsing (Ruffle value.rs string_to_int / string_to_f64)
+// String → number parsing (Ruffle core/src/avm2/value.rs string_to_int / string_to_f64)
 // ---------------------------------------------------------------------------
 
 static bool is_space_cp(unsigned char c)

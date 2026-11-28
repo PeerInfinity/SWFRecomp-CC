@@ -466,7 +466,7 @@ void avm2_media_harness_window(float* out, int64_t blk, int frames)
 #endif
 
 // SoundMixer.computeSpectrum(outputArray, FFTMode = false, stretchFactor = 0)
-// — port of Ruffle sound_mixer.rs compute_spectrum over the mix history.
+// — port of Ruffle core/src/avm2/globals/flash/media/sound_mixer.rs compute_spectrum over the mix history.
 // The history is the last 512 stereo frames of the NetStream audio tap
 // (avm2_net.c; embedded / Sound-object channels are not tapped yet, so they
 // contribute silence). FFTMode: a 2048-point real FFT of those 512 samples

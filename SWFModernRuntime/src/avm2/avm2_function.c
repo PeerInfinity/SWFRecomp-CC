@@ -15,7 +15,7 @@
 #include <memory/heap.h>
 #include <avm2/avm2_ops.h>
 
-// Best-effort port of Ruffle function.rs display_function for error 1063.
+// Best-effort port of Ruffle core/src/avm2/function.rs display_function for error 1063.
 static void display_function(char* buf, size_t buf_size, Avm2Activation* act,
                              const Avm2AbcMethodData* md, uint32_t method_index)
 {
@@ -417,7 +417,7 @@ void avm2_register_function_builtins(Avm2Context* ctx)
 	avm2_builtin_set_debug_name(ctx, cls, "apply",
 	                            "http://adobe.com/AS3/2006/builtin::apply");
 	avm2_builtin_add_getter(ctx, cls, "length", fn_get_length);
-	// ES3-compat layer on Function.prototype (Ruffle globals/Function.as).
+	// ES3-compat layer on Function.prototype (Ruffle core/src/avm2/globals/Function.as).
 	avm2_proto_add_function_n(ctx, cls->prototype_obj, "call", fn_call, 1);
 	avm2_proto_add_function_n(ctx, cls->prototype_obj, "apply", fn_apply, 2);
 	avm2_proto_add_function(ctx, cls->prototype_obj, "toString", fn_proto_to_string);

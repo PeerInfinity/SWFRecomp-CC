@@ -903,7 +903,7 @@ u16 ng_resolveTextFormatFontId(const char* name, int bold, int italic)
 // case-insensitively on the full name — returning a row index or -1.
 // ---------------------------------------------------------------------------
 
-// Ruffle `get_or_load_device_font` (library.rs:576-590): the exact query, then
+// Ruffle `get_or_load_device_font` (core/src/library.rs:576-590): the exact query, then
 // FontMap::find's bold/italic compatibility ladder (library.rs:788-845, order
 // tested upstream in tests/swfs/fonts/embed_matching/fallback_preferences).
 int ng_device_font_ladder(const char* name, uint32_t len, int bold, int italic,
@@ -939,7 +939,7 @@ static int ng_devfont_is_ws(char c)
 	       || c == '\v';
 }
 
-// Ruffle html/layout.rs:561-596: split the format's font name on ',', run the
+// Ruffle core/src/html/layout.rs:561-596: split the format's font name on ',', run the
 // ladder per entry; the first entry that resolves wins. -1 when the whole list
 // misses (the caller then uses its DefaultFont). Entries are trimmed ONLY when
 // the name is a list (contains a comma): "Flash only trims whitespace around

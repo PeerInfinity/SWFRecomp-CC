@@ -1,8 +1,9 @@
 // XML / XMLList classes — the E4X method surface, class-call conversions,
 // settings statics, and the property-engine entry points wired into
-// avm2_ops.c. Port of Ruffle globals/xml.rs, globals/xml_list.rs,
-// globals/XML.as, globals/XMLList.as, object/xml_object.rs and
-// object/xml_list_object.rs (see avm2_e4x.h / avm2_e4x.c for the tree).
+// avm2_ops.c. Port of Ruffle core/src/avm2/globals/xml.rs,
+// core/src/avm2/globals/xml_list.rs, core/src/avm2/globals/XML.as,
+// core/src/avm2/globals/XMLList.as, core/src/avm2/object/xml_object.rs and
+// core/src/avm2/object/xml_list_object.rs (see avm2_e4x.h / avm2_e4x.c for the tree).
 
 #include <stdio.h>
 #include <string.h>
@@ -2943,7 +2944,7 @@ void avm2_register_xml(Avm2Context* ctx)
 
 // ---------------------------------------------------------------------------
 // Legacy flash.xml.XMLNode / XMLDocument / XMLNodeType (port of Ruffle's
-// AS3 implementations in globals/flash/xml/*.as — an independent node
+// AS3 implementations in core/src/avm2/globals/flash/xml/*.as — an independent node
 // model built by converting a parsed E4X tree).
 // ---------------------------------------------------------------------------
 

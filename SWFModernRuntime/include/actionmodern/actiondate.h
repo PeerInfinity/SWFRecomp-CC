@@ -34,6 +34,7 @@ ActionVar actionDateToString(SWFAppContext* app_context, ASObject* date_obj);
 ASFunction* actionDateGetConstructor(SWFAppContext* app_context);
 
 // Look up a Date method by ASnative index (class 103). Returns NULL
-// for unmapped indices. Index scheme follows Ruffle's date.rs method
+// for unmapped indices. Index scheme follows Ruffle's
+// core/src/avm1/globals/date.rs method
 // table (see date.c for the full mapping).
 ASFunction* actionDateGetASnativeMethod(SWFAppContext* app_context, u16 index);

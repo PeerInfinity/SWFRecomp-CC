@@ -1,7 +1,7 @@
 #ifndef AVM2_OBJECT_H
 #define AVM2_OBJECT_H
 
-// ScriptObject per Ruffle script_object.rs:61-79 (avm2-support-plan §4.2):
+// ScriptObject per Ruffle core/src/avm2/object/script_object.rs:61-79 (avm2-support-plan §4.2):
 // fixed slot array for declared traits + dynamic property map for expando
 // props + proto link + class/vtable pointers. Kept in its own small header
 // (exposed architecture surface — see the plan's LittleCube note).

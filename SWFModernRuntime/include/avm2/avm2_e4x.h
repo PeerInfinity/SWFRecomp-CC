@@ -2,7 +2,8 @@
 #define AVM2_E4X_H
 
 // E4X / XML engine (ECMA-357), ported from Ruffle core/src/avm2/e4x.rs +
-// object/xml_object.rs + object/xml_list_object.rs + globals/xml*.
+// core/src/avm2/object/xml_object.rs + core/src/avm2/object/xml_list_object.rs +
+// core/src/avm2/globals/xml*.
 //
 // Two modules:
 //   avm2_e4x.c — the node tree, the hand-written parser (Ruffle uses

@@ -1,4 +1,4 @@
-// String builtin class + methods (port of Ruffle globals/string.rs).
+// String builtin class + methods (port of Ruffle core/src/avm2/globals/string.rs).
 //
 // Representation note: Avm2String holds canonical WTF-8 (see the long comment
 // above avm2_string_concat in avm2_value.c) — UTF-8 extended so an unpaired
@@ -748,7 +748,7 @@ void avm2_register_string(Avm2Context* ctx)
 	avm2_builtin_add_static_method(ctx, cls, "fromCharCode", string_from_char_code);
 
 	// ES3-compat layer: the same methods also live on String.prototype as
-	// plain functions (Ruffle globals/String.as). Tamarin's standard opening
+	// plain functions (Ruffle core/src/avm2/globals/String.as). Tamarin's standard opening
 	// assertion is `String.prototype.<m>.length`, and tests reassign them
 	// onto other prototypes (`Number.prototype.split = String.prototype.split`),
 	// so these must be real prototype properties. Every impl reads its

@@ -1,7 +1,7 @@
 #ifndef AVM2_CLASS_H
 #define AVM2_CLASS_H
 
-// Per-class flattened vtable + class metadata, per Ruffle vtable.rs
+// Per-class flattened vtable + class metadata, per Ruffle core/src/avm2/vtable.rs
 // (avm2-support-plan §4.2): built at class-definition time by inheriting
 // the superclass's table and appending own traits. Native builtins
 // register through the same mechanism so the binding surface stays

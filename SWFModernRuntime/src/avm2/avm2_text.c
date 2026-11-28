@@ -2621,7 +2621,7 @@ void avm2_text_seed_from_tag(Avm2Context* ctx, Avm2Object* obj, uint16_t char_id
 }
 
 // ===========================================================================
-// Text layout engine (Ruffle html/layout.rs + font.rs measurement paths)
+// Text layout engine (Ruffle core/src/html/layout.rs + core/src/font.rs measurement paths)
 // ===========================================================================
 
 #define GUTTER 40  // twips (2px each side)
@@ -3053,7 +3053,7 @@ static EvalParams eval_params(const Avm2TextFormatFields* fmt)
 	return p;
 }
 
-// Ruffle Font::evaluate (font.rs:889):
+// Ruffle Font::evaluate (core/src/font.rs:889):
 //   kerning_enabled = has_kerning_info() && (font_type().is_device() || params.kerning)
 // A DEVICE face always kerns, whatever TextFormat.kerning says.
 static int kerning_enabled(const LFont* f, EvalParams p)
@@ -3542,9 +3542,9 @@ static void lc_newspan(LCtx* lc, const Avm2TextFormatFields* span)
 	}
 }
 
-// --- line wrapping (Ruffle html/line_wrapping.rs) ---
+// --- line wrapping (Ruffle core/src/html/line_wrapping.rs) ---
 
-// Ruffle ruffle_wstr::utils sets, ported verbatim.
+// Ruffle ruffle_wstr::utils sets (wstr/src/utils.rs swf_is_cjk_like etc.), ported verbatim.
 static int is_cjk_like(uint32_t c)
 {
 	return c >= 0x2300;
@@ -5326,7 +5326,7 @@ static Avm2TextFormatFields style_transform(Avm2Context* ctx, Avm2Object* obj)
 	v = style_prop(ctx, obj, "color");
 	if (style_truthy(v))
 	{
-		// innerParseColor (Ruffle style_sheet.rs::inner_parse_color): strip
+		// innerParseColor (Ruffle core/src/avm2/globals/flash/text/style_sheet.rs::inner_parse_color): strip
 		// the leading '#', TRIM TRAILING WHITESPACE, then require 1..=6
 		// remaining chars that parse whole as base-16; anything else is 0.
 		// The trailing trim is load-bearing: a CSS declaration
@@ -5387,7 +5387,7 @@ static Avm2TextFormatFields style_transform(Avm2Context* ctx, Avm2Object* obj)
 	v = style_prop(ctx, obj, "fontFamily");
 	if (style_truthy(v))
 	{
-		// innerParseFontFamily (Ruffle html/style_sheet.rs::parse_font_list):
+		// innerParseFontFamily (Ruffle core/src/html/style_sheet.rs::parse_font_list):
 		// split on commas, trim LEADING spaces only (trailing spaces are part
 		// of the name), map mono/sans-serif/serif to device names, rejoin.
 		// An EMPTY entry is dropped outright — separator included — so
@@ -9668,7 +9668,8 @@ static Avm2Value rectangle_to_string(Avm2Activation* act)
 	return avm2_string(avm2_string_from_literal(act->ctx, buf));
 }
 
-// flash.geom.Rectangle method surface (ported from Ruffle avm2 geom/rectangle).
+// flash.geom.Rectangle method surface (ported from Ruffle avm2 geom/rectangle,
+// now core/src/avm2/globals/flash/geom/Rectangle.as).
 // g_rectangle_class is a slot_class (x/y/width/height at slots[1..4]); until now
 // it carried only toString, so any AS3 that called intersects/union/etc. threw
 // Error #1069. FlashPunk's camera/collision culling calls intersects every frame
@@ -10079,7 +10080,8 @@ static Avm2Class* make_slot_class(Avm2Context* ctx, const char* ns,
 // ---------------------------------------------------------------------------
 // flash.accessibility::AccessibilityImplementation (session 15 T10)
 //
-// A faithful port of Ruffle's AccessibilityImplementation.as. `errno`/`stub`
+// A faithful port of Ruffle's AccessibilityImplementation.as
+// (core/src/avm2/globals/flash/accessibility/AccessibilityImplementation.as). `errno`/`stub`
 // are set as instance properties by the constructor rather than as real
 // vtable slots (the class has no slot surface and every graded read goes
 // through the public-property path); describeType reports them from the
@@ -10549,7 +10551,7 @@ void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield)
 }
 
 // ---------------------------------------------------------------------------
-// Stage 8 text-editing bridge (Ruffle edit_text.rs text_input/text_control_input)
+// Stage 8 text-editing bridge (Ruffle core/src/display_object/edit_text.rs text_input/text_control_input)
 // ---------------------------------------------------------------------------
 
 int avm2_text_is_selectable(struct Avm2EditTextExt* et)
@@ -10640,7 +10642,7 @@ void avm2_text_input_key(Avm2Context* ctx, Avm2Object* focus, int32_t key_code,
 	(void) ctx; (void) focus; (void) key_code; (void) char_code; (void) shift;
 }
 
-// --- restrict (Ruffle EditTextRestrict) ---
+// --- restrict (Ruffle EditTextRestrict, core/src/display_object/edit_text.rs) ---
 // Decode the next UTF-8 codepoint at *p (< end); advance *p.
 static int32_t utf8_next(const char** p, const char* end)
 {
@@ -10865,7 +10867,7 @@ static uint32_t et_find_new_pos(const Avm2EditTextExt* et, const char* code,
 }
 
 // ===========================================================================
-// Caret placement and mouse selection (Ruffle edit_text.rs
+// Caret placement and mouse selection (Ruffle core/src/display_object/edit_text.rs
 // screen_position_to_index / handle_click / handle_drag).
 // ===========================================================================
 

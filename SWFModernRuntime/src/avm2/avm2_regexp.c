@@ -1,6 +1,6 @@
 // RegExp builtin + the String regex paths (match/replace/search/split) —
-// port of Ruffle core/src/avm2/regexp.rs, globals/reg_exp.rs, RegExp.as,
-// and globals/string.rs, backed by QuickJS's libregexp
+// port of Ruffle core/src/avm2/regexp.rs, core/src/avm2/globals/reg_exp.rs,
+// core/src/avm2/globals/RegExp.as, and core/src/avm2/globals/string.rs, backed by QuickJS's libregexp
 // (SWFModernRuntime/third_party/quickjs-libregexp, MIT).
 //
 // Subject strings are converted to UTF-16 (libregexp cbuf_type 1) so

@@ -1,7 +1,7 @@
-// Vector builtin (__AS3__.vec::Vector) — port of Ruffle vector.rs
-// (VectorStorage), object/vector_object.rs (index access + error
-// semantics), object/class_object.rs apply/parametrize, and
-// globals/vector.rs + VectorObject.as (method family).
+// Vector builtin (__AS3__.vec::Vector) — port of Ruffle core/src/avm2/vector.rs
+// (VectorStorage), core/src/avm2/object/vector_object.rs (index access + error
+// semantics), core/src/avm2/object/class_object.rs apply/parametrize, and
+// core/src/avm2/globals/vector.rs + core/src/avm2/globals/VectorObject.as (method family).
 //
 // Model: one Avm2Class per distinct type parameter T (identity matters for
 // is/as/coercion), cached in an application list keyed by the param class.
@@ -511,7 +511,7 @@ static Avm2Value vector_call(Avm2Context* ctx, Avm2Class* cls,
 }
 
 // ---------------------------------------------------------------------------
-// Methods (Ruffle globals/vector.rs + VectorObject.as)
+// Methods (Ruffle core/src/avm2/globals/vector.rs + core/src/avm2/globals/VectorObject.as)
 // ---------------------------------------------------------------------------
 
 static Avm2Object* this_vector(Avm2Activation* act)
@@ -1217,7 +1217,7 @@ static Avm2Value vec_map(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// sort (Ruffle globals/vector.rs sort — always the slow numeric compare, no
+// sort (Ruffle core/src/avm2/globals/vector.rs sort — always the slow numeric compare, no
 // SWF-version quirks; UNIQUESORT discards on violation, RETURNINDEXEDARRAY
 // discards the result entirely)
 // ---------------------------------------------------------------------------

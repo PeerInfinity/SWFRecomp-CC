@@ -1,6 +1,6 @@
 // Typed exceptions (avm2_error.h): try-frame stack, throw dispatch, and
 // the Error class family. Dispatch semantics per Ruffle activation.rs
-// handle_err; error message strings per Ruffle error.rs (exact FP text —
+// handle_err; error message strings per Ruffle core/src/avm2/error.rs (exact FP text —
 // many tests assert them).
 
 #include <stdarg.h>

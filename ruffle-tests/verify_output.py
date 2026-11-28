@@ -4703,8 +4703,13 @@ def main():
     if args.uses_dawn:
         dawn_lib = DAWN_INSTALL / "lib" / "libwebgpu_dawn.a"
         if not dawn_lib.exists():
+            src = "from $DAWN_INSTALL" if "DAWN_INSTALL" in os.environ else \
+                "the default: dawn-install next to the repo, e.g. ~/CC/dawn-install for ~/CC/SWFRecomp-CC"
             print(f"Error: Dawn library not found at {dawn_lib}")
-            print(f"Build Dawn first and install to {DAWN_INSTALL}")
+            print(f"  (Dawn install dir {DAWN_INSTALL}, {src})")
+            print("  Fix: unpack the prebuilt Dawn there (GETTING_STARTED.md section 6), or run")
+            print(f"  `bash scripts/build_dawn.sh {DAWN_INSTALL}`, or set DAWN_INSTALL=<dir> to an")
+            print("  existing install (the one holding lib/libwebgpu_dawn.a).")
             sys.exit(1)
 
     # Determine test list. Walks the tree recursively so nested tests like

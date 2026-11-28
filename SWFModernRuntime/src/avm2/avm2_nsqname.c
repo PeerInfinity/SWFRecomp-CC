@@ -1,6 +1,7 @@
 // Namespace + QName builtins — port of Ruffle
 // core/src/avm2/object/{namespace,qname}_object.rs,
-// globals/{namespace,q_name}.rs and globals/{Namespace,QName}.as.
+// core/src/avm2/globals/{namespace,q_name}.rs and
+// core/src/avm2/globals/{Namespace,QName}.as.
 //
 // A Namespace VALUE (PushNamespace, `namespace n = "uri"` trait defaults,
 // user `new Namespace(...)`) is an Avm2Object of namespace_class whose

@@ -320,11 +320,13 @@ for cat in "${CATEGORIES[@]}"; do
     install_category "${cat}"
 done
 
-echo ""
-echo "Done! Total: ${TOTAL_INSTALLED} tests installed."
-
 # Re-apply the stored Flash fixes: goldens that a real Flash Player 32 capture
 # proved wrong get replaced after every download, and the downloaded original
 # is kept as <file>.upstream. The target is Flash, not Ruffle. Manifest and
 # rules: ruffle-tests/flash_fixes/README.md.
 python3 "${SCRIPT_DIR}/apply_flash_fixes.py" --categories "${CATEGORIES[@]}"
+
+# The one summary line comes last, after the flash-fix lines, so a run ends on
+# its total (S4 fresh-clone check P6 read the earlier order as a second run).
+echo ""
+echo "Done! Total: ${TOTAL_INSTALLED} tests installed."

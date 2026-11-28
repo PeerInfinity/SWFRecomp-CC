@@ -447,7 +447,7 @@ static void register_socket(Avm2Context* ctx)
 // flash.net.XMLSocket
 // ---------------------------------------------------------------------------
 //
-// In Ruffle this is playerglobal AS3 (XMLSocket.as) wrapping a private
+// In Ruffle this is playerglobal AS3 (core/src/avm2/globals/flash/net/XMLSocket.as) wrapping a private
 // flash.net.Socket; here it is the same wrapper written in C. Everything
 // script-visible delegates to the inner Socket — including its errors, which
 // is why close()/send() on an unconnected XMLSocket surface as IOError #2002
@@ -1433,7 +1433,7 @@ void avm2_net_flush_connections(Avm2Context* ctx)
 // ---------------------------------------------------------------------------
 //
 // Ruffle's model (core/src/local_connection.rs +
-// avm2/object/local_connection_object.rs), which is a per-PLAYER channel map,
+// core/src/avm2/object/local_connection_object.rs), which is a per-PLAYER channel map,
 // not any kind of IPC: every endpoint the corpus exercises lives in the same
 // player (the main movie plus the child SWFs the Loader arc executes), so a
 // send is a queued in-process message.
@@ -3392,7 +3392,8 @@ static Avm2Value fileref_save(Avm2Activation* act)
 
 // --- FileReferenceList -----------------------------------------------------
 //
-// Ruffle implements this in AS as an EventDispatcher wrapping one private
+// Ruffle implements this in AS (core/src/avm2/globals/flash/net/FileReferenceList.as)
+// as an EventDispatcher wrapping one private
 // FileReference whose select/cancel it re-broadcasts; the list therefore uses
 // the SINGLE-file dialog, so `fileList` holds exactly one entry named
 // test.txt (the three-file mock belongs to AVM1's FileReferenceList, which

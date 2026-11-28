@@ -107,7 +107,7 @@ Avm2Value avm2_uint_value(uint32_t u);  // Integer if it fits, else Number
 Avm2Value avm2_string(const Avm2String* s);
 Avm2Value avm2_object_value(Avm2Object* obj);
 
-// Coercions (port of Ruffle value.rs semantics). coerce_to_string returns
+// Coercions (port of Ruffle core/src/avm2/value.rs semantics). coerce_to_string returns
 // a heap or interned Avm2String, never NULL. Object arms call toString/
 // valueOf via the public-property machinery and may throw AVM2 errors.
 const Avm2String* avm2_coerce_to_string(Avm2Context* ctx, Avm2Value v);

@@ -359,7 +359,8 @@ void swf_log_navigate(const char* url, size_t url_len,
 // ---------------------------------------------------------------------------
 //
 // The other half of the Ruffle test navigator: `socket.json` replay. Models
-// TestNavigatorBackend::connect_socket without any of its async machinery —
+// TestNavigatorBackend::connect_socket (Ruffle tests/framework/src/backends/
+// navigator.rs) without any of its async machinery —
 // the spawned future becomes a per-connection cursor over the parsed script,
 // the player->server channel becomes an outbox queue, and the server->player
 // channel becomes one global action queue drained at the tick boundary. The

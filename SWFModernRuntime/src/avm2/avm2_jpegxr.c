@@ -320,7 +320,8 @@ static uint8_t* atf_lzma(const uint8_t* d, size_t n, size_t want)
 }
 
 // ATFFormat::CompressedAlpha (4): rebuild the DXT5 stream exactly as
-// atf_jpegxr.rs:49-144 does, then decode it.
+// Ruffle core/src/avm2/globals/flash/display3D/textures/atf_jpegxr.rs:49-144
+// does, then decode it.
 static uint8_t* atf_compressed_alpha(const uint8_t* dxt1a_z, size_t dxt1a_n,
                                      const uint8_t* jxr_a, size_t jxr_a_n,
                                      const uint8_t* dxt5c_z, size_t dxt5c_n,

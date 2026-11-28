@@ -12,8 +12,8 @@
 //
 // The three mechanisms that carry the yield:
 //
-//   * Profile negotiation (Ruffle core/.../display/Stage3D.as +
-//     stage_3d.rs:6-69). `requestContext3D` validates ONE profile string and
+//   * Profile negotiation (Ruffle core/src/avm2/globals/flash/display/Stage3D.as +
+//     core/src/avm2/globals/flash/display/stage_3d.rs:6-69). `requestContext3D` validates ONE profile string and
 //     requests it; `requestContext3DMatchingProfiles` validates a whole
 //     Vector and the highest-ranked REQUESTED profile wins regardless of the
 //     vector's order. The two #2008 messages differ: `checkProfile` names the
@@ -35,7 +35,7 @@
 //     avm2/stage3d_context3d_string_args enumerates all 158 of them.
 //
 // Tranche S2 adds the AGAL bytecode validator behind `Program3D.upload`
-// (agal_validate below) — a transliteration of naga-agal's parse_bytecode +
+// (agal_validate below) — a transliteration of naga-agal's (render/naga-agal/src/builder.rs) parse_bytecode +
 // extract_sampler_configs validation arms, with Ruffle's AgalError -> FP error
 // mapping from core/src/avm2/error.rs::make_agal_upload_error. Ruffle's parser
 // `unwrap()`s on out-of-range register-type bits; we must not copy the panic,
@@ -4080,7 +4080,7 @@ static Avm2Value matrix3d_set_position(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// recompose / decompose / transformVectors (Ruffle geom/Matrix3D.as)
+// recompose / decompose / transformVectors (Ruffle core/src/avm2/globals/flash/geom/Matrix3D.as)
 // ---------------------------------------------------------------------------
 
 static void m3d_set_component(Avm2Context* ctx, Avm2Object* v, const char* name,
@@ -4478,7 +4478,7 @@ static Avm2Value matrix3d_copy_to_matrix3d(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// Matrix3D.interpolate / interpolateTo (Ruffle geom/Matrix3D.as:69-175)
+// Matrix3D.interpolate / interpolateTo (Ruffle core/src/avm2/globals/flash/geom/Matrix3D.as:69-175)
 // ---------------------------------------------------------------------------
 
 // Normalized rotation quaternion (x,y,z,w) of a raw column-major 4x4, read
@@ -4654,7 +4654,7 @@ static Avm2Value matrix3d_interpolate_to(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// flash.geom.Utils3D (Ruffle geom/Utils3D.as, itself from OpenFL)
+// flash.geom.Utils3D (Ruffle core/src/avm2/globals/flash/geom/Utils3D.as, itself from OpenFL)
 // ---------------------------------------------------------------------------
 
 // projectVector(m, v): transformVector then divide x/y/z by the resulting w.

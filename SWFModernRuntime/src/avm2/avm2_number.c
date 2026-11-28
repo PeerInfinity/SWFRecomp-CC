@@ -1,5 +1,5 @@
 // Number / int / uint / Boolean wrapper classes + Math (port of Ruffle
-// globals/{number,int,uint,boolean,math}.rs). AVM2 has no boxed numeric
+// core/src/avm2/globals/{number,int,uint,boolean,math}.rs). AVM2 has no boxed numeric
 // objects: constructing/calling these classes returns primitives; instance
 // methods dispatch off the Number class ivtable for primitive receivers.
 
@@ -1286,7 +1286,7 @@ static Avm2Value math_pow(Avm2Activation* act)
 {
 	double n = arg_f64(act, 0);
 	double p = arg_f64(act, 1);
-	// Flash quirks (Ruffle math.rs pow).
+	// Flash quirks (Ruffle core/src/avm2/globals/math.rs pow).
 	if (!isfinite(n) || !isfinite(p))
 	{
 		if (isnan(p)) return avm2_number(NAN);
@@ -1691,7 +1691,7 @@ static void add_number_methods(Avm2Context* ctx, Avm2Class* cls,
 	                        number_to_exponential_framed);
 	avm2_builtin_add_method(ctx, cls, "toPrecision", number_to_precision_framed);
 
-	// ES3-compat layer on the prototype (Ruffle globals/Number.as).
+	// ES3-compat layer on the prototype (Ruffle core/src/avm2/globals/Number.as).
 	Avm2Object* proto = cls->prototype_obj;
 	avm2_proto_add_function_n(ctx, proto, "toString", proto_to_string, 1);
 	avm2_proto_add_function_n(ctx, proto, "toLocaleString", proto_to_string, 1);

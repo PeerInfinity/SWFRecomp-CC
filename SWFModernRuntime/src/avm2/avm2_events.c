@@ -5,11 +5,11 @@
 // semantics (per-type priority buckets, capture split, dedup by
 // (listener, useCapture)) and the 3-phase DOM dispatch algorithm
 // (events.rs dispatch_event), plus the FP broadcast-event registry
-// (avm2.rs BROADCAST_WHITELIST / broadcast_event) that the frame
+// (core/src/avm2.rs BROADCAST_WHITELIST / broadcast_event) that the frame
 // lifecycle (tranche 3) drives.
 //
 // Sources of truth: Ruffle core/src/avm2/events.rs,
-// globals/flash/events/{Event,EventDispatcher}.as + event*.rs.
+// core/src/avm2/globals/flash/events/{Event,EventDispatcher}.as + event*.rs.
 
 #include <math.h>
 #include <stdio.h>
@@ -362,7 +362,7 @@ static int ed_list_has_type(EDListener* head, const Avm2String* type)
 }
 
 // ---------------------------------------------------------------------------
-// Broadcast registry (Ruffle avm2.rs BROADCAST_WHITELIST / broadcast_list)
+// Broadcast registry (Ruffle core/src/avm2.rs BROADCAST_WHITELIST / broadcast_list)
 // ---------------------------------------------------------------------------
 
 static const char* const k_broadcast_whitelist[4] = {
@@ -2342,7 +2342,7 @@ void avm2_register_events(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, event, "stopPropagation", event_stop_propagation);
 	avm2_builtin_add_method(ctx, event, "stopImmediatePropagation",
 	                        event_stop_immediate_propagation);
-	// Static const inventory from Ruffle Event.as.
+	// Static const inventory from Ruffle core/src/avm2/globals/flash/events/Event.as.
 	static const struct { const char* name; const char* v; } consts[] = {
 		{ "ACTIVATE", "activate" }, { "ADDED", "added" },
 		{ "ADDED_TO_STAGE", "addedToStage" },

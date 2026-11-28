@@ -50,7 +50,9 @@ int video_codec_supported(int codec_id)
 
 // ---------------------------------------------------------------------------
 // BT.601 YUV 4:2:0 → RGBA, byte-for-byte Ruffle's h263-rs-yuv `bt601`
-// (yuv/src/bt601.rs) as used by ruffle_render's Bitmap::to_rgba for BOTH the
+// (yuv/src/bt601.rs; crate h263-rs-yuv 0.1.0 from github.com/ruffle-rs/h263-rs
+// rev 8215bc7, Ruffle's pinned dependency, MIT OR Apache-2.0)
+// as used by ruffle_render's Bitmap::to_rgba for BOTH the
 // Spark and VP6 decoders.
 //
 // This deliberately replaces libswscale. sws_scale interpolates chroma and
@@ -142,7 +144,8 @@ static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
 // H.263 Annex J post-decode deblocking filter.
 //
 // Line-for-line port of Ruffle's `h263-rs-deblock`
-// (deblock/src/deblock.rs), which `video/software/src/decoder/h263.rs`
+// (deblock/src/deblock.rs; crate h263-rs-deblock 0.1.0 from
+// github.com/ruffle-rs/h263-rs rev 8215bc7, MIT OR Apache-2.0), which `video/software/src/decoder/h263.rs`
 // runs over the decoded Y/Cb/Cr planes BEFORE the BT.601 conversion whenever
 // the stream asks for it. libavcodec's FLV1 decoder has no equivalent, so
 // without this every deblocked Spark stream renders with visible 8x8 blocking
@@ -173,6 +176,7 @@ static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
 // ---------------------------------------------------------------------------
 
 // Table J.2/H.263 — QUANT → filter STRENGTH. Index 0 is never used.
+// Same values as h263-rs-deblock deblock/src/deblock.rs QUANT_TO_STRENGTH.
 static const unsigned char VIDEO_QUANT_TO_STRENGTH[32] = {
 	0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 7,
 	7, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12, 12
@@ -331,7 +335,7 @@ static int spark_parse_header(const unsigned char* payload, int len,
 	return 1;
 }
 
-// Ruffle's gate, verbatim (h263.rs:80-90): filter for LEVEL1 unconditionally,
+// Ruffle's gate, verbatim (video/software/src/decoder/h263.rs:80-90): filter for LEVEL1 unconditionally,
 // or for USE_PACKET_VALUE when the picture header says so. Returns the
 // Table J.2 strength, or 0 for "don't filter".
 static int video_deblock_strength(int codec_id, int deblocking,

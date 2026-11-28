@@ -3817,6 +3817,7 @@ static int build_filter_chain(const DisplayObject* obj,
 static void filter_draw_offset_px(const DisplayObject* obj, double vs,
                                   double* ox, double* oy)
 {
+	// PASS_SCALES, ported from Ruffle swf/src/types/blur_filter.rs.
 	static const double pass_scales[15] = {
 		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
 	FilterListEntry scratch;
@@ -5468,6 +5469,7 @@ static int g_filter_root_entry = 0;
 static double filter_chain_reach_px(const FilterListEntry* const* chain, int m,
                                     double vs)
 {
+	// PASS_SCALES, ported from Ruffle swf/src/types/blur_filter.rs.
 	static const double pass_scales[15] = {
 		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
 	double g = 0.0;
@@ -5703,7 +5705,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		f_knockout  = (flags >> 2) & 1;
 		f_composite = (flags >> 1) & 1;
 		int f_on_top = flags & 1;
-		// ruffle bevel.rs: onTop wins over inner ("full"), else inner, else outer.
+		// ruffle render/wgpu/src/filters/bevel.rs: onTop wins over inner ("full"), else inner, else outer.
 		bevel_type = f_on_top ? 2 : (f_inner ? 1 : 0);
 	}
 	else
@@ -5712,7 +5714,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 		f_knockout  = (flags >> 1) & 1;
 		f_inner     = (flags >> 2) & 1;
 	}
-	// ruffle bevel.rs hard-codes composite_source = 1 for bevels.
+	// ruffle render/wgpu/src/filters/bevel.rs hard-codes composite_source = 1 for bevels.
 	if (is_bevel) f_composite = 1;
 
 	// CHAINED (s18): a filter's "composite source" is the LAYER it received,
@@ -5993,7 +5995,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 
 	if (is_bevel)
 	{
-		// ruffle filters.rs: the HIGHLIGHT samples at +offset, the shadow at
+		// ruffle render/wgpu/src/filters.rs: the HIGHLIGHT samples at +offset, the shadow at
 		// -offset, and the bevel is their difference.
 		renderer_compose_filter(context, 1, du, dv,
 			h_r, h_g, h_b, h_a,
@@ -6002,7 +6004,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 	}
 	else
 	{
-		// ruffle drop_shadow.rs passes (-x, -y): sampling the blur "back" by the
+		// ruffle render/wgpu/src/filters/drop_shadow.rs passes (-x, -y): sampling the blur "back" by the
 		// offset displaces the shadow forward along the light direction.
 		renderer_compose_filter(context, 0, -du, -dv,
 			c_r, c_g, c_b, c_a,
@@ -8223,7 +8225,7 @@ tf_cov_undo:
 }
 
 
-// s21 w2-px-b: Ruffle `draw_text_box` (edit_text.rs ~2939) border for an
+// s21 w2-px-b: Ruffle `draw_text_box` (core/src/display_object/edit_text.rs ~2939) border for an
 // EMBEDDED-font field whose world matrix rotates or shears it. The old path
 // drew four locally-thickened rects through the field's transform slot, so the
 // border's thickness was rotated/sheared with the box and its diagonals landed
@@ -8328,7 +8330,7 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 {
 	(void)user_data;
 
-	// s27 w2-avm1-text-layout: Ruffle's EditTextPixelSnapping (edit_text.rs,
+	// s27 w2-avm1-text-layout: Ruffle's EditTextPixelSnapping (core/src/display_object/edit_text.rs,
 	// quality >= medium) for an EMBEDDED-font box under an axis-aligned,
 	// positive, non-unit scale: box = W * create_box(w, h, x_min, y_min)
 	// (translation rounded to whole twips by Matrix*Matrix), then tx/ty =
@@ -8394,7 +8396,7 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	int line_rect = 0;  // draw the border as Ruffle's open line-rect polyline
 	int device_box = (info->has_matrix && info->device_font);
 	if (device_box) {
-		// DEVICE fonts take Ruffle's `draw_device_text_box` (edit_text.rs
+		// DEVICE fonts take Ruffle's `draw_device_text_box` (core/src/display_object/edit_text.rs
 		// ~2845): the bounds are transformed, then their axis-aligned SCREEN
 		// box is pixel-snapped and drawn upright — a device-font box never
 		// rotates or shears with the matrix, not even for the small rotations
@@ -8594,7 +8596,7 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	}
 }
 
-// One glyph's pen advance in TWIPS, as Ruffle lays it out (font_like.rs
+// One glyph's pen advance in TWIPS, as Ruffle lays it out (core/src/font/font_like.rs
 // FontLike::evaluate): `Twips::new((advance as f32 * scale) as i32)`, i.e.
 // truncated to a whole twip PER GLYPH, where scale = height / em. Summing the
 // unrounded product instead drifts right by up to ~1 twip per glyph: three
@@ -8627,7 +8629,7 @@ static inline float tf_glyph_advance_twips(s32 adv, float scale, int device_font
 
 // s25 w2-acid-text-kerning: DefineFont2/3 kerning term for the glyph `cp`
 // whose UTF-8 bytes end at `next_pos`, in EM units (added to the advance
-// BEFORE scaling, Ruffle font_like.rs FontLike::evaluate). Applies only when
+// BEFORE scaling, Ruffle core/src/font/font_like.rs FontLike::evaluate). Applies only when
 // the covering run has TextFormat.kerning set and the next character lies in
 // the SAME Ruffle text fragment: same span, no \n/\r/\t or paragraph
 // sentinel in between (lay_out_span splits on those), and not across a word
@@ -8663,8 +8665,8 @@ static s32 tf_kern_units(const TextFieldGlyphInfo* info, int run_idx, int kfont_
 	return ng_font_kerning_by_idx(kfont_idx, cp, ncp);
 }
 
-// Ruffle html/layout.rs newline(): the line pitch is max_ascent + max_descent
-// + leading, each metric truncated to whole twips (font.rs FontMetrics).
+// Ruffle core/src/html/layout.rs newline(): the line pitch is max_ascent + max_descent
+// + leading, each metric truncated to whole twips (core/src/font.rs FontMetrics).
 static inline float tf_line_pitch_twips(s16 ascent, s16 descent, int em_square,
                                         u16 font_height, s32 leading_twips)
 {
@@ -8681,8 +8683,8 @@ static inline float tf_line_pitch_twips(s16 ascent, s16 descent, int em_square,
 // at which Ruffle starts a new SOFT line, so the measure and draw passes can
 // treat them exactly like a newline that consumes no character.
 //
-// Port of Ruffle html/layout.rs `lay_out_span` (the is_word_wrap loop and
-// `wrap_dimensions`) over html/line_wrapping.rs `wrap_line` /
+// Port of Ruffle core/src/html/layout.rs `lay_out_span` (the is_word_wrap loop and
+// `wrap_dimensions`) over core/src/html/line_wrapping.rs `wrap_line` /
 // `find_allowed_breaks`, with the painter's own per-glyph advance
 // (tf_glyph_advance_twips + kerning, per-run face and size) as `measure`, so
 // a line that wraps is measured with the advances that draw it.
@@ -8701,7 +8703,7 @@ static float tf_ww_sum(const float* adv, int a, int b)
 	return w;
 }
 
-// Ruffle line_wrapping.rs wrap_line over chars [0, n): -1 = None (no break).
+// Ruffle core/src/html/line_wrapping.rs wrap_line over chars [0, n): -1 = None (no break).
 static int tf_ww_wrap_line(const u16* cp, const float* adv, int n,
                            float width, float offset, int is_start, int swf8)
 {

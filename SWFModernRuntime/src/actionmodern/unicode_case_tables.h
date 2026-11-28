@@ -1,5 +1,5 @@
 // Auto-generated Unicode case mapping tables for Flash Player (Unicode 5.1.0)
-// Generated from Ruffle string_methods test expectations
+// Generated from Ruffle string_methods test expectations (tests/tests/swfs/avm1/string_methods/output.txt)
 // Do not edit manually - regenerate with scripts/generate_case_tables.py
 #pragma once
 

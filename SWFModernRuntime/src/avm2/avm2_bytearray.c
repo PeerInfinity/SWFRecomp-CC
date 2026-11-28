@@ -1,6 +1,6 @@
 // flash.utils.ByteArray — port of Ruffle core/src/avm2/bytearray.rs
-// (ByteArrayStorage), globals/flash/utils/byte_array.rs (natives), and
-// ByteArray.as, plus the Endian / CompressionAlgorithm constant classes.
+// (ByteArrayStorage), core/src/avm2/globals/flash/utils/byte_array.rs (natives), and
+// core/src/avm2/globals/flash/utils/ByteArray.as, plus the Endian / CompressionAlgorithm constant classes.
 //
 // Storage is a plain grow-on-write byte buffer with a read/write cursor.
 // Reads past the end throw EOFError 2030; writes that would exceed u32

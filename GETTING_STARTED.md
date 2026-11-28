@@ -39,9 +39,8 @@ cmake -S SWFRecomp -B SWFRecomp/build -DCMAKE_BUILD_TYPE=Release
 cmake --build SWFRecomp/build -j"$(nproc)"
 ```
 
-This produces `SWFRecomp/build/SWFRecomp`, which turns a `.swf` into C. It takes under a minute on 4 cores. One
-`-Wstringop-overflow` warning from `src/swf.cpp` is expected (a GCC false positive). Rebuild it after
-pulling changes to `SWFRecomp/`.
+This produces `SWFRecomp/build/SWFRecomp`, which turns a `.swf` into C. It takes under a minute on 4 cores, and should
+build with no warnings on GCC 13. Rebuild it after pulling changes to `SWFRecomp/`.
 
 **The runtime is not built separately.** `SWFModernRuntime/` is compiled together with each test's generated C by the
 test harness (section 5), so there is nothing to build for it now.
@@ -64,7 +63,7 @@ repository and needs no download.
 
 It prints a line like `avm1: found 766 directories` and then `Installed 792 tests`: the second number is larger
 because some test directories hold nested tests. It then prints one `flash-fix APPLIED` line per corrected golden;
-those are expected, not errors. It takes about a minute.
+those are expected, not errors. The last line is `Done! Total: N tests installed.` It takes about a minute.
 
 ## 5. Run one test
 

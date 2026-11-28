@@ -1,7 +1,7 @@
 // flash.filters — the nine filter value classes, the three constant bags, and
 // the single conversion layer that owns every quantization rule.
 //
-// Ported from Ruffle core/src/avm2/filters.rs + globals/flash/filters/*.as.
+// Ported from Ruffle core/src/avm2/filters.rs + core/src/avm2/globals/flash/filters/*.as.
 // The AS classes coerce NOTHING beyond their declared slot types; all the
 // clamping the corpus grades lives in the DisplayObject.filters round trip
 // (avm2_display.c calls avm2_filter_from_object / avm2_filter_to_object).

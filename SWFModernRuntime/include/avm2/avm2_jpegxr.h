@@ -19,7 +19,7 @@
 int avm2_jxr_decode_rgba(const uint8_t* data, size_t len,
                          uint32_t* out_w, uint32_t* out_h, uint8_t** out_rgba);
 
-// Ruffle core/.../display3D/textures/atf_jpegxr.rs do_compressed_upload for
+// Ruffle core/src/avm2/globals/flash/display3D/textures/atf_jpegxr.rs do_compressed_upload for
 // the JPEG-XR ATF formats: 0/1 (RGB888/RGBA8888, one JPEG-XR image) and
 // 4 (CompressedAlpha: LZMA DXT tables + JPEG-XR endpoint planes, rebuilt into
 // DXT5 and decoded here to RGBA8 because the Stage3D texel store is RGBA).

@@ -230,7 +230,7 @@ typedef struct WebGPURenderContext
 	// texels the innermost mask raised and puts them back to N-1 (so a mask
 	// leaves NO residue behind for the next one, which the old Replace model
 	// relied on a fresh reference to survive). Ports ruffle
-	// render/wgpu/src/pipelines.rs:376-414 + surface/commands.rs:399-433.
+	// render/wgpu/src/pipelines.rs:376-414 + render/wgpu/src/surface/commands.rs:399-433.
 	// Pops must be LIFO — every caller restores monotonically downward.
 	u32 mask_ref;             // nesting level of the ACTIVE clip (0 = none)
 	u32 mask_capture_depth;   // >0 while writing mask geometry (nested sprite masks)
@@ -548,7 +548,7 @@ void render_webgpu_run_displacement(WebGPURenderContext* context,
 	float cr, float cg, float cb, float ca);
 
 // One ColorMatrixFilter pass over the offscreen layer, in place in
-// filter_tex_a (ruffle color_matrix.wgsl: unpremultiply, 4x5, clamp,
+// filter_tex_a (ruffle render/wgpu/shaders/filter/color_matrix.wgsl: unpremultiply, 4x5, clamp,
 // premultiply). m20 is the AS3 ColorMatrixFilter.matrix, row-major 4x5,
 // bias column in 0..255 units.
 void render_webgpu_run_color_matrix(WebGPURenderContext* context, const float* m20);

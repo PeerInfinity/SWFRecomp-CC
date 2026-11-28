@@ -289,7 +289,11 @@ struct PlaceCmCompose
 			for (int k = 0; k < 4; k++) b += (double) cm[r * 5 + k] * m[k][4];
 			out[r][4] = b + (double) cm[r * 5 + 4];
 		}
-		memcpy(m, out, sizeof(m));
+		// Element copy, not memcpy: GCC 13 -O3 misreads memcpy(m, out, sizeof m)
+		// as writing 160 bytes into m[0] (-Wstringop-overflow false positive).
+		for (int r = 0; r < 4; r++)
+			for (int c = 0; c < 5; c++)
+				m[r][c] = out[r][c];
 		any = true;
 	}
 	// Emit cx ∘ this as one cxform (column-major 4x4 multiply + 4 adds/255).
@@ -8193,6 +8197,7 @@ namespace SWFRecomp
 					}
 
 					// Bake the 256-row ramp with Ruffle's CommonGradient::new walk
+					// (render/wgpu/src/mesh.rs)
 					// (gradient_ramp.h). The old code appended rows per SEGMENT, which
 					// only sums to 256 for a strictly-increasing ratio list: a duplicate
 					// ratio emitted 0 rows and a decreasing one emitted 0 rows, so
@@ -8582,7 +8587,8 @@ namespace SWFRecomp
 						fill_styles[i].gradient.num_grads = 15;
 					}
 
-					// Bake the start ramp with the same Ruffle CommonGradient walk as
+					// Bake the start ramp with the same Ruffle CommonGradient walk
+					// (render/wgpu/src/mesh.rs) as
 					// the plain-shape path (gradient_ramp.h). The old per-segment
 					// walker emitted one extra row for every additional stop at ratio
 					// 255 (and none for duplicate/decreasing ratios), so the row count

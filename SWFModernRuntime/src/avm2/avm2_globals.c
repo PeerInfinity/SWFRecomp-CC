@@ -1014,7 +1014,8 @@ static Avm2Value point_to_string(Avm2Activation* act)
 // ---- flash.geom.Point full method surface -------------------------------
 // FlashPunk uses add/clone/distance/normalize/equals/length heavily; the
 // upstream `point` test covers add/subtract/distance/equals/clone/interpolate/
-// length/normalize/offset/polar. Ported from Ruffle globals/flash/geom/point.rs.
+// length/normalize/offset/polar. Ported from Ruffle globals/flash/geom/point.rs
+// (now core/src/avm2/globals/flash/geom/Point.as).
 // x/y are slots[1]/[2] on the sealed class (see point_init).
 
 static double point_num(Avm2Context* ctx, Avm2Object* o, int slot)
@@ -1396,7 +1397,7 @@ static Avm2Value global_unescape(Avm2Activation* act)
 // unreserved set is only [0-9A-Za-z], and both stop at the first NUL.
 // (globals/flash/utils.rs; graded by the avm2 `escape_multi_byte` test.)
 
-// Flash's lenient UTF-8 decode (ruffle_wstr utils.rs DecodeAvmUtf8), used on a
+// Flash's lenient UTF-8 decode (ruffle_wstr wstr/src/utils.rs DecodeAvmUtf8), used on a
 // run of decoded %XX bytes. It differs from strict UTF-8 in three ways: a
 // malformed or truncated sequence yields its LEAD BYTE as a Latin-1 code point
 // and consumes exactly one byte, sequences in the surrogate range are kept
@@ -2042,9 +2043,9 @@ static Avm2Value global_describe_type_utils(Avm2Activation* act)
 // ---------------------------------------------------------------------------
 //
 // Ruffle splits this in two and we mirror the split verbatim:
-//   * globals/avmplus.rs describe_type_json — a plain Object holding the
+//   * core/src/avm2/globals/avmplus.rs describe_type_json — a plain Object holding the
 //     class's traits ({name, isDynamic, isFinal, isStatic, traits{...}}),
-//   * globals/avmplus.as describeType       — pure AS that walks that object
+//   * core/src/avm2/globals/avmplus.as describeType       — pure AS that walks that object
 //     into an E4X <type>, then calls describeTypeJSON a SECOND time with
 //     USE_ITRAITS to build the nested <factory>.
 //
@@ -6935,7 +6936,7 @@ static void register_security(Avm2Context* ctx)
 }
 
 // flash.system.Capabilities — all-static, all read-only. Every value mirrors
-// Ruffle's (globals/flash/system/Capabilities.as + capabilities.rs), which is
+// Ruffle's (core/src/avm2/globals/flash/system/Capabilities.as + capabilities.rs), which is
 // itself a fixed "Flash Player on Windows" profile; nothing here inspects the
 // host. The Tamarin tests that need this class only read `playerType` and
 // branch on it being 'AVMPlus' (the Tamarin *shell*), so any player value takes
@@ -7447,7 +7448,7 @@ static Avm2Value crypto_generate_random_bytes(Avm2Activation* act)
 }
 
 // flash.system.Worker / WorkerDomain state machine (s24 w2-avm2-small-natives),
-// a port of Ruffle avm2/object/worker_object.rs + globals/flash/system/
+// a port of Ruffle core/src/avm2/object/worker_object.rs + core/src/avm2/globals/flash/system/
 // worker.rs + worker_domain.rs. Only the primordial worker ever runs code: a
 // background worker is a state record (new -> running -> terminated) whose
 // changes are announced by avm2_worker_poll, called once per tick from

@@ -7,7 +7,8 @@
 // timestamp off the wire.)
 //
 // The wire format is a byte-exact port of the flash-lso crate
-// (amf3/write.rs + length.rs + element_cache.rs, amf0/write.rs, read.rs)
+// (ruffle-rs/rust-flash-lso @11a0836, the rev Ruffle's core/Cargo.toml pins; MIT;
+// flash-lso/src/amf3/write.rs + length.rs + element_cache.rs, amf0/write.rs, read.rs)
 // as DRIVEN BY Ruffle's bridge (core/src/avm2/amf.rs), quirks included:
 //
 // - EXCEPTION (deliberate divergence from flash-lso/Ruffle, see

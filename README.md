@@ -93,8 +93,10 @@ leans on it heavily. Its test suite, and the work behind it (including what it i
 Tamarin), is how we measure ourselves, and Ruffle's source is our first reference for how a Flash API behaves. The
 architecture is different (ahead-of-time C emission plus a C runtime, where Ruffle is an interpreter in Rust), but
 many behaviours were ported from Ruffle's Rust to C: number formatting, array sorting, ByteArray, BitmapData, timers
-and more. Those functions say so in a comment, and Ruffle's MIT licence is reproduced in
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+and more: 165 functions, tables and shaders in 63 files. Each one names its Ruffle source file in a comment, and they
+are all listed in [`SWFModernRuntime/third_party/ruffle/README.md`](SWFModernRuntime/third_party/ruffle/README.md).
+That code is used under Ruffle's MIT licence ([`LICENSE-MIT.txt`](SWFModernRuntime/third_party/ruffle/LICENSE-MIT.txt),
+listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)).
 
 Where our results and Ruffle's disagree, we check against real Flash Player 32. When FP32 shows that one of Ruffle's
 goldens is wrong, that is recorded in

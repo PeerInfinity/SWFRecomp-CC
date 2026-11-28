@@ -9664,7 +9664,7 @@ static void gfx_flush_stroke_run(Avm2GraphicsExt* g, int to_pending)
 
 // Flatten the active command buffer into contours (pixels), tessellate the fill
 // (libtess2, even-odd unless drawPath asked for nonzero) and build the strokes.
-// Mirrors Ruffle's Drawing::new_fill: the ONE fill path first, then the stroke
+// Mirrors Ruffle's Drawing::new_fill (core/src/drawing.rs): the ONE fill path first, then the stroke
 // runs that were deferred while it was open, then the current run. (action.c
 // drawingFinalizePath is the AVM1 twin, which keeps one fill + one line per
 // DrawPath — see the note in drawingBeginNewLineStyle.)
@@ -10446,7 +10446,7 @@ static void gfx_emit_rect(Avm2GraphicsExt* g, double x, double y,
 	gfx_add_cmd(g, 1, x,       y,       0, 0);
 }
 
-// Ruffle's UNIT_CIRCLE_POINTS (avm2/globals/flash/display/graphics.rs): the
+// Ruffle's UNIT_CIRCLE_POINTS (core/src/avm2/globals/flash/display/graphics.rs): the
 // five control/anchor points of the quarter-ellipse Flash Player itself uses
 // for a rounded corner, kept bit-for-bit including Ruffle's asymmetric
 // 0.414.../6.12e-17 literals (its own TODO notes they are not tidied).
@@ -10470,7 +10470,8 @@ static void gfx_add_side(Avm2GraphicsExt* g, double x, double y)
 	gfx_add_cmd(g, 1, x, y, 0, 0);
 }
 
-// Port of Ruffle `draw_round_rect_internal`. Four independent corner ellipses,
+// Port of Ruffle `draw_round_rect_internal`
+// (core/src/avm2/globals/flash/display/graphics.rs). Four independent corner ellipses,
 // each radius clamped to half the corresponding side, traced from the MIDDLE of
 // the bottom-right ellipse (that is where Flash Player starts) anticlockwise
 // through bottom, left, top and right. Every corner is two quadratics; the four
@@ -12007,7 +12008,7 @@ static Avm2Value geom_matrix_init(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// flash.geom.Matrix method surface (ported from Ruffle avm1/globals/matrix.rs +
+// flash.geom.Matrix method surface (ported from Ruffle core/src/avm1/globals/matrix.rs +
 // render/src/matrix.rs, in pure f64 pixel space to match Flash's own doubles —
 // NOT Ruffle's twips-quantized f32 render Matrix). Point transform semantics:
 //   x' = a*x + c*y + tx ,  y' = b*x + d*y + ty .
@@ -12256,7 +12257,7 @@ static Avm2Value geom_matrix_copy_column_from(Avm2Activation* act)
 	return geom_matrix_copy_row_from(act);
 }
 
-// copyRowTo / copyColumnTo (Ruffle geom/Matrix.as:57-71, 97-111). These two do
+// copyRowTo / copyColumnTo (Ruffle core/src/avm2/globals/flash/geom/Matrix.as:57-71, 97-111). These two do
 // NOT share the bug above: row2 reads (0,0,1) and column2 reads (tx,ty,1).
 // Out-of-range indices leave the vector untouched.
 static void matf_v3_put(Avm2Context* ctx, Avm2Object* v, double x, double y,
@@ -12297,7 +12298,7 @@ static Avm2Value geom_matrix_copy_column_to(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// flash.geom.Vector3D — a direct port of Ruffle's geom/Vector3D.as
+// flash.geom.Vector3D — a direct port of Ruffle's core/src/avm2/globals/flash/geom/Vector3D.as
 // ---------------------------------------------------------------------------
 // x/y/z/w are dynamic props (Matrix3D's copyRow/copyColumnFrom and
 // setProgramConstantsFromMatrix already read them by name). Almost every
@@ -12814,7 +12815,7 @@ static Avm2Value colortransform_to_string(Avm2Activation* act)
 	return avm2_string(avm2_string_new(act->ctx, buf, (uint32_t) off));
 }
 
-// ColorTransform.color (Ruffle geom/ColorTransform.as:47-58): reads the three
+// ColorTransform.color (Ruffle core/src/avm2/globals/flash/geom/ColorTransform.as:47-58): reads the three
 // offsets packed as RGB; writing it zeroes the RGB multipliers and rewrites the
 // offsets, so the object becomes a flat tint. The class is SEALED, so without
 // the accessor `ct.color = n` raised #1056 instead.
@@ -12844,7 +12845,7 @@ static Avm2Value colortransform_set_color(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// concat(second): Ruffle geom/ColorTransform.as:60 — offsets pick up the
+// concat(second): Ruffle core/src/avm2/globals/flash/geom/ColorTransform.as:60 — offsets pick up the
 // receiver's multiplier scaling first, then the multipliers compose.
 static Avm2Value colortransform_concat(Avm2Activation* act)
 {
@@ -15741,7 +15742,7 @@ static int shape_contains_local(Avm2DisplayObjectExt* ext, double lx, double ly)
 	if (med == NULL) med = (const float (*)[2]) morph_end_shape_data;
 	if (ext->shape_vert_count > 0 && ext->is_morph_shape)
 	{
-		// Ruffle morph_shape.rs: b weights END, a weights START (a + b = 1),
+		// Ruffle core/src/display_object/morph_shape.rs: b weights END, a weights START (a + b = 1),
 		// and lerp_twips rounds the interpolated coordinate to whole twips.
 		double b_w = (double) ext->ratio / 65535.0;
 		if (b_w < 0.0) b_w = 0.0; else if (b_w > 1.0) b_w = 1.0;
@@ -19844,7 +19845,7 @@ static void avm2_render_morph(Avm2Context* ctx, Avm2Object* obj,
 		double sys = (double) avm2_bits_to_f(sd[si][1]);
 		double sxe = (double) med[ei][0];
 		double sye = (double) med[ei][1];
-		// Ruffle lerp_twips: round(start*a + end*b) to integer twips.
+		// Ruffle core/src/display_object/morph_shape.rs lerp_twips: round(start*a + end*b) to integer twips.
 		verts[i * 2]     = (float) floor(sxs * a_w + sxe * b_w + 0.5);
 		verts[i * 2 + 1] = (float) floor(sys * a_w + sye * b_w + 0.5);
 	}
@@ -20061,7 +20062,8 @@ static void avm2_text_slots(const Mat* world, double alpha,
 #define MSAA_SAMPLES 4
 #endif
 
-// Twips rounding helpers mirroring Ruffle's Twips methods. The stage-pixel
+// Twips rounding helpers mirroring Ruffle's Twips methods
+// (swf/src/types/twips.rs). The stage-pixel
 // forms (`trunc(t/20)*20`, `nearbyint(t/20)*20`) were correct only while the
 // viewport matched the stage; they are superseded by the DEVICE-pixel forms
 // below, which reduce to them exactly at dscale == 1.
@@ -22628,7 +22630,7 @@ int avm2_render_present(Avm2Context* ctx)
 #endif  // render gate
 
 // Stage view transform for the current scaleMode/align (w2-avm2-stage-view).
-// A literal port of Ruffle display_object/stage.rs build_matrices: per-mode
+// A literal port of Ruffle core/src/display_object/stage.rs build_matrices: per-mode
 // scale (NoScale = the HiDPI scale factor), then L>R>centre / T>B>centre
 // translation of the width/height delta, truncated to twips
 // (Twips::from_pixels). The harness's showAll/centred fit (wasm_wrappers/

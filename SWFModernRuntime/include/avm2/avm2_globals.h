@@ -378,7 +378,7 @@ int avm2_vector_name_access_rt(Avm2Context* ctx, Avm2Object* obj, const char* na
                                int numeric_src);
 
 // The avmplus QuickSort shared by Array.sort/sortOn and Vector.sort
-// (Ruffle globals/array.rs qsort).
+// (Ruffle core/src/avm2/globals/array.rs qsort).
 typedef struct Avm2SortItem { uint32_t idx; Avm2Value v; } Avm2SortItem;
 typedef int (*Avm2SortCmp)(void* ud, const Avm2SortItem* a, const Avm2SortItem* b);
 void avm2_avmplus_qsort(void* ud, Avm2SortCmp cmp, Avm2SortItem* s, uint32_t n);

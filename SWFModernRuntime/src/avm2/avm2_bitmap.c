@@ -2,7 +2,7 @@
 //
 // A trace-accurate port of Ruffle's BitmapData pixel store + operation kit
 // (core/src/bitmap/{bitmap_data,operations}.rs) and the AS3 glue
-// (globals/flash/display/bitmap_data.rs, bitmap.rs). Pixels are stored
+// (core/src/avm2/globals/flash/display/bitmap_data.rs, bitmap.rs). Pixels are stored
 // PREMULTIPLIED, one uint32 per pixel in 0xAARRGGBB form (the value AS3
 // reads/writes — Ruffle's Color::to_bgra_u32 is 0xAARRGGBB despite the
 // name). Conversions to/from straight alpha happen only on the AS3-facing
@@ -66,7 +66,7 @@
 	((((uint32_t) (a) & 0xFF) << 24) | (((uint32_t) (r) & 0xFF) << 16) \
 	 | (((uint32_t) (g) & 0xFF) << 8) | ((uint32_t) (b) & 0xFF))
 
-// Flash's brute-forced un-premultiply factors (bitmap_data.rs
+// Flash's brute-forced un-premultiply factors (Ruffle core/src/bitmap/bitmap_data.rs
 // FLASH_PREMUL_FACTOR). unmultiply(c) = (c * factor + 0x8000) >> 16.
 static const uint32_t FLASH_PREMUL_FACTOR[256] = {
 	0, 16678912, 8339456, 5559638, 4169728, 3335783, 2779819, 2386603, 2086230,
@@ -124,7 +124,7 @@ static uint32_t with_alpha(uint32_t c, uint32_t a)
 }
 
 #ifndef AVM2_BITMAP_KERNELS_ONLY
-// blend_over (bitmap_data.rs): self = dest, source on top; both premultiplied.
+// blend_over (Ruffle core/src/bitmap/bitmap_data.rs): self = dest, source on top; both premultiplied.
 //
 // The inverse-alpha factor is `256 - sa` scaled by a >>8, NOT `(255 - sa)/255`.
 // Ruffle 0c6a734da switched to this form with the note "verified against Flash
@@ -518,7 +518,7 @@ static double read_prop_num(Avm2Context* ctx, Avm2Value obj, const char* name)
 	return avm2_coerce_to_number(ctx, v);
 }
 
-// Ruffle round_to_even (ecma_conversions.rs): ties-to-even, out-of-range or
+// Ruffle round_to_even (core/src/ecma_conversions.rs): ties-to-even, out-of-range or
 // non-finite -> INT32_MIN.
 static int32_t round_to_even(double n)
 {
@@ -1730,7 +1730,7 @@ static Avm2Value bd_hit_test(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// histogram (AS3-implemented in Ruffle; replicated here)
+// histogram (AS3-implemented in Ruffle core/src/avm2/globals/flash/display/BitmapData.as; replicated here)
 // ---------------------------------------------------------------------------
 
 static Avm2Value bd_histogram(Avm2Activation* act)
@@ -1777,7 +1777,7 @@ static Avm2Value bd_histogram(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// pixelDissolve (Feistel permutation, ported from operations.rs)
+// pixelDissolve (Feistel permutation, ported from Ruffle core/src/bitmap/operations.rs)
 // ---------------------------------------------------------------------------
 
 static uint32_t feistel_block_size(uint32_t sequence_length)
@@ -4862,8 +4862,8 @@ static Avm2Value bd_encode(Avm2Activation* act)
 	return out;
 }
 
-// PROTOTYPE (w1-drift-avm2): compare (Ruffle bitmap_data.rs compare +
-// operations.rs compare). 0 when every unmultiplied pixel matches, -3/-4 on a
+// PROTOTYPE (w1-drift-avm2): compare (Ruffle core/src/avm2/globals/flash/display/bitmap_data.rs compare +
+// core/src/bitmap/operations.rs compare). 0 when every unmultiplied pixel matches, -3/-4 on a
 // width/height mismatch, else a fresh transparent BitmapData of per-pixel
 // differences (RGB delta with alpha 0xFF, or an alpha-only delta splatted to
 // all four channels).
@@ -4908,7 +4908,7 @@ static Avm2Value bd_compare(Avm2Activation* act)
 	return avm2_object_value(obj);
 }
 
-// copyChannel (operations.rs): copy one source channel into a dest channel.
+// copyChannel (Ruffle core/src/bitmap/operations.rs): copy one source channel into a dest channel.
 static Avm2Value bd_copy_channel(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -4954,7 +4954,7 @@ static Avm2Value bd_copy_channel(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// paletteMap (operations.rs palette_map): per pixel, look each unmultiplied
+// paletteMap (Ruffle core/src/bitmap/operations.rs palette_map): per pixel, look each unmultiplied
 // source channel up in its 256-entry array and wrap-add the four FULL 32-bit
 // entries (no per-channel mask: the AVM1 arm, bitmapDataPaletteMap, is FP32-
 // pinned on avm1/bitmap_data_thorough/paletteMap). A missing / null / non-
@@ -5020,7 +5020,7 @@ static Avm2Value bd_palette_map(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// scroll (operations.rs): in-place shift of all pixels by (x, y).
+// scroll (Ruffle core/src/bitmap/operations.rs): in-place shift of all pixels by (x, y).
 static Avm2Value bd_scroll(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -5048,7 +5048,7 @@ static Avm2Value bd_scroll(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// getColorBoundsRect (operations.rs color_bounds_rect).
+// getColorBoundsRect (Ruffle core/src/bitmap/operations.rs color_bounds_rect).
 static Avm2Value bd_get_color_bounds_rect(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
