@@ -3991,3 +3991,120 @@ the s28 failure again, so a FRESH dispatch was the retry).
 - **Unchanged NO-GOs:** register §1a.
 
 **Pixels.** See `graphics-fanout-playbook.md` §28.
+
+## 31. Session 30 (2026-11-27) — dual-axis fan-out #22, CLOUD-FIRST, FLASH OVER RUFFLE: trace 4860 → 4891 eff (4893 → 4921 rows; +26 rm→pass, +4 mm→eff by name, 0 real regressions, 1 known intermittent; 28 new rows, all pass), pixels 553 → 556 on the s29 intersection (+3 / 0, 8 new comparisons pass → 564 / 137), flash_fixes 93 → 100, 0 unexplained regressions in either mode
+
+Commits `2d40d3799..HEAD` on master: 34 non-results commits. 17 cloud slots, Opus, env "SWFRecomp fan-out": 7 wave-1
+(diagnosis; `w1-exec-order` was an implementation slot), 7 wave-2, 3 wave-2b. All delivered, none lost. 5 local one-task
+sessions on the browser ladder: `browser-attach-child-early` → `browser-nested-swapdepths-remove` →
+`browser-timeline-self-goto` → `browser-clip-event-order` → `browser-pending-finalize`. The N ladder stayed PARKED
+and the N procgen arc CANCELLED (no slot touched either). Every report, patch and local Flash capture is under
+`session30-fanout-reports/` (captures in `w1-local-oracles/<slot>/`, `pre-launch-oracles/`); slot table, grading runs and
+per-interim ledgers (`interim{2,3,4}-expected-ledger.md`) are in `AGENT_LAUNCH_ORDER.md`.
+
+**Baselines read fresh**: graphics = s29 FINAL `45938113471` at `2d40d3799` (results `51ab63688`): 4860 eff / 4893
+(4704 pass + 156 rm, 33 failing); pixels 553 pass / 140 fail / 6 ignored / 3 skip on the comparison set. No-graphics
+`63bcc2dd8`: 4858 eff. Upstream Ruffle `b7ff32d93..66f9073de`: one new row (`avm2/xmldocument_tostring`).
+
+**Grading runs** (detail: `session30-fanout-reports/AGENT_LAUNCH_ORDER.md` §"Grading runs"):
+
+| run | code | trace | pixels | no-graphics |
+|---|---|---|---|---|
+| `46040854188` interim #1 | `f4edebdce` acid-large swap, layer_group `--screen` re-golden | exact: 1 new upstream row mm | 0 moves (both rows re-graded vs FP32) | — |
+| `46061659732` / `46069337749` interim #2 | `a18a0e033` exec-order + batch 2 (6 slots) + ladder #2 | **exact −1**: 15/15 → pass, `global_proto_decls` mm→rm (predicted from the combined local run), 20 new pass; **`ButtonEventsTest` rm→mm unpredicted** (native-table unlisted-member order) | +3 (acid-shapes, gradients, morph_test1 f1), 0 regressions; `heavy_tesselation` unpriced → FP32 swap | move-for-move identical |
+| `46078812768` interim #3 | `715a5300c` batch 3 (5 patches + order fix) | exact: ExternalInterface-v8 rm→pass, ButtonEventsTest restored, 5 new pass | exact: 0 moves; heavy_tesselation now vs FP32 | — |
+| `46085491256` interim #4 | `9498e80c1` ladder #3 (sprite GotoFrame opcode inline, all builds) | exact: 1 new pass, 0 other moves | 0 moves | — |
+| **`46090531443` / `46095073993` FINAL** | `6441e7d5d` (+ browser-only `b8671fd2f` in NG) batch 4 + ladders #3–#5 | **exact**: +13 rm→pass, 2 new pass; `bug1157243/empty` pass→mm = the documented ±1 load intermittent (3/3 local pass at the same code). **4891 eff / 4921**: 4760 pass + 131 rm + 30 mm | **exact**: 0 moves. 564 pass / 137 fail | see §31.0 |
+
+Pages: dry runs `46061672559`, `46078822038` green; REAL deploy at closeout (§31.0).
+
+**Final vs baseline, by name** (both modes identical apart from the pre-s30 NG audio rows):
+- Trace: **+26 rm → pass** (gnash setProperty ×4, Object ×3, LoadVars ×3, Sound-v5, EmbeddedFontTest,
+  zeroframe_definesprite, ExternalInterface-v8, html_text_img_parsing; AVM2 swf_9 goto ×3, MaskTest-3, avmplus
+  bug_558863/bug_479786/e15_1_2_2, textblock_releaselines, textline_atom_index, clipDepth, pixelBounds),
+  **+4 mm → effective** (gnash `action_execution_order_test11`, `_test4`, `avm1/global_proto_decls` → rm,
+  `regression/avm1_nested_child_swapdepths_remove` → pass). 28 new rows, all pass (27 FP32-golden regression fixtures
+  + upstream `xmldocument_tostring`, mm → pass). **0 real regressions** (1 known intermittent).
+- Pixels on the 701-row intersection: **+3 / 0** (`acid-shapes` HIGH flatten; `gradients` + `morph_test1` frame1 LOW
+  symmetric vertex tie). 32 bands improved, 31 worsened, every one on a landing ledger or FP32-graded (§31.2). 8 new
+  comparisons, all pass.
+
+### 31.0 Closeout facts
+
+- FINAL no-graphics `46095073993` at `b8671fd2f` (= FINAL graphics code + browser-only ladder #5; results `4fb87dedb`): **= ledger**. 4759 pass + 131 rm = **4890 eff**; mode diffs = `audio/aac`, `avm2/audio_computespectrum` (pre-s30 NG) and `bug1157243/empty` (PASSES in NG: the intermittent).
+- Branch prune: all 17 `fanout/*` blob-checked against master: every report, patch, log and fixture identical; the only differing blobs are shared code/docs that landed merged with other slots (and `w2b-lowq-text`'s `tag.c` with the y half defaulted off). Nothing archived; all pruned.
+- Pages: PAGES_REAL_PENDING.
+- Browser ladder at closeout: `browser-pending-finalize` (#5) still running; code `b8671fd2f` landed browser-only.
+
+### 31.1 Ledger
+
+| patch | trace | pixels | notes |
+|---|---:|---:|---|
+| `3208fd86e` batch 0 | | 0 | acid-large FP32 LOW swap (WIN == LNX); layer_group alpha/erase re-goldened to FP32 `--screen` LOW (draw() is invalid for non-LAYER blends) |
+| `3944257a4` browser-attach-child-early | | | browser-only: attach build pass under `g_build_only`; loopback "Failed to place" warning gone |
+| `17bc522de` w1-exec-order | **+2 mm→pass** + 1 fixture | | per-clip onEnterFrame immediately before ITS own frame script, clips newest-first, `_root` last (`actionAQRunExecNewer`, `SWF_EXEC_ORDER_EF=0`) |
+| `92f7d5e8a` browser-nested-swapdepths-remove | +1 booked fail → pass | | nested swapDepths/removeMovieClip act on the PARENT sprite's list, not the global one (all builds; also fixed a latent same-name root clobber) |
+| `a18a0e033` w2-drift-smalls-land | +1 mm→pass, +1 rm→pass, +5 fixtures | | tabIndex −1/delete on every target (FP32); `<img>` with nothing after it starts no load; XMLNode vars as slot traits; hitTest layer marker + scale-aware min stroke (hittest_shapeflag 6 → 4 lines) |
+| `a18a0e033` w2-array-forin-proto | +3 fixtures | | ARRAY for..in walks `__proto__` (inherited first, deepest level first) + untracked literal indices; FP32 fixture byte-identical |
+| `a18a0e033` w2-native-table-land | (with forin: `global_proto_decls` mm→rm) | | generated AVM1 native-object table from the FP32 golden (`scripts/gen_avm1_native_table.py`, `SWF_NATIVE_TABLE=0`), Array/String ctor identity, singleton own toString removed |
+| `a18a0e033` w2-stroke-geometry-land | +6 image fixtures | **acid-shapes fail→pass** | AVM2 + AVM1 drawing-API curves flattened at 0.01 px at HIGH (LOW keeps 0.1 px) |
+| `a18a0e033` w2-rm-avm2-land | **+11 rm→pass**, +2 fixtures | | SWF ≤ 9 goto cleanup/construct rules, RemoveObject breaks a mask pair, BA `in`, avmplus pow2 parse, RE multiline `^`, FTE atoms, off-list pixelBounds ×5, clip layers never in getObjectsUnderPoint; 2 flash_fixes |
+| `a18a0e033` w2-lowq-land | +2 image fixtures | **gradients, morph_test1 f1 fail→pass**; priced: acid-scale +160, style_changes_in_html +904 vs FP32 | LOW symmetric vertex tie (+1/256 px both axes, 3 exemptions), TSNAP on the local offset, field-local pen; acid-scale + overlaps swapped to FP32 LOW |
+| `715a5300c` w2-native-instance | **+1 rm→pass** | | XML/XMLNode instance layout, aliased native ctors run their initialisers, hidden instance slots on native-backed classes only |
+| `715a5300c` w2b-native-residues | +5 fixtures | | ASnative proto-less SWF6+, SWF5 hides SWF6+ Object.prototype methods on fn/array/clip receivers, Object ctor identity bug, BitmapData string-arg nondeterminism (string pointer read as float), per-instant DST in `date.c` |
+| `715a5300c` native-table order fix | ButtonEventsTest restored | | members the SWF15 table does not list keep the NEWEST slots (enumerate first, FP32) |
+| `715a5300c` w2b-lowq-text | | BeginBitmapFill 794 → 293; df2 probe budget 52 527 → 12 891 | LOW DefineFont2 whole-px advance at SWF ≥ 7 only (FP32 v5–v8 probe; SmallText irrelevant to the render); its em-1024 y gate REFUTED by FP32 → landed OFF |
+| `715a5300c` w2b-stroke-timeline | | 47 toward / 3 away (priced) | timeline-shape HIGH 0.01 px flatten (`SWFRECOMP_CURVE_TOL_TWIPS` from `verify_output.py`; LOW, fonts, morphs and browser builds keep 2 tw) |
+| `715a5300c` flash_fixes | | | heavy_tesselation FP32 LOW swap; global_instance_decls `mock_timezone` CEST |
+| `171b302e4`, `dd2f979a5` browser-timeline-self-goto | +1 fixture | | browser timeline-sprite self-goto pass; a timeline sprite's own GotoFrame opcode applies INLINE in every build (corpus-neutral at interim #4); dead pending_remove code deleted |
+| `9dc3e514a` w2-rm-avm1-gnash-land | **+13 rm→pass**, +2 fixtures | | ASnative 900/901 (fresh object per call at SWF6+), SWF5 receiver base clip, `removeMovieClip("")`, addProperty fires a watcher, borrowed XML.load/LoadVars, zero-frame header counters, SWF5 SetMember clears the native hide flag, Sound bound by path, SmallText per-glyph ceil `textWidth` |
+| `cd519d658` browser-clip-event-order | | | browser-only (CI preprocess md5-identical): clip-event enterFrame exec order = CI; later-frame child init ungated |
+| `b8671fd2f` browser-pending-finalize | | | browser-only: pending-finalize queue + slot unload events ported |
+
+### 31.2 Standing verdicts that fell
+
+- **"The layer_group LOW gap is ~80 k channels of compositing"** (s29 UNSURE): the draw() captures were invalid for
+  ALPHA/ERASE; against FP32 `--screen` ours is 4 268 / 2 143 (golden 13 763 / 11 979).
+- **"B20b setProperty in tellTarget (M)"**: the rows died on `ASnative(901,0)` making no clip (S). "Device-font AVM1
+  family": 2 of 4 rows are AVM2. "EmbeddedFontTest = DefineFont3 advance scale": DefineFont2 SmallText per-glyph ceil.
+- **"Hide `__proto__`/`__constructor__` on every instance"**: native-backed classes only. "Filter defaults are wrong":
+  the aliased-construction path skipped the initialisers.
+- **"`global_instance_decls` nondeterminism is an uninitialised read"**: a string pointer reinterpreted as a float.
+- **"html_text_img_parsing is blocked by a platform line"**: the load count rule (nothing after the image → no load).
+- **"The +2 px glyph-probe offset is a raster offset"**: EditText layout (field-local pen). **"The DF2 advance ceil is
+  gated by an EditText flag"**: it is the SWF version (≥ 7). **"The pen y is per font kind"**: refuted by FP32.
+- **"The residual convex stroke excess is a quad-offset model"**: Flash is WIDER than exact (half-width plateau); NO-GO.
+- **"The timeline twin moves an FP32 row away"**: count only; L1 to the FP32 golden fell.
+- **"`manufacturer` position is run-to-run"**: host difference (3/3 LNX agree), ACCEPTED Category 15.
+- **"Unlisted members go first"** (w1-native-table order rule): Flash lists them first in for..in → stored newest.
+
+### 31.3 Method notes (deltas vs s29)
+
+- **A combined-batch status move no slot saw** (`global_proto_decls` mm→rm needs native-table + forin): run the headline
+  rows on the STACKED tree before writing the interim ledger.
+- **One unpredicted interim loss came from a sweep blind spot**: w2-native-table-land's 143-row guard did not include
+  gnash `ButtonEventsTest` (a button for..in). A kill-switch A/B in a clean worktree found the owner in one pass.
+- **Grade peer-dirty trees in a clean worktree**: every landing of s30 was smoke-built in `git worktree` at HEAD+patch
+  (or at the local commit) with its own recompiler, so ladder edits never contaminated a verdict.
+- **Peer-dirty landings**: `git apply --cached P` + `git apply P`, then diff the staged hunk of the shared file against
+  the patch's hunk (exact) before committing. 0 sweeps this session.
+- **Hold a code landing while a no-graphics leg is pending**: `workflow_dispatch` cannot pin a SHA.
+- **Coordinator FP32 runs settled 12 slot requests the same hour** (ASnative identity, SmallText, the DF2 version edge,
+  the y-pen probe, 3 native identity/residue probes, forin, native instance, 7 LOW screen captures, adv flags).
+- **Known CI intermittent**: `from_shumway/as3-loader/bug1157243/empty` (±1, load-sensitive; BACKLOG). Check its CI
+  history before chasing it.
+
+### 31.4 Left on the board (session 31)
+
+**Trace**
+- 131 rm rows (priced buckets, register §1a). Cheapest named: `Function-v5` (SWF5 `new` sets no `__constructor__`, S,
+  + B6 visibility M); array-v5..v8 B20a; Inheritance B17 (M–L); displaylist_depths ranges; button duplication;
+  ASnative id table beyond 900/901 (generator, L).
+- `for (k in Object)` lists `__proto__,constructor` (FP32: nothing; DONT_ENUM on `_global.Object`'s own slots, S).
+- FP32 version value-gating (members present but `undefined` below their SWF version, M–L).
+- L1′ AVM2 loader timing (HELD: needs a gradeable FP32 capture).
+**Pixels**
+- `style_changes_in_html` field 5 world-y (+904 vs FP32): the switch is not font kind / HTML / zones.
+- LOW glyph chord rule (recompiler, M), the morph_test1 xtrace glyph residue after the 3rd glyph.
+- `acid-scale` (+160 vs FP32), `scroll_rect_scaled`, `acid-small` (timeline flatten, priced).
+**Browser ladder**: `browser-pending-finalize` (#5) running at closeout; its report names the next slice (`ng_queue_slot_unload_events` FP32 fixture is the standing candidate).

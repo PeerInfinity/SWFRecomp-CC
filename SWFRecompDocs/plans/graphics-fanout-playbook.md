@@ -1747,3 +1747,50 @@ run `--check`; re-derive any STALE entry against Flash before re-applying it, de
 - **Never route binaries through `git merge-file`** (it emptied a flash_fix PNG). Copy binaries; union `fixes.json` as JSON.
 - **CI outlier counts ≤ the worker's local prediction is normal** on some rows; grade the name and the direction.
 - **A grading run with a lost shard publishes partial results.** Rerun the failed jobs and grade the republished commit.
+
+## 29. Session-30 state of the board (2026-11-27)
+
+**Baseline:** s29 FINAL `45938113471` at `2d40d3799` (results `51ab63688`): 553 pass / 140 fail / 6 ignored / 3 skip on
+the comparison set.
+
+**Images runs** (graphics full, `images=true`): interim #1 `46040854188`, #2 `46061659732`, #3 `46078812768`,
+#4 `46085491256`; **FINAL `46090531443` at `6441e7d5d` (results `8abd7880f`)**.
+
+**Result: 564 pass / 137 fail** (+6 ignored, 3 skip; 710 comparisons). On the 701-row baseline intersection:
+**+3 / 0** (`from_shumway/acid/acid-shapes`, `visual/simple_shapes/gradients/gradients`, `morph_test1` [frame1]); 32
+bands better, 31 worse, every move on a landing ledger or FP32-graded. 8 new comparisons, all pass. Trace side: arc §31.
+
+**Models landed** (each priced by name before landing; each interim graded against that list):
+
+| model (commit) | status moves | bands | graded against |
+|---|---|---|---|
+| AVM2 + AVM1 drawing-API HIGH curve flatten 0.01 px (`a18a0e033` w2-stroke-geometry-land) | **acid-shapes fail→pass** | 6 Flash-golden HIGH rows toward; `hittestpoint_boundary` +4 priced | 6 new FP32 HIGH fixtures (WIN == LNX) |
+| LOW symmetric vertex tie +1/256 px both axes, 3 exemptions; TSNAP on the local offset; field-local pen (`a18a0e033` w2-lowq-land) | **gradients, morph_test1 f1 fail→pass** | blend_modes ×14 + twins −3 224; filters ×6 toward FP32 (host-dep.), acid-scale +160 and style_changes_in_html +904 AWAY (priced) | FP32 LOW `--screen` + WIN (`w1-local-oracles/w2-lowq-land/`) |
+| LOW DefineFont2 whole-px advance at SWF ≥ 7 (`715a5300c` w2b-lowq-text) | 0 | BeginBitmapFill 794 → 293, df2 probe 52 527 → 12 891 | FP32 v5–v8 probe (`w2b-lowq-text-fixtures/`) |
+| Timeline-shape HIGH flatten 0.01 px via `SWFRECOMP_CURVE_TOL_TWIPS` (`715a5300c` w2b-stroke-timeline) | 0 | 47 toward / 3 away (`scroll_rect_scaled`, `acid-small` .01/.05) | whole non-LOW corpus enumerated by codegen; L1 to golden |
+
+**Measured NO-GO:** residual convex-side stroke excess (Flash is WIDER than the exact Minkowski offset: a half-width
+plateau of +1.15–1.2 px at hw ≥ 32; no quad-offset model fits). AVM2 HIGH seam twin: 0 px.
+**HELD (refuted by FP32):** pen y per font kind (`SWF_TF_LOW_PEN_LOCAL_Y=0` keeps the slot's rule, default off).
+
+### Flash fixes at closeout (`ruffle-tests/flash_fixes/fixes.json`, 100 entries; +7 in s30)
+
+`python3 ruffle-tests/apply_flash_fixes.py --check`: **ALREADY 22, APPLIED 78**.
+
+| source | kind | n | rows |
+|---|---|---:|---|
+| s29 pre-launch FP32 LOW (WIN == LNX) | image | 1 | `from_shumway/acid/acid-large` |
+| s30 w2-rm-avm2-land | trace / toml | 2 | `avm2/swf_9_goto_in_construct_frame` (FP32 cut at a tick), `from_shumway/timeline/nav/clipDepth` (`num_ticks = 4`) |
+| s30 coordinator FP32 LOW `--screen` (WIN == LNX) | image | 3 | `from_shumway/acid/acid-scale`, `visual/simple_shapes/overlaps`, `visual/simple_shapes/heavy_tesselation` |
+| s30 coordinator (FP32 golden's host TZ) | toml | 1 | `avm1/global_instance_decls` (`mock_timezone` CEST) |
+
+Kept as Ruffle goldens (FP32 WIN ≠ LNX, host-dependent): `visual/filters/bevel` (46 243 ch), `glow` (1 598),
+`drop_shadow_angles` (176). Re-goldened in `regression/` directly: `avm2_layer_group_alpha` / `_erase` (FP32
+`--screen` LOW; draw() is invalid for non-LAYER blends).
+
+### Left on the board (pixels)
+
+- LOW: `style_changes_in_html` field-5 y switch; the LOW glyph chord rule (recompiler, M); `acid-scale` tie cost;
+  filters LOW (host-dependent goldens: grade vs LNX FP32 only).
+- HIGH: convex stroke excess (NO-GO, measured); Flash-exact HIGH AA (NO-GO s29, register §1b; acid-shapes now
+  passes, so the criterion's example row is gone).

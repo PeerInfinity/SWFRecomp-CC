@@ -1,13 +1,13 @@
 # Project state: SWFRecomp-CC
 
-**As of:** 2026-11-27, after fan-out session 29 (code `2d40d3799`). **Maintained by:** each fan-out coordinator at
+**As of:** 2026-11-27, after fan-out session 30 (code `6441e7d5d`). **Maintained by:** each fan-out coordinator at
 closeout (update §1–§3), plus any one-task session that changes a track's status (update §4).
 **Companion:** [`NO_GO_REGISTER.md`](NO_GO_REGISTER.md) lists everything ruled not worth doing, each entry with a
 reopen criterion.
 
 This page replaces the stale headline numbers in `ruffle-tests/tests/swfs/_investigation/OVERVIEW.md` (2026-07)
-and `feature-priority-map.md` (2026-07). Per-session detail lives in `polish-sweep-arc.md` (trace, §30 = s29) and
-`graphics-fanout-playbook.md` (pixels, §28 = s29).
+and `feature-priority-map.md` (2026-07). Per-session detail lives in `polish-sweep-arc.md` (trace, §31 = s30) and
+`graphics-fanout-playbook.md` (pixels, §29 = s30).
 
 **The goal** (Robert's ruling, 2026-11-24): match **Flash Player 32**, not Ruffle. Ruffle's test corpus is the
 instrument. A Ruffle golden that FP32 proves wrong gets corrected in `ruffle-tests/flash_fixes/`, never chased. The
@@ -15,25 +15,25 @@ oracle is a real FP32 projector, scripted locally (`tools/flash-oracle/`).
 
 ## 1. Corpus state (Ruffle test suites)
 
-Source: the s29 FINAL runs. Graphics `45938113471` (results `51ab63688`); no-graphics `45938116102`
-(`63bcc2dd8`, 4858 eff). Mode differences are only `audio/aac` and `avm2/audio_computespectrum`. Never quote these
+Source: the s30 FINAL runs. Graphics `46090531443` (results `8abd7880f`); no-graphics `46095073993`
+(results `4fb87dedb`, **4890 eff**: identical to graphics except the two audio rows below and the `bug1157243/empty` intermittent, which passed in NG). Mode differences are only `audio/aac` and `avm2/audio_computespectrum`. Never quote these
 forward: re-read the newest results (memory `ci-baseline-must-be-read-fresh`).
 
 ### Trace (graphics mode)
 
 | suite | rows | pass | ruffle_matched | failing | effective |
 |---|---:|---:|---:|---:|---:|
-| from_avmplus | 1574 | 1564 | 8 | 2 | 99.9% |
-| avm2 | 1352 | 1317 | 30 | 5 | 99.6% |
-| avm1 | 791 | 776 | 5 | 10 | 98.7% |
-| regression | 319 | 318 | 0 | 1 | 99.7% |
-| from_gnash/actionscript.all | 243 | 181 | 59 | 3 | 98.8% |
-| from_shumway | 229 | 215 | 13 | 1 | 99.6% |
+| from_avmplus | 1574 | 1567 | 5 | 2 | 99.9% |
+| avm2 | 1353 | 1322 | 26 | 5 | 99.6% |
+| avm1 | 791 | 776 | 6 | 9 | 98.9% |
+| regression | 346 | 346 | 0 | 0 | 100.0% |
+| from_gnash/actionscript.all | 243 | 193 | 47 | 3 | 98.8% |
+| from_shumway | 229 | 217 | 10 | 2 | 99.1% |
 | visual | 151 | 149 | 2 | 0 | 100.0% |
-| from_gnash/misc-ming.all | 111 | 74 | 28 | 9 | 91.9% |
+| from_gnash/misc-ming.all | 111 | 77 | 27 | 7 | 93.7% |
 | from_gnash/misc-swfc.all | 21 | 17 | 3 | 1 | 95.2% |
-| from_gnash/misc-swfmill.all | 20 | 19 | 1 | 0 | 100.0% |
-| timeline | 17 | 14 | 3 | 0 | 100.0% |
+| from_gnash/misc-swfmill.all | 20 | 20 | 0 | 0 | 100.0% |
+| timeline | 17 | 16 | 1 | 0 | 100.0% |
 | mixed_avm | 12 | 10 | 1 | 1 | 91.7% |
 | text | 12 | 12 | 0 | 0 | 100.0% |
 | fonts | 9 | 8 | 1 | 0 | 100.0% |
@@ -42,32 +42,33 @@ forward: re-read the newest results (memory `ci-baseline-must-be-read-fresh`).
 | swf | 7 | 7 | 0 | 0 | 100.0% |
 | audio | 5 | 5 | 0 | 0 | 100.0% |
 | import_assets | 3 | 3 | 0 | 0 | 100.0% |
-| **total** | **4893** | **4704** | **156** | **33** | **99.3%** |
+| **total** | **4921** | **4760** | **131** | **30** | **99.4%** |
 
 **Read "effective" with care.** `ruffle_matched` (rm) means "our diffs are a subset of Ruffle's diffs". It is not a
-Flash pass. s28's `trace-provenance` found 139 of the then-185 rm rows have FLASH goldens; s29 closed 29 of them, so
-**about 110 of the 156 rm rows are real Flash gaps** (re-derive per row from TP before citing).
-- Honest Flash-correct count: 4704 pass, plus at most ~46 rm rows.
-- Hidden work: about **143 rows** (~110 rm + 33 failing).
-- `regression/` (319 rows) is our own fixture suite, with goldens mostly from FP32 captures. Its one failing row,
-  `avm1_nested_child_swapdepths_remove`, is a booked expected-fail (a real Flash gap, M).
+Flash pass. s28's `trace-provenance` found 139 of the then-185 rm rows have FLASH goldens; s29 closed 29 and s30 26
+more, so **about 85 of the 131 rm rows are real Flash gaps** (re-derive per row from TP before citing).
+- Honest Flash-correct count: 4760 pass, plus at most ~46 rm rows.
+- Hidden work: about **115 rows** (~85 rm + 30 failing).
+- `regression/` (346 rows, all pass) is our own fixture suite, goldens mostly FP32 captures.
 
-**The 33 failing rows**, all dispositioned in `NO_GO_REGISTER.md` §1a: the gnash action_order family ×7, the AVM1
-native-object enumeration rows (`global_*_decls` ×3, `argstest-v6/7/8`), `globals_monkeypatch`,
-`external_interface_monkeypatch`, `set_property_values/swf4`, `date`, `pixelDissolve`, `movieclip_hittest_shapeflag`,
-`sandbox_type_remote` ×2, `avm2/avm1_root`, `bom`, `loader_load`, `verify_method_info_duplicate`, `eforin_001/002`,
-`GradientFillTest`, `RegisterClassTest4`, `matrix_accuracy_test1`, shumway `esc`, `mixed_avm/avm1_loads_avm2`, and
-the booked regression fixture above. s29 moved `globals_swf5`, `native_objects_swf6`, `dependent_strings`,
-`loader_applicationDomain` and `swz` to pass.
+**The 30 failing rows**, all dispositioned in `NO_GO_REGISTER.md` §1a: the gnash action_order family ×5
+(`ActionOrderTest3/4/5`, `PlaceAndRemove`, `extend_test`; s30 moved `test11` and `_test4` to pass), the AVM1
+native-object enumeration rows (`global_instance_decls`, `global_proto_decls_delete`, `argstest-v6/7/8`; s30 moved
+`global_proto_decls` to rm), `globals_monkeypatch`, `external_interface_monkeypatch`, `set_property_values/swf4`,
+`date`, `pixelDissolve`, `movieclip_hittest_shapeflag` (4 device-font lines, ACCEPTED), `sandbox_type_remote` ×2,
+`avm2/avm1_root`, `bom`, `loader_load`, `verify_method_info_duplicate`, `eforin_001/002`, `GradientFillTest`,
+`RegisterClassTest4`, `matrix_accuracy_test1`, shumway `esc`, `mixed_avm/avm1_loads_avm2`, and shumway
+`as3-loader/bug1157243/empty` (the known ±1 load intermittent: it passes locally and in most CI runs).
 
 ### Pixels (graphics `images=true`)
 
-- **552 pass / 140 fail** (+6 ignored, 3 skip; 701 comparisons). s29 on the baseline intersection: +1 / −1 (the loss,
-  `acid-large`, is priced: toward its FP32 capture, golden Ruffle-made); 6 new comparisons pass.
-- s29 Flash models: HIGH text coverage (4 sub-scanlines × exact x, 1/16), LOW translation snap per display-list level
-  (TSNAP), the LOW stroke raster, seam caps/joins. s28 had already traded 101 Ruffle-golden passes for Flash models.
-- 93 goldens are FP32-corrected through `ruffle-tests/flash_fixes/fixes.json` (+31 in s29).
-- 130 of the 140 failing pixel rows are quality=LOW. Flash-exact HIGH AA was built and MEASURED NO-GO in s29 (0 flips).
+- **564 pass / 137 fail** (+6 ignored, 3 skip; 710 comparisons). s30 on the s29 intersection: **+3 / 0**
+  (`acid-shapes`, `gradients`, `morph_test1` frame1); 8 new comparisons pass.
+- s30 Flash models: drawing-API and timeline HIGH curve flatten 0.01 px; LOW symmetric vertex tie; LOW field-local
+  pen; LOW DefineFont2 whole-px advance at SWF ≥ 7. Earlier: HIGH text coverage, TSNAP, the LOW stroke raster, seams.
+- 100 goldens are FP32-corrected through `ruffle-tests/flash_fixes/fixes.json` (+7 in s30).
+- Flash-exact HIGH AA stays MEASURED NO-GO (s29). The residual convex stroke excess is NO-GO (s30: Flash is wider
+  than the exact offset).
 
 ### Trajectory
 
@@ -78,22 +79,25 @@ the booked regression fixture above. s29 moved `globals_swf5`, `native_objects_s
 | s25 (2026-11-22) | 4622 / 4662 | 561 / 613 | |
 | s27 (2026-11-24) | 4781 / 4819 | 626 / 665 | real Flash oracle arrives |
 | s28 (2026-11-26) | 4827 / 4864 | 545 / 685 | Flash over Ruffle: +75 trace by name, −101 priced pixels |
-| **s29 (2026-11-27)** | **4860 / 4893** | **552 / 692** | +34 trace by name, 0 regressions; flash_fixes 62 → 93 |
+| s29 (2026-11-27) | 4860 / 4893 | 552 / 692 | +34 trace by name, 0 regressions; flash_fixes 62 → 93 |
+| **s30 (2026-11-27)** | **4891 / 4921** | **564 / 701** | +30 trace by name (26 rm→pass), 0 real regressions; pixels +3 / 0; flash_fixes 93 → 100 |
 
-## 2. Worth doing: corpus (ranked; detail in arc §30.4 and playbook §28)
+## 2. Worth doing: corpus (ranked; detail in arc §31.4 and playbook §29)
 
-1. **The ~110 Flash-golden rm rows.** The w1b "priced, not worked" buckets (register §1a), ~20 mechanisms each with a
-   completion cell. The biggest shared one is a **native-object table generated from the FP32 golden** (L; owns the 3
-   `global_*_decls` rows, `argstest-v6/7/8` and the ExternalInterface-v8 rest). Others: AVM2 frame/event lifecycle,
-   device-font metrics, typed nulls, `avm1movie`, the FTE line model.
-2. **Exec order, next halves.** The script half of the flat exec list landed (`078350610`). Remaining: enterFrame before
-   own script and the clip-event merge. `action_execution_order_test11` already moved Flash-ward, so it is the probe.
-3. **Pixels: LOW residues.** The LOW fill .5-vertex tie, `acid-large` (swap candidate after a WIN == LNX check), the
-   ungraded `avm2_layer_group_alpha/_erase` LOW captures, `sprite_with_frames` re-grade.
-4. **Pixels: real Flash gaps.** `acid-shapes` (88; captured pre-s30: needs curved-stroke edge geometry AND the HIGH AA rule), `place_object_test` (2604),
-   `acid-stroke-0` (3413), `morph_test1` ×6 LOW glyph rule, the AVM2 twin of the w3 seam-join gate.
-5. **Small trace leads:** TextField `tabIndex = null` (needs FP32), `movieclip_hittest_shapeflag` lines 71/296 (FP32-graded pre-s30: real gaps; the row cannot flip, 4 device-font lines stay ACCEPTED),
-   `avm1_nested_child_swapdepths_remove` (M), the #2044 ErrorEvent path for `html_text_img_parsing`.
+1. **The ~85 Flash-golden rm rows.** The w1b "priced, not worked" buckets (register §1a). Cheapest named (s30
+   w1-rm-avm1-gnash table): `Function-v5` (SWF5 `new` sets no `__constructor__`, S, + B6 visibility, M), array-v5..v8
+   B20a (M), displaylist_depths ranges (M), button duplication (M), Inheritance B17 (M–L), the ASnative id table beyond
+   900/901 (L, generator from gnash `getNative`). AVM2: L1′ loader timing (HELD: needs a gradeable FP32 capture).
+2. **The native-object table residue.** Generated table landed (s30). Left: FP32 version value-gating (members present
+   but `undefined` below their SWF version, M–L), `for (k in Object)` (S), Error.prototype own slots (S).
+3. **Exec order.** Script half (s29) + enterFrame-before-own-script (s30) landed; `ActionOrderTest3/4/5`,
+   `PlaceAndRemove` and `extend_test` remain (re-measure each against its FP32 golden first).
+4. **Pixels: LOW text and geometry.** `style_changes_in_html` field-5 world-y (+904 vs FP32; the switch is not font
+   kind, HTML or zones), the LOW glyph chord rule (recompiler, M), `acid-scale` tie cost (+160), filters LOW (goldens
+   host-dependent: grade vs LNX FP32).
+5. **Small leads:** `movieclip_hittest_shapeflag` (4 ACCEPTED device-font lines only now), the morph_test1 xtrace
+   glyph residue after glyph 3 (FP32 v5–v8 probe), the AVM2 twin of the timeline flatten for fonts (measured: 2 tiny
+   moves, not landed).
 
 ## 3. Not worth doing (summary; full register in `NO_GO_REGISTER.md`)
 
@@ -165,11 +169,10 @@ the booked regression fixture above. s29 moved `globals_swf5`, `native_objects_s
   - s27 local ladder ported CI's eager placement init, per-tick advance order, and parked-root frame behaviour into the browser. It also made every browser link fail on any wasm-ld warning (`c8ed0e679`).
   - s28 sent root gotos and attached-clip gotos through the CI arms and deleted `advance_attached_clip_frames` (`dc6c75a64`, `a9fb68b42`, 2026-11-26). Browser audio is now an AudioWorklet (`0cb5464e5`, 2026-10-19).
 - **s29 (local ladder, 3 slices):** goto(current frame) = stop/play only in EVERY build, CI was the wrong side (`c91637b7a`); the DJ freeze (`3fd694def`); natural-advance frame scripts as ONE exec list by place_seq across nested/timeline/attached clips, all builds (`078350610`, kill switch `SWF_EXEC_ORDER_MERGED=0`).
+- **s30 (local ladder, 5 slices):** attach-child early advance gated + loopback place warning gone (`3944257a4`, browser-only); nested swapDepths/removeMovieClip act on the parent sprite's list, ALL builds (`92f7d5e8a`); timeline-sprite self-goto ported + a sprite's own GotoFrame opcode applies inline in ALL builds (`171b302e4`, `dd2f979a5`, corpus-neutral on CI); clip-event enterFrame order = CI + later-frame child init ungated (`cd519d658`, browser-only); the pending-finalize queue + slot unload events ported (`b8671fd2f`, browser-only). The browser = FP32 on the 3 exec-order fixtures.
 - **Status:** ACTIVE. It is a local ladder between sessions.
 - **Next steps (worth doing), in order:**
-  1. `browser-attach-child-early` (S): the browser-only force-nested-build advance in `ng_attachMovie` (`tag_stubs.c`) advances an already-built child on the attach tick (one frame ahead). Gate it to unbuilt holders; grade with `avm1_attach_timeline_frame_order` in child_probe + Minesweeper radio bounds. Also the spurious "Failed to place object at depth 1" on same-char loop-back re-place.
-  2. `avm1_nested_child_swapdepths_remove` (M): a timeline child's swapDepths + remove survives (booked expected-fail fixture, all builds).
-  3. The timeline-sprite self-goto port §5a (M) and the dead `pending_remove` code.
+  1. `browser-pending-finalize` (s30 #5) is running at s30 closeout (code `b8671fd2f` landed, browser-only); its report names the next slice. Candidates on the board: browser = FP32 on gnash `action_execution_order_test11`/`_test4` past line 20/18 (pending-finalize) and `ng_queue_slot_unload_events` (timeline swapDepths+removeMovieClip drops onClipEvent(unload); FP32 fixture first).
   - The gate inventory's triage column is still empty; regenerate it with `tools/gate_inventory.py` (count UNCONFIRMED).
 - **Ruled out:**
   - "Browser gaps are action.c arms." The eager-init, advance-order and parked-frame gaps were in `tag.c`/`swf.c` (arc §28 standing verdicts).
