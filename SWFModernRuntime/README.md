@@ -1,110 +1,43 @@
-# SWFModernRuntime
+# SWFModernRuntime: the runtime
 
-The runtime library of [SWFRecomp-CC](https://github.com/PeerInfinity/SWFRecomp-CC): executes the C code that the `SWFRecomp/` recompiler generates from Flash SWF files, natively (headless or with offscreen Dawn/WebGPU rendering) or as WebAssembly in the browser.
+The runtime library of [SWFRecomp-CC](../README.md). It executes the C that the [`../SWFRecomp/`](../SWFRecomp/README.md)
+recompiler generates: the AVM1 and AVM2 virtual machines, the Flash class library, the player loop and display list,
+rendering and audio. The same sources build three ways:
 
-Forked in October 2025 from [SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) by LittleCube. Since July 2026 the two are a **permanent friendly fork** — same idea, diverged architectures, knowledge exchanged but no code merged in either direction. See [`../SWFRecompDocs/merge/upstream-relationship-2026-07.md`](../SWFRecompDocs/merge/upstream-relationship-2026-07.md) for the decision and status, and [`../SWFRecompDocs/upstream-comparison/`](../SWFRecompDocs/upstream-comparison/) for what each side's architecture does better.
+| Build | Player loop | Rendering | Used by |
+|---|---|---|---|
+| no-graphics (`-DNO_GRAPHICS`) | `src/libswf/swf_core.c` | none | the test harness's default mode |
+| graphics, native (`-DUSE_WEBGPU -DOFFSCREEN_RENDER`) | `src/libswf/swf.c` | `src/rendering/render_webgpu.c` on [Dawn](https://dawn.googlesource.com/dawn), offscreen on software Vulkan | `--mode=graphics`, the CI grading mode; image captures |
+| browser (Emscripten) | `src/libswf/swf.c` | `render_webgpu.c` on the browser's WebGPU | the [live demos](https://peerinfinity.github.io/SWFRecomp-CC/), Seedling |
 
-## What is This?
+There is no separate library build step for testing: `ruffle-tests/verify_output.py` compiles the runtime sources it
+needs together with each test's generated C. See [`../GETTING_STARTED.md`](../GETTING_STARTED.md).
 
-This runtime contains an AVM1 (ActionScript 1/2) implementation in `src/actionmodern/`, an AVM2 (ActionScript 3) implementation in `src/avm2/`, the SWF tag/display-list layer in `src/libswf/`, and rendering in `src/rendering/` (native offscreen via Dawn, browser via emscripten + WebGPU). It runs the full Ruffle, Gnash, Shumway and Tamarin test corpora in CI.
+## Source map
 
-**Live Demos:** https://peerinfinity.github.io/SWFRecomp-CC/
+| Path | What |
+|---|---|
+| `src/actionmodern/` | **AVM1** (ActionScript 1 and 2). `action.c` is the core: values, objects, prototypes, scope chain, the built-in classes and the MovieClip API. Beside it: `variables.c`, `object.c`, `math.c`, `date.c`, `timer.c`, `avm1_amf.c` (SharedObject/AMF0), `registered_class.c`, `image_decode.c`, `video_codec.c`, filter kernels |
+| `src/avm2/` | **AVM2** (ActionScript 3): the value model and object/class system (`avm2_value.c`, `avm2_object.c`, `avm2_class.c`), operations (`avm2_ops.c`), GC (`avm2_gc.c`), and the flash.* and top-level classes, one file per area (`avm2_display.c`, `avm2_text.c`, `avm2_bitmap.c`, `avm2_xml.c`/`avm2_e4x.c`, `avm2_net.c`, `avm2_stage3d.c`, …) |
+| `src/libswf/` | The player: frame loop (`swf.c` / `swf_core.c`), display list and tag execution (`tag.c`), hit testing and input events |
+| `src/rendering/` | `render_webgpu.c`, the WebGPU renderer (shapes, text, bitmaps, filters, blend modes); `render_stub.c`, a no-op renderer that lets the browser build's code paths compile natively for sanitizer runs |
+| `src/audio/` | Sound mixing (`audio.c`) and the browser AudioWorklet output |
+| `src/memory/` | The heap allocator wrapper (o1heap) |
+| `src/flashbang/` | The SDL3 GPU renderer inherited from upstream. Only the CMake build in this directory uses it; the test harness and browser builds do not |
+| `include/` | Headers, mirroring `src/` |
+| `lib/`, `third_party/` | Vendored libraries (zlib, LZMA, c-hashmap, o1heap, SDL3, libtess2, QuickJS regexp) and the Ruffle licence for ported code; see [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) |
 
-## Documentation
+The behaviour target is Flash Player 32 (see the [root README](../README.md#the-goal-match-flash-player-32)). Many
+functions document which Ruffle or Flash behaviour they reproduce in a comment above them, and the test that pins it.
 
-Everything lives in the combined repo's [`SWFRecompDocs/`](../SWFRecompDocs/README.md) directory (the upstream `SWFRecompDocs` repository it descends from has been frozen since November 2025):
+## Origin
 
-- **[Session start guide](../ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md)** - Architecture, how to run tests, infrastructure
-- **[Reference](../SWFRecompDocs/reference/)** - Technical documentation
-- **[Guides](../SWFRecompDocs/guides/)** - Step-by-step guides
+Forked in October 2025 from [SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) by LittleCube. Since July
+2026 the two are a permanent friendly fork: same idea, diverged architectures, knowledge exchanged but no code merged in
+either direction ([`../SWFRecompDocs/merge/upstream-relationship-2026-07.md`](../SWFRecompDocs/merge/upstream-relationship-2026-07.md)).
+Upstream has SDL3, a thread-safe context, a concurrent GC and an AS2-prelude standard library. This fork added the
+AVM2 runtime, the WebGPU renderer used here, and the behaviour work measured by the test corpus.
 
-**Related Repositories:**
-- **[SWFRecomp/](../SWFRecomp/)** - The static recompiler (same repo)
-- **[SWFRecomp/SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime)** - Upstream runtime by LittleCube (SDL3, concurrent GC, AS2-prelude stdlib) — tracked, not merged
+## Licence
 
-## Quick Demo
-
-The `trace_swf_4` example is working! It demonstrates:
-- SWF bytecode → C code → WebAssembly compilation pipeline
-- ActionScript execution in browser
-- String operations and console output
-- Native performance without Flash Player
-
-**[Try it live!](https://swfrecomp.github.io/SWFRecompDocs/examples/trace-swf-test/)**
-
-## Project Goals
-
-- Compile SWFRecomp-generated C code to WebAssembly
-- Add Canvas2D rendering backend (in progress)
-- Support SDL3 WebGPU (when available)
-- Maintain 100% compatibility with native runtime
-
-## Architecture
-
-```
-Flash SWF → SWFRecomp → C Code → Emscripten → WASM → Browser
-                                      ↓
-                            Canvas2D/WebGL2/WebGPU
-```
-
-The generated C code is **100% portable** - it compiles to both native and WASM with the same source.
-
-## Repository Structure
-
-```
-SWFModernRuntime/
-├── src/                    # Runtime source
-│   ├── libswf/            # Core SWF execution
-│   ├── actionmodern/      # ActionScript VM with variable storage improvements
-│   └── flashbang/         # Native GPU rendering
-└── include/               # Header files
-```
-
-## Building
-
-The runtime is tested through the Ruffle test harness (`ruffle-tests/verify_output.py`) and the old
-`SWFRecomp/tests/` suite. (The 2025 standalone variable-storage tests `test_*.c` / `Makefile.test*` were deleted
-in 7393244a4; recover with `git checkout 7393244a4^ -- SWFModernRuntime/Makefile.test`, etc.)
-
-### Integration with SWFRecomp
-
-This runtime is used by [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) when generating WASM builds. See the SWFRecomp repository for complete build instructions and working examples.
-
-## Current Status
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| **ActionScript VM** | ✅ Working | String ops, math, variables |
-| **Variable Storage** | ✅ Working | Copy-on-Store, array optimization |
-| **Memory Management** | ✅ Working | Proper cleanup, no leaks |
-| **Test Suite** | ✅ Complete | 1,100+ lines of tests |
-| **Frame execution** | ✅ Working | Frame-by-frame playback |
-| **Native GPU Rendering** | ✅ Working | SDL3 + WebGPU (upstream) |
-
-## Key Features in This Fork
-
-### Variable Storage Improvements
-- **Copy-on-Store**: Variables own their string data
-- **Array Optimization**: O(1) lookup for constant strings by ID
-- **Memory Management**: Proper heap allocation and cleanup
-- **Ownership Tracking**: No memory leaks or dangling pointers
-
-See the [branch differences document](https://github.com/PeerInfinity/SWFRecomp-CC-history/blob/master/SWFRecompDocs/deprecated/merge/swfmodernruntime-branch-differences.md) (historical, November 2025) for the details of that first divergence.
-
-## Upstream
-
-There is no sync. Upstream is tracked read-only in the combined repo's gitignored `upstream/` clones (`upstream/MERGE-ANALYSIS.md` is the log); behavioral findings about upstream's code are reported as GitHub issues on the org repo, per the arrangement agreed with LittleCube in July 2026.
-
-## License
-
-Same as upstream SWFModernRuntime (see [LICENSE](LICENSE)).
-
-## Credits
-
-- **Origin:** [SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) by LittleCube
-- **Origin:** [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) by LittleCube
-- **Inspiration:** [N64Recomp](https://github.com/N64Recomp/N64Recomp) by Wiseguy
-
----
-
-**Note:** This is a friendly fork. The upstream project (by LittleCube) is the architecture-first implementation of the same idea; this fork is the behavioral-parity implementation. The two exchange knowledge, not code.
+MIT, as upstream ([`LICENSE`](LICENSE)).

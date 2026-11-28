@@ -1,5 +1,9 @@
 # Cloud Environment Setup
 
+> **Superseded (2026-11-28) by [`GETTING_STARTED.md`](../../../../GETTING_STARTED.md)** at the repo root, which is
+> checked on a fresh clone. This page dates from 2026-02: its test paths and counts are out of date (tests now
+> install under `ruffle-tests/tests/swfs/<suite>/`). The cloud setup script is `scripts/cloud_env_setup.sh`.
+
 This document describes how to set up a fresh cloud environment (Ubuntu x86_64) to build
 the recompiler and run Ruffle AVM1 tests locally.
 

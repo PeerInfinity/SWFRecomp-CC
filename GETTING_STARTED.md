@@ -1,7 +1,7 @@
 # Getting started
 
-This page takes a fresh machine to one passing AVM1 test and one passing AVM2 test from Ruffle's test suite. See the end of this page for when it was last
-checked end to end on a fresh clone.
+This page takes a fresh machine to one passing AVM1 test and one passing AVM2 test from Ruffle's test suite, in
+about five minutes. See the end of this page for when it was last checked end to end on a fresh clone.
 
 Everything here is for **Linux x86_64**; the commands are for **Ubuntu 24.04**, which is what CI runs. Other
 distributions work if they have the same tools. On Windows, use WSL2.
@@ -10,14 +10,17 @@ distributions work if they have the same tools. On Windows, use WSL2.
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential cmake git python3 ccache
+sudo apt-get install -y build-essential cmake git ca-certificates python3 zlib1g-dev ccache
 ```
 
+(Drop `sudo` if you are root and it is not installed.)
+
 - `gcc`/`g++` 13 or newer, CMake 3.28 or newer, Python 3.10 or newer. The test harness uses only the Python standard
-  library.
+  library. `zlib1g-dev` is needed because the runtime links the system zlib (the recompiler bundles its own).
 - `ccache` is optional, but it makes the second and later test runs much faster: every test compiles the runtime
   sources, and ccache caches them.
-- About 4 GB of free disk for the repository, the build and the downloaded tests.
+- Disk: about 350 MB for this page (a shallow clone, the build, and the avm1 + avm2 tests); a few GB if you download
+  every suite and run many tests.
 
 ## 2. Clone
 
@@ -37,11 +40,12 @@ cmake -S SWFRecomp -B SWFRecomp/build -DCMAKE_BUILD_TYPE=Release
 cmake --build SWFRecomp/build -j"$(nproc)"
 ```
 
-This produces `SWFRecomp/build/SWFRecomp`, which turns a `.swf` into C. It takes a minute or two. Rebuild it after
+This produces `SWFRecomp/build/SWFRecomp`, which turns a `.swf` into C. It takes under a minute on 4 cores. One
+`-Wstringop-overflow` warning from `src/swf.cpp` is expected (a GCC false positive). Rebuild it after
 pulling changes to `SWFRecomp/`.
 
 **The runtime is not built separately.** `SWFModernRuntime/` is compiled together with each test's generated C by the
-test harness (step 5), so there is nothing to build for it now.
+test harness (section 5), so there is nothing to build for it now.
 
 ## 4. Download the tests
 
@@ -58,6 +62,10 @@ With no arguments it fetches only `avm1`. The other suites are `from_avmplus`, `
 `timeline`, `text`, `swf`, `import_assets`, `audio`, `fonts`, `mixed_avm` and `stage3d`. Re-running it refreshes the
 tests from Ruffle's current `master`. This project's own suite, `ruffle-tests/tests/swfs/regression/`, is part of the
 repository and needs no download.
+
+It prints a line like `avm1: found 766 directories` and then `Installed 792 tests`: the second number is larger
+because some test directories hold nested tests. It then prints one `flash-fix APPLIED` line per corrected golden;
+those are expected, not errors. It takes about a minute.
 
 ## 5. Run one test
 
@@ -76,21 +84,26 @@ python3 ruffle-tests/verify_output.py --test=add --diff --verbose
 python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/avm2 --test=hello_world --diff --verbose
 ```
 
-Each should end with:
+Each should print:
 
 ```
+[1/1] add... PASS
+...
 Total tests:     1
 Pass:            1 (100.0%)
+Fail:            0
 ```
 
-The first run takes longer (about half a minute) because the runtime sources are compiled for the first time.
+The first AVM1 test takes about 40 seconds on 4 cores and the first AVM2 test about a minute, because the runtime
+sources are compiled for the first time (AVM2 compiles a different set). With ccache, repeat runs of a test take
+under a second.
 
 - Any test directory works the same way: `--tests-dir=ruffle-tests/tests/swfs/<suite>` plus `--test=<directory name>`.
   Nested suites are directories too, for example `--tests-dir=ruffle-tests/tests/swfs/from_gnash/actionscript.all`.
-- `--diff` prints expected vs actual lines when they differ. The generated C stays in the test directory
-  (`RecompiledScripts/`, `RecompiledTags/`, and `RecompiledABC/` for AVM2), so you can read what the recompiler made.
+- `--diff` prints expected vs actual lines when they differ, and `--verbose` prints each test's status and phase
+  timings as it runs. The generated C stays in the test directory (`RecompiledScripts/`, `RecompiledTags/`, and `RecompiledABC/` for AVM2), so you can read what the recompiler made.
 - **Run single tests only.** The full corpus is more than 4,900 tests and takes hours on one machine; CI runs it
-  sharded (step 7).
+  sharded (see section 7).
 
 These runs use the default **no-graphics** build: the headless player loop (`SWFModernRuntime/src/libswf/swf_core.c`)
 with no renderer. That is enough for trace output.
@@ -104,13 +117,14 @@ in. Trace results are the same as no-graphics apart from a few audio rows.
 1. Install software Vulkan and the optional codec libraries:
 
    ```bash
-   sudo apt-get install -y pkg-config mesa-vulkan-drivers libvulkan1 libavcodec-dev libavutil-dev libswscale-dev libjxr-dev liblzma-dev
+   sudo apt-get install -y curl pkg-config mesa-vulkan-drivers libvulkan1 libavcodec-dev libavutil-dev libswscale-dev libjxr-dev liblzma-dev
    ```
 
-   The codec libraries are optional; without them, the few tests that decode AAC audio or JPEG-XR images fail.
+   `curl` is for the Dawn download below. The codec libraries are optional; without them, the few tests that decode AAC audio or JPEG-XR images fail.
 
 2. Get a Dawn build. The harness looks for it in `dawn-install/` **next to** the repository (`../dawn-install`), or
-   wherever the `DAWN_INSTALL` environment variable points. Either:
+   wherever the `DAWN_INSTALL` environment variable points. (The tarball's own `MANIFEST.txt` suggests `~/CC`; that
+   matches only if you cloned into `~/CC`, so follow the command here or set `DAWN_INSTALL`.) Either:
    - download the prebuilt one that CI uses (Ubuntu 24.04 x86_64, 29 MB, built from the commit pinned in
      `scripts/build_dawn.sh`):
 
@@ -129,18 +143,21 @@ in. Trace results are the same as no-graphics apart from a few audio rows.
 3. Run a test in graphics mode:
 
    ```bash
-   python3 ruffle-tests/verify_output.py --test=add --mode=graphics --diff
+   python3 ruffle-tests/verify_output.py --test=add --mode=graphics --diff --verbose
+   python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/avm2 --test=hello_world --mode=graphics --diff --verbose
    ```
 
-To compare rendered frames with the tests' expected PNGs as well, install Pillow (`python3 -m pip install Pillow`) and
-add `--images`. Image comparisons are reported separately and never decide a test's pass or fail. More detail:
+   The first graphics run compiles the renderer too, about 45 seconds.
+
+To compare rendered frames with the tests' expected PNGs as well, install Pillow (`sudo apt-get install -y python3-pil`;
+plain `pip install` is refused by Ubuntu's system Python) and add `--images`. Image comparisons are reported separately and never decide a test's pass or fail. More detail:
 [`HEADLESS_SETUP.md`](ruffle-tests/tests/swfs/_investigation/HEADLESS_SETUP.md).
 
 ## 7. Where the results and CI are
 
 - **Result tables:** [`ruffle-tests/results/`](ruffle-tests/results/README.md). `RUFFLE_RESULTS_GRAPHICS.md` is the
   per-suite summary from the most recent graphics-mode CI run. Per-test detail (status, timings, diffs) is in each
-  suite's `ruffle-tests/tests/swfs/<suite>/_results/`.
+  suite's `ruffle-tests/tests/swfs/<suite>/_results/` (for `from_gnash`, in each sub-suite's `_results/`).
 - **Project state:** [`SWFRecompDocs/plans/PROJECT_STATE.md`](SWFRecompDocs/plans/PROJECT_STATE.md), with the dated
   headline numbers and what is still worth doing.
 - **CI:** [`.github/workflows/ruffle-tests.yml`](.github/workflows/ruffle-tests.yml) ("Ruffle Tests"). It is dispatched
