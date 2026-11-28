@@ -19,6 +19,7 @@ lives at the path given.
 | o1heap (Pavel Kirienko) | `SWFModernRuntime/lib/o1heap/` | MIT | header of `o1heap.h` |
 | SDL3 | `SWFModernRuntime/lib/SDL3/` | zlib (some sub-components differ; see its tree) | `SWFModernRuntime/lib/SDL3/LICENSE.txt` |
 | sdl3webgpu | `SWFModernRuntime/lib/sdl3webgpu/` | MIT | header of `sdl3webgpu.c` |
+| Ruffle (ported semantics) | functions in `SWFModernRuntime/src/{avm2,actionmodern,libswf,rendering}/` and `SWFRecomp/src/abc/` whose comments say they are a port of Ruffle code (about 30 files; `git grep -il "port.* ruffle"`) | MIT (Ruffle is MIT OR Apache-2.0; used under MIT) | `SWFModernRuntime/third_party/ruffle/LICENSE-MIT.txt` |
 | **Noto Sans** | `SWFRecomp/assets/NotoSans.ttf` (embedded in the Emscripten build of the recompiler as the device-font fallback) | **SIL OFL 1.1** | `SWFRecomp/assets/NotoSans-OFL.txt` |
 | 04b_03 font | `SWFRecomp/tests/graphics/define_edit_text/04B_03__.TTF` (test fixture only, not shipped in any build) | its author's own terms | — |
 
