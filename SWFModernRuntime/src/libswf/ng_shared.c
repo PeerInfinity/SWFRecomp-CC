@@ -505,6 +505,8 @@ static struct ng_font_ent {
 	   units), sorted by (left << 16 | right). NULL / 0 when the font has none. */
 	const s32* kern_pairs;
 	size_t kern_count;
+	/* s30 w2-rm-avm1-gnash-land: DefineFont2/3 SmallText flag (0x20). */
+	u8 small_text;
 } *ng_fonts;
 static size_t ng_fonts_cap = 0;
 
@@ -699,6 +701,14 @@ void ng_record_font_kerning(u16 font_id, const s32* pairs, size_t count)
 			ng_fonts[i].kern_count = pairs ? count : 0;
 			return;
 		}
+	}
+}
+
+// s30 w2-rm-avm1-gnash-land: the font was defined with the SmallText flag.
+void ng_record_font_small_text(u16 font_id)
+{
+	for (size_t i = 0; i < ng_font_count; i++) {
+		if (ng_fonts[i].font_id == font_id) { ng_fonts[i].small_text = 1; return; }
 	}
 }
 
@@ -1636,6 +1646,15 @@ static u16 ng_decode_utf8_char(const char* text, size_t text_len, size_t* pos)
 
 static int ng_device_font_mode = 0;
 void ng_setDeviceFontMode(int mode) { ng_device_font_mode = mode; }
+// s30 w2-rm-avm1-gnash-land: set by the AVM1 textWidth getter only
+// (computeTextFieldDimension). FP32 measures a SmallText embedded font's
+// textWidth as the sum of ceil(advance x size / em) whole pixels per glyph
+// (gnash misc-ming.all/EmbeddedFontTest golden: all 12 widths exact); with
+// SmallText cleared it gives the unrounded sum, truncated (FP32
+// embeddedfont_smalltext_probe off.lnx.txt). Autosize, wrapping, textHeight
+// and rendering are untouched.
+static int ng_small_text_ceil_mode = 0;
+void ng_setSmallTextCeilMode(int mode) { ng_small_text_ceil_mode = mode; }
 
 static int ng_round_to_pixel(int twips) {
 	double px = (double)twips / 20.0;
@@ -1974,6 +1993,8 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 		int cur_width_twips = 0;
 		int cur_trimmed_twips = 0;
 		int _tw_ls_r = ng_device_font_mode ? ng_round_ls_to_pixel(letter_spacing_twips) : 0;
+		int _tw_st_ceil = ng_small_text_ceil_mode && !ng_device_font_mode &&
+		    ng_fonts[fi].small_text && !ng_fonts[fi].is_builtin;
 		for (size_t i = 0; i < text_len; ) {
 			unsigned char c = (unsigned char)text[i];
 			if (c == '\r' || c == '\n') {
@@ -1998,7 +2019,13 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 			int glyph_twips = 0;
 			if (adv >= 0) {
 				int raw = (int)((float)adv * (float)font_height / (float)em);
-				if (ng_device_font_mode) {
+				if (_tw_st_ceil) {
+					long long num = (long long)adv * (long long)font_height;
+					long long den = (long long)em * 20;
+					glyph_twips = (int)(((num + den - 1) / den) * 20) + letter_spacing_twips;
+					if (glyph_twips <= 0 && letter_spacing_twips < 0)
+						glyph_twips = raw;
+				} else if (ng_device_font_mode) {
 					int unspaced = ng_round_to_pixel(raw);
 					if (_tw_ls_r != 0) {
 						int spaced = unspaced + _tw_ls_r;

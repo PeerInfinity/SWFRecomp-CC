@@ -655,6 +655,25 @@ extern MovieClip* g_current_context;
 extern void actionSetCurrentContext(MovieClip* mc);
 
 // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
+// s30 w1-rm-avm1-gnash: a sprite's own frame-1 DoAction and its onClipLoad
+// can run before process_sprite_init_at_depth copies the DefineSprite HEADER
+// frame count into the clip, so they read the createMovieClip defaults (1/1/1).
+// FP32 (gnash misc-swfmill.all/zeroframe_definesprite, golden
+// a00b11c22d000) reads the header there: _framesloaded = _totalframes =
+// declared, and _currentframe = 0 for a 0-frame sprite. Idempotent with the
+// later init (same values).
+static void sync_sprite_counters_pre_init(DisplayObject* obj, MovieClip* mc)
+{
+	if (obj == NULL || mc == NULL || !obj->sprite_needs_init) return;
+	if (obj->char_id == 0 || obj->char_id >= dictionary_capacity) return;
+	Character* ch = &dictionary[obj->char_id];
+	if (ch->type != CHAR_TYPE_SPRITE) return;
+	mc->totalframes = (int)ch->sprite_declared_frames;
+	mc->framesloaded = (int)ch->sprite_declared_frames;
+	if (ch->sprite_declared_frames == 0)
+		mc->currentframe = 0;
+}
+
 void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
 {
 	DisplayObject* saved = g_current_sprite_obj;
@@ -668,6 +687,7 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
 		// during advance_sprite_frames display-list loop-back re-execution.
 		MovieClip* mc = ng_mc_for_sprite_obj(obj);
 		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); actionSetBaseClip(mc); }
+		sync_sprite_counters_pre_init(obj, mc);
 	}
 
 	// Each sprite frame starts with a fresh SetTarget state (no explicit root target)
@@ -13250,6 +13270,7 @@ static void aq_dispatch_clip_load(SWFAppContext* app_context, void* user)
 		MovieClip* mc = actionFindOrCreateMovieClip(
 			app_context, pcl->obj->instance_name, parent);
 		if (mc) actionSetCurrentContext(mc);
+		sync_sprite_counters_pre_init(pcl->obj, mc);
 	}
 	pcl->action(app_context);
 	actionSetCurrentContext(saved_ctx);
@@ -17271,6 +17292,13 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
 void tagDefineFontKerning(u16 font_id, const s32* pairs, size_t count)
 {
 	ng_record_font_kerning(font_id, pairs, count);
+}
+
+// s30 w2-rm-avm1-gnash-land: emitted by the recompiler only for a
+// DefineFont2/3 with the SmallText flag (0x20).
+void tagDefineFontSmallText(u16 font_id)
+{
+	ng_record_font_small_text(font_id);
 }
 
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)

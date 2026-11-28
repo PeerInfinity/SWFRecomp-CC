@@ -1654,3 +1654,45 @@ left along each line.
 em-1024 fonts (`SWF_TF_LOW_ADV_CEIL=0` kills it, `SWF_TF_LOW_ADV_CEIL_MINVER` moves the edge). The 7-vs-8 edge and
 the SmallText-only question are open (w2b-lowq-text LOCAL ORACLE REQUEST 1, `w2b-lowq-text-fixtures/
 swfver_ceil_probe/`). Prune criterion: Ruffle lays out SWF 7+ DefineFont2 text with whole-px advances at LOW.
+## s30 `XML.prototype.load` on a non-XML receiver (s30 w2-rm-avm1-gnash-land, 2026-11-27)
+
+**Tests:** `from_gnash/actionscript.all/LoadVars-v6`, `-v7`, `-v8` (LoadVars.as:183, 195-197).
+
+`x = new LoadVars(); x.load = XML.prototype.load; x.load("vars.txt")`. FP32 (the corpus golden is Flash, s28
+trace-provenance) returns `true` and delivers the response through the RECEIVER's `onData` (LoadVars: decode, then
+`onLoad`, which sees `x['var2'] == 'val2'`). Ruffle (`core/src/avm1/globals/xml.rs:414`, `if let NativeObject::Xml(_)
+= this.native()`) returns `false` and loads nothing; `output.ruffle.txt` prints `FAILED: expected: true obtained:
+false`.
+
+**Decision:** match Flash (landed: `builtin_xml_load` accepts any receiver; the XML DOM reset and `status`/`loaded`
+slots stay XML-only, `aq_dispatch_xml_load`). A plain-Object receiver (no `onData`) is unprobed: it returns true and
+fires nothing. Prune criterion: Ruffle drops the native check.
+
+## s30 SetMember on a version-hidden native MovieClip.prototype member (s30 w2-rm-avm1-gnash-land, 2026-11-27)
+
+**Tests:** `from_gnash/actionscript.all/Sound-v5` (Sound.as:240-269); `regression/avm1_asnative_mc_probe_swf5`
+(section B).
+
+SWF5: `MovieClip.prototype.createEmptyMovieClip = ASnative(901, 0); createEmptyMovieClip('c1', 1)`. FP32 creates
+`_level0.c1` (`w1-local-oracles/w1-rm-avm1-gnash/avm1_asnative_mc_probe/swf5.lnx.txt` line B: `typeof a2=movieclip`):
+a script SetMember of the SWF6-tagged member clears (or bypasses) its version-hide flag. Ruffle keeps the attributes
+on `set_local` (`script_object.rs`), so the bare call stays undefined and every later Sound check binds to `_root`
+(`obtained: 76`).
+
+Same row, second rule: in SWF5 a `Sound` bound to a clip loses the association on `removeMovieClip()` even when the
+clip has an `onUnload` handler (Sound.as:268-269 `typeof(s2.getVolume()) == 'undefined'` PASSED in FP32; gnash marks
+it `xcheck`). Ruffle keeps the binding through the deferred-removal window in every version.
+
+**Decision:** match Flash (landed: `actionSetMember` clears the hide bits when the member still holds its native
+stub; `actionCallFunction`'s `createEmptyMovieClip` SWF5 gate defers to the now-visible member;
+`resolveSoundOwner` drops a pending-removal owner at SWF<6). Prune criterion: Ruffle clears attributes on
+SetMember, or a Flash capture contradicts either rule.
+
+## s30 ASnative(900/901, n) identity: fresh object per call at SWF6+ (s30 w2-rm-avm1-gnash-land, 2026-11-27)
+
+**Test:** `regression/avm1_asnative_mc_probe_swf6` (section D; FP32 golden `swf6.lnx.txt`).
+
+FP32 SWF6: `ASnative(901,0) == MovieClip.prototype.createEmptyMovieClip` is **false**, and two `ASnative(901,0)` calls
+compared are **false**; SWF5 prints true/true. Ruffle's side was not checked (no corpus row grades it); this is an
+ours≠Flash record more than a Ruffle≠Flash one. **Decision:** match Flash (landed: `actionMCNativeByASnativeId` returns a fresh wrapper
+of the stub at SWF6+, mapped back by `actionMCNativeStubOf`). Prune criterion: none.

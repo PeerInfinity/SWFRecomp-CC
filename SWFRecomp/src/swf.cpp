@@ -2944,6 +2944,9 @@ namespace SWFRecomp
 					// Store bold/italic flags
 					font_bold_flags[font_id] = (flags & 0x01) != 0;
 					font_italic_flags[font_id] = (flags & 0x02) != 0;
+					// s30 w2-rm-avm1-gnash-land: SmallText (FP32 textWidth
+					// ceils each glyph advance to a whole pixel for these fonts only)
+					font_smalltext_flags[font_id] = (flags & 0x20) != 0;
 
 					// FontName
 					tag.clearFields();
@@ -3484,6 +3487,9 @@ namespace SWFRecomp
 									 << to_string(kern_pairs.size())
 									 << ");" << endl;
 						}
+						if (font_smalltext_flags.count(font_id) && font_smalltext_flags[font_id])
+							tag_init << "\t\t" << "tagDefineFontSmallText("
+									 << charId(font_id) << ");" << endl;
 						tag_init << "\t" << "}" << endl;
 						// Emit glyph base index for runtime glyph rendering
 						auto gb_it = font_glyph_bases.find(font_id);

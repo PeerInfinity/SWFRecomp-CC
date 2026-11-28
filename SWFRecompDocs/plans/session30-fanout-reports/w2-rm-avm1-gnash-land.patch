@@ -1,0 +1,1257 @@
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index cc08707a..269e7bf1 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -223,6 +223,8 @@ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base);
+ // DefineFont2/3 kerning table: count triples (left_code, right_code,
+ // adjustment in EM units), sorted by (left << 16 | right).
+ void tagDefineFontKerning(u16 font_id, const s32* pairs, size_t count);
++// s30 w2-rm-avm1-gnash-land: DefineFont2/3 SmallText flag (textWidth ceil).
++void tagDefineFontSmallText(u16 font_id);
+ // `deblocking` is the tag's VideoFlagsDeblocking field (UB[3]) — a
+ // VIDEO_DEBLOCK_* value from actionmodern/video_codec.h.
+ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
+@@ -647,6 +649,8 @@ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
+     const u16* code_table, const s32* advance_table, size_t glyph_count);
+ void ng_record_font_glyph_base(u16 font_id, size_t glyph_base);
+ void ng_record_font_kerning(u16 font_id, const s32* pairs, size_t count);
++void ng_record_font_small_text(u16 font_id);
++void ng_setSmallTextCeilMode(int mode);
+ s32 ng_font_kerning_by_idx(int font_idx, u16 left, u16 right);
+ int ng_find_font_with_metrics(u16 font_id);
+ int ng_font_find_glyph(int font_idx, u16 code_point);
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index f878fe18..7da5ac47 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -1941,6 +1941,12 @@ static MovieClip* resolveSoundOwner(SWFAppContext* app_context, ASObject* sound_
+ 	// dynamic_props which survives the deferred-removal window.
+ 	if (mc != &root_movieclip && mc->depth == INT_MIN)
+ 		return NULL;
++	// s30 w2-rm-avm1-gnash-land: SWF5 loses the association no matter the
++	// onUnload handler (FP32 gnash Sound-v5 golden, Sound.as:268-269 PASSED
++	// `typeof(s2.getVolume()) == 'undefined'`; Ruffle keeps it — RvF). The
++	// deferred-removal window keeps the binding only at SWF6+.
++	if (mc != &root_movieclip && g_swf_version < 6 && (mc->pending_removal || mc->avm1_removed))
++		return NULL;
+ 	return mc;
+ }
+ 
+@@ -5460,6 +5466,52 @@ static ActionVar builtin_object_unwatch(SWFAppContext* app_context, ActionVar* a
+ 
+ // Built-in Object.prototype.addProperty(name, getter, setter)
+ // Callable via Function.call: Object.addProperty.call(target, name, getter, setter)
++// s30 w1-rm-avm1-gnash (s28 B12): addProperty of a WATCHED name that did not
++// exist fires the watcher once (name, undefined, undefined, userData;
++// this = obj), and its return becomes the getter/setter's underlying value;
++// an existing name does not fire it (FP32 gnash Object.as:797-823,
++// Object-v6..v8 golden). Called by both addProperty paths (the
++// builtin_object_addProperty value and actionCallMethod's OBJECT arm).
++static void addPropertyFireWatcher(SWFAppContext* app_context, ASObject* obj,
++                                   const char* prop_name, u32 prop_name_len)
++{
++	for (int _wi = 0; _wi < g_watch_count; _wi++) {
++		if (g_watch_table[_wi].obj != obj || g_watch_table[_wi].mc != NULL) continue;
++		if (g_watch_table[_wi].prop_name_len != prop_name_len ||
++		    strncmp(g_watch_table[_wi].prop_name, prop_name, prop_name_len) != 0) continue;
++		ASFunction* _wf = g_watch_table[_wi].watcher_func;
++		if (_wf == NULL) return;
++		int _t2 = (_wf->function_type == 2 && _wf->advanced_func != NULL);
++		int _t1 = (_wf->function_type == 1 && _wf->simple_func != NULL);
++		if (!_t2 && !_t1) return;
++		if (watchReentryBlocked(obj, NULL, prop_name, prop_name_len)) return;
++		ActionVar _old = {0}; _old.type = ACTION_STACK_VALUE_UNDEFINED;
++		ActionVar _val = {0}; _val.type = ACTION_STACK_VALUE_UNDEFINED;
++		ActionVar _wthis = {0};
++		_wthis.type = ACTION_STACK_VALUE_OBJECT;
++		_wthis.data.numeric_value = (u64) obj;
++		ActionVar _ud = g_watch_table[_wi].user_data;
++		watch_firing_push(obj, NULL, prop_name, prop_name_len);
++		// Same per-type flags/ownership as the object SetMember watch site.
++		if (_t2)
++			invokeWatchCallback(app_context, _wf, &_ud,
++				&_wthis, prop_name, prop_name_len, &_old, &_val,
++				INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
++				INV_BIND_THIS | INV_VERSION_SWITCH,
++				4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/1);
++		else
++			invokeWatchCallback(app_context, _wf, &_ud,
++				&_wthis, prop_name, prop_name_len, &_old, &_val,
++				INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_VERSION_SWITCH,
++				4, /*pname_owns*/1, /*free_pname*/0, /*clear_owns*/1);
++		watch_firing_pop();
++		// Re-find: the watcher may have grown obj->properties.
++		ASProperty* _p2 = findPropertyRaw(obj, prop_name, prop_name_len);
++		if (_p2 != NULL) _p2->value = _val;
++		return;
++	}
++}
++
+ static ActionVar builtin_object_addProperty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	ActionVar ret = {0};
+@@ -5525,6 +5577,7 @@ static ActionVar builtin_object_addProperty(SWFAppContext* app_context, ActionVa
+ 		// (amf_serialize_typed_objects cases 11 and 17).
+ 		if (_addprop_created) prop->flags |= PROPERTY_FLAG_ENUMERABLE;
+ 		ret.data.numeric_value = 1; // true
++		if (_addprop_created) addPropertyFireWatcher(app_context, obj, prop_name, prop_name_len);
+ 	}
+ 	return ret;
+ }
+@@ -8270,6 +8323,19 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
+ 		return asnativeUnknownMinor(class_id);
+ 	}
+ 
++	// Class 900/901: MovieClip.prototype natives.
++	if (class_id == 900 || class_id == 901) {
++		extern ASFunction* actionMCNativeByASnativeId(SWFAppContext*, u32, u32);
++		ASFunction* fn = actionMCNativeByASnativeId(app_context, class_id, method_index);
++		if (fn != NULL) {
++			ActionVar result = {0};
++			result.type = ACTION_STACK_VALUE_FUNCTION;
++			VAL(u64, &result.data.numeric_value) = (u64)fn;
++			return result;
++		}
++		return asnativeUnknownMinor(class_id);
++	}
++
+ 	return asnativeUnknownMinor(class_id);
+ }
+ 
+@@ -17973,6 +18039,79 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
+ 		g_mc_ctor_modern = &g_movieclip_constructor;
+ }
+ 
++// s30 w1-rm-avm1-gnash: ASnative(900, n) / ASnative(901, n) are the
++// MovieClip.prototype natives (gnash MovieClip_as.cpp:207-255 table; FP32
++// setProperty.as:30 `createSprite = ASnative(901, 0); createSprite("mc1",10)`
++// and Sound.as:240 PASSED). Returns the matching g_mc_method_funcs stub (SWF5)
++// or a fresh wrapper of it (SWF6+, below), or NULL for an id whose method has
++// no stub here.
++typedef struct McNativeWrap { ASFunction* wrap; ASFunction* stub; } McNativeWrap;
++static McNativeWrap* g_mc_native_wraps = NULL;
++static u32 g_mc_native_wrap_count = 0, g_mc_native_wrap_cap = 0;
++ASFunction* actionMCNativeByASnativeId(SWFAppContext* app_context, u32 major, u32 minor)
++{
++	static const char* const k900[] = {
++		"attachMovie", "swapDepths", "localToGlobal", "globalToLocal", "hitTest",
++		"getBounds", "getBytesTotal", "getBytesLoaded", "attachAudio", "attachVideo",
++		"getDepth", "setMask", "play", "stop", "nextFrame", "prevFrame",
++		"gotoAndPlay", "gotoAndStop", "duplicateMovieClip", "removeMovieClip",
++		"startDrag", "stopDrag", "getNextHighestDepth", "getInstanceAtDepth",
++		"getSWFVersion", "attachBitmap", "getRect"
++	};
++	static const char* const k901[] = {
++		"createEmptyMovieClip", "beginFill", "beginGradientFill", "moveTo", "lineTo",
++		"curveTo", "lineStyle", "endFill", "clear", "lineGradientStyle",
++		"beginMeshFill", "beginBitmapFill"
++	};
++	const char* name = NULL;
++	if (major == 900 && minor < sizeof(k900) / sizeof(k900[0])) name = k900[minor];
++	else if (major == 901 && minor < sizeof(k901) / sizeof(k901[0])) name = k901[minor];
++	if (name == NULL) return NULL;
++	initMovieClipPrototype(app_context);
++	ASFunction* stub = NULL;
++	for (int i = 0; i < MC_METHOD_COUNT; i++)
++		if (strcmp(g_mc_method_funcs[i].name, name) == 0) { stub = &g_mc_method_funcs[i]; break; }
++	if (stub == NULL) return NULL;
++	// s30 w2-rm-avm1-gnash-land (FP32 avm1_asnative_mc_probe section D): at
++	// SWF6+ every ASnative(900|901, n) call hands out a FRESH function object
++	// (`ASnative(901,0) == MovieClip.prototype.createEmptyMovieClip` and two
++	// calls compared are both false); SWF5 prints true/true, so it keeps the
++	// shared stub. The wrapper is a copy of the stub bound to the same arm
++	// (same name, same advanced_func for the real-function natives) and is
++	// registered so actionMCNativeStubOf maps it back for every
++	// g_mc_method_funcs identity check.
++	if (g_swf_version < 6) return stub;
++	ASFunction* w = (ASFunction*) calloc(1, sizeof(ASFunction));
++	if (w == NULL) return stub;
++	memcpy(w, stub, sizeof(ASFunction));
++	w->gc_next = NULL; w->gc_epoch = 0;
++	w->own_props = NULL; w->prototype_obj = NULL;
++	actionGcLinkFunction(w);
++	if (g_mc_native_wrap_count == g_mc_native_wrap_cap) {
++		u32 nc = g_mc_native_wrap_cap ? g_mc_native_wrap_cap * 2 : 16;
++		McNativeWrap* nt = (McNativeWrap*) realloc(g_mc_native_wraps, nc * sizeof(McNativeWrap));
++		if (nt == NULL) { free(w); return stub; }
++		g_mc_native_wraps = nt; g_mc_native_wrap_cap = nc;
++	}
++	g_mc_native_wraps[g_mc_native_wrap_count].wrap = w;
++	g_mc_native_wraps[g_mc_native_wrap_count].stub = stub;
++	g_mc_native_wrap_count++;
++	return w;
++}
++
++// s30 w2-rm-avm1-gnash-land: the g_mc_method_funcs stub `f` stands for —
++// `f` itself when it is one, the stub a fresh ASnative(900|901, n) wrapper
++// was copied from, else NULL. The table only grows on ASnative(900|901)
++// calls at SWF6+, so the scan is empty for every other movie.
++ASFunction* actionMCNativeStubOf(ASFunction* f)
++{
++	if (f == NULL) return NULL;
++	if (f >= &g_mc_method_funcs[0] && f < &g_mc_method_funcs[MC_METHOD_COUNT]) return f;
++	for (u32 i = 0; i < g_mc_native_wrap_count; i++)
++		if (g_mc_native_wraps[i].wrap == f) return g_mc_native_wraps[i].stub;
++	return NULL;
++}
++
+ // TextField constructor function and prototype
+ static ASFunction g_textfield_constructor;
+ static int g_textfield_constructor_init = 0;
+@@ -22157,7 +22296,10 @@ static void aq_dispatch_xml_load(SWFAppContext* app_context, void* user) {
+ 	if (doc != NULL) {
+ 		if (d->content != NULL && d->content_length > 0) {
+ 			// Orphan existing children (the real DOM list) before re-parsing
+-			ActionVar* cn = getProperty(doc, "__realChildren", 14);
++			// (XML receivers only: XML.prototype.load borrowed by a LoadVars
++			// delivers straight to its onData, builtin_xml_load).
++			ActionVar* cn = (doc->native_type == NATIVE_XML)
++				? getProperty(doc, "__realChildren", 14) : NULL;
+ 			if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
+ 				ASArray* children = (ASArray*) cn->data.numeric_value;
+ 				if (children != NULL) {
+@@ -22174,9 +22316,11 @@ static void aq_dispatch_xml_load(SWFAppContext* app_context, void* user) {
+ 					children->length = 0;
+ 				}
+ 			}
+-			xml_rebuild_childnodes(app_context, doc);
+-			xml_set_null(app_context, doc, "firstChild", 10);
+-			xml_set_null(app_context, doc, "lastChild", 9);
++			if (doc->native_type == NATIVE_XML) {
++				xml_rebuild_childnodes(app_context, doc);
++				xml_set_null(app_context, doc, "firstChild", 10);
++				xml_set_null(app_context, doc, "lastChild", 9);
++			}
+ 
+ 			// The response has arrived: NOW the byte counters get their real
+ 			// values, immediately before onData fires (Ruffle
+@@ -22226,10 +22370,14 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
+ 	if (this_obj == NULL) { ret.data.numeric_value = 0; return ret; }
+ 	ASObject* doc = (ASObject*) this_obj;
+ 
+-	// Ruffle: XML.prototype.load returns false when `this` is not an XML native.
+-	// core/src/avm1/globals/xml.rs:414 — `if let NativeObject::Xml(_) = this.native()`.
+-	// The LoadVars test reassigns `x.load = XML.prototype.load` and expects false.
+-	if (doc->native_type != NATIVE_XML) { ret.data.numeric_value = 0; return ret; }
++	// Ruffle returns false when `this` is not an XML native (xml.rs:414), but
++	// FP32 loads into ANY receiver and delivers through its onData: gnash
++	// LoadVars.as:195-197 `x.load = XML.prototype.load; x.load(vars.txt)`
++	// PASSED `== true`, then x.onLoad saw `x['var2'] == 'val2'` (:183) — the
++	// LoadVars onData decoded it (s30 w1-rm-avm1-gnash, s28 B18; RvF).
++	// A non-XML receiver keeps its own state: no DOM reset, no XML status /
++	// loaded slots (unprobed; see aq_dispatch_xml_load's is_xml gate).
++	int _xl_is_xml = (doc->native_type == NATIVE_XML);
+ 
+ 	// Get URL argument
+ 	char url_utf8[512];
+@@ -22240,7 +22388,7 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
+ 	}
+ 
+ 	// Set loaded = false initially (observable synchronously)
+-	xml_store_loaded(app_context, doc, 0);
++	if (_xl_is_xml) xml_store_loaded(app_context, doc, 0);
+ 
+ 	// Request phase. Ruffle's spawn_xml_fetch (core/src/avm1/globals/xml.rs:541-565)
+ 	// creates/resets the byte counters to `_bytesLoaded = 0` and
+@@ -22265,7 +22413,7 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
+ 	int success = 0;
+ 
+ 	if (data != NULL && data->content != NULL && data->content_length > 0) {
+-		xml_store_status(app_context, doc, 0.0);
++		if (_xl_is_xml) xml_store_status(app_context, doc, 0.0);
+ 		success = 1;
+ 	}
+ 
+@@ -37151,6 +37299,8 @@ typedef struct ClosureFrame {
+ 	ASObject* saved_global;
+ 	int saved_movie_idx;
+ 	u8 flags;
++	MovieClip* saved_base;  // s30 w1-rm-avm1-gnash: g_base_clip across a CF_CTX_RECEIVER call
++	u8 base_set;
+ } ClosureFrame;
+ 
+ static void enterClosureFrame(SWFAppContext* app_context, ClosureFrame* cf,
+@@ -37158,6 +37308,7 @@ static void enterClosureFrame(SWFAppContext* app_context, ClosureFrame* cf,
+ {
+ 	cf->flags = cf_flags;
+ 	cf->saved_ver = 0; cf->saved_global = NULL; cf->saved_movie_idx = 0;
++	cf->saved_base = NULL; cf->base_set = 0;
+ 
+ 	if (cf_flags & CF_VERSION)
+ 		switchToFunctionVersion(func, &cf->saved_ver, &cf->saved_global, &cf->saved_movie_idx);
+@@ -37221,6 +37372,13 @@ static void enterClosureFrame(SWFAppContext* app_context, ClosureFrame* cf,
+ 	{
+ 		actionSetCurrentContext(ctx_receiver);
+ 		g_current_sprite_obj = NULL;
++		// s30 w1-rm-avm1-gnash: a v5 (non-closure) call's base clip is
++		// this_do, the receiver (Ruffle function.rs:303-309), so setTarget("")
++		// inside it returns to the receiver (FP32 setProperty-v5 :233
++		// `_root.checkpoint == "/mc3"`).
++		cf->saved_base = g_base_clip;
++		cf->base_set = 1;
++		g_base_clip = ctx_receiver;
+ 	}
+ }
+ 
+@@ -37237,6 +37395,8 @@ static void leaveClosureFrame(SWFAppContext* app_context, ClosureFrame* cf)
+ 		}
+ 		scope_depth = cf->saved_scope_depth;
+ 	}
++	if (cf->base_set)
++		g_base_clip = cf->saved_base;
+ 	// Unconditional: a no-op assignment when CF_CTX never fired.
+ 	actionSetCurrentContext(cf->saved_ctx);
+ 	g_current_sprite_obj = cf->saved_sprite;
+@@ -48077,7 +48237,16 @@ static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, Action
+ 	ASProperty* own_loaded = findPropertyRaw(target, "loaded", 6);
+ 	if (own_loaded == NULL) {
+ 		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
+-		setProperty(app_context, target, "loaded", 6, &lf);
++		// s30 w1-rm-avm1-gnash (s28 B18): an INHERITED `loaded` accessor
++		// (an XML target: XML.prototype.loaded) takes the write through its
++		// setter, so the target gets no own `loaded` (FP32 LoadVars.as:139
++		// `!r.hasOwnProperty("loaded")` for r = new XML, typeof boolean :140),
++		// exactly as builtin_xml_sendAndLoad does.
++		ASProperty* inh_loaded = findPropertyStructWithPrototype(target, "loaded", 6);
++		if (inh_loaded != NULL && inh_loaded->setter != NULL)
++			invokeVirtualSetter(app_context, inh_loaded, (void*) target, &lf);
++		else
++			setProperty(app_context, target, "loaded", 6, &lf);
+ 	}
+ 	// Initialize _bytesLoaded = 0 / _bytesTotal = 0 on the target so
+ 	// getBytesLoaded()/getBytesTotal() return numbers instead of undefined.
+@@ -59571,6 +59740,23 @@ void actionSetMember(SWFAppContext* app_context)
+ 			{
+ 				return;
+ 			}
++			// s30 w2-rm-avm1-gnash-land (FP32 avm1_asnative_mc_probe section
++			// B): a script SetMember of a version-hidden NATIVE MovieClip.
++			// prototype member clears its hide flag, so in SWF5
++			// `MovieClip.prototype.createEmptyMovieClip = ASnative(901,0);
++			// createEmptyMovieClip('c1', 1)` works (gnash Sound.as:240). Ruffle
++			// keeps the attributes on set_local (RvF). Gated to a member that
++			// still holds its g_mc_method_funcs stub, so a script-defined
++			// hidden property keeps its flags.
++			if (prop_name != NULL && prop_name_len > 0)
++			{
++				extern ASFunction* actionMCNativeStubOf(ASFunction* f);
++				ASProperty* _hp = findPropertyRaw(obj, prop_name, prop_name_len);
++				if (_hp != NULL && _hp->value.type == ACTION_STACK_VALUE_FUNCTION &&
++				    isPropertyHiddenAtVersion(_hp->flash_flags) &&
++				    actionMCNativeStubOf((ASFunction*)(uintptr_t)_hp->value.data.numeric_value) != NULL)
++					_hp->flash_flags &= (u16)~0x7580;
++			}
+ 			// MovieClip.prototype.transform is ReadOnly + DontDelete in SWF8+
+ 			// (gnash actionscript.all/flash.as:90-96): writes silently fail and
+ 			// hasOwnProperty stays true after delete. SWF<8 allows the write.
+@@ -63325,9 +63511,11 @@ static __attribute__((noinline)) int computeTextFieldDimension(
+ 		}
+ 		int ls_twips = getLetterSpacingTwips(mc);
+ 		setDeviceFontModeForMC(mc);
++		ng_setSmallTextCeilMode(1);  // s30 w2-rm-avm1-gnash-land (SmallText ceil)
+ 		int tw_twips = ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
+ 		    word_wrap, field_width_twips, g_swf_version,
+ 		    left_margin_twips, right_margin_twips, indent_twips, align, ls_twips);
++		ng_setSmallTextCeilMode(0);
+ 		// Device text keeps its aspect ratio: textWidth is reported in the
+ 		// field's local space, i.e. scaled by d/a of the concatenated matrix
+ 		// (Ruffle edit_text.rs layout_to_local_matrix device_font_scale_x;
+@@ -64763,6 +64951,11 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 								} else {
+ 									_dx += (double)bxmin / 20.0;
+ 								}
++								// s30 w2-rm-avm1-gnash-land: Flash's _x is whole
++								// twips; the float matrix fold left 49.6000061
++								// (FP32 gnash EmbeddedFontTest :308 `tf10._x ==
++								// 49.6`, a 0.2-scaled field).
++								_dx = spvTwipsQuantizePixels(_dx);
+ 							}
+ 							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
+ 							return;
+@@ -64788,6 +64981,7 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 							s32 bxmin, bxmax, bymin, bymax;
+ 							ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
+ 							_dx += (_xf[0] * (double)bxmin + _xf[4] * (double)bymin) / 20.0;
++							_dx = spvTwipsQuantizePixels(_dx);  // s30: whole twips (native arm)
+ 						}
+ 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
+ 						return;
+@@ -68918,6 +69112,20 @@ void actionRemoveSprite(SWFAppContext* app_context)
+ 		target_name = _remove_tgt_buf;
+ 	}
+ 
++	// s30 w1-rm-avm1-gnash: an empty target path resolves to the current
++	// target clip (Ruffle action_remove_sprite -> resolve_target_display_object
++	// with start_clip = target_clip_or_root). SWF5 `mc2.remove()` running
++	// removeMovieClip("") removes mc2 (FP32 setProperty-v5 :202); in SWF6+ the
++	// closure's target is _root, whose depth is not removable (no-op, :204).
++	if (target_name[0] == '\0' && _rs_target_mc == NULL &&
++	    target.type == ACTION_STACK_VALUE_STRING && target.str_size == 0) {
++		extern MovieClip root_movieclip;
++		MovieClip* _rs_cur = g_current_context;
++		if (_rs_cur != NULL && _rs_cur != &root_movieclip && _rs_cur->name[0] != '\0') {
++			_rs_target_mc = _rs_cur;
++			target_name = _rs_cur->name;
++		}
++	}
+ 	// Handle null/empty gracefully
+ 	if (target_name[0] == '\0') {
+ 		return;
+@@ -70929,6 +71137,7 @@ static MovieClip* cfWithScopeMethodTarget(const char* name, u32 name_len)
+ // Re-push a popped CallFunction's args as a CallMethod on `target` and run
+ // actionCallMethod's MOVIECLIP arm (same stack synthesis as the bare
+ // getBounds/hitTest arm below). Frees `args`.
++static int g_mc_delegate_from_value = 0;
+ static void cfDelegateToMCMethod(SWFAppContext* app_context, char* str_buffer,
+ 	MovieClip* target, const char* name, u32 name_len, ActionVar* args, u32 num_args)
+ {
+@@ -70945,7 +71154,13 @@ static void cfDelegateToMCMethod(SWFAppContext* app_context, char* str_buffer,
+ 	PUSH(ACTION_STACK_VALUE_F64, _nbits);
+ 	PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target);
+ 	PUSH_STR(name, name_len);
++	// s30 w1-rm-avm1-gnash: the callee is a function VALUE already in hand
++	// (a bare name or ASnative(901, 0) stored in a variable), so the SWF6/7
++	// version tag on the MovieClip.prototype property must not hide the arm
++	// (FP32 setProperty-v5 `createSprite = ASnative(901, 0)` works in SWF5).
++	g_mc_delegate_from_value = 1;
+ 	actionCallMethod(app_context, str_buffer);
++	g_mc_delegate_from_value = 0;
+ }
+ 
+ // s26 w1-avm1-dispatch-scope PROTOTYPE: the clip a bare MovieClip-method name
+@@ -72451,7 +72666,25 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 		}
+ 		// createEmptyMovieClip was introduced in SWF6 — in SWF5 resolution
+ 		// should leave the function undefined, not invoke this builtin.
++		// s30 w2-rm-avm1-gnash-land: unless a script SetMember made the
++		// prototype member visible (actionSetMember clears the native hide
++		// flag; FP32 avm1_asnative_mc_probe B, gnash Sound.as:240-241): then
++		// the bare name resolves to the native and runs on the timeline.
+ 		if (g_swf_version < 6) {
++			extern ASFunction* actionMCNativeStubOf(ASFunction* f);
++			ASObject* _cemc_proto = getMovieClipPrototype(g_swf_version);
++			ASProperty* _cemc_p = _cemc_proto != NULL
++				? findPropertyRaw(_cemc_proto, func_name, func_name_len) : NULL;
++			if (_cemc_p != NULL && _cemc_p->value.type == ACTION_STACK_VALUE_FUNCTION &&
++			    !isPropertyHiddenAtVersion(_cemc_p->flash_flags) &&
++			    actionMCNativeStubOf((ASFunction*)(uintptr_t)_cemc_p->value.data.numeric_value) != NULL) {
++				extern MovieClip root_movieclip;
++				MovieClip* _cemc_rcv = _cemc_with != NULL ? _cemc_with
++					: (g_current_context ? g_current_context : &root_movieclip);
++				cfDelegateToMCMethod(app_context, str_buffer, _cemc_rcv,
++					func_name, func_name_len, args, num_args);
++				return;
++			}
+ 			if (args != NULL) FREE(args);
+ 			pushUndefined(app_context);
+ 			return;
+@@ -73223,8 +73456,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 		// ...) runs that method on the clip the scope chain found it on
+ 		// (Ruffle Callable(scope_obj, fn)); before, the stub fell through to the
+ 		// "built-in constructor as plain function" branch and pushed undefined.
+-		if (func != NULL && func >= &g_mc_method_funcs[0] &&
+-		    func < &g_mc_method_funcs[MC_METHOD_COUNT] &&
++		if (func != NULL && actionMCNativeStubOf(func) != NULL &&
+ 		    func->advanced_func != (Function2Ptr) builtin_mc_meth &&
+ 		    !cfIsTimelineNavName(func->name))
+ 		{
+@@ -77916,6 +78148,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					// property, even for the names setProperty force-hides.
+ 					if (_addprop_created) prop->flags |= PROPERTY_FLAG_ENUMERABLE;
+ 					result = 1; // boolean true
++					if (_addprop_created)
++						addPropertyFireWatcher(app_context, obj, prop_name, prop_name_len);
+ 				}
+ 				} // _valid_accessors
+ 			}
+@@ -79897,7 +80131,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 			if (!_mcm_is_object_method) goto _mc_user_dispatch;
+ 		}
+ 		if (mcArmCaseMiss(method_name, method_name_len)) goto _mc_user_dispatch; // s27 w2 lead 2
+-		if (mc != NULL && !MC_IS_TEXTFIELD(mc) && !mc->is_button_mc &&
++		int _mcm_from_value = g_mc_delegate_from_value;
++		g_mc_delegate_from_value = 0;
++		if (mc != NULL && !MC_IS_TEXTFIELD(mc) && !mc->is_button_mc && !_mcm_from_value &&
+ 		    mcArmVersionHidden(app_context, mc, method_name, method_name_len)) {
+ 			if (args != NULL) FREE(args);
+ 			pushUndefined(app_context);
+@@ -80789,7 +81025,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 		{
+ 			// createEmptyMovieClip was introduced in SWF6. In SWF5 the method
+ 			// is hidden and a call resolves to undefined — no clip created.
+-			if (g_swf_version < 6) {
++			// A function VALUE delegated here (ASnative(901, 0) held in a
++			// variable) is the native itself and runs in SWF5 (FP32
++			// setProperty-v5, Sound-v5).
++			if (g_swf_version < 6 && !_mcm_from_value) {
+ 				if (args != NULL) FREE(args);
+ 				pushUndefined(app_context);
+ 				return;
+@@ -84368,6 +84607,23 @@ _mc_user_dispatch: ;
+ 				if (_mc_user_func == NULL)
+ 					_mc_user_func = lookupFunctionByName(method_name, method_name_len);
+ 			}
++			// s30 w1-rm-avm1-gnash: a native MovieClip.prototype stub stored
++			// under ANOTHER name (`_root.mk = ASnative(901, 0)`,
++			// `mc.gd = MovieClip.prototype.getDepth`) is still that native: run
++			// its builtin arm on this clip instead of the stub's undefined.
++			// Not on a Button receiver: Flash duplicates a button as a button
++			// and ignores initObj (gnash duplicate_movie_clip_test.c:149-154);
++			// our MC arm would build a movieclip, so buttons keep the stub.
++			if (_mc_user_func != NULL && mc != NULL && !mc->is_button_mc &&
++			    actionMCNativeStubOf(_mc_user_func) != NULL &&
++			    _mc_user_func->advanced_func == NULL && _mc_user_func->simple_func == NULL &&
++			    !cfIsTimelineNavName(_mc_user_func->name) &&
++			    !(strlen(_mc_user_func->name) == method_name_len &&
++			      strncasecmp(_mc_user_func->name, method_name, method_name_len) == 0)) {
++				cfDelegateToMCMethod(app_context, str_buffer, mc, _mc_user_func->name,
++					(u32)strlen(_mc_user_func->name), args, num_args);
++				return;
++			}
+ 			if (_mc_user_func != NULL) {
+ 					ASFunction* func = _mc_user_func;
+ 						ActionVar this_var = {0};
+diff --git a/SWFModernRuntime/src/libswf/ng_shared.c b/SWFModernRuntime/src/libswf/ng_shared.c
+index f1627730..49069fd9 100644
+--- a/SWFModernRuntime/src/libswf/ng_shared.c
++++ b/SWFModernRuntime/src/libswf/ng_shared.c
+@@ -505,6 +505,8 @@ static struct ng_font_ent {
+ 	   units), sorted by (left << 16 | right). NULL / 0 when the font has none. */
+ 	const s32* kern_pairs;
+ 	size_t kern_count;
++	/* s30 w2-rm-avm1-gnash-land: DefineFont2/3 SmallText flag (0x20). */
++	u8 small_text;
+ } *ng_fonts;
+ static size_t ng_fonts_cap = 0;
+ 
+@@ -702,6 +704,14 @@ void ng_record_font_kerning(u16 font_id, const s32* pairs, size_t count)
+ 	}
+ }
+ 
++// s30 w2-rm-avm1-gnash-land: the font was defined with the SmallText flag.
++void ng_record_font_small_text(u16 font_id)
++{
++	for (size_t i = 0; i < ng_font_count; i++) {
++		if (ng_fonts[i].font_id == font_id) { ng_fonts[i].small_text = 1; return; }
++	}
++}
++
+ // Kerning adjustment (EM units) for the (left, right) code-point pair, 0 when
+ // the font has no such pair. Ruffle font.rs GlyphSource::get_kerning_offset.
+ s32 ng_font_kerning_by_idx(int font_idx, u16 left, u16 right)
+@@ -1636,6 +1646,15 @@ static u16 ng_decode_utf8_char(const char* text, size_t text_len, size_t* pos)
+ 
+ static int ng_device_font_mode = 0;
+ void ng_setDeviceFontMode(int mode) { ng_device_font_mode = mode; }
++// s30 w2-rm-avm1-gnash-land: set by the AVM1 textWidth getter only
++// (computeTextFieldDimension). FP32 measures a SmallText embedded font's
++// textWidth as the sum of ceil(advance x size / em) whole pixels per glyph
++// (gnash misc-ming.all/EmbeddedFontTest golden: all 12 widths exact); with
++// SmallText cleared it gives the unrounded sum, truncated (FP32
++// embeddedfont_smalltext_probe off.lnx.txt). Autosize, wrapping, textHeight
++// and rendering are untouched.
++static int ng_small_text_ceil_mode = 0;
++void ng_setSmallTextCeilMode(int mode) { ng_small_text_ceil_mode = mode; }
+ 
+ static int ng_round_to_pixel(int twips) {
+ 	double px = (double)twips / 20.0;
+@@ -1974,6 +1993,8 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
+ 		int cur_width_twips = 0;
+ 		int cur_trimmed_twips = 0;
+ 		int _tw_ls_r = ng_device_font_mode ? ng_round_ls_to_pixel(letter_spacing_twips) : 0;
++		int _tw_st_ceil = ng_small_text_ceil_mode && !ng_device_font_mode &&
++		    ng_fonts[fi].small_text && !ng_fonts[fi].is_builtin;
+ 		for (size_t i = 0; i < text_len; ) {
+ 			unsigned char c = (unsigned char)text[i];
+ 			if (c == '\r' || c == '\n') {
+@@ -1998,7 +2019,13 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
+ 			int glyph_twips = 0;
+ 			if (adv >= 0) {
+ 				int raw = (int)((float)adv * (float)font_height / (float)em);
+-				if (ng_device_font_mode) {
++				if (_tw_st_ceil) {
++					long long num = (long long)adv * (long long)font_height;
++					long long den = (long long)em * 20;
++					glyph_twips = (int)(((num + den - 1) / den) * 20) + letter_spacing_twips;
++					if (glyph_twips <= 0 && letter_spacing_twips < 0)
++						glyph_twips = raw;
++				} else if (ng_device_font_mode) {
+ 					int unspaced = ng_round_to_pixel(raw);
+ 					if (_tw_ls_r != 0) {
+ 						int spaced = unspaced + _tw_ls_r;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 747f6195..ff2e79a0 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -655,6 +655,25 @@ extern MovieClip* g_current_context;
+ extern void actionSetCurrentContext(MovieClip* mc);
+ 
+ // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
++// s30 w1-rm-avm1-gnash: a sprite's own frame-1 DoAction and its onClipLoad
++// can run before process_sprite_init_at_depth copies the DefineSprite HEADER
++// frame count into the clip, so they read the createMovieClip defaults (1/1/1).
++// FP32 (gnash misc-swfmill.all/zeroframe_definesprite, golden
++// a00b11c22d000) reads the header there: _framesloaded = _totalframes =
++// declared, and _currentframe = 0 for a 0-frame sprite. Idempotent with the
++// later init (same values).
++static void sync_sprite_counters_pre_init(DisplayObject* obj, MovieClip* mc)
++{
++	if (obj == NULL || mc == NULL || !obj->sprite_needs_init) return;
++	if (obj->char_id == 0 || obj->char_id >= dictionary_capacity) return;
++	Character* ch = &dictionary[obj->char_id];
++	if (ch->type != CHAR_TYPE_SPRITE) return;
++	mc->totalframes = (int)ch->sprite_declared_frames;
++	mc->framesloaded = (int)ch->sprite_declared_frames;
++	if (ch->sprite_declared_frames == 0)
++		mc->currentframe = 0;
++}
++
+ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
+ {
+ 	DisplayObject* saved = g_current_sprite_obj;
+@@ -668,6 +687,7 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
+ 		// during advance_sprite_frames display-list loop-back re-execution.
+ 		MovieClip* mc = ng_mc_for_sprite_obj(obj);
+ 		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); actionSetBaseClip(mc); }
++		sync_sprite_counters_pre_init(obj, mc);
+ 	}
+ 
+ 	// Each sprite frame starts with a fresh SetTarget state (no explicit root target)
+@@ -13302,6 +13322,7 @@ static void aq_dispatch_clip_load(SWFAppContext* app_context, void* user)
+ 		MovieClip* mc = actionFindOrCreateMovieClip(
+ 			app_context, pcl->obj->instance_name, parent);
+ 		if (mc) actionSetCurrentContext(mc);
++		sync_sprite_counters_pre_init(pcl->obj, mc);
+ 	}
+ 	pcl->action(app_context);
+ 	actionSetCurrentContext(saved_ctx);
+@@ -17409,6 +17430,13 @@ void tagDefineFontKerning(u16 font_id, const s32* pairs, size_t count)
+ 	ng_record_font_kerning(font_id, pairs, count);
+ }
+ 
++// s30 w2-rm-avm1-gnash-land: emitted by the recompiler only for a
++// DefineFont2/3 with the SmallText flag (0x20).
++void tagDefineFontSmallText(u16 font_id)
++{
++	ng_record_font_small_text(font_id);
++}
++
+ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
+ {
+ 	// Movie-local index into glyph_data, baked at define time exactly like
+diff --git a/SWFRecomp/include/swf.hpp b/SWFRecomp/include/swf.hpp
+index 19f8a2ea..63b0af6b 100644
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -377,6 +377,7 @@ namespace SWFRecomp
+ 		std::unordered_map<u16, std::string> font_names;  // font_id → font name string
+ 		std::unordered_map<u16, bool> font_bold_flags;    // font_id → bold flag
+ 		std::unordered_map<u16, bool> font_italic_flags;  // font_id → italic flag
++		std::unordered_map<u16, bool> font_smalltext_flags;  // font_id → DefineFont2/3 SmallText (0x20)
+ 		std::unordered_map<u16, s16> font_ascent;         // font_id → ascent (EM units)
+ 		std::unordered_map<u16, s16> font_descent;        // font_id → descent (EM units)
+ 		std::unordered_map<u16, s16> font_leading;        // font_id → leading (EM units)
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index ee36e9d0..9ccd09ad 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -2921,6 +2921,9 @@ namespace SWFRecomp
+ 					// Store bold/italic flags
+ 					font_bold_flags[font_id] = (flags & 0x01) != 0;
+ 					font_italic_flags[font_id] = (flags & 0x02) != 0;
++					// s30 w2-rm-avm1-gnash-land: SmallText (FP32 textWidth
++					// ceils each glyph advance to a whole pixel for these fonts only)
++					font_smalltext_flags[font_id] = (flags & 0x20) != 0;
+ 
+ 					// FontName
+ 					tag.clearFields();
+@@ -3461,6 +3464,9 @@ namespace SWFRecomp
+ 									 << to_string(kern_pairs.size())
+ 									 << ");" << endl;
+ 						}
++						if (font_smalltext_flags.count(font_id) && font_smalltext_flags[font_id])
++							tag_init << "\t\t" << "tagDefineFontSmallText("
++									 << charId(font_id) << ");" << endl;
+ 						tag_init << "\t" << "}" << endl;
+ 						// Emit glyph base index for runtime glyph rendering
+ 						auto gb_it = font_glyph_bases.find(font_id);
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/create_test_swf.py
+new file mode 100644
+index 00000000..442e2347
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/create_test_swf.py
+@@ -0,0 +1,47 @@
++#!/usr/bin/env python3
++"""avm1_asnative_mc_probe_swf5 (regression fixture, built as `create_test_swf.py test.swf 5`):
++pins ASnative(900/901, n) = the MovieClip.prototype natives (s30 w1-rm-avm1-gnash R1),
++the SWF5 SetMember-clears-hide-flag rule (section B)
++(s30 w2-rm-avm1-gnash-land). Golden = FP32 LNX direct pinned
++(session30-fanout-reports/w1-local-oracles/w1-rm-avm1-gnash/avm1_asnative_mc_probe/swf5.lnx.txt).
++
++Original probe docstring: avm1_asnative_mc_probe: s30 w1-rm-avm1-gnash. ASnative(900/901, n) =
++MovieClip.prototype natives, called bare / as a method / after assignment to
++MovieClip.prototype, in SWF5 and SWF6+ (gnash setProperty.as:30, Sound.as:240).
++
++Usage: create_test_swf.py <out.swf> [swf_version, default 6]
++"""
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++T = trace_concat
++def setv(name, code): return push(name) + code + SETVAR
++def asn(a, b): return push(b, a, 2, 'ASnative') + CALLF
++
++code = b''
++# A: bare call of a variable holding ASnative(901, 0)
++code += setv('cs', asn(901, 0))
++code += T('A typeof cs=', get('cs') + TYPEOF)
++code += callf('cs', 'a1', 10)
++code += T('A typeof a1=', get('a1') + TYPEOF, ' a1=', get('a1'), ' depth=', callm('a1', 'getDepth', keep=True))
++# B: assigned onto MovieClip.prototype then bare-called (Sound.as:240)
++code += get('MovieClip.prototype') + push('createEmptyMovieClip') + asn(901, 0) + SETMEM
++code += callf('createEmptyMovieClip', 'a2', 11)
++code += T('B typeof a2=', get('a2') + TYPEOF, ' a2=', get('a2'))
++# C: method call through an own property of _root
++code += get('_root') + push('mk') + asn(901, 0) + SETMEM
++code += callm('_root', 'mk', 'a3', 12)
++code += T('C typeof a3=', get('a3') + TYPEOF, ' a3=', get('a3'))
++# D: identity with the prototype member and between two ASnative calls
++code += T('D same-as-proto=', asn(901, 0) + get('MovieClip.prototype.createEmptyMovieClip') + op(0x49),
++          ' two-calls-equal=', asn(901, 0) + asn(901, 0) + op(0x49))
++# E: a 900 entry, getDepth via ASnative(900, 10) borrowed onto a3
++code += get('a3') + push('gd') + asn(900, 10) + SETMEM
++code += T('E a3.gd()=', callm('a3', 'gd', keep=True))
++# F: bare call inside a function invoked as a method of a3 (this = a3)
++code += get('a3') + push('f') + deffunc1('', [], callf('cs', 'inner', 1)) + SETMEM
++code += callm('a3', 'f')
++code += T('F typeof a3.inner=', get('a3.inner') + TYPEOF, ' typeof _root.inner=', get('_root.inner') + TYPEOF)
++code += push('done') + TRACE + STOP
++ver = int(sys.argv[2]) if len(sys.argv) > 2 else 6
++open(sys.argv[1], 'wb').write(swf(ver, b'', [doaction(code)], w=200, h=150))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/output.txt b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/output.txt
+new file mode 100644
+index 00000000..d1022109
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/output.txt
+@@ -0,0 +1,8 @@
++A typeof cs=function
++A typeof a1=movieclip a1=_level0.a1 depth=
++B typeof a2=movieclip a2=_level0.a2
++C typeof a3=movieclip a3=_level0.a3
++D same-as-proto=true two-calls-equal=true
++E a3.gd()=12
++F typeof a3.inner=undefined typeof _root.inner=undefined
++done
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/test.swf b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef016e58a4518281ffc08ff58e7632503621cbe3
+GIT binary patch
+literal 995
+zcmbVLO>YuW6g>rTqBbUeq{c|?tVp|nq_8GM`IxW}lCp4VUf`7yff<=+8}{`typ8|F
+z-{Q_6g6F<r9F%4j&Su`+d(VC6oO`GDaa8(M1g>$?Lg^>)_5ht{;L|Q_Hk*s$4<_vc
+zU>w7~h9?>C8)IHUj_*cGWo9=T&13tNpT1c~I=u47aWh4gJ3+-hg7;YJ)j8zsu<Y1;
+z^%qK=Cn#1CWgh~*gaWx=Vga%6Cpt3M5-lZk(yZkTQ*Anu#w9O(0(=N>X1YC}MJUT>
+zv<giq6fv+z)U?vd=<Xsi>#Q(W<xtqO5&6_%-=s?J>yv1EpE{!ITW$4B8$*dU#>kiE
+zep-d0Ay*1se9kxAQ8{!}8W1nU)cqcp&f@kT8jUTDMn;37ga%`z@f_&*v0CV=imT2s
+zLh?rcpGFV*fqlVwn%l5CR`YpW)nC4<xsb`dEic(8e_0kPk@s}sn9J&UclRvq(9*!J
+zuNt-K<n)X(cULOwA<L9@WtS^_FNyERAly5U<7~OqtAAE|xYx~LIgpn?FB?eBfwQs5
+i43mBX{sdgpwA3v}S{>|;dKXcV|7H>{H7Xuj<n|ka>DPt;
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/test.toml b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/test.toml
+new file mode 100644
+index 00000000..99142b5c
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf5/test.toml
+@@ -0,0 +1 @@
++num_ticks = 3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/create_test_swf.py
+new file mode 100644
+index 00000000..9d6d52cb
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/create_test_swf.py
+@@ -0,0 +1,47 @@
++#!/usr/bin/env python3
++"""avm1_asnative_mc_probe_swf6 (regression fixture, built as `create_test_swf.py test.swf 6`):
++pins ASnative(900/901, n) = the MovieClip.prototype natives (s30 w1-rm-avm1-gnash R1),
++the SWF6+ fresh-object-per-call identity (section D)
++(s30 w2-rm-avm1-gnash-land). Golden = FP32 LNX direct pinned
++(session30-fanout-reports/w1-local-oracles/w1-rm-avm1-gnash/avm1_asnative_mc_probe/swf6.lnx.txt).
++
++Original probe docstring: avm1_asnative_mc_probe: s30 w1-rm-avm1-gnash. ASnative(900/901, n) =
++MovieClip.prototype natives, called bare / as a method / after assignment to
++MovieClip.prototype, in SWF5 and SWF6+ (gnash setProperty.as:30, Sound.as:240).
++
++Usage: create_test_swf.py <out.swf> [swf_version, default 6]
++"""
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++T = trace_concat
++def setv(name, code): return push(name) + code + SETVAR
++def asn(a, b): return push(b, a, 2, 'ASnative') + CALLF
++
++code = b''
++# A: bare call of a variable holding ASnative(901, 0)
++code += setv('cs', asn(901, 0))
++code += T('A typeof cs=', get('cs') + TYPEOF)
++code += callf('cs', 'a1', 10)
++code += T('A typeof a1=', get('a1') + TYPEOF, ' a1=', get('a1'), ' depth=', callm('a1', 'getDepth', keep=True))
++# B: assigned onto MovieClip.prototype then bare-called (Sound.as:240)
++code += get('MovieClip.prototype') + push('createEmptyMovieClip') + asn(901, 0) + SETMEM
++code += callf('createEmptyMovieClip', 'a2', 11)
++code += T('B typeof a2=', get('a2') + TYPEOF, ' a2=', get('a2'))
++# C: method call through an own property of _root
++code += get('_root') + push('mk') + asn(901, 0) + SETMEM
++code += callm('_root', 'mk', 'a3', 12)
++code += T('C typeof a3=', get('a3') + TYPEOF, ' a3=', get('a3'))
++# D: identity with the prototype member and between two ASnative calls
++code += T('D same-as-proto=', asn(901, 0) + get('MovieClip.prototype.createEmptyMovieClip') + op(0x49),
++          ' two-calls-equal=', asn(901, 0) + asn(901, 0) + op(0x49))
++# E: a 900 entry, getDepth via ASnative(900, 10) borrowed onto a3
++code += get('a3') + push('gd') + asn(900, 10) + SETMEM
++code += T('E a3.gd()=', callm('a3', 'gd', keep=True))
++# F: bare call inside a function invoked as a method of a3 (this = a3)
++code += get('a3') + push('f') + deffunc1('', [], callf('cs', 'inner', 1)) + SETMEM
++code += callm('a3', 'f')
++code += T('F typeof a3.inner=', get('a3.inner') + TYPEOF, ' typeof _root.inner=', get('_root.inner') + TYPEOF)
++code += push('done') + TRACE + STOP
++ver = int(sys.argv[2]) if len(sys.argv) > 2 else 6
++open(sys.argv[1], 'wb').write(swf(ver, b'', [doaction(code)], w=200, h=150))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/output.txt b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/output.txt
+new file mode 100644
+index 00000000..53642fab
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/output.txt
+@@ -0,0 +1,8 @@
++A typeof cs=function
++A typeof a1=movieclip a1=_level0.a1 depth=10
++B typeof a2=movieclip a2=_level0.a2
++C typeof a3=movieclip a3=_level0.a3
++D same-as-proto=false two-calls-equal=false
++E a3.gd()=12
++F typeof a3.inner=undefined typeof _root.inner=movieclip
++done
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/test.swf b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..22852a2ccb72a338d44b110d5eedc484b0fc1259
+GIT binary patch
+literal 995
+zcmbVL%TD7!5G-JW#V$hPp+#tU_!Pk*NF?WoM*<cH5(y3*(I^>0L=u~L0C8u3VJ`d$
+z-@=U#3Dsk~&I0lQUp(&a>Zz)3ADy2~zfJ*H*w{ni1z4XzeI9&jlcUjScj}o*`vYjj
+zuq*H+<NamKo0Q}J*+7}@okn%d&hgVX50MTp{Z?E}QLFW!XlLO4lzO!TIXf&nR+s-n
+zshtGHDx&N(;7cfw`z00-3%{)+b0yJ2LMP2y-q6veE@_<d(qF(yc-PgnUN^$3d`832
+zghCMw`<t4ES{Z%VkIX|>n5(iW?AeHX%CLV@C13SPv>l|5sPenEa;A-;L>pt|OLH%V
+zVQ9#eg8SF`hC3>=j!FgMg_!!e$EmZp_K!y8okk_2!B9ejG16E7>VB;Hx}@TgbBvI@
+z(SOtE#&KX5IZtyRmRhRUi%a_ER`rBT?rnL=WAc|}p%Qs_+K#!bp7;30(l#v(JoHs%
+zyVKs>qRjD?%6iB$rCr(O5>Ey3eGP<r6LRbh2735mwVR*1IV=aV1RP}p*>>P;EHcBS
+gUxPmZ*EB74%aK+G<D(u&6y?8ZhXakGhdpw81BS`hhX4Qo
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/test.toml b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/test.toml
+new file mode 100644
+index 00000000..99142b5c
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_asnative_mc_probe_swf6/test.toml
+@@ -0,0 +1 @@
++num_ticks = 3

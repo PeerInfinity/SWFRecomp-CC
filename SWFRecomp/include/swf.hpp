@@ -377,6 +377,7 @@ namespace SWFRecomp
 		std::unordered_map<u16, std::string> font_names;  // font_id → font name string
 		std::unordered_map<u16, bool> font_bold_flags;    // font_id → bold flag
 		std::unordered_map<u16, bool> font_italic_flags;  // font_id → italic flag
+		std::unordered_map<u16, bool> font_smalltext_flags;  // font_id → DefineFont2/3 SmallText (0x20)
 		std::unordered_map<u16, s16> font_ascent;         // font_id → ascent (EM units)
 		std::unordered_map<u16, s16> font_descent;        // font_id → descent (EM units)
 		std::unordered_map<u16, s16> font_leading;        // font_id → leading (EM units)
