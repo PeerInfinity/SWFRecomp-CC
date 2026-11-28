@@ -1,6 +1,6 @@
 # Ruffle Test Results (Filtered)
 
-*Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
+*Tests on the [ignored list](../ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
 **Commit:** `3dfab12779f5`  
@@ -11,26 +11,26 @@
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
-| audio | 4 | 5 | 80.0% | [details](ruffle-tests/tests/swfs/audio/_results/results_filtered.md) |
-| avm1 | 776 | 783 | 99.1% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
-| avm2 | 1311 | 1324 | 99.0% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
-| fonts | 8 | 9 | 88.9% | [details](ruffle-tests/tests/swfs/fonts/_results/results_filtered.md) |
-| from_avmplus | 1567 | 1572 | 99.7% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_filtered.md) |
-| from_gnash/actionscript.all | 193 | 240 | 80.4% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) |
-| from_gnash/misc-ming.all | 77 | 110 | 70.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_filtered.md) |
-| from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_filtered.md) |
-| from_gnash/misc-swfc.all | 17 | 20 | 85.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_filtered.md) |
-| from_gnash/misc-swfmill.all | 20 | 20 | 100% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_filtered.md) |
-| from_shumway | 217 | 223 | 97.3% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_filtered.md) |
-| from_shumway/avm1 | 47 | 47 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
-| import_assets | 3 | 3 | 100% | [details](ruffle-tests/tests/swfs/import_assets/_results/results_filtered.md) |
-| mixed_avm | 10 | 12 | 83.3% | [details](ruffle-tests/tests/swfs/mixed_avm/_results/results_filtered.md) |
-| regression | 347 | 347 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results_filtered.md) |
-| stage3d | 8 | 8 | 100% | [details](ruffle-tests/tests/swfs/stage3d/_results/results_filtered.md) |
-| swf | 7 | 7 | 100% | [details](ruffle-tests/tests/swfs/swf/_results/results_filtered.md) |
-| text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
-| timeline | 16 | 17 | 94.1% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
-| visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
+| audio | 4 | 5 | 80.0% | [details](../tests/swfs/audio/_results/results_filtered.md) |
+| avm1 | 776 | 783 | 99.1% | [details](../tests/swfs/avm1/_results/results_filtered.md) |
+| avm2 | 1311 | 1324 | 99.0% | [details](../tests/swfs/avm2/_results/results_filtered.md) |
+| fonts | 8 | 9 | 88.9% | [details](../tests/swfs/fonts/_results/results_filtered.md) |
+| from_avmplus | 1567 | 1572 | 99.7% | [details](../tests/swfs/from_avmplus/_results/results_filtered.md) |
+| from_gnash/actionscript.all | 193 | 240 | 80.4% | [details](../tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) |
+| from_gnash/misc-ming.all | 77 | 110 | 70.0% | [details](../tests/swfs/from_gnash/misc-ming.all/_results/results_filtered.md) |
+| from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](../tests/swfs/from_gnash/misc-mtasc.all/_results/results_filtered.md) |
+| from_gnash/misc-swfc.all | 17 | 20 | 85.0% | [details](../tests/swfs/from_gnash/misc-swfc.all/_results/results_filtered.md) |
+| from_gnash/misc-swfmill.all | 20 | 20 | 100% | [details](../tests/swfs/from_gnash/misc-swfmill.all/_results/results_filtered.md) |
+| from_shumway | 217 | 223 | 97.3% | [details](../tests/swfs/from_shumway/_results/results_filtered.md) |
+| from_shumway/avm1 | 47 | 47 | 100% | [details](../tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
+| import_assets | 3 | 3 | 100% | [details](../tests/swfs/import_assets/_results/results_filtered.md) |
+| mixed_avm | 10 | 12 | 83.3% | [details](../tests/swfs/mixed_avm/_results/results_filtered.md) |
+| regression | 347 | 347 | 100% | [details](../tests/swfs/regression/_results/results_filtered.md) |
+| stage3d | 8 | 8 | 100% | [details](../tests/swfs/stage3d/_results/results_filtered.md) |
+| swf | 7 | 7 | 100% | [details](../tests/swfs/swf/_results/results_filtered.md) |
+| text | 12 | 12 | 100% | [details](../tests/swfs/text/_results/results_filtered.md) |
+| timeline | 16 | 17 | 94.1% | [details](../tests/swfs/timeline/_results/results_filtered.md) |
+| visual | 149 | 151 | 98.7% | [details](../tests/swfs/visual/_results/results_filtered.md) |
 | **Total** | **4796** | **4919** | **97.5%** | |
 
 *50 tests ignored.*

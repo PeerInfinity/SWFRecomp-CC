@@ -10,26 +10,26 @@
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
-| audio | 4 | 5 | 80.0% | [details](ruffle-tests/tests/swfs/audio/_results/results.md) |
-| avm1 | 776 | 791 | 98.1% | [details](ruffle-tests/tests/swfs/avm1/_results/results.md) |
-| avm2 | 1321 | 1353 | 97.6% | [details](ruffle-tests/tests/swfs/avm2/_results/results.md) |
-| fonts | 8 | 9 | 88.9% | [details](ruffle-tests/tests/swfs/fonts/_results/results.md) |
-| from_avmplus | 1567 | 1574 | 99.6% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results.md) |
-| from_gnash/actionscript.all | 193 | 243 | 79.4% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results.md) |
-| from_gnash/misc-ming.all | 77 | 111 | 69.4% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results.md) |
-| from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results.md) |
-| from_gnash/misc-swfc.all | 17 | 21 | 81.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results.md) |
-| from_gnash/misc-swfmill.all | 20 | 20 | 100% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results.md) |
-| from_shumway | 218 | 229 | 95.2% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results.md) |
-| from_shumway/avm1 | 47 | 47 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results.md) |
-| import_assets | 3 | 3 | 100% | [details](ruffle-tests/tests/swfs/import_assets/_results/results.md) |
-| mixed_avm | 10 | 12 | 83.3% | [details](ruffle-tests/tests/swfs/mixed_avm/_results/results.md) |
-| regression | 347 | 347 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results.md) |
-| stage3d | 8 | 8 | 100% | [details](ruffle-tests/tests/swfs/stage3d/_results/results.md) |
-| swf | 7 | 7 | 100% | [details](ruffle-tests/tests/swfs/swf/_results/results.md) |
-| text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results.md) |
-| timeline | 16 | 17 | 94.1% | [details](ruffle-tests/tests/swfs/timeline/_results/results.md) |
-| visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results.md) |
+| audio | 4 | 5 | 80.0% | [details](../tests/swfs/audio/_results/results.md) |
+| avm1 | 776 | 791 | 98.1% | [details](../tests/swfs/avm1/_results/results.md) |
+| avm2 | 1321 | 1353 | 97.6% | [details](../tests/swfs/avm2/_results/results.md) |
+| fonts | 8 | 9 | 88.9% | [details](../tests/swfs/fonts/_results/results.md) |
+| from_avmplus | 1567 | 1574 | 99.6% | [details](../tests/swfs/from_avmplus/_results/results.md) |
+| from_gnash/actionscript.all | 193 | 243 | 79.4% | [details](../tests/swfs/from_gnash/actionscript.all/_results/results.md) |
+| from_gnash/misc-ming.all | 77 | 111 | 69.4% | [details](../tests/swfs/from_gnash/misc-ming.all/_results/results.md) |
+| from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](../tests/swfs/from_gnash/misc-mtasc.all/_results/results.md) |
+| from_gnash/misc-swfc.all | 17 | 21 | 81.0% | [details](../tests/swfs/from_gnash/misc-swfc.all/_results/results.md) |
+| from_gnash/misc-swfmill.all | 20 | 20 | 100% | [details](../tests/swfs/from_gnash/misc-swfmill.all/_results/results.md) |
+| from_shumway | 218 | 229 | 95.2% | [details](../tests/swfs/from_shumway/_results/results.md) |
+| from_shumway/avm1 | 47 | 47 | 100% | [details](../tests/swfs/from_shumway/avm1/_results/results.md) |
+| import_assets | 3 | 3 | 100% | [details](../tests/swfs/import_assets/_results/results.md) |
+| mixed_avm | 10 | 12 | 83.3% | [details](../tests/swfs/mixed_avm/_results/results.md) |
+| regression | 347 | 347 | 100% | [details](../tests/swfs/regression/_results/results.md) |
+| stage3d | 8 | 8 | 100% | [details](../tests/swfs/stage3d/_results/results.md) |
+| swf | 7 | 7 | 100% | [details](../tests/swfs/swf/_results/results.md) |
+| text | 12 | 12 | 100% | [details](../tests/swfs/text/_results/results.md) |
+| timeline | 16 | 17 | 94.1% | [details](../tests/swfs/timeline/_results/results.md) |
+| visual | 149 | 151 | 98.7% | [details](../tests/swfs/visual/_results/results.md) |
 | **Total** | **4807** | **4969** | **96.7%** | |
 
 ## Line-Level Accuracy
