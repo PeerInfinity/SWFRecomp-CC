@@ -562,3 +562,62 @@ Ruled in discussion session `repo-cleanup-discussion` while S3 ran. Recorded her
     the Pages page loads and recompiles one example, and Archipelago-CC has been told.
 - **R3: docs discussion for seedling-wasm and swfrecomp-browser (D11c), after R1.** A discussion with Robert. Rulings
   are appended here; an edit slice follows only if he rules one.
+
+### R1 closeout (2026-11-28, session `cleanup-r1-vanilla-seedling`)
+
+**Done except the branch prune.** seedling-wasm `main` = **`ecc5eaf`** (from `a335206`). It carries `seedling_original`
+rebuilt on SWFRecomp-CC **`8e6ef0c354e96553813ed28cb56ceae85e3e1fe0`**, with its `builds.json` entry and README row.
+The other three builds are untouched.
+
+- **Build:** a detached worktree at `8e6ef0c35`, now removed.
+  - Recompiled the same SWF bytes (md5 `a543c03a…` verified) into
+    `~/CC/seedling_original_build/recompiled_orig_r5`, using the r4 config shape.
+  - The counts are **708 classes, 3759 methods, 3649 bodies, 0 verify failures, 491 SymbolClass bindings**. They equal
+    every earlier build, and the recompiler log is line-identical to r4's.
+  - `diff -rq` against r4 moves only `abc_timeline.c`, `draws.c`, `draws.h` and `tagMain.c`.
+  - Then `FRESH=1 build_wasm_avm2.sh` with the defaults, under the flock with `EMCC_CORES=4` and emcc 5.0.0: 7m06s.
+    The script compiles serially, so there is no `-j` to cap. Then `deploy_wasm_avm2.sh` with `DEMO_SWF`.
+- **Payload md5s:**
+
+  | file | md5 | bytes |
+  |---|---|---|
+  | `seedling_original.wasm` | `b125136a89eb215a2284c2ab98aaddae` | 36,189,620 (+196,715) |
+  | `seedling_original.js` | `d92c4afc12e0ddc88298a9501c08c964` | 155,665 |
+  | `game.html` | `1c22f10c…`, byte-identical | 3,643 |
+  | `swf_bridge_avm2.js` | `9fbbf1bb…`, byte-identical | 4,725 |
+- **Smoke test.** Headless Chromium 1243 on SwiftShader-Vulkan, the deployed `game.html`, a real click on ▶ Start:
+  - the runtime is ready at 0.5 s;
+  - the title screen renders and was screenshotted (its `Level:` block came at 79 s);
+  - a key press reaches the overworld (the third `Level:` block at 93.7 s, P-Pos 80,128): house, player and opening
+    dialog;
+  - 0 WebGPU errors, 0 pageerrors, `__swfGpu` `{lost:0, stalls:1}`, and only the shim's own bridge line.
+
+  Screenshots, log and script are in `~/CC/seedling_original_build/recompiled_orig_r5/smoke/`. No perf numbers.
+- **Archipelago-CC's tools were run read-only.** They ran in a `git clone --shared` in the scratchpad at Archipelago
+  `origin/main` `b4f4093` (GitHub `main` at the time), with the submodule path holding the seedling-wasm commit.
+  - `seedling-wasm-readme.mjs --write` regenerated the row, and `--check` then reported OK.
+  - `check-seedling-wasm-pins.mjs` reported **ALL PASS — 4 pinned builds, four views in agreement**.
+  - Nothing was written to `~/CC/Archipelago-CC`. Its local `main` is 1209 commits behind `origin/main`, so check
+    against `origin/main`.
+- **Finding: the vanilla build now carries the SharedObject host hook.** The new runtime exports `avm2_so_flush_all`
+  and `avm2_so_reload`, the hook p4h declares as `sosave`. `game.html` sets no `Module.swfSharedObjectHost`, so saves
+  stay memory-only. `capabilities` stays `[]` because nothing drives a demo. Declaring `sosave` is Archipelago's call.
+- **NOT DONE: deleting `p4f-rebuild`.** The auto-mode classifier denied `git push origin --delete p4f-rebuild`.
+  - The branch is fully merged into `main` (`2de3163`), and no tracked Archipelago-CC file names it.
+  - Robert can run that command, or approve it for a later session.
+  - `p4h-main` and `p4h-rc1` are untouched (D11e).
+- **Archipelago-CC handoff note:** seedling-wasm `main` moved `a335206` → `ecc5eaf`. Only `seedling_original` changed:
+  - its `.wasm` and `.js`, its `builds.json` entry (md5s, bytes, `source.recompiler` = `8e6ef0c35…`, a new `builtFrom`
+    paragraph) and its README row;
+  - payload md5s: wasm `b125136a89eb215a2284c2ab98aaddae`, js `d92c4afc12e0ddc88298a9501c08c964`;
+  - p4d, p4g and p4h are byte-identical.
+
+  To do in Archipelago-CC:
+  - bump the `frontend/modules/flashPanel/wasm` gitlink to `ecc5eaf` in its own commit;
+  - run `check-seedling-wasm-pins.mjs` and `seedling-wasm-readme.mjs --check` (both green here);
+  - price the bump with `check-seedling-full-tier-owed.mjs`. The demo's payload md5 moved, so the manifest-prose
+    exemption does not apply by its letter, although no build an instrument drives moved;
+  - decide whether the demo should declare `sosave`.
+
+  The swfrecomp-browser pin is unaffected: it pins the default build's recompiler, and that is still p4g on `344c85a`.
+- **Next:** R3 (the docs discussion) is unblocked. R2 still waits for p4h to become the default.
