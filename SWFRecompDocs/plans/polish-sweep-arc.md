@@ -4034,7 +4034,7 @@ Pages: dry runs `46061672559`, `46078822038` green; REAL deploy at closeout (§3
 - FINAL no-graphics `46095073993` at `b8671fd2f` (= FINAL graphics code + browser-only ladder #5; results `4fb87dedb`): **= ledger**. 4759 pass + 131 rm = **4890 eff**; mode diffs = `audio/aac`, `avm2/audio_computespectrum` (pre-s30 NG) and `bug1157243/empty` (PASSES in NG: the intermittent).
 - Branch prune: all 18 `fanout/*` blob-checked against master: every report, patch, log and fixture identical; the only differing blobs are shared code/docs that landed merged with other slots (and `w2b-lowq-text`'s `tag.c` with the y half defaulted off). Nothing archived; all pruned.
 - Pages: dry runs green; REAL deploy `46098662667` at `71a763f42` (the "Deploy to GitHub Pages" step ran, success, first try).
-- Browser ladder at closeout: `browser-pending-finalize` (#5) still running; code `b8671fd2f` landed browser-only.
+- Browser ladder #5 `browser-pending-finalize` DONE after closeout: `b8671fd2f` (browser-only; test11 32/32, test4 26/26 = FP32 in child_probe) + report `6492fb769`. Its one CI fix is HELD on local branch `local/s30-rmc-clipaction-unload` @ `29565880b` (every-build removeMovieClip + slot onClipEvent(unload) bug; FP32 fixture `avm1_swapdepths_remove_clipevent_unload`): s31 lands and grades it.
 
 ### 31.1 Ledger
 
@@ -4107,4 +4107,4 @@ Pages: dry runs `46061672559`, `46078822038` green; REAL deploy at closeout (§3
 - `style_changes_in_html` field 5 world-y (+904 vs FP32): the switch is not font kind / HTML / zones.
 - LOW glyph chord rule (recompiler, M), the morph_test1 xtrace glyph residue after the 3rd glyph.
 - `acid-scale` (+160 vs FP32), `scroll_rect_scaled`, `acid-small` (timeline flatten, priced).
-**Browser ladder**: `browser-pending-finalize` (#5) running at closeout; its report names the next slice (`ng_queue_slot_unload_events` FP32 fixture is the standing candidate).
+**Browser ladder**: FIRST land + grade the held branch `local/s30-rmc-clipaction-unload` (both modes); then the browser PlaceObject2/Ratio REPLACE-preservation and SetInstanceName name-change ports (fixture first).
