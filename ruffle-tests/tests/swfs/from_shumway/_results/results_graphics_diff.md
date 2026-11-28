@@ -1,15 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `715a5300c822` (2026-11-27T23:57:03.282912+00:00)
-**Current:** `9498e80c12e3` (2026-11-28T00:52:29.308278+00:00)
+**Previous:** `9498e80c12e3` (2026-11-28T00:52:29.308278+00:00)
+**Current:** `6441e7d5d749` (2026-11-28T01:46:36.945872+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 218 | 218 | 0 |
+| Passing | 218 | 217 | -1 |
 | Total | 229 | 229 | 0 |
-| Pass rate | 95.2% | 95.2% | 0% |
-| Mismatched lines | 70 | 70 | 0 |
+| Pass rate | 95.2% | 94.8% | -0.4% |
+| Mismatched lines | 70 | 71 | +1 |
+|   Increased | | | +1 |
 
-No changes detected.
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `as3-loader/bug1157243/empty` | output_mismatch | 1/1 | 0/1 |
