@@ -97,6 +97,9 @@ section of the previous session's `BRIEFS_COMMON.md` (history repo) into yours, 
 4. The previous run of record as your TEMPLATE: `SWFRecomp-CC-history:SWFRecompDocs/plans/session<N-1>-fanout-reports/`.
    Copy the shape of `BRIEFS_COMMON.md`, `briefs/` (start the headers from `tools/coord/templates/`), `prompts/`,
    `AGENT_LAUNCH_ORDER.md` and `SIBLING_FILE_MAP.md` into your session dir **in the history repo**.
+   s30's `BRIEFS_COMMON.md` predates D3: in your copy, change every "read X in this repo / on origin/master" for a
+   session-dir file to the worker's history clone (`/root/history/<path>`), and keep its Delivery rule (commit only
+   files under the session dir on `fanout/<slug>`).
 5. Tools: `tools/coord/` (above), `scripts/image_status_diff.py --band-floor 0 --max-list 300`, and
    `python3 ruffle-tests/apply_flash_fixes.py --check` (run it in the MAIN tree).
 

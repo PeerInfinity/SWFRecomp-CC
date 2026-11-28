@@ -78,7 +78,7 @@ the shared tree. Never run full suites locally; CI is needed only for slices tha
 - Create the public `SWFRecomp-CC-history` repo and clone it at `~/CC/SWFRecomp-CC-history`.
 - Copy the §2 "moves" set into it at the **same relative paths**, so citations stay greppable, and commit it there.
 - In the main repo, remove the set and leave a `README.md` stub in each top-level moved dir that links the new location.
-- Promote the coordinator tooling to `tools/coord/` (newest copy from `session30-fanout-reports/coord-tools/`) and
+- Promote the coordinator tooling to `tools/coord/` (newest copy from `SWFRecomp-CC-history:SWFRecompDocs/plans/session30-fanout-reports/coord-tools/`) and
   repoint `recompiler_ab_sweep.sh`.
 - Rewrite the citations in tracked files with a mechanical sed to `SWFRecomp-CC-history:<path>`, and do the same in
   the 14 memories.
@@ -182,3 +182,98 @@ are executed, and `git grep` for each moved path hits only stubs and citations.
 
 Rewriting history, shrinking the pack, renaming `master` (D7), vendored third-party libraries (SDL3 and the rest), and
 the CANCELLED N procgen arc (S2 inventories its files only).
+
+## 6. S1 closeout (2026-11-28, session `cleanup-s1-history-split`)
+
+**Done.** History repo **`PeerInfinity/SWFRecomp-CC-history`** (public, default branch `master`, checkout
+`~/CC/SWFRecomp-CC-history`), import commit `65eca06`. Main repo: `b2151adb1` (tools/coord), `49a663a5b` (removal +
+stubs), `d81f64081` (citations + D3 machinery + D7), and this closeout commit. The tree was quiet: no SWFRecomp peer
+session busy, no commits after `f92da554c`.
+
+### What moved (4,861 tracked files, `git ls-files -s` byte-identical in both repos before the `git rm`)
+
+| Path | Files |
+|---|---|
+| `plans/session{7..30}-fanout-reports/` + `session9-graphics-setup-reports/` | 4,477 |
+| `prompts/` | 211 |
+| `status/` | 114 |
+| `plans/completed/` | 30 |
+| `deprecated/` | 29 |
+
+No binaries other than images, `.swf` fixtures and 2 `.ttf` (no ELF/PE, no Flash projector; everything was already
+public in the main repo). 55 untracked/ignored files that sat in the moved dirs (50 built `.swf`, `__pycache__`) are in
+neither repo: they were moved to `~/CC/SWFRecomp-CC-local-residue/s1-moved-untracked/` (same relative paths).
+
+### The `status/` split: all 114 are logs, so the whole directory moved
+
+Read file by file. None is current reference: every file is a dated record of one session or slice.
+- 77 `YYYY-MM-DD-*.md` session logs (2025-11 heap/string work, the 2026-05/06 Doodle Jump, Snake, Tetris,
+  Minesweeper, Riddle School and glaiel game-debugging logs, `2026-09-02-bitmap-texture-pools.md`).
+- 26 undated slice closeouts, each with a `Date`/`Baseline`/`Brief` header: the multi-SWF arc slices
+  (`child-*`, `per-movie-*`, `avm2-child-*`, `avm1-mcl-holder-totalframes`), the emission-mode slices
+  (`avm2-try-helper-emission`, `avm2-tu-split-emission`, `avm2-dead-payload-skip`, `emission-mode-residuals`), the
+  browser slices (`browser-*`), `bitmap-pool-layer-cap`, `seedling-collide-hotloop`, `avm2-observation-hooks`,
+  `worktree-unlanded-work-audit-2026-09-04` + `worktree-rescue-2026-09-04/`.
+- 2025 snapshots: `project-status.md` (last updated 2025-10), `OPCODE_CORRECTIONS_SUMMARY.md`,
+  `o1heap-integration-investigation.md`, the four `experiment-0N-*-results.md`, and the old `README.md`.
+
+Their current content already lives in the state docs and memories. Code comments and fixtures cite them as
+provenance, and those citations were rewritten.
+
+### Deviations from §3 S1
+
+1. **One stub for the 24 report dirs**, `SWFRecompDocs/plans/fanout-reports.md`, not a `README.md` in each. 24
+   placeholder dirs in `plans/` would undo the declutter. `prompts/`, `status/`, `deprecated/` and `plans/completed/`
+   each got a `README.md` stub. `plans/README.md` now says finished plans go to the history repo.
+2. **Memories: 87, not about 14.** The §1 count covered only fan-out-report citations. All 87 were rewritten with the
+   same script (plus 4 bare `status/`/`prompts/` cites and one `[[../../…]]` link), after a backup copy was made.
+3. **No functional dependency on a moved path.** `ruffle-tests/recompiler_ab_sweep.sh` only cites reports in comments,
+   so "repoint" was a citation rewrite. The only code that reads a moved dir is the dead
+   `scripts/build_opcode_index.py` (reads `SWFRecompDocs/prompts`, prints an error and continues if it is missing);
+   S3 deletes it. `ruffle-tests/flash_fixes/fixes.json` `evidence` strings are free text with no consumer.
+   `apply_flash_fixes.py --check` was run after the rewrite.
+4. **Rewrite scope.** `d81f64081` touches 226 files: 221 from the main rewrite pass, a second pass for bare
+   `status/x.md` / `prompts/x.md` mentions, and the D3/D7 edits. The changes are comments, docstrings, README/toml prose and markdown links only, with
+   no code (every changed non-markdown line was checked to be a comment or docstring). Markdown links that resolved
+   into a moved dir became `https://github.com/PeerInfinity/SWFRecomp-CC-history/{blob,tree}/master/…` URLs; local
+   absolute paths became `~/CC/SWFRecomp-CC-history/…`. These were skipped, because S3 deletes them: `CC/`,
+   `md-files.json`, `repository-data.json`, `opcode-index.json`, `docs/opcode-index.json` and
+   `scripts/build_opcode_index.py`.
+5. **The done-line grep.** `git grep 'fanout-reports'` also hits text that is not a moved path: the plan's own §1/§2
+   descriptions (globs), and the D3 procedure text that names the generic `sessionN-fanout-reports/` path (playbook
+   §5a, arc §31.5, `tools/coord/`, `fanout_cloud_worker.sh`). No concrete moved path is cited without the
+   `SWFRecomp-CC-history` prefix.
+6. **coord-tools.** The s30 copy is a superset of s26–s29 (allrows/status_moves* are blob-identical across copies;
+   `land_branch.sh` exists only in s29/s30, identical); no tool existed only in an older copy. Changes:
+   - `watch_reports.sh` takes `REPORT_DIR` instead of the hardcoded `session30` path;
+   - `land_branch.sh` got `--help`, argument checks and a scratch-dir guard;
+   - **new** `archive_branch.sh` copies a fanout branch's NEW/CHANGED report blobs into the history checkout, and is
+     the closeout "cmp every blob" check before pruning;
+   - **new** `COORDINATOR_BRIEF_TEMPLATE.md` (from the s30 brief) and `templates/_w{1,2}_header.txt`.
+7. **D3 delivery shape (a design call; the plan didn't specify it).** A cloud session can push only to the repo it was
+   launched on. Workers therefore clone the history repo read-only (`git clone --depth 1`), and they still deliver on
+   `fanout/<slug>` in the MAIN repo, at the history-repo path. That branch is never merged. The coordinator lands the
+   code with `land_branch.sh` and copies the report 1:1 with `archive_branch.sh`. `fanout_cloud_worker.sh` now warns
+   when a prompt cites a session dir without naming the history repo, or when the history checkout is unpushed.
+   **Untested end to end**: no fan-out ran in S1, so the first s31 worker is its proof. Check its first `get_run_log`
+   for the clone.
+8. **Ladder prompts and status closeouts go to the history repo too** (`SWFRecompDocs/prompts/`, `status/` there).
+   This follows from D2 moving those dirs. Memory `session-launch-protocol` says so.
+9. D7 is in `NO_GO_REGISTER.md` §1c.
+
+### CI
+
+`gh workflow run ruffle-tests.yml -f mode=graphics -f categories=all` at `d81f64081`: run `46165163125`.
+**Green, results `97df6c0d2`.** Against the previous graphics results `a72b5c8a8` (run `46111106971`), graded with
+`tools/coord/status_moves.py` / `allrows.py`, which is also their first smoke run from the new path: **0 status moves** on the
+4,922-row intersection, so no pass→fail. 4,926 rows: 4,763 pass + 131 rm + 32 mm. The 4 new rows are upstream drift.
+Ruffle migrated its SharedObject tests to the SWF runner on 2026-11-28 (`76660b186`, `d9d7154f0`, `624119354`):
+`avm1/shared_object_self_ref` passes, while `avm1/shared_object`, `avm1/shared_object_localhost_network` and
+`avm2/shared_object` are output_mismatch. These three are new rows for the next corpus session's drift slot.
+
+### Next slice
+
+**S2: side-project inventory and decision** (a discussion session with Robert; see §3 S2). Nothing in S1 blocks it. The
+N capture/fixture dirs under `plans/`, `flash-oracle-captures` and `tools/divergence/perf/` are untouched and wait for
+S2. S6 (prune) is independent and can run any time no session is active. The 8 worktrees may hold untracked copies of
+moved paths; check them against the history checkout, not master (memory `fanout-worktree-residue-self-archives`).
