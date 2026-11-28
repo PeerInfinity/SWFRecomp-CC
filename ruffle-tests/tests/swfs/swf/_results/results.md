@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-28 02:31 UTC
+**Date**: 2026-11-28 08:08 UTC
 
-**Git SHA**: `b8671fd2f5`
+**Git SHA**: `3dfab12779`
 
-**Run Duration**: 1m 22s
+**Run Duration**: 1m 20s
 
 ## Summary
 
@@ -24,12 +24,12 @@
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `convolution_filter_big_matrix` | 2 | 19.7s |  |
-| 2 | `lzma_length_too_long` | 19 | 20.2s |  |
+| 2 | `lzma_length_too_long` | 19 | 19.4s |  |
 | 3 | `lzma_length_too_short` | 18 | 1.1s |  |
-| 4 | `swf_length_too_long` | 18 | 19.7s |  |
+| 4 | `swf_length_too_long` | 18 | 18.6s |  |
 | 5 | `swf_length_too_short_no_end` | 19 | 1.1s |  |
-| 6 | `swf_length_too_short_no_second_frame` | 18 | 18.8s |  |
-| 7 | `swf_length_zero` | 0 | 1.0s |  |
+| 6 | `swf_length_too_short_no_second_frame` | 18 | 18.9s |  |
+| 7 | `swf_length_zero` | 0 | 1.4s |  |
 
 ## Near-Passing Tests
 
