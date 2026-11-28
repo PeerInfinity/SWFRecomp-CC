@@ -54,8 +54,32 @@ the shared tree. Never run full suites locally; CI is needed only for slices tha
 | D5 | Dead files | **Delete them.** The plan lists each one (§3, S3). The slice re-checks references before each delete. Git history keeps them. |
 | D6 | Branches and worktrees | **Prune the merged local branches and the old worktrees** (check each worktree for uncommitted work first). Review the remote branches one at a time with Robert. |
 | D7 | Rename `master` → `main` | **No.** Ruffle itself uses `master` (`ruffle-rs/ruffle`, checked 2026-11-28). A rename touches 43 workflows and scripts, `CLAUDE.md`, the pipeline handoff, memories, every worktree and cloud env, and the Pages config, and gives the audience nothing. Recorded in `NO_GO_REGISTER.md` by S1. |
-| D8 | Side projects | **To be decided.** Robert wants some side projects moved out of the main repo. Which ones, and where they go, needs investigation and discussion: slice S2. |
+| D8 | Side projects | **Decided in S2** (2026-11-28): per-path rulings D8a–D8l below. Finished-game one-offs, reports and provenance captures go to the history repo; the perf dumps are deleted; everything that tests or drives code still here stays. Executed by S2b. |
 | D9 | Order | Structural moves first, so the docs written later point at final paths. The prune is independent. |
+| D10 | SWF files in git (S2, 2026-11-28) | **The SWFs already tracked stay in both repos** (no history purge, and the history repo is not deleted and re-created). **No more `git add -f`:** a SWF is tracked only when a `.gitignore` allow rule covers it. Robert wants to review the tracked SWFs in detail first (slice S7). Until S7 rules, `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md:80` ("`git add -f` the `.swf` fixtures") is left unchanged; no fan-out is planned before then. The history repo got a `.gitignore` (`*.swf`, build outputs, Flash binaries; `7879606`). |
+
+### D8 side-project rulings (S2, Robert, 2026-11-28)
+
+The inventory was taken at `d81f64081`. Counts are tracked files. "Refs" are other tracked files naming the path. Rule
+behind every ruling: **anything that tests or drives code still in this repo stays**; finished-game one-offs, reports
+and provenance captures go to the history repo (as S1 did); raw data dumps are deleted (git history keeps them).
+
+| # | Path | Size | Ruling |
+|---|---|---|---|
+| D8a | `ruffle-tests/_eq_tas/`, `ruffle-tests/_rwk_tas/` (TAS scripts, EQ/RWK bring-ups DONE) | 20 files, 62 KB | **History repo.** No CI or test consumer; 5 refs, 2 memories. |
+| D8b | `tools/divergence/game_drive/`: the 15 `minesweeper_*` and 3 `pacman_*` probes (finished games) | 18 files | **History repo.** The harness (`tetris_compare.py`, `n_drive_compare.py`, `n_click_probe.py`, `smoke_demo.py`, `dbg_capture.py`, `death_verify.py`, `dj_smoke.py`, `ready_probe.py`, `tetris_*`, README) **stays**: it is live and the game-debugging guide names it. Re-word the README's file list. |
+| D8c | `SWFRecompDocs/games/` (flasharchive build results, game search; 2026-05 snapshot) | 2 files, 26 KB | **History repo.** Re-cite in `guides/wasm-game-debugging-session-guide.md`. |
+| D8d | N work: `SWFRecompDocs/plans/n-*.md` (18 ladder reports + the 3 CANCELLED procgen plans `n-level-generator-plan.md`, `n-portals-plan.md`, `n-physics-js-reimplementation-plan.md`), `n-stroke-snap-captures/`, `n-join-disc-captures/`, `n-exec-order-sibling-fixture/`, `n-levels-5plus-hairline-fixture/` | 140 files, 1.35 MB | **History repo, all of it.** The captures are provenance only: the regression fixtures built from them carry their own goldens. Live N state stays in memory `n-play-game` (the pixel ladder is PARKED, not cancelled). Edit `NO_GO_REGISTER.md`'s procgen row ("existing code and docs stay in place" → the docs moved to the history repo; code stays). |
+| D8e | `SWFRecompDocs/plans/flash-oracle-captures/` | 12 files, 103 KB | **History repo.** Provenance for regression goldens (cited by a `tag.c` comment and 2 regression `test.toml`/`create_test_swf.py`). New oracle captures belong with the fixture they grade, not here. |
+| D8f | `tools/divergence/perf/` raw dumps: 5 `seedling_profile_*.json`, 4 `*.cpuprofile`, `seedling_static_type_scout.csv`, `inst_slot_census_2026-07-15.txt`, 2 `ti_2026-07-20_*.png` | 13 files, 19.5 MB | **Delete** (not moved: they would add 19.5 MB to a second public repo, and they are stale; `NO_GO_REGISTER` already requires a fresh profile of HEAD to reopen anything). Their conclusions live in `SEEDLING_AB_STATUS.md` / `RWK_AB_STATUS.md` and memories. Citations become "deleted in `<sha>`; recover with `git checkout <sha>^ -- <path>`". The rig (`*_win.py`, `*.mjs`, the small A/B CSVs and `results.txt`), the status docs and `WINDOWS_PLAYWRIGHT_FROM_WSL.md` (cited by `CLAUDE.md`) **stay**. |
+| D8g | `tools/divergence/ARCHIVE.md` (125 KB session log) | 1 file | **History repo.** `PROGRESS.md` (169 KB) **stays** while sessions still append to it. |
+| D8h | `ruffle-tests/tests/swfs/_rando/` (Archipelago `Rando` builtin tests) | 35 files, 70 KB | **Stays.** It tests runtime code that stays (`WITH_AP`); Archipelago-CC consumes it. |
+| D8i | `ruffle-tests/tests/swfs/_swfbridge/livetest/` (10 harnesses: DJ, N, RWK, Seedling, SharedObject hook, toy browser) | 113 files, 755 KB | **Stays.** Live; `run_image_tests.py` excludes it by name. |
+| D8j | `docs/injector/` + `demos/{ruffle-inject,ruffle-editor,runtime-swf}/` | 57 files, 2.9 MB | **Stays.** A live Pages demo (`docs/index.html` links it); `demos/` is its source. If S4 finds it broken, it becomes an S3-style delete plus link removal. |
+| D8k | `docs/examples.staging/` | 5 files, 55 KB | **Delete in S3** (dead since 2026-02, no refs). |
+| D8l | `SWFRecomp/wasm_recompiler_demo` | 0 tracked | **Nothing to do.** Only old `PHASE{1,2}_*.md` plans mention it. |
+
+Arc docs for Seedling, EQ, Snailiad, Archipelago and DJ in `plans/` stay (S1 ruling: arcs stay).
 
 ### What moves to the history repo (S1)
 
@@ -104,9 +128,28 @@ the shared tree. Never run full suites locally; CI is needed only for slices tha
 - Append the rulings to this plan as §2 D8a… and add an execution slice (S2b) if anything moves.
 - **Done:** the rulings and the S2b slice line are committed to this file.
 
-**S2b: side-project extraction (only if S2 rules any moves).** Same mechanics as S1: copy at the same relative paths,
-leave stubs, rewrite citations, and run CI if test fixtures or tooling paths move. **Done:** S2's per-project rulings
-are executed, and `git grep` for each moved path hits only stubs and citations.
+**S2b: side-project extraction (ruled in S2, §2 D8a–D8l).** Same mechanics as S1. Copy the D8a–D8e and D8g paths into
+`SWFRecomp-CC-history` at the same relative paths and commit there. `git rm` them here, with one stub per moved
+top-level dir (or a single `SWFRecompDocs/plans/n-work.md` stub for the D8d set, as S1 did for the report dirs).
+`git rm` the 13 D8f dumps; no copy. Rewrite citations in tracked files and memories (`SWFRecomp-CC-history:<path>`, or
+the D8f recovery-sha form), and edit the `NO_GO_REGISTER.md` procgen row. Trim the `game_drive` README. Check the
+worktrees for untracked copies before calling it done (memory `fanout-worktree-residue-self-archives`). Run it only
+while the tree is quiet. CI isn't needed: no CI, test or Pages path moves (comments only), but run `apply_flash_fixes.py
+--check` and one `regression` test whose docstring was rewritten. **Done:** both repos pushed; `git grep` for each
+moved path hits only stubs and `SWFRecomp-CC-history:` citations; `git grep` for each D8f filename hits only recovery
+citations; `du -sh tools/divergence/perf` is under 1 MB.
+
+`.gitignore` checks (S2, 2026-11-28):
+- No root `.gitignore` rule names a moved or deleted path, so none needs editing.
+- `SWFRecomp-CC-history` has no `.gitignore`, so copy with `git ls-files`, never `cp -r`. The moved dirs hold 26
+  ignored, untracked files: 25 probe-generated `test.swf`/`.pyc` in `n-stroke-snap-captures` and `n-join-disc-captures`,
+  and `_rwk_tas/__pycache__`. Like S1's residue, they go to `~/CC/SWFRecomp-CC-local-residue/s2b-moved-untracked/` and
+  never into the history repo.
+- `n-exec-order-sibling-fixture/test.swf` is tracked despite the global `*.swf` rule (force-added in `4e66127cc`). The
+  history repo now ignores `*.swf` (`7879606`), so per D10 S2b adds an allow rule for that path to the history repo's
+  `.gitignore` instead of `git add -f`, and the `cmp` check includes it.
+- `game_drive` stays, along with its local-only, ignored `Minesweeper.swf`, `Tetris.swf` and `compare_out/`. Those are
+  non-OSS game binaries and outputs, and they must never be copied out with the minesweeper probes.
 
 **S3: root declutter and dead files.**
 - Move `RUFFLE_*.md` to `ruffle-tests/results/`, changing `publish_results.sh`, `generate_results_index.py` and
@@ -158,6 +201,24 @@ are executed, and `git grep` for each moved path hits only stubs and citations.
   Keep `ruffle-test-results` and `ruffle-image-results`.
 - **Done:** `git worktree list` shows only the main tree. `git branch` lists master plus the branches Robert chose to
   keep. The remote branch list matches his rulings.
+
+**S7: SWF review and whitelist (discussion with Robert, then execution; ruled in D10).**
+- Robert reviews the tracked SWFs path by path. At S2 (2026-11-28) there were 586 in the main repo:
+  - 389 in `regression/` (322 of 347 dirs have a generator);
+  - the rest in `docs/examples`, `_rando`, the divergence gates and tracer, `demos/`, `docs/injector` and `docs/recompiler`.
+  - 5 of them were force-added outside any allow rule: `tools/flash-oracle/capture/{PinStub,CaptureWrapper}.swf`,
+    `tools/flash-oracle/probes/tick_avm{1,2}/`, `SWFRecompDocs/plans/n-exec-order-sibling-fixture/test.swf` (the last
+    one moves in S2b).
+  - The history repo has 190, all fan-out fixture and probe SWFs (2026-11-21..27, 43 commits; the largest is 174 KB,
+    910 KB in total).
+  - No game SWFs and no Flash binaries are tracked.
+- Origin, for the record: the 8 allow rules were each added by an agent session inside a feature commit, with a stated
+  reason (2026-02-06 … 2026-09-02). The force-adds are a fan-out habit: seen in s27 worker reports, written into the s30
+  coordinator brief (`638d02461`), and carried into `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md:80` by S1.
+- Then: give every SWF that is kept an allow rule. Untrack (forward-only `git rm --cached`) any that Robert rules out.
+  Replace the template's `git add -f` line with the ruled procedure.
+- **Done:** `git ls-files -ci --exclude-standard` is empty in both repos, and no brief, template or playbook tells a
+  session to `git add -f` a SWF.
 
 ## 4. Risks
 
@@ -277,3 +338,15 @@ Ruffle migrated its SharedObject tests to the SWF runner on 2026-11-28 (`76660b1
 N capture/fixture dirs under `plans/`, `flash-oracle-captures` and `tools/divergence/perf/` are untouched and wait for
 S2. S6 (prune) is independent and can run any time no session is active. The 8 worktrees may hold untracked copies of
 moved paths; check them against the history checkout, not master (memory `fanout-worktree-residue-self-archives`).
+
+## 7. S2 closeout (2026-11-28, discussion session `cleanup-s2-side-projects`)
+
+**Done:** Robert ruled on every candidate (§2 D8a–D8l) and on the SWF question (§2 D10). This session moved and deleted
+nothing in the main repo. It made one change in the history repo, the `.gitignore` (`7879606`).
+- **Brief deltas:**
+  - The perf dumps are **deleted**, not moved (D8f). There are 13 of them, 19.5 MB; S2's first estimate was 17.9 MB.
+  - "Keep SWFs out of the repos" became D10, which is about how SWFs get tracked rather than which ones are tracked.
+  - New slice S7.
+  - The N procgen row in `NO_GO_REGISTER.md` ("docs stay in place") needs an edit in S2b.
+- **Next slice: S2b** (execution; run it only while the tree is quiet). S3–S6 are unchanged. S7 (SWF review) needs
+  Robert, and must run before the next fan-out or the template line in D10 must be changed first.
