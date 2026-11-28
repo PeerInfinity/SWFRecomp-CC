@@ -25,8 +25,6 @@ sup*.swf
 !docs/examples/**/test.swf
 # Allow divergence regression-gate fixture SWFs (hand-built, tracked)
 !tools/divergence/gates/*.swf
-# Allow demo SWFs for in-browser recompiler
-!docs/recompiler/*.swf
 # In-browser recompiler artifacts are generated at deploy time by
 # SWFRecomp/scripts/deploy_wasm_demo.sh (run by the deploy-pages workflows):
 # the Emscripten build of the recompiler, the runtime-snapshot build bundle
@@ -49,6 +47,14 @@ docs/recompiler/host/
 !tools/divergence/tracer.swf
 # Allow Archipelago Rando integration-test SWFs (hand-built MTASC test inputs)
 !ruffle-tests/tests/swfs/_rando/**/*.swf
+# Allow the Flash oracle's capture wrappers and tick probes (built by
+# tools/flash-oracle/capture/build.sh and the probes' TickProbe.as; repo
+# cleanup S7, Robert 2026-11-28 — they were force-added before this rule).
+!tools/flash-oracle/capture/*.swf
+!tools/flash-oracle/probes/*/test.swf
+# SWF policy (repo cleanup D10/S7): never `git add -f` a SWF. A SWF is tracked
+# only when an allow rule above covers it; a new location gets its own rule in
+# the same commit. Check: `git ls-files -ci --exclude-standard -- '*.swf'` is empty.
 
 # Libraries
 zlib.dll

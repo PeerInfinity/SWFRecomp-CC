@@ -77,8 +77,12 @@ Local ladder sessions edit, and sometimes stage, files in the same tree you comm
 Recipe: (1) `git status --short` + `git diff --cached --name-only` first; (2) stage your exact content (`git apply
 --cached P` + `git apply P` for a peer-dirty file, or `git hash-object -w` + `git update-index --cacheinfo`); (3) check
 `git diff --cached --name-only`; (4) plain `git commit`. `tools/coord/land_branch.sh` refuses peer-dirty files.
-**Binary files never go through `git merge-file`**; after a landing, `git add -f` the `.swf` fixtures and check every
-committed binary is non-empty.
+**Binary files never go through `git merge-file`**; after a landing, stage the `.swf` fixtures by name with a plain
+`git add` and check every committed binary is non-empty. **Never `git add -f` a SWF** (plan D10/S7): a SWF is tracked
+only under a `.gitignore` allow rule. In the main repo `regression/<test>/*.swf` is covered; in the history repo every
+`sessionN-fanout-reports/**/*.swf` is covered. If `git add` says a SWF path is ignored, it is somewhere no rule
+allows: move it under `regression/`, or add a `!path` rule in the same commit and name it in the closeout. Check
+`git ls-files -ci --exclude-standard -- '*.swf'` is empty in both repos before you push.
 
 ## The Flash oracle (memory `flash-player-oracle`)
 

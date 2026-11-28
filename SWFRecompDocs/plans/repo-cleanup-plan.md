@@ -877,3 +877,70 @@ The external links in the two new docs (history repo, `SWFRecomp/SWFRecompDocs`,
 `SWFRecomp-CC-p4h-rc1` worktrees, seedling-wasm's `p4h-main` and `p4h-rc1`) and the `seedling-wasm-leak` branch (§3 S6)
 until an Archipelago-CC session says which it still needs. **S7: the SWF review with Robert**
 (§3 S7), which must still precede the next fan-out.
+
+## 14. S7 closeout (2026-11-28, discussion + execution session `cleanup-s7-swf-whitelist`)
+
+**Done:** `git ls-files -ci --exclude-standard -- '*.swf'` is empty in both repos, and the coordinator template no
+longer tells a session to `git add -f` a SWF. Nothing was untracked, so there was no CI run.
+
+### Inventory (read-only, before the rulings)
+- **Main repo: 585 SWFs, about 1.19 MB.** One fewer than S2's 586, because the n-exec-order fixture moved in S2b.
+
+  | Group | SWFs | Bytes | Rule before S7 | Generator |
+  |---|---|---|---|---|
+  | `ruffle-tests/tests/swfs/regression/` | 389 in 347 dirs | 815 KB | `regression/*/*.swf` | 322 dirs in-dir (Python, MTASC, mxmlc); 25 s27–s30 dirs have none in the dir (the generator is in the history-repo report or a `GENERATOR.txt` pointer) |
+  | `docs/examples` | 168 | 346 KB | `docs/examples/**/test.swf` | all, `SWFRecomp/tests/*/create_test_swf.py`; served as committed by `deploy-pages.yml` |
+  | `demos/` | 10 | 7.7 KB | `demos/**/*.swf` | all |
+  | `docs/injector` | 2 | 3.5 KB | `docs/injector/**/*.swf` | byte copies of `demos/ruffle-editor/wrapper_as{2,3}.swf` |
+  | `_rando` | 5 | 2.6 KB | `_rando/**/*.swf` | MTASC `.as` |
+  | divergence gates and tracer | 7 | 3.6 KB | two rules | `.swfml` / `.as`, `build_tracer.sh` |
+  | `tools/flash-oracle` capture and probes | 4 | 6.6 KB | **none (force-added)** | `capture/build.sh`, `TickProbe.as` |
+  | `docs/recompiler` | 0 | n/a | `docs/recompiler/*.swf` (dead since `124f9e52f`) | n/a |
+
+- **History repo: 191 SWFs, 911 KB.**
+  - 190 force-added fan-out fixture and probe SWFs in `session23`–`session30-fanout-reports`. 119 are byte copies of a
+    main-repo tracked SWF, and 14 have no generator beside them.
+  - 1 (n-exec-order) already had its S2b rule.
+- **Origin and licence:**
+  - Every tracked SWF in both repos is ours: no game SWF and no Flash binary.
+  - No main-repo SWF is a byte copy of any of the 5,088 local upstream corpus SWFs.
+  - Three history-repo SWFs are byte copies of OSS upstream tests: Ruffle `avm1/tab_ordering_properties_tab_index_edge_case`
+    (s29 `tab_edge_corpus.swf`), and Gnash `misc-ming.all/EmbeddedFontTest` twice (s30 `smalltext_on.swf`).
+  - Embedded fonts are synthetic, or OSS fonts taken from corpus SWFs or the system: Bitstream Vera, Noto Sans, DejaVu Sans.
+  - The exception is the history-repo s30 `ypen_scope_probe`, which embeds **Arial** outlines copied from Ruffle's
+    `text/style_changes_in_html` (Ruffle ships them). Robert kept it.
+  - Outside the SWF scope, for the record: `SWFRecomp/tests/graphics/define_edit_text/04B_03__.TTF` (freeware pixel
+    font, by way of Seedling) is tracked.
+
+### Rulings (Robert, 2026-11-28)
+1. Main-repo groups regression, docs/examples, demos, docs/injector, `_rando`, gates and tracer: **keep all**
+   under their existing rules.
+2. The 4 Flash-oracle SWFs: **keep**, and add the allow rules `!tools/flash-oracle/capture/*.swf` and
+   `!tools/flash-oracle/probes/*/test.swf`.
+3. The history repo's 190: **keep**, and make the `.gitignore` allow those paths, so that committing there works with a
+   plain `git add`. The rule is `!SWFRecompDocs/plans/session*-fanout-reports/**/*.swf`. It is an open glob, so future
+   session dirs are covered too.
+4. Delete the dead `!docs/recompiler/*.swf` rule. The done-check is scoped to SWFs
+   (`git ls-files -ci --exclude-standard -- '*.swf'`). Unscoped, it lists 15 vendored SDL3 files (`*Config.cmake`, shader
+   `*.hlsl`) that SDL's own nested `.gitignore` ignores. Those are left untouched.
+
+### What changed
+- Main `.gitignore`:
+  - the dead rule is gone;
+  - the two oracle rules are added;
+  - a policy comment (never `git add -f` a SWF; a new location gets its own rule in the same commit; the check).
+- History `.gitignore`: the header comment now gives the check, and the fan-out session-dir allow rule is added.
+- `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md:80`:
+  - Old: "`git add -f` the `.swf` fixtures".
+  - New: stage the SWFs by name with a plain `git add`. Never `-f`. Which paths are covered in each repo. What to do
+    when `git add` says a path is ignored (move it under `regression/`, or add a `!path` rule in the same commit and name
+    it). The `-ci` check before pushing.
+  - No other tracked brief, template or playbook said to force-add SWFs. The archived s23–s30 reports and the s30
+    coordinator prompt in the history repo still say so, but they are records and were left as they were (forward-only).
+- Checked:
+  - with `git check-ignore`, new SWFs at `session31-fanout-reports/.../test.swf`, `tools/flash-oracle/probes/<new>/test.swf`
+    and `tools/flash-oracle/capture/*.swf` are allowed;
+  - `git status` showed no previously ignored local SWF becoming untracked-visible in either repo.
+
+### Next slice
+S6 (branch and worktree prune, §3 S6) is unchanged. S7 no longer blocks the next fan-out.
