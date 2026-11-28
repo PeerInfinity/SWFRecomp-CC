@@ -215,7 +215,7 @@ facts drop the achievable prize under the noise floor:
    the increment *beyond* the existing IC hit, NOT the full `vtable_find_mn`.
 
 **Sizing the increment (the airtight close):**
-- **CDP attribution** (`seedling_profile_..._after_domainhash.json`, pre-call-IC):
+- **CDP attribution** (`tools/divergence/perf/seedling_profile_2026-07-14_after_domainhash.json`; deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/seedling_profile_2026-07-14_after_domainhash.json`, pre-call-IC):
   `vtable_find_mn` = 6.52% of frame, of which **CALL-side = 1.79%** (GET 4.23%, SET
   0.47%). The GET share is already killed by the Step-2/3 slot levers (slot reads
   skip the vtable entirely). The **entire** call-dispatch surface devirt could
@@ -264,7 +264,7 @@ After closing the arc, captured a **fresh real-GPU CDP profile at the current
 ~47 ms pre-slot-lever *and* pre a `setproperty` qname fix, so their ranking was
 obsolete. Rig: Windows-Chrome via WSL interop ([[windows-playwright-from-wsl]]),
 Intel Gen9, `seedling_cdp_profile_win.py`, 24,609 samples @ 200 µs. Saved to
-`tools/divergence/perf/seedling_profile_2026-07-14_fresh_step4.json`.
+`tools/divergence/perf/seedling_profile_2026-07-14_fresh_step4.json` (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/seedling_profile_2026-07-14_fresh_step4.json`).
 
 **Current-state self-time buckets (1% ≈ 0.33 ms at ~32.6 ms):**
 
@@ -509,7 +509,7 @@ overhead that overlaps nothing of ours. The arithmetic holds: still need to cut
 Built a read-only scout (`SWF_SCOUT_TYPES=<csv>` env-gate in `abc_emit.cpp`;
 lightweight forward abstract-interpretation over each verified body, tracking a
 static type per stack slot/local, classifying every static property op). **Ran on
-Seedling's ABC → `tools/divergence/perf/seedling_static_type_scout.csv`.**
+Seedling's ABC → `tools/divergence/perf/seedling_static_type_scout.csv`.** (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/seedling_static_type_scout.csv`)
 Validation: scout visited **exactly 25738 get / 2922 set / 4765 call** sites —
 byte-exact match to the emitter's own site counts → stack alignment held across all
 3626 bodies. Weighted three ways (self-time, inclusive-time, unweighted) — GET is

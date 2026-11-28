@@ -350,3 +350,68 @@ nothing in the main repo. It made one change in the history repo, the `.gitignor
   - The N procgen row in `NO_GO_REGISTER.md` ("docs stay in place") needs an edit in S2b.
 - **Next slice: S2b** (execution; run it only while the tree is quiet). S3–S6 are unchanged. S7 (SWF review) needs
   Robert, and must run before the next fan-out or the template line in D10 must be changed first.
+
+## 8. S2b closeout (2026-11-28, session `cleanup-s2b-extraction`)
+
+**Done.** History repo import `bd3f5f8`. Main repo: `db8023b5e` (moves, stubs, D8f deletes, path citations) and this
+commit (D8f recovery citations + closeout). The tree was quiet: no commits after `dc0915012`, no fan-out, ladder or
+cleanup session committing here (the busy peers were the launcher and non-SWFRecomp sessions).
+
+### What moved (193 tracked files; `git ls-files -s` mode+blob+path identical in both repos, plus `cmp` of every file, before the `git rm`)
+
+| Ruling | Path | Files |
+|---|---|---|
+| D8a | `ruffle-tests/_eq_tas/`, `ruffle-tests/_rwk_tas/` | 5 + 15 |
+| D8b | `tools/divergence/game_drive/{minesweeper_*,pacman_*}` (15 + 3) | 18 |
+| D8c | `SWFRecompDocs/games/` | 2 |
+| D8d | `SWFRecompDocs/plans/n-*` (21 docs + 4 capture/fixture dirs) | 140 |
+| D8e | `SWFRecompDocs/plans/flash-oracle-captures/` | 12 |
+| D8g | `tools/divergence/ARCHIVE.md` | 1 |
+
+- The history repo's `.gitignore` got a D10 allow rule for `SWFRecompDocs/plans/n-exec-order-sibling-fixture/test.swf`
+  (no `git add -f`). The copy was made with `git ls-files | tar`, so the 26 ignored probe `test.swf`/`.pyc` files and
+  `game_drive`'s `Minesweeper.swf`, `Tetris.swf` and `compare_out/` never left this machine.
+- Stubs: `ruffle-tests/{_eq_tas,_rwk_tas}/README.md`, `SWFRecompDocs/games/README.md`,
+  `plans/flash-oracle-captures/README.md`, `plans/n-work.md` (the whole D8d set) and a pointer at
+  `tools/divergence/ARCHIVE.md`. The `game_drive` README got a "Files" list of what stays plus a moved-probes line.
+- Untracked residue: 27 files (the 26 above plus `game_drive/__pycache__/minesweeper_capture.cpython-312.pyc`) went to
+  `~/CC/SWFRecomp-CC-local-residue/s2b-moved-untracked/`.
+
+### Deleted (D8f, not copied)
+
+The 13 dumps in `tools/divergence/perf` (19.5 MB): 5 `seedling_profile_*.json`, 4 `*.cpuprofile`
+(`seedling_c4_2026-09-14/{demo-load,p4d-boot}`, `seedling_hotloop_2026-09-16/{on,off}-k544`),
+`seedling_static_type_scout.csv`, `inst_slot_census_2026-07-15.txt`, 2 `ti_2026-07-20_*.png`. Recover any one with
+`git checkout db8023b5e^ -- <path>`. `du -sh tools/divergence/perf` = 392 KB.
+
+### Citations
+
+- 37 tracked files rewritten to `SWFRecomp-CC-history:<path>` (comments, docstrings and prose only; the 7 code files
+  changed comment lines only): bare forms like `n-stroke-snap-report.md`, `_eq_tas/…`, `flash-oracle-captures/…` and
+  the probe filenames in `PROGRESS.md` were expanded to the full path. `plans/README.md`'s three procgen links became
+  GitHub URLs. `NO_GO_REGISTER.md`'s procgen row now reads "code stays; the docs moved to the history repo".
+  `guides/wasm-game-debugging-session-guide.md` cites the history copy of `FLASHARCHIVE_BUILD_RESULTS.md` as a 2026-05
+  snapshot.
+- D8f: 4 tracked files and 3 memories carry `deleted in db8023b5e; recover with git checkout db8023b5e^ -- <path>`.
+- Memories: 21 changed in all (moved-path citations via the same script, plus the 3 D8f ones; backup taken first). One command line in
+  `avm2-eq-init2-gotoframe-hotspot` got a local path (`~/CC/SWFRecomp-CC-history/…`) instead of the citation prefix,
+  so the command still runs.
+
+### Deviations and notes
+
+1. **No live consumer of a moved path.** Every hit outside the moved set was a comment, docstring or doc. The perf rig
+   (`analyze.mjs`, `probe.mjs`, `qtbucket.py`) reads `.cpuprofile` files by argument, not the deleted ones, so it still
+   works on a fresh profile.
+2. **`ARCHIVE.md` got a file stub at its own path** rather than a directory stub (it is a single file).
+3. **Worktrees:** none of the 7 live worktrees holds untracked files under a moved or deleted path. The 8th
+   (`…/wt-browser`) is gone and marked prunable; S6 prunes it.
+4. **Done-line greps:** moved paths hit only stubs, `SWFRecomp-CC-history:` citations, history-repo URLs and this plan's
+   own §1/§2/§3 text. D8f filenames hit only recovery citations and this plan.
+5. **Checks:** `apply_flash_fixes.py --check` exit 0, no STALE rows. `regression/avm1_exec_order_sibling_interleave`
+   (docstring rewritten) passes. No CI: comments only.
+6. `tools/coord/COORDINATOR_BRIEF_TEMPLATE.md:80` left unchanged (S7, D10).
+
+### Next slice
+
+**S3: root declutter and dead files** (§3 S3; run it only while the tree is quiet; it needs a full CI run). S6 is
+independent. S7 (SWF review with Robert) still has to precede the next fan-out.

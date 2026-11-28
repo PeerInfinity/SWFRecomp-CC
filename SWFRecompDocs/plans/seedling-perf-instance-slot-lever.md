@@ -32,7 +32,7 @@ a vtable-identity check + count guard + `resolved_get` dispatch).
 - `tools/divergence/perf/SEEDLING_AB_STATUS.md` (session 8, blit) — the A/B method +
   the lesson that a *toggle* A/B can hide the real win; measure **NEW-vs-master**, not
   only the isolated toggle.
-- Fresh profile: `tools/divergence/perf/seedling_profile_2026-07-15_post_blit.json`.
+- Fresh profile: `tools/divergence/perf/seedling_profile_2026-07-15_post_blit.json` (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/seedling_profile_2026-07-15_post_blit.json`).
 
 ### THE SEAM (recompiler)
 The existing forward abstract-interp `analyzeSlotSpec` already tracks a static type per
@@ -151,7 +151,7 @@ receivers — whether it would newly specialize under the full soundness rule
 (`isSealed` + `findUniqueSlot` + `!subclassRedeclares` + `computeSlotIndex > 0`),
 tagged by `method_index`. Recompiled Seedling's ABC and cross-referenced the
 per-method counts against the fresh profile's hot GET-cluster drivers
-(`seedling_profile_2026-07-15_post_blit.json`, GET-cluster =
+(`seedling_profile_2026-07-15_post_blit.json`, deleted in `db8023b5e`, GET-cluster =
 `resolved_get` + `getproperty_static_ic` + impl/public, attributed to the nearest
 `abc0_m*` ancestor frame).
 

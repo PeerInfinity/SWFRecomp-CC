@@ -95,8 +95,8 @@ path has nothing addressable.
 A temporary `SWF_CENSUS_INST_SLOT` counter in `analyzeSlotSpec` (reverted after measuring)
 classified all 25,738 Seedling `GetPropertyStatic` sites and tagged the newly-specializable
 ones by `method_index`; cross-referenced against the fresh profile's hot GET-cluster
-drivers (`seedling_profile_2026-07-15_post_blit.json`). Raw census:
-`tools/divergence/perf/inst_slot_census_2026-07-15.txt`.
+drivers (`seedling_profile_2026-07-15_post_blit.json` (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/seedling_profile_2026-07-15_post_blit.json`)). Raw census:
+`tools/divergence/perf/inst_slot_census_2026-07-15.txt` (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/inst_slot_census_2026-07-15.txt`).
 ```
   25,738 GetPropertyStatic:  this 5826 (lever-A ✓) | getlex 13335 (lever-A ✓)
                              | classobj 1903 (lever-B ✓) | non-this typed-inst 992
@@ -512,7 +512,7 @@ does a **linear scan with per-entry string compares** on every getproperty/
 callproperty/findproperty — no hash, no inline cache. Ruffle's vtable is a
 HashMap (O(1)); that alone plausibly explains most of the ~6x gap. This is the
 AVM2 analog of the AVM1 `findOrCreateMovieClip`/property-name cluster.
-Raw profile: `seedling_profile_2026-07-14.json`. Driver+method:
+Raw profile: `seedling_profile_2026-07-14.json` (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/seedling_profile_2026-07-14.json`). Driver+method:
 `WINDOWS_PLAYWRIGHT_FROM_WSL.md`.
 
 **Fix #1 LANDED + VERIFIED (this session):** lazy name-keyed hash index on
@@ -531,7 +531,7 @@ rig, Intel Gen9):**
   gap vs Ruffle (46ms) ~6.0x          ~3.3x
 ```
 Render VERIFIED byte-identical (OverWorld house/grass/water/path/trees/player;
-scratchpad `seedling_after.png`). Profiles: `seedling_profile_2026-07-14.json`
+scratchpad `seedling_after.png`). Profiles (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/<file>`): `seedling_profile_2026-07-14.json`
 (before), `..._after_vtablehash.json` (after).
 
 **Fix #2 LANDED + VERIFIED — hash `avm2_domain_find` (`avm2_globals.c`).** Same
@@ -547,7 +547,7 @@ ascending-index order → byte-identical). **Measured real-GPU A/B (same rig):**
   gap vs Ruffle (46ms) ~3.3x          ~1.3x
 ```
 Render VERIFIED byte-identical (`seedling_after2.png`). New profile:
-`seedling_profile_2026-07-14_after_domainhash.json`. A **22% "(idle)"** slice
+`seedling_profile_2026-07-14_after_domainhash.json` (deleted in `db8023b5e`; recover with `git checkout db8023b5e^ -- tools/divergence/perf/seedling_profile_2026-07-14_after_domainhash.json`). A **22% "(idle)"** slice
 now appears — the tick is no longer CPU-saturated every ms.
 
 **CUMULATIVE: 280 → ~62 ms/frame (≈4.5x), ~6.0x → ~1.3x vs Ruffle**, from two

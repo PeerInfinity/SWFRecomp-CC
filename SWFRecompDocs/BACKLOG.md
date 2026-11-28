@@ -172,7 +172,8 @@ first).
   Archipelago-CC's gates drives this frame (the tier and wasm gates
   drive p4d, whose boot pass is 0.33 s), so this is a game-speed item,
   not a gate. Evidence: `tools/divergence/perf/seedling_c4_2026-09-14/`
-  (`demo-load.cpuprofile`, `p4d-boot.cpuprofile`, `results.txt`, the
+  (`demo-load.cpuprofile` and `p4d-boot.cpuprofile`, deleted in `db8023b5e`; recover with
+  `git checkout db8023b5e^ -- tools/divergence/perf/seedling_c4_2026-09-14/`; `results.txt` and the
   phase/JIT-control scripts); the write-up is Archipelago-CC's plan
   `NewDocs/plans/seedling-headless-webgpu-plan.md` §23.1.3. (2026-09-14)
   **Update 2026-09-16 (`2973513c4`):** the property-get share is fixed —
