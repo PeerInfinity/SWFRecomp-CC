@@ -204,15 +204,16 @@ Manual workflow dispatch (if not using the handoff):
 5. Results are committed to the `ruffle-test-results` branch
 6. After the run, merge `ruffle-test-results` into master to update result files
 
-Other CI workflows:
-- **"SWFRecomp CI"** — runs the old hand-written test suite (+ WASM builds, opcode docs)
-- **"Run All Tests"** — triggers both old and Ruffle/Gnash/Shumway suites together
+Other CI workflows (`.github/workflows/`): `weekly-no-graphics.yml` (the weekly no-graphics canary),
+`build-dawn.yml` (Dawn prebuild), `deploy-pages.yml` / `deploy-pages-build.yml` (GitHub Pages). The old
+"SWFRecomp CI" (`test.yml`) and "Run All Tests" (`all-tests.yml`) workflows were deleted in repo-cleanup S3
+(2026-11-28); the old hand-written suite runs locally only.
 
 ## Architecture Overview
 
 ### Two-stage pipeline: Recompiler → Runtime
 
-1. **SWFRecomp** (`SWFRecomp/src/action/action.cpp`, ~2000 lines) — Reads SWF bytecode, emits C code
+1. **SWFRecomp** (`SWFRecomp/src/action/action.cpp`, ~3000 lines) — Reads SWF bytecode, emits C code
    - Two-pass: first pass identifies jump targets, second pass emits C
    - Each ActionScript bytecode op → a C function call (e.g., `ActionAdd` → `actionAdd(app_context)`)
    - Stack-based: all operations use PUSH/POP macros on a byte buffer
@@ -229,7 +230,7 @@ Other CI workflows:
 
 | File | Purpose |
 |------|---------|
-| `SWFModernRuntime/src/actionmodern/action.c` | Main runtime (~50K lines) |
+| `SWFModernRuntime/src/actionmodern/action.c` | Main runtime (~90K lines) |
 | `SWFModernRuntime/include/actionmodern/action.h` | Function declarations |
 | `SWFModernRuntime/include/actionmodern/variables.h` | ActionVar struct |
 | `SWFModernRuntime/include/actionmodern/stackvalue.h` | Type enum |
@@ -290,7 +291,7 @@ There is a separate, older test system in `SWFRecomp/tests/`. These are hand-wri
 | **Runner** | `all_tests.sh` (bash, calls `build_test.sh`) | `verify_output.py` (Python, self-contained build) |
 | **Build** | `build_test.sh` (supports native + WASM) | `verify_output.py` builds native only (gcc, temp dir) |
 | **Results** | `test_results.json` (structured: sub-tests, opcodes, timing) | `results.json` per suite (line-level stats, failure categories) |
-| **CI** | "SWFRecomp CI" workflow | "Ruffle AVM1 Tests" workflow (covers all suites) |
+| **CI** | none (local only; `test.yml` deleted 2026-11-28) | `ruffle-tests.yml` ("Ruffle Tests", covers all suites) |
 
 ### Running old tests
 

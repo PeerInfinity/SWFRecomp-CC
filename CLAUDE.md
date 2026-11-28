@@ -96,7 +96,7 @@ gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f single_test=TE
 ## Project Structure
 
 - `SWFRecomp/` — Recompiler: converts SWF bytecode to C (`src/action/action.cpp` is the main bytecode→C translator)
-- `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~50K lines, the core runtime)
+- `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~90K lines, the core runtime)
 - `ruffle-tests/` — Ruffle test suites (since 2026-07-24 the FULL upstream corpus is mirrored, no AVM filtering; see `tests/swfs/_investigation/FULL_SUITE_IMPORT_AUDIT.md`):
   - `tests/swfs/avm1/` — ~720 AVM1 tests from Ruffle (100% filtered pass rate)
   - `tests/swfs/avm2/` — ~1220 AVM2 tests from Ruffle
