@@ -8,7 +8,7 @@ Documentation for SWFRecomp-CC, which recompiles Adobe Flash (SWF) content to C 
 
 ### Live Demos
 
-Interactive WebAssembly demonstrations of recompiled Flash content (see [docs/](docs/) for source):
+Interactive WebAssembly demonstrations of recompiled Flash content (the 2025 `SWFRecompDocs/docs/` example builds were deleted in 7393244a4; the live Pages site is the repo-root [`docs/`](../docs/)):
 
 - **[trace_swf_4 Demo](https://swfrecomp.github.io/SWFRecompDocs/examples/trace_swf_4/)** - Console output demo showing SWF → C → WASM pipeline
 

@@ -131,16 +131,13 @@ diff reference.xml generated.xml
 
 Note: Binary comparison of SWF files may show small differences (swfmill's bit-packing can differ by 1 byte), but the XML round-trip output should be identical.
 
-### 5. Update the Coverage Chart
+### 5. Coverage chart (retired)
 
-After adding your test, regenerate the coverage data:
-
-```bash
-python3 scripts/build_opcode_index.py
-python3 scripts/generate_opcode_markdown.py
-```
-
-This will pick up the new test's `test_info.json` and update `opcode-index.json`, `opcode-index.md`, and `opcode-index-plain.md`.
+The opcode/feature coverage chart (`opcode-index*.{json,md}`, `feature-index*.md`) and its generators
+(`scripts/build_opcode_index.py`, `scripts/generate_opcode_markdown.py`, `scripts/test-and-document.py`) were last
+regenerated 2026-02 and were deleted in 7393244a4 (repo-cleanup S3). Recover with
+`git checkout 7393244a4^ -- scripts/build_opcode_index.py scripts/generate_opcode_markdown.py`. `docs/opcode-index.json`
+is a frozen snapshot the Pages index still reads.
 
 ## swfmill_helpers.py API Reference
 
@@ -432,7 +429,7 @@ If you need to test a SWF feature not yet supported by `swfmill_helpers.py`, you
 
 1. Study the swfmill XML format for the feature: convert a reference SWF with `swfmill swf2xml` and examine the XML
 2. Add a new class or method to `swfmill_helpers.py` that generates the corresponding XML elements
-3. Add the feature ID to `GRAPHICS_FEATURES` in `scripts/build_opcode_index.py` if it's a new feature not already in the list
+3. (Until S3 the coverage chart's `GRAPHICS_FEATURES` list in `scripts/build_opcode_index.py` also needed the feature ID; that generator was deleted in 7393244a4.)
 
 Features that currently need to be added to `swfmill_helpers.py`:
 
@@ -522,17 +519,5 @@ This is also what the CI workflow does. It handles SWF generation, recompilation
 
 The build system (`SWFRecomp/scripts/build_test.sh`) automatically runs `create_test_swf.py` when `test.swf` is missing. You don't need to commit generated SWF files -- they are gitignored.
 
-The full documentation pipeline:
-
-```bash
-# Run everything: tests, build opcode index, generate markdown
-python3 scripts/test-and-document.py --build
-```
-
-Or run individual steps:
-
-```bash
-# Just rebuild the coverage chart
-python3 scripts/build_opcode_index.py
-python3 scripts/generate_opcode_markdown.py
-```
+(The old documentation pipeline, `scripts/test-and-document.py --build`, and the coverage-chart generators were
+deleted in 7393244a4; see §5.)

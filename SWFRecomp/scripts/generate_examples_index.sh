@@ -420,7 +420,12 @@ with open(catalog_file, 'w') as f:
 print(f"  Generated {catalog_file} with {len(tests)} tests and {len(excluded)} excluded")
 PYEOF
 
-# Copy opcode-index.json to docs/ if it exists in repo root
+# Copy opcode-index.json to docs/ if it exists in repo root. Since repo-cleanup
+# S3 it never does: the root copy and its generators (build_opcode_index.py,
+# generate_opcode_markdown.py, test.yml) were deleted in 7393244a4, and
+# docs/opcode-index.json (read by docs/index.html for the old-test opcode tags)
+# is a frozen 2026-03 snapshot. Recover the generators with
+# git checkout 7393244a4^ -- scripts/build_opcode_index.py scripts/generate_opcode_markdown.py
 OPCODE_INDEX="${REPO_ROOT}/opcode-index.json"
 if [ -f "$OPCODE_INDEX" ]; then
     cp "$OPCODE_INDEX" "${DOCS_DIR}/opcode-index.json"

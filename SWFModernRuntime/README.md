@@ -57,26 +57,14 @@ SWFModernRuntime/
 │   ├── libswf/            # Core SWF execution
 │   ├── actionmodern/      # ActionScript VM with variable storage improvements
 │   └── flashbang/         # Native GPU rendering
-├── include/               # Header files
-├── test_*.c               # Test suite for variable storage
-└── Makefile.test*         # Build files for tests
+└── include/               # Header files
 ```
 
 ## Building
 
-### Run Tests
-
-This repository contains a comprehensive test suite for the variable storage system:
-
-```bash
-# Build and run all tests
-make -f Makefile.test
-
-# Or run individual test suites
-make -f Makefile.test_simple              # Basic variable tests
-make -f Makefile.test_string_id           # String ID optimization tests
-make -f Makefile.test_simple_string_id    # Simple ID tests
-```
+The runtime is tested through the Ruffle test harness (`ruffle-tests/verify_output.py`) and the old
+`SWFRecomp/tests/` suite. (The 2025 standalone variable-storage tests `test_*.c` / `Makefile.test*` were deleted
+in 7393244a4; recover with `git checkout 7393244a4^ -- SWFModernRuntime/Makefile.test`, etc.)
 
 ### Integration with SWFRecomp
 
