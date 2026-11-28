@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-27T21:14:49.035830+00:00",
-    "old_git_sha": "a18a0e03349f07a0a41e1c7bb971b8eafe349891",
-    "new_timestamp": "2026-11-27T23:57:03.270608+00:00",
-    "new_git_sha": "715a5300c822a50c51e4dc2e2a0052b0dfb62a7a",
+    "old_timestamp": "2026-11-27T23:57:03.270608+00:00",
+    "old_git_sha": "715a5300c822a50c51e4dc2e2a0052b0dfb62a7a",
+    "new_timestamp": "2026-11-28T00:52:29.286551+00:00",
+    "new_git_sha": "9498e80c12e3422fa6cdfe634e4080b94ad93e57",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 338,
+    "old_pass": 343,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 338,
-    "old_total": 338,
+    "old_effective_pass": 343,
+    "old_total": 343,
     "old_pass_rate": 100.0,
-    "new_pass": 343,
+    "new_pass": 344,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 343,
-    "new_total": 343,
+    "new_effective_pass": 344,
+    "new_total": 344,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,69 +25,21 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 338,
-    "added": 5,
+    "unchanged": 343,
+    "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_native_identity_probe_swf5",
+      "test": "avm1_timeline_selfgoto_child_replace",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 43,
-        "expected_lines": 43,
-        "matching_lines": 43
-      }
-    },
-    {
-      "test": "avm1_native_identity_probe_swf6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 43,
-        "expected_lines": 43,
-        "matching_lines": 43
-      }
-    },
-    {
-      "test": "avm1_native_identity_probe_swf7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 43,
-        "expected_lines": 43,
-        "matching_lines": 43
-      }
-    },
-    {
-      "test": "avm1_native_identity_probe_swf8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 43,
-        "expected_lines": 43,
-        "matching_lines": 43
-      }
-    },
-    {
-      "test": "avm1_native_instance_layout",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 27
       }
     }
   ]
