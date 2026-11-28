@@ -814,6 +814,68 @@ Ruled after S4 found Ruffle ports that nobody had credited (§11).
 - **Done:** every ported function names its Ruffle source, and the table exists. The three D12c fixes are landed. A
   per-change graphics CI run passes with no pass→fail. Closeout as §12 "A1 closeout". Next slice line: S5.
 
+### A1 closeout (2026-11-28, session `cleanup-a1-ruffle-attribution`)
+
+**Done.** Main `ab18c4dff` (audit, D12c fixes), the results merge `ee08f1411`, and this closeout commit. CI: graphics
+`categories=all`, run `46180085211`, success. `corpus_status_diff.py 6e3754929 WORKTREE`: 4,927 graded rows,
+**0 moves** (4,763 pass, 131 rm, 33 failing). `git ls-files 'RUFFLE_*.md'` at the root is empty after the merge.
+
+**The audit:**
+- **Searched:** about 2,900 `ruffle` lines in 96 files, split across six parallel agents by file group. Each agent
+  also checked its files' large literal tables against `~/CC/ruffle`.
+- **Rule:** a row is code taken from Ruffle: its structure, constants, tables, shader text or method inventory.
+  Behaviour references ("matches Ruffle", ordering semantics our own code implements) are not rows.
+- **Result:** **165 rows in 63 files**:
+  - 73 ports, 55 close models, 19 tables/constants, 9 shaders, 4 generated from Ruffle data, 5 mixed.
+  - Each comment now gives the full Ruffle path (e.g. `core/src/avm2/globals/array.rs`), and the Ruffle commit where
+    the comment had one. All 10 recorded hashes resolve in Ruffle.
+- **Table:** `SWFModernRuntime/third_party/ruffle/README.md` (scope, method, sources outside ruffle-rs/ruffle). Linked
+  from the `THIRD_PARTY_NOTICES.md` row and the README paragraph. The "about 30 files" count is replaced by 165 / 63.
+- **Comment-only, checked mechanically.** For each changed source file, the comment-stripped text of HEAD and the
+  worktree was compared. Only two files differ in code:
+  - `swf.cpp`, the D12c fix;
+  - `render_webgpu.c`, an existing `//` comment inside a WGSL string, now giving the full shader path.
+
+**Flagged: near-verbatim or unattributed before A1** (attribution added, code untouched):
+- `tag.c` `pass_scales[15]` (×2): Ruffle `swf/src/types/blur_filter.rs` `PASS_SCALES`, value for value.
+  Unattributed.
+- `object.c` `flash_hide_masks`: `core/src/avm1/property.rs` `VERSION_MASKS` for SWF 5–9. Unattributed.
+- `action.c` `bitmapDataNoise`: close model of `core/src/bitmap/operations.rs` `noise` + `LehmerRng`. Unattributed.
+- `action.c` `perlin_*`: near-verbatim `core/src/bitmap/turbulence.rs`. It credited only W3C before. Ruffle's file
+  carries a **W3C copyright notice**, which is now reproduced above our copy, with its own `THIRD_PARTY_NOTICES` row.
+- Already attributed but near-verbatim: the `action.c` Array.sort qsort (`core/src/avm1/globals/array.rs`) and
+  `shape_hit_test.c` `winding_number_curve` (`render/src/shape_utils.rs`).
+
+**Overturned in the brief / new facts:**
+- **Not every port is Ruffle-repo code.** Three sources live in other repos:
+  - `ruffle-rs/h263-rs` @ `8215bc7`: the `video_codec.c` deblock, line for line. MIT OR Apache-2.0, with its own
+    copyright line.
+  - `ruffle-rs/rust-flash-lso` @ `11a0836`: the `avm2_amf.c` wire format. MIT, Callum Thomson.
+  - `ruffle-rs/jpegxr`: BSD-3. Nothing copied; we call the system libjxr in the same order.
+
+  Each MIT crate's own licence text is now beside Ruffle's: `third_party/ruffle/LICENSE-MIT-h263-rs.txt` and
+  `LICENSE-MIT-rust-flash-lso.txt`. Ruffle's single copyright line does not cover them.
+- **D12c "summary printed twice" did not reproduce.** In an isolated run of `download_tests.sh avm1` the summary
+  printed once. It came **before** the flash-fix lines, so check 2 read the run as two. Fix: `Done! Total` is now the
+  last line. GETTING_STARTED says so, and no longer tells readers to expect the `-Wstringop-overflow` warning.
+- **`-Wstringop-overflow`:** `memcpy(&m, &out, sizeof m)` still warns on GCC 13 -O3. An element-wise copy builds
+  with 0 warnings. No pragma was needed.
+- **Missing-Dawn error** (`verify_output.py`): it now names the path, whether `$DAWN_INSTALL` or the default chose it
+  (`~/CC/dawn-install` for a `~/CC` clone), the prebuilt in GETTING_STARTED §6, `build_dawn.sh`, and the
+  `DAWN_INSTALL` override.
+- Generated `unicode_case_tables.h` and `avm1_native_table.inc` cite the Ruffle test golden they came from. Their
+  generator scripts now write that line, so regenerating keeps it.
+- Memory `ruffle-code-reuse-ruled-out` corrected. Only **linking** Ruffle crates was ruled out; ports are everywhere,
+  including the WGSL filter/blend shaders that memory listed as "if ever revisited".
+- **S5 and S7 ran in parallel and landed before this closeout** (§13, §14). S5's ARCHITECTURE already quotes A1's
+  165 / 63 and links the table, so the numbers agree.
+
+**Rule for new ports:** cite the Ruffle file path in the comment, and add a row to the table.
+
+### Next slice
+S5 and S7 are done (§13, §14), so the next slice is **S6** (branch and worktree prune, §3 S6). Open for Robert: the
+seedling-wasm `p4f-rebuild` delete (§10 R1).
+
 ## 13. S5 closeout (2026-11-28, session `cleanup-s5-docs-index-architecture`)
 
 **Done.** One docs-only commit (this section included). No code, CI or Pages path changed, so no CI run.
