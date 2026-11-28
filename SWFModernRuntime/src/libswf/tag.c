@@ -7895,16 +7895,15 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
 	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Mark (but don't clear display_list) any MCs queued for finalize, so
 	// ENTER_FRAME skips MCs being removed by tag-stream tagRemoveObject2 in
 	// this frame. The clear (which frees sprite_display_list and would dangle
 	// other MCs' display_obj pointers) is deferred to actionDrainOnloadAndScript
 	// after queued onLoad handlers drain. Matches Flash's behavior:
 	// avm1/clip_events expects no onEnterFrame after RemoveObject2.
+	// Every build since s30 browser-pending-finalize.
 	extern void run_pending_finalize_mark_only(SWFAppContext* app_context);
 	run_pending_finalize_mark_only(app_context);
-#endif
 
 	// Set enterframe_eligible for all initialized sprites (recursive into buttons)
 	set_enterframe_eligible_recursive(display_list, max_depth);
@@ -13328,10 +13327,16 @@ void ng_queue_placement_clip_events(SWFAppContext* app_context, size_t depth)
 	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
 }
 
+#endif
+
 // Public wrapper: queue UNLOAD clip-action callbacks for a slot, mirroring
 // the tagRemoveObject2 path. Used by AS-side removeMovieClip / actionRemoveSprite
 // on clones so clip-action UNLOAD fires the same as a tag-stream RemoveObject2
 // would. Caller is responsible for clearing the display_list slot afterward.
+// Every build since s30 browser-pending-finalize (the browser had a no-op stub
+// in graphics_stubs.c, so a swapDepths'd + removeMovieClip'd timeline clip
+// never ran its onClipEvent(unload); regression/
+// avm1_swapdepths_remove_clipevent_unload).
 void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, MovieClip* mc)
 {
 	if (depth > max_depth) return;
@@ -13349,7 +13354,6 @@ void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, Movie
 				display_list[depth].clip_actions[a].action, mc);
 	}
 }
-#endif
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Script-only (Phase 2) PlaceObject: placement already happened in Phase 1, so
@@ -15127,13 +15131,11 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 //     by name (instance_name stays populated until finalize).
 // For MCs WITHOUT unload handlers, both run inline (no handler to wait for).
 //
-// The pending-finalize QUEUE functions below are NO_GRAPHICS/OFFSCREEN_RENDER
-// only (browser-WASM gets no-op stubs in the #else), but the state table and
-// the realloc/free funnel that scrubs it (ng_spriteDLRealloc / ng_freeSpriteDL
-// / ng_ensureDisplayListSize) compile in ALL modes: the funnel call sites in
-// tag.c/tag_stubs.c are shared with the browser build, which otherwise fails
-// to link (undefined ng_freeSpriteDL). In browser mode the table just stays
-// empty, so its scrub loops are no-ops.
+// The pending-finalize queue (state table, queue/mark/finalize functions, and
+// the realloc/free funnel that scrubs it) compiles in every build. Until s30
+// browser-pending-finalize the browser had no-op stubs here, so a
+// RemoveObject2'd clip with an unload handler got enterFrame on its removal
+// tick and was never cleared from the display list.
 #define NG_PENDING_FINALIZE_CAP 256
 typedef struct {
 	MovieClip* mc;
@@ -15489,7 +15491,6 @@ void ng_ensureDisplayListSize(SWFAppContext* app_context, size_t depth)
 	                   new_cap);
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 extern void actionMarkMCPendingRemovalDirect(MovieClip* mc, int swf_depth);
 static void clear_display_entry(SWFAppContext* app_context, size_t depth);
 
@@ -15640,20 +15641,6 @@ void run_pending_finalize(SWFAppContext* app_context)
 	}
 	free(list);
 }
-#else
-void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth) {
-	(void)mc; (void)swf_depth; (void)depth;
-}
-void run_pending_finalize_mark_only(SWFAppContext* app_context) { (void)app_context; }
-void run_pending_finalize(SWFAppContext* app_context) { (void)app_context; }
-// Stub for browser-WASM graphics build: there's no pending-finalize queue
-// in this path (run_pending_finalize / queue_pending_finalize_mc are no-ops
-// above), so no depth can ever have a pending finalize. Returning 0 lets
-// tagPlaceObject2 / tagPlaceObject2WithClipActions / tagPlaceObject2Ratio
-// link cleanly when called from this build mode — they reference the
-// function unconditionally via `extern int ng_depth_has_pending_finalize`.
-int ng_depth_has_pending_finalize(size_t depth) { (void)depth; return 0; }
-#endif
 
 // Forward decls — defined later in this file. Needed in clear_display_entry's
 // freed-DL invalidation walk below (all modes).
