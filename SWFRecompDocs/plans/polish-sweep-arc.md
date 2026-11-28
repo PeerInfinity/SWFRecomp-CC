@@ -4107,4 +4107,4 @@ Pages: dry runs `46061672559`, `46078822038` green; REAL deploy at closeout (§3
 - `style_changes_in_html` field 5 world-y (+904 vs FP32): the switch is not font kind / HTML / zones.
 - LOW glyph chord rule (recompiler, M), the morph_test1 xtrace glyph residue after the 3rd glyph.
 - `acid-scale` (+160 vs FP32), `scroll_rect_scaled`, `acid-small` (timeline flatten, priced).
-**Browser ladder**: FIRST land + grade the held branch `local/s30-rmc-clipaction-unload` (both modes); then the browser PlaceObject2/Ratio REPLACE-preservation and SetInstanceName name-change ports (fixture first).
+**Browser ladder**: the held branch LANDED 2026-11-28 as `3dfab1277` (graded = ledger: G `46111106971`, NG `46119474607`; +1 new regression pass, 0 other moves). Next: the browser PlaceObject2/Ratio REPLACE-preservation and SetInstanceName name-change ports (fixture first).
